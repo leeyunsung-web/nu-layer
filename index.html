@@ -4826,7 +4826,24 @@ showLayerMenu(ev.clientX, ev.clientY, [
   const PALETTE = buildPalette();
 
   const drawCanvas = $('drawCanvas');
-  const dctx = drawCanvas.getContext('2d', {willReadFrequently:true});
+  // willReadFrequently는 브라우저에게 "이 캔버스는 픽셀을 자주 읽으니 GPU가
+  // 아니라 CPU 메모리에 둬라"라고 말하는 옵션이다. 그런데 화면에 보이는 이
+  // 캔버스가 하는 일은 정반대다 -- 획을 그을 때마다 1080×1080을 지우고 레이어
+  // 세 장을 겹쳐 그린다(픽셀 연산 약 470만 회). 그것이 통째로 소프트웨어
+  // 래스터라이저를 타고 있었다.
+  //
+  // 한 번 다시 그리는 비용이 CPU에서 약 5.6ms, GPU에서 약 0.2ms다. 애플펜슬은
+  // 초당 120번 가까이 다시 그리게 만드니 CPU 설정으로는 메인 스레드의 3분의 2를
+  // 이것 하나가 먹는다. 손가락은 그 절반이라 아슬아슬하게 버틴다 -- 두 입력의
+  // 차이가 여기서 갈렸다.
+  //
+  // 여기서 픽셀을 읽는 곳은 스포이드(1×1)와 저장·등록 시의 경계 계산뿐이고,
+  // 둘 다 매 프레임이 아니라 어쩌다 한 번이다. GPU 쪽이 압도적으로 이득이다.
+  //
+  // (주의: 저지연 모드 desynchronized는 쓰지 않는다. 그 옵션은 캔버스를 별도
+  //  합성 평면으로 빼내는데, 이 캔버스는 흰 종이를 그리지 않고 CSS 배경에
+  //  얹혀 있어서 투명한 부분이 검게 나온다.)
+  const dctx = drawCanvas.getContext('2d', { alpha: true });
 
   // ==================== LAYERS ====================
   // The visible drawCanvas is a COMPOSITE. Each layer owns an offscreen
