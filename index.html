@@ -6961,14 +6961,17 @@ showLayerMenu(ev.clientX, ev.clientY, [
       const warm = document.createElement('canvas');
       warm.width = 256; warm.height = 256;
       const wx = warm.getContext('2d');
+      // 예열은 '실제로 겪을 크기'로 해야 한다. 애플펜슬은 손가락의 열 배에
+      // 가까운 점을 남기므로, 짧은 획으로만 예열하면 정작 긴 획을 만났을 때
+      // 다시 처음부터 최적화가 시작된다. 펜슬 기준(1000점 안팎)까지 올려 둔다.
       const pts = [];
-      for(let i=0;i<160;i++) pts.push({ x: 10+i*1.4, y: 128+Math.sin(i/9)*40, p: 0.5 });
+      for(let i=0;i<1200;i++) pts.push({ x: 10+(i%230)*1.05, y: 128+Math.sin(i/9)*40, p: 0.5 });
       for(const tex of ['smooth', 'gpen', 'ink', 'pencil']){
-        for(let k=0;k<6;k++){
+        for(const n of [60, 240, 600, 1200]){
           try {
             renderStrokeFull(wx, { type:'stroke', tool:'brush', color:'#111', width:6,
                                    texture:tex, grain:50, seed:12345,
-                                   points: pts.slice(0, 40 + k*20) });
+                                   points: pts.slice(0, n) });
           } catch(_){}
         }
         wx.clearRect(0,0,warm.width,warm.height);
