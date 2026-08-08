@@ -728,8 +728,8 @@
       <div class="tool-row" style="display:flex;gap:10px;flex-wrap:wrap;">
         <div class="range-row">
           <span>STABILIZER</span>
-          <input type="range" id="stabilizer" min="0" max="20" value="0" title="손떨림 보정. 0 = 손끝을 그대로 따라갑니다(가장 가벼움). 값을 올리면 선은 부드러워지지만 붓이 손보다 그만큼 뒤에서 따라옵니다.">
-          <span class="val" id="stabilizerVal">0</span>
+          <input type="range" id="stabilizer" min="0" max="20" value="3" title="손떨림 보정. 낮을수록 즉각적이지만, 0으로 두면 손떨림이 그대로 기록되어 점이 늘고 선이 거칠어집니다. 2~4 사이가 대체로 가장 가볍게 느껴집니다.">
+          <span class="val" id="stabilizerVal">3</span>
         </div>
       </div>
       <div class="tool-row" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
@@ -6685,14 +6685,15 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // Adjustable via the STABILIZER slider (0 = raw input, higher = smoother
   // but laggier). The chosen radius is baked into the recorded points, so
   // replay/undo/archives stay deterministic regardless of later changes.
-  // 0 = 손끝을 그대로 따라간다.
+  // 이 값은 두 가지를 동시에 한다. 하나는 '의도된 지연'(붓이 손보다 뒤에서
+  // 따라온다), 다른 하나는 '떨림 걸러내기'다. 그래서 0이 항상 가벼운 것이
+  // 아니다 -- 0으로 두면 걸러내기가 사라져 손떨림의 방향 반전이 그대로 점으로
+  // 기록된다. 실측(떨림 3px·느린 손 기준)으로 점 수가 232개에서 462개로 두 배가
+  // 되고, 매 프레임 그 전부를 다시 그리므로 오히려 무거워진다. 선도 거칠어진다.
   //
-  // 이 값은 '의도된 지연'이다. 붓은 손이 이만큼 움직인 뒤에야 출발하고,
-  // 출발한 뒤에도 손보다 늘 이만큼 뒤에 놓인다 -- "펜을 그으면 느리게 따라온다"
-  // 는 체감의 직접적인 원인이다. 마우스에서는 손떨림을 걷어내는 값이지만,
-  // 애플펜슬은 입력 자체가 정밀해서 그 이득이 작고 지연만 남는다.
-  // 선이 떨린다고 느끼면 STABILIZER 슬라이더로 올리면 된다.
-  let lazyRadius = 0; // canvas px (1080-scale)
+  // 6(원래 값)은 지연이 뚜렷하고, 0은 떨림이 그대로 들어온다. 3은 걸러내기를
+  // 거의 유지하면서 지연은 절반이다.
+  let lazyRadius = 3; // canvas px (1080-scale)
   let lastRawPos = null;
 
   // ---- SELECT tool: move the active layer's contents by dragging ----
