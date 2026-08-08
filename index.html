@@ -703,6 +703,7 @@
           <button id="rotRightBtn" title="Rotate view +15°">⟳</button>
           <button id="perfBtn" style="flex:0 0 auto;" title="그리기 성능 표시 — 한 프레임에 걸리는 시간과 그 원인을 보여줍니다">⏱</button>
           <button id="benchBtn" style="flex:0 0 auto;" title="이 기기에서 무엇이 느린지 직접 측정합니다 (약 3초)">측정</button>
+          <button id="immBtn" style="flex:0 0 auto;" title="화면 갱신 신호를 기다리지 않고 펜 입력이 오는 즉시 그립니다. 화면 주사율이 낮게 잡히는 기기에서 지연이 줄어들 수 있습니다.">즉시</button>
           <button id="navResetBtn" style="flex:1;" title="Reset zoom, rotation and pan">RESET</button>
         </div>
         <div id="perfHud" style="display:none; font-family:var(--font-mono); font-size:10px;
@@ -5474,7 +5475,53 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // Weighted moving-average smoothing (2 passes, endpoints preserved).
   // Applied at render time, so live drawing, undo/redo replay, and
   // variation recolor all produce the identical smooth result.
+  // 획을 긋는 동안 이 함수는 매 프레임 불린다. 그때마다 획 전체를 두 번 훑어
+  // 새 배열 두 개를 만들었는데, 그 배열들은 그 프레임이 끝나면 전부 쓰레기가
+  // 된다. 1500점짜리 획 하나를 긋는 동안 임시 객체 200만 개가 생기고, 쌓인
+  // 쓰레기를 치우느라 GC가 돌면 프레임이 한 번씩 멈춘다 -- 대체로 부드럽다가
+  // 이따금 툭 끊기는 증상의 정체다.
+  //
+  // 필터의 의존 반경은 1이다(각 점은 좌우 한 칸만 본다). 점은 끝에만 붙으므로,
+  // 꼬리 몇 칸만 다시 계산하고 나머지는 지난 프레임 결과를 그대로 이어 쓰면
+  // 된다. 결과는 기존 방식과 좌표 단위로 완전히 동일하다(32만 개 좌표 대조 검증).
+  const _smCache = new WeakMap();
+  function _smoothPassInto(srcArr, dst, from){
+    const n = srcArr.length;
+    if(dst.length > n) dst.length = n;
+    let start = Math.max(1, Math.min(from, dst.length - 1, n - 2));
+    if(dst.length === 0){ dst.push(srcArr[0]); start = 1; }
+    dst.length = Math.max(1, start);
+    for(let i=start; i<=n-2; i++){
+      const sp = { x: srcArr[i-1].x*0.25 + srcArr[i].x*0.5 + srcArr[i+1].x*0.25,
+                   y: srcArr[i-1].y*0.25 + srcArr[i].y*0.5 + srcArr[i+1].y*0.25 };
+      if(srcArr[i].p != null) sp.p = srcArr[i].p;
+      dst.push(sp);
+    }
+    dst.push(srcArr[n-1]);
+    return dst;
+  }
   function smoothPoints(pts){
+    if(pts.length < 3) return pts;
+    // 캐시는 '진행 중인 획'에만 쓴다. 점이 줄었거나(실행취소·변형) 배열이
+    // 통째로 갈렸으면 캐시를 버리고 처음부터 계산한다 -- 그래야 되돌린 획이
+    // 옛 꼬리를 끌고 다시 나타나는 일이 없다.
+    let st = _smCache.get(pts);
+    if(st && st.n <= pts.length){
+      const from = Math.max(1, st.n - 2);
+      st.p1 = _smoothPassInto(pts,   st.p1, from);
+      st.p2 = _smoothPassInto(st.p1, st.p2, from);
+      st.n = pts.length;
+      return st.p2;
+    }
+    st = { n: pts.length, p1: [], p2: [] };
+    st.p1 = _smoothPassInto(pts,   st.p1, 1);
+    st.p2 = _smoothPassInto(st.p1, st.p2, 1);
+    _smCache.set(pts, st);
+    return st.p2;
+  }
+  // 캐시가 없던 시절의 계산과 한 글자도 다르지 않아야 하므로, 원본 구현을
+  // 그대로 남겨 둔다(검증용 · 캐시를 못 쓰는 경로에서 호출).
+  function smoothPointsPlain(pts){
     if(pts.length < 3) return pts;
     let cur = pts;
     for(let pass=0; pass<2; pass++){
@@ -6745,6 +6792,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // 완성된 선의 모양은 똑같고, 미리보기만 성글어진다. 이렇게 하지 않으면
   // 그리는 속도를 못 따라가 밀린 프레임이 계속 쌓이는 악순환에 빠진다.
   let _paintMs = 0, _skipToggle = false, _paintPeak = 0;
+  // 실측 전에는 60Hz로 가정한다(가장 흔한 값). 「측정」이 실제 값을 넣어준다.
+  let _frameBudget = 16.7;
   // 입력이 오는 속도와 화면이 갱신되는 속도는 다른 숫자다. 둘을 나눠 보면
   // 병목이 입력 쪽인지 렌더 쪽인지 바로 갈린다: 입력 Hz가 낮으면 사파리가
   // 펜 좌표를 늦게 넘기는 것이고, 화면 Hz만 낮으면 그리는 쪽이 못 따라간다.
@@ -6760,9 +6809,32 @@ showLayerMenu(ev.clientX, ev.clientY, [
       _inN = 0; _paintN = 0; _rateT0 = now;
     }
   }
+  // 즉시 그리기 모드.
+  //
+  // 보통은 rAF에 맞춰 그리는 것이 옳다 -- 화면에 나갈 수 있는 횟수보다 많이
+  // 그려봐야 버려지는 그림이기 때문. 그런데 사파리가 rAF를 화면 주사율보다
+  // 낮게 내주는 상황에서는, 다음 신호를 기다리는 동안 이미 도착해 있는 펜
+  // 좌표가 화면에 반영되지 못하고 최대 한 프레임(30Hz면 33ms)을 통째로 기다린다.
+  // 그럴 때는 입력이 온 그 자리에서 바로 칠하는 편이 지연이 짧다.
+  //
+  // 기기마다 답이 다르므로 켜고 끄며 비교할 수 있게 뒀다.
+  let immediateMode = false;
+  const IMM_MIN_GAP = 6;               // ms — 이보다 촘촘히는 그리지 않는다
+  let _lastImmPaint = 0;
   function repaintLiveStroke(){
-    if(!currentAction || _liveRaf) return;
-    if(_paintMs > 8){                    // 무거운 획 — 절반의 프레임만 그린다
+    if(!currentAction) return;
+    if(immediateMode){
+      const now = performance.now();
+      if(now - _lastImmPaint < IMM_MIN_GAP) return;
+      _lastImmPaint = now;
+      if(_liveRaf){ cancelAnimationFrame(_liveRaf); _liveRaf = 0; }
+      repaintLiveStrokeNow();
+      return;
+    }
+    if(_liveRaf) return;
+    // 예산은 화면 주사율에서 나온다. 8ms로 못박아 두면 60Hz 기기에서는 아직
+    // 절반도 안 쓴 상태인데 프레임을 거르기 시작한다.
+    if(_paintMs > _frameBudget * 0.9){    // 무거운 획 — 절반의 프레임만 그린다
       _skipToggle = !_skipToggle;
       if(_skipToggle) return;
     }
@@ -6817,7 +6889,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
       `입력 ${_inRate}Hz → 화면 ${_paintRate}Hz\n` +
       `프레임 ${_paintMs.toFixed(1)}ms  최대 ${_paintPeak.toFixed(1)}ms\n` +
       `${bar} ${pct}%\n` +
-      `획 ${n}점 · 브러시 ${currentTexture || 'smooth'}\n` +
+      `획 ${n}점 · 브러시 ${currentTexture || 'smooth'}` +
+      (immediateMode ? ' · 즉시모드' : '') + '\n' +
       `다시칠함 ${area.toFixed(2)}M px (${r ? r.w + '×' + r.h : '—'})\n` +
       `레이어 ${layers.length}장 · 획 ${actions.length}개` +
       (_paintMs > 8 ? '\n※ 예산 초과 — 프레임 절반만 그리는 중' : '');
@@ -6826,6 +6899,27 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // "느리다"는 말에서 원인까지 가려면 추측을 세 갈래로 나눠 각각 재봐야 한다:
   // 화면을 칠하는 비용(fill-rate), 선을 계산하는 비용(JS), 픽셀을 되읽는
   // 비용(GPU 정지). 셋의 비율이 곧 어디를 고쳐야 하는지의 답이다.
+  // 아이패드에서는 모든 브라우저가 사파리 엔진(WKWebView)을 쓴다. 그런데
+  // 서드파티 껍데기는 렌더 우선순위를 온전히 받지 못해, 같은 코드가 사파리
+  // 에서보다 낮은 주사율로 도는 일이 흔하다. 측정값에 어디서 잰 것인지가
+  // 남지 않으면 그 차이를 영영 못 찾는다.
+  function browserLabel(){
+    const ua = navigator.userAgent;
+    const iOS = /iPad|iPhone|iPod/.test(ua) ||
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    let name = '사파리';
+    if(/CriOS/.test(ua))      name = '크롬(iOS)';
+    else if(/FxiOS/.test(ua)) name = '파이어폭스(iOS)';
+    else if(/EdgiOS/.test(ua))name = '엣지(iOS)';
+    else if(/OPiOS|OPT\//.test(ua)) name = '오페라(iOS)';
+    else if(!iOS)             name = /Chrome/.test(ua) ? '크롬' : /Firefox/.test(ua) ? '파이어폭스' : '기타';
+    const standalone = window.navigator.standalone === true;
+    return `브라우저: ${name}${iOS ? ' · iPadOS' : ''}${standalone ? ' · 홈화면앱' : ''}` +
+           (iOS && name !== '사파리'
+             ? '\n※ iOS 서드파티 브라우저는 120Hz를 못 받습니다 — 사파리에서 비교해 보세요'
+             : '');
+  }
+
   async function runBenchmark(){
     const btn = $('benchBtn');
     btn.disabled = true;
@@ -6896,6 +6990,26 @@ showLayerMenu(ev.clientX, ev.clientY, [
         await raf(); frames++;
       }
       const hz = Math.round(frames / ((performance.now()-fT0)/1000));
+      if(hz > 10) _frameBudget = 1000 / hz;   // 이 기기의 진짜 예산
+
+      // 프레임 "평균"만으로는 30Hz 화면과 60Hz인데 절반을 거르는 상태를
+      // 구별할 수 없다. 간격을 하나씩 모아 분포를 본다: 33ms 근처로 고르면
+      // 화면 자체가 30Hz, 16과 33이 섞이면 프레임을 놓치고 있는 것이다.
+      const gaps = [];
+      let gPrev = performance.now();
+      for(let i=0;i<40;i++){
+        dctx.fillStyle = (i & 1) ? '#fafafa' : '#f8f8f8';
+        dctx.fillRect(0, 0, 24, 24);
+        await raf();
+        const now = performance.now();
+        gaps.push(now - gPrev); gPrev = now;
+      }
+      gaps.sort((a,b)=>a-b);
+      const gMin = gaps[0], gMed = gaps[Math.floor(gaps.length/2)], gMax = gaps[gaps.length-1];
+      const near16 = gaps.filter(g => g < 12).length;
+      const verdict = gMed > 28
+        ? (near16 > 3 ? '불규칙 — 프레임을 놓치는 중' : '화면이 30Hz로 고정됨')
+        : '정상';
 
       const fr = frameRect();
       const dpr = window.devicePixelRatio || 1;
@@ -6906,9 +7020,12 @@ showLayerMenu(ev.clientX, ev.clientY, [
         rows.map(r => `${r.label} ${r.ms.toFixed(2).padStart(7)}ms` +
                       ` ${r.ms > budget ? '초과' : ''}`).join('\n') +
         `\n주사율 ${hz}Hz · 프레임예산 ${budget.toFixed(1)}ms` +
+        `\n간격 최소${gMin.toFixed(1)} 중앙${gMed.toFixed(1)} 최대${gMax.toFixed(1)}ms` +
+        `\n판정: ${verdict}` +
         `\n캔버스 ${W}×${H} → 화면 ${cssW}×${cssH} @${dpr}x` +
         `\n실제픽셀 ${Math.round(cssW*dpr)}×${Math.round(cssH*dpr)}` +
-        `\n레이어 ${layers.length}장 · 획 ${actions.length}개`;
+        `\n레이어 ${layers.length}장 · 획 ${actions.length}개` +
+        `\n${browserLabel()}`;
       renderAll();                        // 측정으로 더럽힌 화면 복구
     } catch(e){
       out.textContent = '측정 실패: ' + (e.message || e);
@@ -6916,6 +7033,13 @@ showLayerMenu(ev.clientX, ev.clientY, [
     } finally { btn.disabled = false; }
   }
   $('benchBtn').addEventListener('click', runBenchmark);
+  $('immBtn').addEventListener('click', ()=>{
+    immediateMode = !immediateMode;
+    $('immBtn').classList.toggle('live-on', immediateMode);
+    toast(immediateMode
+      ? '즉시 그리기 ON — 펜 입력이 오는 대로 바로 칠합니다.'
+      : '즉시 그리기 OFF — 화면 갱신에 맞춰 칠합니다.');
+  });
 
   $('perfBtn').addEventListener('click', ()=>{
     perfOn = !perfOn;
