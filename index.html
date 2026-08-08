@@ -710,8 +710,8 @@
       <div class="tool-row" style="display:flex;gap:10px;flex-wrap:wrap;">
         <div class="range-row">
           <span>STABILIZER</span>
-          <input type="range" id="stabilizer" min="0" max="20" value="6" title="Stroke stabilization: 0 = raw input, higher = smoother but the brush lags more">
-          <span class="val" id="stabilizerVal">6</span>
+          <input type="range" id="stabilizer" min="0" max="20" value="0" title="손떨림 보정. 0 = 손끝을 그대로 따라갑니다(가장 가벼움). 값을 올리면 선은 부드러워지지만 붓이 손보다 그만큼 뒤에서 따라옵니다.">
+          <span class="val" id="stabilizerVal">0</span>
         </div>
       </div>
       <div class="tool-row" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
@@ -6667,7 +6667,14 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // Adjustable via the STABILIZER slider (0 = raw input, higher = smoother
   // but laggier). The chosen radius is baked into the recorded points, so
   // replay/undo/archives stay deterministic regardless of later changes.
-  let lazyRadius = 6; // canvas px (1080-scale); ~2px on screen at default
+  // 0 = 손끝을 그대로 따라간다.
+  //
+  // 이 값은 '의도된 지연'이다. 붓은 손이 이만큼 움직인 뒤에야 출발하고,
+  // 출발한 뒤에도 손보다 늘 이만큼 뒤에 놓인다 -- "펜을 그으면 느리게 따라온다"
+  // 는 체감의 직접적인 원인이다. 마우스에서는 손떨림을 걷어내는 값이지만,
+  // 애플펜슬은 입력 자체가 정밀해서 그 이득이 작고 지연만 남는다.
+  // 선이 떨린다고 느끼면 STABILIZER 슬라이더로 올리면 된다.
+  let lazyRadius = 0; // canvas px (1080-scale)
   let lastRawPos = null;
 
   // ---- SELECT tool: move the active layer's contents by dragging ----
