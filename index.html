@@ -74,6 +74,24 @@
   .canvas-frame {
     position: relative; width: 100%; aspect-ratio: 1/1; border: 1px solid var(--border-soft);
     border-radius: 8px; overflow: hidden; background: var(--canvas-bg);
+    touch-action: none;
+  }
+
+  /* ---------- iOS: 글자 선택 판정 끄기 ----------
+     사파리는 화면을 꾹 누르면 "글자를 고르려는 것"으로 보고 파란 선택 영역과
+     확대경을 띄운다. 캔버스 위에서 펜을 천천히 긋거나 잠깐 머무르면 그리기
+     대신 그 판정이 발동해, 선이 끊기고 엉뚱한 UI가 뜬다.
+     또한 그 판정을 하는 동안 사파리가 첫 입력을 붙들었다 넘기므로, 긋기
+     시작이 한 박자 늦게 느껴지는 원인이기도 하다. */
+  html, body {
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+  /* 이름 바꾸기·설정 입력창 등 실제로 글자를 다루는 곳은 되돌린다 */
+  input, textarea, select, [contenteditable="true"], .selectable {
+    -webkit-user-select: text; user-select: text;
   }
   .paper-bg {
     position: absolute; inset: 0; background: var(--canvas-bg);
