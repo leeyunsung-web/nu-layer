@@ -6737,6 +6737,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     currentAction = { type:'stroke', id:++actionCounter, tool:currentTool, color:strokeColor, width:brushSize,
                       texture: currentTexture, grain: currentGrain, seed: (Math.random()*2147483647)|0,
                       points:[penPoint(p, e)], layer: activeLayer().id };
+    keepDisplayAwake(2000);
     liveBoxReset();
     rateReset();
     _lastSampleCX = null; _lastSampleCY = null;
@@ -6926,6 +6927,75 @@ showLayerMenu(ev.clientX, ev.clientY, [
     _paintMs = _paintMs ? _paintMs * 0.8 + dt * 0.2 : dt;
     if(dt > _paintPeak) _paintPeak = dt;
     if(perfOn) perfRender(r);
+  }
+
+  // ==================== 예열 ====================
+  // "처음 몇 획은 끊기다가 중간부터 따라온다"는 증상은 성능이 아니라 예열의
+  // 문제다. 세 가지가 첫 획에 한꺼번에 몰린다:
+  //
+  //  1. 임시 캔버스 네 장(각 1080²)이 첫 획에서야 만들어진다. 만드는 순간
+  //     GPU 텍스처가 할당되고 첫 그리기에서 업로드가 일어난다.
+  //  2. 그리기 경로의 자바스크립트가 아직 최적화되지 않았다. 같은 코드를 여러 번
+  //     돌려야 엔진이 기계어로 바꿔 준다 -- 그 전까지는 몇 배 느리다.
+  //  3. 프로모션 화면은 정지 화면에서 주사율을 낮춰 둔다. 펜이 닿는 순간에는
+  //     아직 낮은 상태이고, 올라오는 데 시간이 걸린다.
+  //
+  // 1과 2는 페이지가 한가할 때 미리 치러 두면 되고, 3은 펜이 화면에 '닿기 전'
+  // 부터 좌표를 보내는 성질을 이용해 미리 깨워 둘 수 있다.
+  function warmUpDrawing(){
+    try {
+      // (1) 임시 캔버스를 지금 만들고 한 번씩 그려 텍스처를 올려 둔다.
+      if(!liveBelow){
+        liveBelow = mkLayerScratch(); liveAbove = mkLayerScratch();
+        liveBase  = mkLayerScratch(); liveTemp  = mkLayerScratch();
+      }
+      for(const c of [liveBelow, liveAbove, liveBase, liveTemp]){
+        const x = c.getContext('2d');
+        x.clearRect(0, 0, 2, 2);
+        x.fillStyle = 'rgba(0,0,0,0.004)';
+        x.fillRect(0, 0, 2, 2);
+        x.clearRect(0, 0, 2, 2);
+      }
+      // (2) 실제 렌더 경로를 화면 밖에서 여러 번 돌린다. 값을 쓰지는 않고,
+      //     엔진이 이 함수들을 최적화하게 만드는 것이 목적이다.
+      const warm = document.createElement('canvas');
+      warm.width = 256; warm.height = 256;
+      const wx = warm.getContext('2d');
+      const pts = [];
+      for(let i=0;i<160;i++) pts.push({ x: 10+i*1.4, y: 128+Math.sin(i/9)*40, p: 0.5 });
+      for(const tex of ['smooth', 'gpen', 'ink', 'pencil']){
+        for(let k=0;k<6;k++){
+          try {
+            renderStrokeFull(wx, { type:'stroke', tool:'brush', color:'#111', width:6,
+                                   texture:tex, grain:50, seed:12345,
+                                   points: pts.slice(0, 40 + k*20) });
+          } catch(_){}
+        }
+        wx.clearRect(0,0,warm.width,warm.height);
+      }
+    } catch(e){ console.warn('warm-up skipped', e); }
+  }
+
+  // ---- 화면 깨워 두기 ----
+  // 펜슬은 화면에 닿기 전 떠 있는 동안에도 좌표를 보낸다. 그 신호를 "곧 그린다"는
+  // 예고로 받아, 닿기 전에 미리 화면 주사율을 올려 둔다. 매 프레임 눈에 보이지
+  // 않는 칠(투명 1픽셀)을 오버레이에 넣어 합성기를 깨워 두는 방식이라, 그림에는
+  // 아무 영향이 없다.
+  let _awakeUntil = 0, _awakeRaf = 0;
+  function keepDisplayAwake(ms){
+    _awakeUntil = Math.max(_awakeUntil, performance.now() + (ms || 1200));
+    if(_awakeRaf) return;
+    const tick = ()=>{
+      if(performance.now() > _awakeUntil && !drawing){ _awakeRaf = 0; return; }
+      const oc = $('lassoOverlay');
+      if(oc){
+        const x = oc.getContext('2d');
+        x.fillStyle = 'rgba(0,0,0,0)';     // 완전 투명 — 픽셀은 그대로, 캔버스는 '변경됨'
+        x.fillRect(0, 0, 1, 1);
+      }
+      _awakeRaf = requestAnimationFrame(tick);
+    };
+    _awakeRaf = requestAnimationFrame(tick);
   }
 
   // ---- 성능 표시 ----
@@ -7509,6 +7579,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
     //
     // 커서는 눈으로 보는 것이니 화면이 갱신되는 만큼만 옮기면 충분하다.
     queueCursorState(e);
+    // 손이 캔버스 위에 있는 동안(떠 있는 펜 포함) 화면을 깨어 있게 유지한다.
+    if(_awakeUntil - performance.now() < 500) keepDisplayAwake(1500);
     if(viewDrag){
       if(viewDrag.mode === 'rotate'){
         const a = Math.atan2(e.clientY - viewDrag.cy, e.clientX - viewDrag.cx);
@@ -7624,7 +7696,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
     if(moved) repaintLiveStroke();
   });
 
-  drawCanvas.addEventListener('pointerenter', e => updateCursorState(e));
+  drawCanvas.addEventListener('pointerenter', e => {
+    updateCursorState(e);
+    keepDisplayAwake(1500);        // 펜이 다가왔다 — 화면을 미리 올려 둔다
+  });
   drawCanvas.addEventListener('pointerleave', () => { $('canvasCursor').style.display = 'none'; });
 
   function endStroke(){
@@ -10230,6 +10305,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // are all initialized before first use.
   restoreAutosave();
   updateDiscardBtn();
+  // 페이지가 자리를 잡은 뒤, 한가한 틈에 예열한다. 첫 획이 느린 이유를 첫 획
+  // 전에 치러 두는 것이므로 사용자는 이 시간을 체감하지 않는다.
+  if(typeof requestIdleCallback === 'function') requestIdleCallback(()=> warmUpDrawing(), { timeout: 1500 });
+  else setTimeout(warmUpDrawing, 400);
   renderLayersPanel();
   updateNavPreview();
   const _origRenderAll = renderAll;
