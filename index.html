@@ -6729,6 +6729,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
                       texture: currentTexture, grain: currentGrain, seed: (Math.random()*2147483647)|0,
                       points:[penPoint(p, e)], layer: activeLayer().id };
     liveBoxReset();
+    rateReset();
+    _lastSampleCX = null; _lastSampleCY = null;
     liveBoxAdd(currentAction.points[0]);
     takeStrokeSnapshot();
     repaintLiveStrokeNow();      // 첫 점은 즉시 -- 여기서 한 프레임을 기다리면 톡 찍는 점이 늦게 뜬다
@@ -6808,15 +6810,21 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // 입력이 오는 속도와 화면이 갱신되는 속도는 다른 숫자다. 둘을 나눠 보면
   // 병목이 입력 쪽인지 렌더 쪽인지 바로 갈린다: 입력 Hz가 낮으면 사파리가
   // 펜 좌표를 늦게 넘기는 것이고, 화면 Hz만 낮으면 그리는 쪽이 못 따라간다.
-  let _inRate = 0, _paintRate = 0, _inN = 0, _paintN = 0, _rateT0 = 0;
+  let _inRate = 0, _paintRate = 0, _inN = 0, _paintN = 0, _rateT0 = 0, _inPeak = 0;
+  function rateReset(){ _inN = 0; _paintN = 0; _rateT0 = performance.now(); }
   function rateTick(which){
+    // 펜을 떼고 있는 동안에도 시계가 흐르면, 짧게 긋고 쉬는 보통의 그리기에서
+    // 비율이 실제보다 낮게 나온다 -- 쉰 시간까지 분모에 들어가기 때문. 획을
+    // 긋는 동안만 센다.
+    if(typeof drawing === 'undefined' || !drawing) return;
     const now = performance.now();
     if(!_rateT0) _rateT0 = now;
     if(which === 'in') _inN++; else _paintN++;
     const dt = now - _rateT0;
-    if(dt >= 500){
+    if(dt >= 400){
       _inRate = Math.round(_inN / (dt/1000));
       _paintRate = Math.round(_paintN / (dt/1000));
+      if(_inRate > _inPeak) _inPeak = _inRate;
       _inN = 0; _paintN = 0; _rateT0 = now;
     }
   }
@@ -6843,12 +6851,15 @@ showLayerMenu(ev.clientX, ev.clientY, [
       return;
     }
     if(_liveRaf) return;
-    // 예산은 화면 주사율에서 나온다. 8ms로 못박아 두면 60Hz 기기에서는 아직
-    // 절반도 안 쓴 상태인데 프레임을 거르기 시작한다.
-    if(_paintMs > _frameBudget * 0.9){    // 무거운 획 — 절반의 프레임만 그린다
-      _skipToggle = !_skipToggle;
-      if(_skipToggle) return;
-    }
+    // [제거됨] 예산을 넘기면 프레임을 절반만 그리던 장치.
+    //
+    // 실기에서 입력 44Hz · 화면 22Hz라는 정확히 2:1 비율이 나왔다. 이게 켜져
+    // 있었다는 뜻이다. 그런데 판단 근거인 _paintMs에는 미니맵 갱신이 섞여
+    // 들어가 평균이 부풀려져 있었다 -- 실제로는 여유가 있는데 스스로 절반으로
+    // 떨어뜨리고 있었던 것이다.
+    //
+    // 프레임이 밀리면 브라우저가 알아서 rAF를 건너뛴다. 내가 미리 깎아 둘
+    // 이유가 없었다. 추측으로 만든 보호 장치가 실제 손해를 낳은 경우.
     _liveRaf = requestAnimationFrame(()=>{ _liveRaf = 0; repaintLiveStrokeNow(); });
   }
   function repaintLiveStrokeNow(){
@@ -6874,11 +6885,14 @@ showLayerMenu(ev.clientX, ev.clientY, [
     // 미니맵은 1080²을 축소해 다시 그리는 작업이라 획 중에는 값이 비싸다.
     // 손이 움직이는 동안 몇 프레임 늦어도 아무도 모른다. 획이 끝나면
     // compositeLayers가 정확한 그림으로 한 번 더 갱신한다.
-    if((++_navTick & 7) === 0) updateNavPreview();
-    if(typeof scheduleLiveSync === 'function') scheduleLiveSync();
+    // 프레임 측정은 여기서 끊는다. 미니맵 갱신은 8프레임에 한 번 도는 별개의
+    // 일이라(1080²을 축소 렌더), 같이 재면 그 프레임만 유독 무겁게 잡혀
+    // 평균이 실제보다 부풀려진다 -- 그 부푼 값이 아래의 판단을 망쳤다.
     // 한 프레임 값은 널을 뛰므로 지수 평균으로 눌러 읽는다.
     rateTick('paint');
     const dt = performance.now() - _t0;
+    if((++_navTick & 7) === 0) updateNavPreview();
+    if(typeof scheduleLiveSync === 'function') scheduleLiveSync();
     _paintMs = _paintMs ? _paintMs * 0.8 + dt * 0.2 : dt;
     if(dt > _paintPeak) _paintPeak = dt;
     if(perfOn) perfRender(r);
@@ -6897,7 +6911,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const pct = Math.round(_paintMs / budget * 100);
     const bar = '█'.repeat(Math.min(10, Math.round(pct/10))).padEnd(10, '·');
     el.textContent =
-      `입력 ${_inRate}Hz → 화면 ${_paintRate}Hz\n` +
+      `입력 ${_inRate}Hz(최고 ${_inPeak}) → 화면 ${_paintRate}Hz\n` +
       `프레임 ${_paintMs.toFixed(1)}ms  최대 ${_paintPeak.toFixed(1)}ms\n` +
       `${bar} ${pct}%\n` +
       `획 ${n}점 · 브러시 ${currentTexture || 'smooth'}` +
@@ -7054,7 +7068,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
   $('perfBtn').addEventListener('click', ()=>{
     perfOn = !perfOn;
-    _paintPeak = 0;
+    _paintPeak = 0; _inPeak = 0;
     $('perfHud').style.display = perfOn ? '' : 'none';
     $('perfBtn').classList.toggle('live-on', perfOn);
     if(perfOn) perfRender(null);
@@ -7072,6 +7086,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // 필요하면 STABILIZER 슬라이더로 언제든 올릴 수 있다.
   let lazyRadius = 3; // canvas px (1080-scale)
   let lastRawPos = null;
+  // 마지막으로 '실제로 채택한' 샘플의 화면 좌표. 좌표 변환 전에 솎아내는 데 쓴다.
+  let _lastSampleCX = null, _lastSampleCY = null;
 
   // ---- SELECT tool: move the active layer's contents by dragging ----
   let movingLayer = null;
@@ -7511,9 +7527,38 @@ showLayerMenu(ev.clientX, ev.clientY, [
     // 화면 1px = 캔버스 몇 px 인가. (프레임 폭은 프레임당 한 번만 잰다)
     const fr0 = frameRect();
     const cssToCanvas = drawCanvas.width / ((fr0.width || 1) * (viewZoom || 1));
-    const minAdvance = Math.max(0.35, 0.6 * cssToCanvas);
+    // 여기가 손가락과 펜슬을 가른 지점이었다.
+    //
+    // 점은 '샘플이 올 때마다'가 아니라 '일정 거리를 나아갈 때마다' 쌓인다.
+    // 손가락은 초당 44개밖에 못 보내니 점도 그만큼이 상한이지만, 펜슬은 열 배를
+    // 보내므로 거리 기준이 허락하는 만큼 전부 점이 된다 -- 같은 그림을 그려도
+    // 획 하나에 열 배의 점이 남고, 매 프레임 그 전부의 경로를 다시 세운다.
+    // "손가락은 괜찮은데 펜슬만 무겁다"의 정체다.
+    //
+    // 기준을 화면 1.2px로 넓혔다. 획은 어차피 곡선으로 부드럽게 이어 그리므로
+    // 그보다 촘촘한 점은 같은 모양을 두 번 말하는 것에 가깝고, 4초 획 기준
+    // 1760점이 1000점으로 준다. 확대해서 그릴 때는 cssToCanvas에 배율이
+    // 들어가 있어 기준이 저절로 촘촘해지므로, 세밀한 작업은 그대로 세밀하다.
+    const minAdvance = Math.max(0.35, 1.2 * cssToCanvas);
     let moved = false;
+    // 화면 좌표에서 먼저 걸러낸다.
+    //
+    // 애플펜슬은 손가락보다 열 배 가까운 양의 좌표를 쏟아낸다. 그 전부를
+    // getPos에 넣어 캔버스 좌표로 바꾸는데(회전·확대 역변환 = 삼각함수), 정작
+    // 대부분은 바로 다음 줄에서 "너무 가깝다"며 버려진다. 버릴 점을 위해 변환
+    // 비용을 먼저 치르고 있었던 셈이다.
+    //
+    // 변환 전 화면 좌표만 비교해도 같은 판정이 되므로, 여기서 먼저 쳐낸다.
+    // 기준은 실제로 쓰는 간격보다 넉넉히 작게 잡아, 이 필터가 선 모양에는
+    // 관여하지 못하게 한다 -- 모양을 정하는 것은 아래의 minAdvance 하나뿐이다.
+    const cssMin = Math.max(0.25, minAdvance / cssToCanvas * 0.5);
+    let lastCX = _lastSampleCX, lastCY = _lastSampleCY;
     for(const ev of batch){
+      if(lastCX != null){
+        const cdx = ev.clientX - lastCX, cdy = ev.clientY - lastCY;
+        if(cdx*cdx + cdy*cdy < cssMin*cssMin) continue;
+      }
+      lastCX = ev.clientX; lastCY = ev.clientY;
       const p = getPos(ev);
       lastRawPos = p;
       const last = pts[pts.length-1];
@@ -7544,6 +7589,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       pts.push(np);
       liveBoxAdd(np);
       moved = true;
+      _lastSampleCX = lastCX; _lastSampleCY = lastCY;
     }
     if(moved) repaintLiveStroke();
   });
