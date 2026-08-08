@@ -112,10 +112,23 @@
     box-shadow: 0 0 0 1px var(--border-soft), 0 6px 22px rgba(0,0,0,0.10);
     background: var(--canvas-bg);
   }
-  .canvas-frame { background: #e8e8ee; } /* backdrop behind the zoomed-out artboard */
+  .canvas-frame { background: #e8e8ee; touch-action: none; } /* backdrop behind the zoomed-out artboard */
   #drawCanvas {
     position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none;
   }
+  /* ---------- iPadOS / Apple Pencil ----------
+     사파리는 기본적으로 캔버스 위에서도 더블탭 확대, 길게 눌러 선택, 스크롤
+     바운스를 노린다. 그 판정을 하느라 첫 입력을 붙들었다가 넘기므로, 그리기
+     시작이 한 박자 늦게 느껴진다. 아래 선언들이 그 판정을 아예 없앤다. */
+  html, body {
+    overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  /* 입력창과 글자는 다시 선택 가능하게 (위 규칙에서 되돌린다) */
+  input, textarea, select, .selectable { -webkit-user-select: text; user-select: text; }
   /* ---------- navigation (view zoom / rotate) ---------- */
   .nav-wrap {
     border: 1px solid var(--border); border-radius: 10px; background: var(--panel-alt);
@@ -709,8 +722,8 @@
       <div class="tool-row" style="display:flex;gap:10px;flex-wrap:wrap;">
         <div class="range-row">
           <span>STABILIZER</span>
-          <input type="range" id="stabilizer" min="0" max="20" value="6" title="Stroke stabilization: 0 = raw input, higher = smoother but the brush lags more">
-          <span class="val" id="stabilizerVal">6</span>
+          <input type="range" id="stabilizer" min="0" max="20" value="3" title="손떨림 보정: 0 = 원본 입력(가장 즉각적), 높을수록 부드럽지만 붓이 손보다 늦게 따라옵니다. 애플펜슬처럼 정밀한 입력에는 낮은 값이 잘 맞습니다.">
+          <span class="val" id="stabilizerVal">3</span>
         </div>
       </div>
       <div class="tool-row" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
@@ -4769,7 +4782,15 @@ showLayerMenu(ev.clientX, ev.clientY, [
   const PALETTE = buildPalette();
 
   const drawCanvas = $('drawCanvas');
-  const dctx = drawCanvas.getContext('2d', {willReadFrequently:true});
+  // willReadFrequently를 켜면 브라우저가 이 캔버스를 GPU가 아니라 CPU 메모리에
+  // 올린다. 픽셀을 자주 읽는 캔버스에는 이득이지만, 화면에 보이는 이 캔버스는
+  // 매 프레임 레이어를 겹쳐 그리는 쪽이라 정반대의 선택이었다 -- 아이패드에서
+  // 1080² 합성이 통째로 소프트웨어 래스터라이저를 타면서 펜이 눈에 띄게 밀렸다.
+  // 여기서 픽셀을 읽는 곳은 스포이드의 1×1 getImageData 한 곳뿐이다.
+  //
+  // desynchronized: 표시 파이프라인과의 동기화를 느슨하게 해 한 프레임을 덜
+  // 기다린다. 펜 입력에서 체감이 가장 큰 옵션이다.
+  const dctx = drawCanvas.getContext('2d', { desynchronized: true });
 
   // ==================== LAYERS ====================
   // The visible drawCanvas is a COMPOSITE. Each layer owns an offscreen
@@ -4859,8 +4880,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       // rasterization snap by the zoom factor (the zoomed-in jitter), and
       // fattened the 1px ring. Out here it's pointer-locked at any zoom /
       // rotation and the ring stays 1px crisp.
-      const view = $('canvasView');
-      const fr = (view.parentElement || view).getBoundingClientRect(); // .canvas-frame, untransformed
+      const fr = frameRect();                       // .canvas-frame, untransformed (프레임당 1회)
       const W0 = fr.width || 1;
       const size = brushSize * (W0 / 1080) * (viewZoom || 1); // on-screen brush footprint
       cursorCircle.style.width = size + 'px';
@@ -4938,14 +4958,34 @@ showLayerMenu(ev.clientX, ev.clientY, [
     return pr == null ? { x: p.x, y: p.y } : { x: p.x, y: p.y, p: pr };
   }
 
+  // 프레임의 화면상 위치/크기. getBoundingClientRect는 레이아웃을 강제로
+  // 확정시키는 호출이라, 애플펜슬처럼 한 번의 pointermove에 좌표가 수십 개씩
+  // 뭉쳐 들어오면 그 수만큼 레이아웃이 다시 계산된다. 커서 위치를 쓰는 코드와
+  // 번갈아 돌면서 read→write→read 순환(레이아웃 스래싱)까지 만든다.
+  // 한 프레임 안에서는 프레임이 움직일 수 없으므로, 프레임당 한 번만 재고
+  // 나머지는 그 값을 돌려쓴다.
+  let _frRect = null, _frRectQueued = false;
+  function frameRect(){
+    if(_frRect) return _frRect;
+    const view = $('canvasView');
+    _frRect = (view.parentElement || view).getBoundingClientRect();
+    if(!_frRectQueued){
+      _frRectQueued = true;
+      requestAnimationFrame(()=>{ _frRect = null; _frRectQueued = false; });
+    }
+    return _frRect;
+  }
+  function invalidateFrameRect(){ _frRect = null; }
+  window.addEventListener('resize', invalidateFrameRect);
+  window.addEventListener('scroll', invalidateFrameRect, true);
+
   function getPos(e){
     // Use the UNTRANSFORMED parent frame for the base geometry: its rect is
     // exact (fractional CSS pixels), whereas offsetWidth is integer-rounded
     // and the transformed bbox mixes in the scale/rotation. The sub-pixel
     // skew from rounding was invisible at 100% but got magnified by zoom,
     // making the pointer feel unstable when zoomed in.
-    const view = $('canvasView');
-    const fr = (view.parentElement || view).getBoundingClientRect(); // .canvas-frame, untransformed
+    const fr = frameRect();                       // .canvas-frame, untransformed (프레임당 1회)
     const cx = fr.left + fr.width/2 + viewPanX;   // transformed view center = frame center + pan
     const cy = fr.top  + fr.height/2 + viewPanY;
     const vx = e.clientX - cx, vy = e.clientY - cy;
@@ -6574,8 +6614,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
     currentAction = { type:'stroke', id:++actionCounter, tool:currentTool, color:strokeColor, width:brushSize,
                       texture: currentTexture, grain: currentGrain, seed: (Math.random()*2147483647)|0,
                       points:[penPoint(p, e)], layer: activeLayer().id };
+    liveBoxReset();
+    liveBoxAdd(currentAction.points[0]);
     takeStrokeSnapshot();
-    repaintLiveStroke();
+    repaintLiveStrokeNow();      // 첫 점은 즉시 -- 여기서 한 프레임을 기다리면 톡 찍는 점이 늦게 뜬다
   });
 
   // ---- Live stroke: snapshot + full repaint ----
@@ -6604,21 +6646,71 @@ showLayerMenu(ev.clientX, ev.clientY, [
       if(!l.visible) continue;
       (seenActive ? a : b).drawImage(l.canvas, 0, 0);
     }
-  }
-  function repaintLiveStroke(){
-    if(!currentAction) return;
+    // 이후 프레임은 더러워진 사각형만 liveBase에서 복원하므로, 그 바깥은 지금
+    // 한 번 채워 둔 내용이 획이 끝날 때까지 그대로 쓰인다.
     const t = liveTemp.getContext('2d');
-    t.clearRect(0,0,liveTemp.width,liveTemp.height);
+    t.clearRect(0, 0, liveTemp.width, liveTemp.height);
     t.drawImage(liveBase, 0, 0);
+  }
+  // 진행 중인 획의 경계 상자. 획은 자라기만 하므로 상자도 커지기만 하고, 따라서
+  // 상자 바깥은 이번 획이 한 번도 건드린 적 없는 영역 -- 다시 그릴 이유가 없다.
+  let liveBox = null;
+  function liveBoxReset(){ liveBox = null; }
+  function liveBoxAdd(p){
+    if(!p) return;
+    if(!liveBox) liveBox = { x0:p.x, y0:p.y, x1:p.x, y1:p.y };
+    else {
+      if(p.x < liveBox.x0) liveBox.x0 = p.x;
+      if(p.x > liveBox.x1) liveBox.x1 = p.x;
+      if(p.y < liveBox.y0) liveBox.y0 = p.y;
+      if(p.y > liveBox.y1) liveBox.y1 = p.y;
+    }
+  }
+  function liveDirtyRect(){
+    if(!liveBox) return null;
+    // 여유폭: 선 굵기 절반이면 기하학적으로는 충분하지만, G펜의 번짐·스프레이
+    // 입자·안티에일리어싱은 그보다 밖으로 나간다. 넉넉히 잡아도 어차피 화면
+    // 한 귀퉁이라 비용이 없다.
+    const pad = (currentAction ? currentAction.width : 8) * 1.5 + 24;
+    const x = Math.max(0, Math.floor(liveBox.x0 - pad));
+    const y = Math.max(0, Math.floor(liveBox.y0 - pad));
+    const w = Math.min(drawCanvas.width,  Math.ceil(liveBox.x1 + pad)) - x;
+    const h = Math.min(drawCanvas.height, Math.ceil(liveBox.y1 + pad)) - y;
+    if(w <= 0 || h <= 0) return null;
+    return { x, y, w, h };
+  }
+
+  // 펜 입력은 프레임보다 빠르게 들어온다(애플펜슬 240Hz). 이벤트마다 다시
+  // 그리면 화면에 나가지도 못할 그림을 몇 장씩 그리다가, 정작 다음 입력을
+  // 받을 시간을 잡아먹는다. 프레임당 한 장으로 묶으면 지연이 줄어든다.
+  let _liveRaf = 0, _navTick = 0;
+  function repaintLiveStroke(){
+    if(!currentAction || _liveRaf) return;
+    _liveRaf = requestAnimationFrame(()=>{ _liveRaf = 0; repaintLiveStrokeNow(); });
+  }
+  function repaintLiveStrokeNow(){
+    if(!currentAction) return;
+    const r = liveDirtyRect();
+    if(!r) return;
+    const t = liveTemp.getContext('2d');
+    t.save();
+    t.beginPath(); t.rect(r.x, r.y, r.w, r.h); t.clip();
+    t.clearRect(r.x, r.y, r.w, r.h);
+    t.drawImage(liveBase, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h);
     renderStrokeFull(t, currentAction);
+    t.restore();
     dctx.save();
+    dctx.beginPath(); dctx.rect(r.x, r.y, r.w, r.h); dctx.clip();
     dctx.globalCompositeOperation = 'source-over';
-    dctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-    dctx.drawImage(liveBelow, 0, 0);
-    dctx.drawImage(liveTemp, 0, 0);
-    dctx.drawImage(liveAbove, 0, 0);
+    dctx.clearRect(r.x, r.y, r.w, r.h);
+    dctx.drawImage(liveBelow, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h);
+    dctx.drawImage(liveTemp,  r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h);
+    dctx.drawImage(liveAbove, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h);
     dctx.restore();
-    updateNavPreview();
+    // 미니맵은 1080²을 축소해 다시 그리는 작업이라 획 중에는 값이 비싸다.
+    // 손이 움직이는 동안 몇 프레임 늦어도 아무도 모른다. 획이 끝나면
+    // compositeLayers가 정확한 그림으로 한 번 더 갱신한다.
+    if((++_navTick & 7) === 0) updateNavPreview();
     if(typeof scheduleLiveSync === 'function') scheduleLiveSync();
   }
 
@@ -6628,7 +6720,11 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // Adjustable via the STABILIZER slider (0 = raw input, higher = smoother
   // but laggier). The chosen radius is baked into the recorded points, so
   // replay/undo/archives stay deterministic regardless of later changes.
-  let lazyRadius = 6; // canvas px (1080-scale); ~2px on screen at default
+  // 이 값은 '의도된 지연'이다 -- 붓은 손이 이만큼 움직인 뒤에야 따라온다.
+  // 마우스에는 손떨림을 걷어내는 이득이 크지만, 애플펜슬은 입력 자체가 이미
+  // 정밀해서 같은 값이 그냥 굼뜬 느낌으로만 남는다. 기본값을 낮춰 잡았고,
+  // 필요하면 STABILIZER 슬라이더로 언제든 올릴 수 있다.
+  let lazyRadius = 3; // canvas px (1080-scale)
   let lastRawPos = null;
 
   // ---- SELECT tool: move the active layer's contents by dragging ----
@@ -7075,6 +7171,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       const pr = penPressure(ev);
       if(pr != null) np.p = pr;
       pts.push(np);
+      liveBoxAdd(np);
       moved = true;
     }
     if(moved) repaintLiveStroke();
@@ -7122,8 +7219,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
         const last = pts[pts.length-1];
         if(lastRawPos && Math.hypot(lastRawPos.x-last.x, lastRawPos.y-last.y) > 0.5){
           pts.push({ x: lastRawPos.x, y: lastRawPos.y });
-          repaintLiveStroke();
+          liveBoxAdd(lastRawPos);
         }
+        if(_liveRaf){ cancelAnimationFrame(_liveRaf); _liveRaf = 0; }
         // Commit the finished stroke into its layer, then recomposite.
         renderStrokeFull(activeLayer().ctx, currentAction);
         compositeLayers();
