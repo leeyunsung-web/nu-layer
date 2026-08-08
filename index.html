@@ -7108,6 +7108,25 @@ showLayerMenu(ev.clientX, ev.clientY, [
       if(dist <= slack) continue; // string is slack → brush stays put
       const t = (dist - slack) / dist;
       const np = { x: last.x + dx * t, y: last.y + dy * t };
+      // 지연 붓은 '손이 slack보다 멀어졌을 때' 점을 찍고, 그 점을 손보다 slack
+      // 만큼 뒤에 놓는다. 그래서 점 사이의 간격은 결국 '한 샘플의 이동거리'와
+      // 같아진다 -- 좌표가 촘촘히 올수록 점도 촘촘해진다.
+      //
+      // 손가락은 초당 44번, 애플펜슬은 440번을 보낸다. 그래서 똑같은 획을
+      // 그어도 펜슬 쪽에 열 배의 점이 남는다(2000px 획 기준 178점 대 1756점).
+      // 매 프레임 획 전체를 다시 그리는 구조이므로, 점 수가 곧 프레임 비용이다.
+      // 손가락만 멀쩡했던 이유다.
+      //
+      // 그래서 최소 간격을 둔다. 캔버스 좌표 2px은 실제 화면에서 1px도 안 되는
+      // 거리라 선 모양은 달라지지 않는다. 확대해서 그릴 때는 배율로 나누어
+      // 저절로 촘촘해지므로 세밀한 작업도 그대로다.
+      //
+      // 이 값은 화면 크기를 재지 않는다. 레이아웃 측정에 기대면 그 측정이
+      // 어긋나는 순간 기준이 폭주해 획이 통째로 사라질 수 있기 때문이다.
+      if(pts.length > 1){
+        const adv = Math.hypot(np.x - last.x, np.y - last.y);
+        if(adv < 2 / Math.max(1, viewZoom || 1)) continue;
+      }
       // The lazy brush lands the sample short of the pointer, but the pressure
       // that belongs to it is the one being applied RIGHT NOW, not an
       // interpolation toward a sample we never took.
