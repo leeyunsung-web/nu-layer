@@ -731,8 +731,8 @@
       <div class="tool-row" style="display:flex;gap:10px;flex-wrap:wrap;">
         <div class="range-row">
           <span>STABILIZER</span>
-          <input type="range" id="stabilizer" min="0" max="20" value="3" title="손떨림 보정: 0 = 원본 입력(가장 즉각적), 높을수록 부드럽지만 붓이 손보다 늦게 따라옵니다. 애플펜슬처럼 정밀한 입력에는 낮은 값이 잘 맞습니다.">
-          <span class="val" id="stabilizerVal">3</span>
+          <input type="range" id="stabilizer" min="0" max="20" value="0" title="손떨림 보정: 0 = 원본 입력(가장 즉각적). 값을 올리면 선은 부드러워지지만, 붓이 손보다 그만큼 늦게 따라옵니다 — 지연을 느끼신다면 0으로 두세요.">
+          <span class="val" id="stabilizerVal">0</span>
         </div>
       </div>
       <div class="tool-row" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
@@ -6738,6 +6738,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
                       texture: currentTexture, grain: currentGrain, seed: (Math.random()*2147483647)|0,
                       points:[penPoint(p, e)], layer: activeLayer().id };
     keepDisplayAwake(2000);
+    predictTail.length = 0;
     liveBoxReset();
     rateReset();
     _lastSampleCX = null; _lastSampleCY = null;
@@ -6799,6 +6800,25 @@ showLayerMenu(ev.clientX, ev.clientY, [
     t.clearRect(0, 0, liveTemp.width, liveTemp.height);
     t.drawImage(liveBase, 0, 0);
   }
+  // ---- 예측 선단 ----
+  //
+  // 지금까지 재온 것들은 전부 "그리는 데 걸리는 시간"이었고, 그건 이미 예산의
+  // 2%다. 남은 지연은 계산이 아니라 경로 자체에서 온다: 펜이 화면에 닿고 →
+  // OS가 좌표를 만들고 → 사파리가 넘겨주고 → 우리가 그리고 → 합성기가 화면에
+  // 올린다. 각 단계가 한 프레임씩만 먹어도 손끝과 선 사이에 두세 프레임이 뜬다.
+  // 코드를 아무리 빠르게 해도 이 거리는 줄지 않는다 -- "전혀 바뀐 게 없다"는
+  // 체감이 정확한 이유다.
+  //
+  // 네이티브 앱이 펜슬에서 즉각적으로 느껴지는 이유는 이 거리를 지우기 때문이
+  // 아니라 '가리기' 때문이다. 애플펜슬 하드웨어는 다음 몇 밀리초의 궤적을
+  // 예측해 함께 보내는데, 그 예측분까지 미리 그려 두면 선이 손끝을 따라잡은
+  // 것처럼 보인다. 웹에도 같은 값이 들어온다(getPredictedEvents).
+  //
+  // 예측분은 화면에만 그리고 기록에는 남기지 않는다. 빗나가면 다음 프레임에
+  // 지워지고, 저장되는 선은 언제나 실제로 지나간 좌표뿐이다.
+  let predictTail = [];
+  let predictSupported = null;
+
   // 진행 중인 획의 경계 상자. 획은 자라기만 하므로 상자도 커지기만 하고, 따라서
   // 상자 바깥은 이번 획이 한 번도 건드린 적 없는 영역 -- 다시 그릴 이유가 없다.
   let liveBox = null;
@@ -6815,6 +6835,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
   }
   function liveDirtyRect(){
     if(!liveBox) return null;
+    for(const q of predictTail) liveBoxAdd(q);   // 예측 선단도 지워질 범위 안에
     // 여유폭: 선 굵기 절반이면 기하학적으로는 충분하지만, G펜의 번짐·스프레이
     // 입자·안티에일리어싱은 그보다 밖으로 나간다. 넉넉히 잡아도 어차피 화면
     // 한 귀퉁이라 비용이 없다.
@@ -6905,7 +6926,14 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const t = liveTemp.getContext('2d');
     t.clearRect(r.x, r.y, r.w, r.h);
     t.drawImage(liveBase, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h);
-    renderStrokeFull(t, currentAction);
+    if(predictTail.length){
+      // 실제 점 + 예측 선단을 이어 한 획으로 그린다. currentAction 자체는
+      // 건드리지 않으므로 저장·실행취소·리플레이에는 예측이 남지 않는다.
+      const ghost = { ...currentAction, points: currentAction.points.concat(predictTail) };
+      renderStrokeFull(t, ghost);
+    } else {
+      renderStrokeFull(t, currentAction);
+    }
     dctx.save();
     dctx.globalCompositeOperation = 'source-over';
     dctx.clearRect(r.x, r.y, r.w, r.h);
@@ -7017,6 +7045,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
       `입력 ${_inRate}Hz(최고 ${_inPeak}) → 화면 ${_paintRate}Hz\n` +
       `프레임 ${_paintMs.toFixed(1)}ms  최대 ${_paintPeak.toFixed(1)}ms\n` +
       `${bar} ${pct}%\n` +
+      `예측 ${predictSupported === null ? '?' : predictSupported ? '사용중 +' + predictTail.length : '미지원'}` +
+      ` · 보정 ${lazyRadius}\n` +
       `획 ${n}점 · 브러시 ${currentTexture || 'smooth'}` +
       (immediateMode ? ' · 즉시모드' : '') + '\n' +
       `다시칠함 ${area.toFixed(2)}M px (${r ? r.w + '×' + r.h : '—'})\n` +
@@ -7187,7 +7217,12 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // 마우스에는 손떨림을 걷어내는 이득이 크지만, 애플펜슬은 입력 자체가 이미
   // 정밀해서 같은 값이 그냥 굼뜬 느낌으로만 남는다. 기본값을 낮춰 잡았고,
   // 필요하면 STABILIZER 슬라이더로 언제든 올릴 수 있다.
-  let lazyRadius = 3; // canvas px (1080-scale)
+  // 0 = 손끝을 그대로 따라간다.
+  //
+  // 이 값은 '의도된 지연'이다 -- 붓은 손이 이만큼 움직인 뒤에야 출발한다.
+  // 손떨림을 걷어내는 값이지만, 지연을 호소하는 상황에서 기본으로 켜 둘
+  // 이유는 없다. 필요한 사람이 STABILIZER 슬라이더로 올리면 된다.
+  let lazyRadius = 0; // canvas px (1080-scale)
   let lastRawPos = null;
   // 마지막으로 '실제로 채택한' 샘플의 화면 좌표. 좌표 변환 전에 솎아내는 데 쓴다.
   let _lastSampleCX = null, _lastSampleCY = null;
@@ -7696,6 +7731,24 @@ showLayerMenu(ev.clientX, ev.clientY, [
       moved = true;
       _lastSampleCX = lastCX; _lastSampleCY = lastCY;
     }
+    // 예측 좌표 수집. 실제 점과 같은 변환을 거치되 pts에는 넣지 않는다.
+    if(typeof e.getPredictedEvents === 'function'){
+      let pr = null;
+      try { pr = e.getPredictedEvents(); } catch(_){ pr = null; }
+      if(predictSupported === null) predictSupported = !!(pr && pr.length);
+      predictTail.length = 0;
+      if(pr && pr.length){
+        const lastPt = pts[pts.length-1];
+        for(let i=0; i<pr.length && i<6; i++){
+          const q = getPos(pr[i]);
+          // 너무 멀리 나간 예측은 버린다. 빗나갔을 때 눈에 띄는 헛선이 되고,
+          // 어차피 다음 프레임이면 실제 좌표가 그 자리를 대신한다.
+          if(Math.hypot(q.x - lastPt.x, q.y - lastPt.y) > 120) break;
+          predictTail.push({ x: q.x, y: q.y, p: lastPt.p });
+        }
+      }
+      if(predictTail.length) moved = true;
+    }
     if(moved) repaintLiveStroke();
   });
 
@@ -7746,6 +7799,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
           pts.push({ x: lastRawPos.x, y: lastRawPos.y });
           liveBoxAdd(lastRawPos);
         }
+        predictTail.length = 0;      // 손을 뗐다 — 예측은 더 이상 의미가 없다
         if(_liveRaf){ cancelAnimationFrame(_liveRaf); _liveRaf = 0; }
         // Commit the finished stroke into its layer, then recomposite.
         renderStrokeFull(activeLayer().ctx, currentAction);
