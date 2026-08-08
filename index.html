@@ -4788,9 +4788,14 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // 1080² 합성이 통째로 소프트웨어 래스터라이저를 타면서 펜이 눈에 띄게 밀렸다.
   // 여기서 픽셀을 읽는 곳은 스포이드의 1×1 getImageData 한 곳뿐이다.
   //
-  // desynchronized: 표시 파이프라인과의 동기화를 느슨하게 해 한 프레임을 덜
-  // 기다린다. 펜 입력에서 체감이 가장 큰 옵션이다.
-  const dctx = drawCanvas.getContext('2d', { desynchronized: true });
+  // desynchronized(저지연 오버레이 평면)는 쓰지 않는다. 한 프레임을 벌어주긴
+  // 하지만, 그 모드의 캔버스는 자기만의 합성 평면으로 빠져나가 뒤에 있는 것과
+  // 섞이지 않는다. 이 캔버스는 종이(흰 바탕)를 그리지 않고 CSS 배경에 얹혀
+  // 있으므로, 투명한 부분이 종이 대신 검게 나온다 -- 리셋 직후처럼 캔버스가
+  // 통째로 비면 화면 전체가 새까매진다.
+  //
+  // alpha는 명시해 둔다: 이 캔버스의 투명도는 장식이 아니라 구조다.
+  const dctx = drawCanvas.getContext('2d', { alpha: true });
 
   // ==================== LAYERS ====================
   // The visible drawCanvas is a COMPOSITE. Each layer owns an offscreen
