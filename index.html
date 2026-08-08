@@ -97,6 +97,7 @@
     background: rgba(255,255,255,0.94); backdrop-filter: blur(8px);
     border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
     box-shadow: 0 8px 20px rgba(0,0,0,0.08); width: 210px;
+    max-width: calc(100% - 16px); max-height: calc(100% - 16px); overflow-y: auto;
     flex-direction: column; gap: 8px;
   }
   #traceControls.show { display: flex; }
@@ -736,12 +737,11 @@
       <div class="tool-row" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
         <span class="tex-label">TEXTURE</span>
         <div class="tex-group">
-          <button class="tex-btn" data-tex="smooth" title="Clean anti-aliased line">SMOOTH</button>
+          <button class="tex-btn active" data-tex="smooth" title="아무 효과도 없는 기본 펜 — 굵기가 일정한 깨끗한 선. 가장 가볍고 반응이 빠릅니다 (기본값)">SMOOTH</button>
           <button class="tex-btn" data-tex="pencil" title="Paper-tooth pencil grain">PENCIL</button>
-          <button class="tex-btn active" data-tex="spray" title="Scattered airbrush dots (default)">SPRAY</button>
+          <button class="tex-btn" data-tex="spray" title="Scattered airbrush dots">SPRAY</button>
           <button class="tex-btn" data-tex="ink" title="Manga dip-pen (G-pen): soft swell on entry, long sharp taper on exit, fast strokes run thin">INK</button>
           <button class="tex-btn" data-tex="gpen" title="G-PEN (publication) — pressure-driven steel nib: true stylus pressure, tine inertia, speed-shaped ends (flick out for a hairline nuki; set down and stop for a round ink blob) and a patchy, torn inked edge that breaks up on the paper grain. GRAIN alone controls how rough it gets. Falls back to speed when the stroke has no pressure. Exports to SVG as exact vector.">G-PEN</button>
-          <button class="tex-btn" data-tex="inkspray" title="INK &#183; SPRAY — the G-pen ribbon with an atomised, sprayed edge: solid wet core, scattered fringe, and a dry-brush break-up where the taper runs thin">INK·SP</button>
         </div>
         <div class="range-row">
           <span>GRAIN</span>
@@ -795,6 +795,7 @@
         <input type="file" id="inputTrace" accept="image/*" hidden>
         <input type="range" id="traceOpacity" min="0" max="100" value="30" title="Opacity" style="width:70px">
         <button class="btn btn-sm btn-ghost" id="btnAdjustTrace" title="Resize / rotate reference">ADJUST</button>
+        <button class="btn btn-sm" id="btnTraceDoneTop" style="display:none;" title="참고 이미지 배치를 마치고 그리기로 돌아갑니다">✓ 배치 완료</button>
         <button class="btn btn-sm btn-ghost" id="btnClearTrace">CLEAR</button>
       </div>
 
@@ -818,7 +819,7 @@
           <div class="tc-row"><span>OPACITY</span><input type="range" id="traceOpacity2" min="0" max="100" value="30"><span class="tc-val" id="traceOpacityVal">30%</span></div>
           <div class="tc-btns">
             <button class="btn btn-sm btn-ghost" id="traceReset">RESET</button>
-            <button class="btn btn-sm" id="traceDone">DONE</button>
+            <button class="btn btn-sm" id="traceDone">✓ 완료</button>
           </div>
         </div>
       </div>
@@ -2936,6 +2937,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
     traceImg.style.zIndex = traceAdjustMode ? '8' : '';
     $('btnAdjustTrace').classList.toggle('active', traceAdjustMode);
     $('btnAdjustTrace').textContent = traceAdjustMode ? 'DRAWING' : 'ADJUST';
+    // 떠 있는 패널은 좁은 화면에서 캔버스에 가려 놓치기 쉽다. 같은 기능을
+    // 항상 보이는 도구줄에도 둔다.
+    const topDone = $('btnTraceDoneTop');
+    if(topDone) topDone.style.display = traceAdjustMode ? '' : 'none';
     if(!traceAdjustMode) setTraceSelected(false);
   }
 
@@ -2944,15 +2949,28 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const f = e.target.files[0];
     if(!f) return;
     const url = URL.createObjectURL(f);
+    // 선택 상자와 조절 패널의 위치는 이미지의 실제 크기에서 나온다. 예전에는
+    // src를 넣자마자 그것들을 세웠는데, 이미지 디코딩은 비동기라 그 시점에는
+    // 크기가 0이었다 -- 아이패드의 큰 사진일수록 확실히 늦어, 상자가 엉뚱한
+    // 곳에 서거나 보이지 않았다. 디코딩이 끝난 뒤에 세운다.
+    traceImg.onload = ()=>{
+      traceImg.onload = null;
+      traceState.scale = 1; traceState.rotate = 0; traceState.x = 0; traceState.y = 0;
+      traceState.loaded = true;
+      applyTraceTransform();
+      syncTraceControls();
+      setTraceAdjustMode(true);   // enter adjust mode right after loading
+      setTraceSelected(true);
+      toast('참고 이미지를 불러왔습니다 — 끌어서 옮기고, 끝나면 [✓ 배치 완료]를 누르세요.');
+    };
+    traceImg.onerror = ()=>{
+      traceImg.onerror = null;
+      traceState.loaded = false;
+      traceImg.style.display = 'none';
+      toast('이 사진은 열 수 없습니다. 다른 형식(JPEG·PNG)으로 시도해 보세요.');
+    };
     traceImg.src = url;
     traceImg.style.display = 'block';
-    traceState.scale = 1; traceState.rotate = 0; traceState.x = 0; traceState.y = 0;
-    traceState.loaded = true;
-    applyTraceTransform();
-    syncTraceControls();
-    setTraceAdjustMode(true);   // enter adjust mode right after loading
-    setTraceSelected(true);
-    toast('Reference loaded — drag to move, use controls to scale/rotate.');
     e.target.value = '';
   });
 
@@ -2997,6 +3015,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     updateTraceSelectBox();
   });
   $('traceDone').addEventListener('click', ()=> setTraceAdjustMode(false));
+  $('btnTraceDoneTop').addEventListener('click', ()=> setTraceAdjustMode(false));
 
   $('btnAdjustTrace').addEventListener('click', ()=>{
     if(!traceState.loaded){ toast('Load a reference image first.'); return; }
@@ -6726,6 +6745,21 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // 완성된 선의 모양은 똑같고, 미리보기만 성글어진다. 이렇게 하지 않으면
   // 그리는 속도를 못 따라가 밀린 프레임이 계속 쌓이는 악순환에 빠진다.
   let _paintMs = 0, _skipToggle = false, _paintPeak = 0;
+  // 입력이 오는 속도와 화면이 갱신되는 속도는 다른 숫자다. 둘을 나눠 보면
+  // 병목이 입력 쪽인지 렌더 쪽인지 바로 갈린다: 입력 Hz가 낮으면 사파리가
+  // 펜 좌표를 늦게 넘기는 것이고, 화면 Hz만 낮으면 그리는 쪽이 못 따라간다.
+  let _inRate = 0, _paintRate = 0, _inN = 0, _paintN = 0, _rateT0 = 0;
+  function rateTick(which){
+    const now = performance.now();
+    if(!_rateT0) _rateT0 = now;
+    if(which === 'in') _inN++; else _paintN++;
+    const dt = now - _rateT0;
+    if(dt >= 500){
+      _inRate = Math.round(_inN / (dt/1000));
+      _paintRate = Math.round(_paintN / (dt/1000));
+      _inN = 0; _paintN = 0; _rateT0 = now;
+    }
+  }
   function repaintLiveStroke(){
     if(!currentAction || _liveRaf) return;
     if(_paintMs > 8){                    // 무거운 획 — 절반의 프레임만 그린다
@@ -6739,15 +6773,15 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const r = liveDirtyRect();
     if(!r) return;
     const _t0 = performance.now();
+    // clip은 쓰지 않는다. 더티 사각형은 획의 경계 상자에 여유를 더한 것이라
+    // 애초에 획 전체를 품고 있어 잘라낼 것이 없고, 실측(아이패드)에서 clip을
+    // 세우는 비용이 아껴지는 픽셀 값보다 컸다 -- 전체 합성 0.2ms 대 clip 부분
+    // 합성 0.5ms. 원본 사각형만 지정해 옮기는 지금 방식이 더 싸다.
     const t = liveTemp.getContext('2d');
-    t.save();
-    t.beginPath(); t.rect(r.x, r.y, r.w, r.h); t.clip();
     t.clearRect(r.x, r.y, r.w, r.h);
     t.drawImage(liveBase, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h);
     renderStrokeFull(t, currentAction);
-    t.restore();
     dctx.save();
-    dctx.beginPath(); dctx.rect(r.x, r.y, r.w, r.h); dctx.clip();
     dctx.globalCompositeOperation = 'source-over';
     dctx.clearRect(r.x, r.y, r.w, r.h);
     dctx.drawImage(liveBelow, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h);
@@ -6760,6 +6794,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     if((++_navTick & 7) === 0) updateNavPreview();
     if(typeof scheduleLiveSync === 'function') scheduleLiveSync();
     // 한 프레임 값은 널을 뛰므로 지수 평균으로 눌러 읽는다.
+    rateTick('paint');
     const dt = performance.now() - _t0;
     _paintMs = _paintMs ? _paintMs * 0.8 + dt * 0.2 : dt;
     if(dt > _paintPeak) _paintPeak = dt;
@@ -6779,6 +6814,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const pct = Math.round(_paintMs / budget * 100);
     const bar = '█'.repeat(Math.min(10, Math.round(pct/10))).padEnd(10, '·');
     el.textContent =
+      `입력 ${_inRate}Hz → 화면 ${_paintRate}Hz\n` +
       `프레임 ${_paintMs.toFixed(1)}ms  최대 ${_paintPeak.toFixed(1)}ms\n` +
       `${bar} ${pct}%\n` +
       `획 ${n}점 · 브러시 ${currentTexture || 'smooth'}\n` +
@@ -6842,8 +6878,23 @@ showLayerMenu(ev.clientX, ev.clientY, [
       rows.push(await time('픽셀읽기', 5, ()=>{ dctx.getImageData(0,0,W,H); }));
 
       // 5) 실제 화면 주사율
-      let frames = 0; const fT0 = performance.now();
-      while(performance.now() - fT0 < 500){ await raf(); frames++; }
+      //
+      // 빈 rAF 루프로 재면 안 된다. 프로모션 화면은 그릴 것이 없으면 스스로
+      // 주사율을 24Hz까지 떨어뜨리므로, 아무것도 그리지 않는 측정은 "화면이
+      // 느리다"가 아니라 "잴 동안 화면이 쉬고 있었다"를 재게 된다. 매 프레임
+      // 실제로 픽셀을 바꿔 화면을 깨운 상태에서 잰다.
+      let frames = 0; let fT0 = performance.now();
+      while(performance.now() - fT0 < 300){        // 워밍업: 주사율을 끌어올린다
+        dctx.fillStyle = (frames & 1) ? '#fafafa' : '#f8f8f8';
+        dctx.fillRect(0, 0, 24, 24);
+        await raf(); frames++;
+      }
+      frames = 0; fT0 = performance.now();
+      while(performance.now() - fT0 < 700){
+        dctx.fillStyle = (frames & 1) ? '#fafafa' : '#f8f8f8';
+        dctx.fillRect(0, 0, 24, 24);
+        await raf(); frames++;
+      }
       const hz = Math.round(frames / ((performance.now()-fT0)/1000));
 
       const fr = frameRect();
@@ -7309,6 +7360,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     // up as angular, imprecise lines; this restores 1:1 input fidelity.
     const batch = (typeof e.getCoalescedEvents === 'function' && e.getCoalescedEvents().length)
       ? e.getCoalescedEvents() : [e];
+    if(perfOn) for(let i=0;i<batch.length;i++) rateTick('in');
     const pts = currentAction.points;
     // The stabilizer slack is meant to feel constant ON SCREEN. Its value is
     // stored in canvas px, so divide by the view zoom — otherwise zooming in
@@ -7678,10 +7730,12 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // STROKE's texture/grain exactly ("as selected for strokes") until the
   // user adjusts TEXTURE or GRAIN while the eraser is active — from then
   // on the eraser keeps its own independent settings, just like SIZE.
-  let currentTexture = 'spray';
+  // 기본은 효과 없는 SMOOTH. 매 프레임 획 전체를 다시 그리는 구조라, 질감
+  // 브러시는 첫 획부터 비용이 붙는다 -- 기본값이 가벼워야 처음 인상이 가볍다.
+  let currentTexture = 'smooth';
   let currentGrain = 100;
-  const brushTex  = { tex: 'spray', grain: 100 };
-  const eraserTex = { tex: 'spray', grain: 100, customized: false };
+  const brushTex  = { tex: 'smooth', grain: 100 };
+  const eraserTex = { tex: 'smooth', grain: 100, customized: false };
   function texStateForActiveTool(){
     if(currentTool === 'eraser') return eraserTex.customized ? eraserTex : brushTex;
     return brushTex;
