@@ -1386,7 +1386,15 @@
     toast('Folder dissolved: layers kept.');
   }
 
+  // 같은 프레임 안에서 여러 번 불려도 한 번만 그린다. 획을 마칠 때처럼 급한
+  // 순간에는 이쪽으로 미뤄, 다음 획을 시작하는 손을 붙들지 않게 한다.
+  let _panelRaf = 0;
+  function schedulePanelRefresh(){
+    if(_panelRaf) return;
+    _panelRaf = requestAnimationFrame(()=>{ _panelRaf = 0; renderLayersPanel(); });
+  }
   function renderLayersPanel(){
+    if(_panelRaf){ cancelAnimationFrame(_panelRaf); _panelRaf = 0; }
     normalizeFolders();
     selectedLayerIds = new Set([...selectedLayerIds].filter(id => layers.some(l=>l.id===id)));
     if(typeof syncLayerWidthSlider === 'function') syncLayerWidthSlider();
@@ -6566,6 +6574,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         console.error('renderAll: skipped an action due to error', err, a);
       }
     });
+    invalidateStrokeSnapshot();   // 레이어 픽셀이 통째로 다시 그려졌다
     compositeLayers();
     if(selectedStrokeId != null){
       const sel = actions.find(a=>a.id===selectedStrokeId);
@@ -6749,10 +6758,31 @@ showLayerMenu(ev.clientX, ev.clientY, [
     c.width = drawCanvas.width; c.height = drawCanvas.height;
     return c;
   }
+  // 아래/위 레이어 묶음은 획을 하나 그었다고 달라지지 않는다. 달라지는 것은
+  // 방금 그린 획이 들어간 '활성 레이어'뿐이다. 그런데 매번 세 장을 전부 지우고
+  // 모든 레이어를 다시 겹쳐 그리고 있었다 -- 레이어가 많을수록 획을 시작할
+  // 때마다 그 비용을 치른다. "다음 획이 늦게 나오는" 체감의 한 몫이다.
+  //
+  // 레이어 구성이나 내용이 바뀌면 그때만 다시 만들고, 그 사이에는 활성
+  // 레이어 한 장만 새로 뜬다.
+  let _snapKey = null;
+  function invalidateStrokeSnapshot(){ _snapKey = null; }
   function takeStrokeSnapshot(){
     if(!liveBelow){ liveBelow = mkLayerScratch(); liveAbove = mkLayerScratch(); liveBase = mkLayerScratch(); liveTemp = mkLayerScratch(); }
     const al = activeLayer();
-    const b = liveBelow.getContext('2d'), a = liveAbove.getContext('2d'), base = liveBase.getContext('2d');
+    const key = al.id + '|' + layers.map(l => l.id + (l.visible ? 'v' : 'h')).join(',');
+    const base = liveBase.getContext('2d');
+    if(_snapKey === key){
+      // 아래/위는 그대로 두고 활성 레이어만 갱신한다 (한 장 지우고 한 장 그리기).
+      base.clearRect(0,0,liveBase.width,liveBase.height);
+      base.drawImage(al.canvas, 0, 0);
+      const t0 = liveTemp.getContext('2d');
+      t0.clearRect(0, 0, liveTemp.width, liveTemp.height);
+      t0.drawImage(liveBase, 0, 0);
+      return;
+    }
+    _snapKey = key;
+    const b = liveBelow.getContext('2d'), a = liveAbove.getContext('2d');
     b.clearRect(0,0,liveBelow.width,liveBelow.height);
     a.clearRect(0,0,liveAbove.width,liveAbove.height);
     base.clearRect(0,0,liveBase.width,liveBase.height);
@@ -7643,7 +7673,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
         renderStrokeFull(activeLayer().ctx, currentAction);
         compositeLayers();
         actions.push(currentAction);
-        renderLayersPanel();
+        // 레이어 목록은 240줄짜리 DOM을 통째로 다시 만든다. 획 하나 그었다고
+        // 레이어 구성이 달라지지는 않으므로(획 수 배지만 바뀐다), 손을 뗀
+        // 직후의 촉박한 순간에 그 일을 할 이유가 없다. 다음 프레임으로 미룬다.
+        schedulePanelRefresh();
         redoStack.length = 0;
         // 획이 끝났다 — 미뤄둔 무거운 동기화를 지금 흘려보낸다.
         if(typeof flushLiveSyncAfterStroke === 'function') flushLiveSyncAfterStroke();
@@ -9806,7 +9839,20 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
   function scheduleAutosave(){
     if(autosaveTimer) return;
-    autosaveTimer = setTimeout(()=>{ autosaveTimer = null; autosaveNow(); }, 2500);
+    // 2.5초 뒤는 하필 다음 획을 시작할 즈음이다. 자동저장은 모든 획의 모든
+    // 점을 문자열로 만들고 localStorage에 동기적으로 쓰는 일이라, 그 순간에
+    // 걸리면 펜을 대는 손이 붙들린다.
+    //
+    // 브라우저가 한가하다고 알려줄 때 처리하고(requestIdleCallback), 그마저
+    // 없으면 조금 더 늦춘다. 페이지를 떠날 때는 어차피 즉시 저장이 걸린다.
+    autosaveTimer = setTimeout(()=>{
+      autosaveTimer = null;
+      if(typeof requestIdleCallback === 'function'){
+        requestIdleCallback(()=> autosaveNow(), { timeout: 4000 });
+      } else {
+        autosaveNow();
+      }
+    }, 3500);
   }
 
   function restoreAutosave(rawIn, label){
