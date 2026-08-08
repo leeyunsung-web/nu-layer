@@ -4916,6 +4916,17 @@ showLayerMenu(ev.clientX, ev.clientY, [
   let drawing = false;
   let currentAction = null;
 
+  // 마지막 좌표만 들고 있다가 프레임당 한 번 반영한다.
+  let _curEvt = null, _curRaf = 0;
+  function queueCursorState(e){
+    _curEvt = e;
+    if(_curRaf) return;
+    _curRaf = requestAnimationFrame(()=>{
+      _curRaf = 0;
+      const ev = _curEvt; _curEvt = null;
+      if(ev) updateCursorState(ev);
+    });
+  }
   function updateCursorState(e) {
     if (rotateKeyHeld || spaceKeyHeld || viewDrag) {
       $('canvasCursor').style.display = 'none';
@@ -7445,7 +7456,13 @@ showLayerMenu(ev.clientX, ev.clientY, [
   }
 
   drawCanvas.addEventListener('pointermove', e=>{
-    updateCursorState(e);
+    // 손가락은 초당 60번쯤 좌표를 보내지만 애플펜슬은 240번을 보낸다. 게다가
+    // 이 기기의 펜슬은 화면에 닿기 전 '떠 있는' 동안에도 계속 좌표를 보낸다.
+    // 커서 링을 그 전부에 맞춰 옮기면, 그리지도 않는 동안 초당 240번씩 스타일
+    // 재계산이 걸린다 -- 손가락에는 없고 펜슬에만 있는 부담이다.
+    //
+    // 커서는 눈으로 보는 것이니 화면이 갱신되는 만큼만 옮기면 충분하다.
+    queueCursorState(e);
     if(viewDrag){
       if(viewDrag.mode === 'rotate'){
         const a = Math.atan2(e.clientY - viewDrag.cy, e.clientX - viewDrag.cx);
@@ -7491,6 +7508,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
     // multiplied the dead-zone (e.g. 4× zoom → 4× bigger slack) and the
     // brush felt detached from the pointer.
     const slack = lazyRadius / (viewZoom || 1);
+    // 화면 1px = 캔버스 몇 px 인가. (프레임 폭은 프레임당 한 번만 잰다)
+    const fr0 = frameRect();
+    const cssToCanvas = drawCanvas.width / ((fr0.width || 1) * (viewZoom || 1));
+    const minAdvance = Math.max(0.35, 0.6 * cssToCanvas);
     let moved = false;
     for(const ev of batch){
       const p = getPos(ev);
@@ -7506,9 +7527,15 @@ showLayerMenu(ev.clientX, ev.clientY, [
       // 매 프레임 다시 그리는 비용과 저장 용량만 그만큼 불린다. 애플펜슬은
       // 초당 240번을 보내므로 이 구간이 특히 길다.
       //
-      // 0.7px은 화면에 보이는 최소 단위보다 작아 선 모양이 달라지지 않는다.
+      // 간격 기준은 화면 픽셀로 잡아야 한다. 캔버스는 1080이고 아이패드에서는
+      // 그보다 작게 표시되므로, 캔버스 0.7px이 화면에서는 0.3px도 안 된다 --
+      // 보이지도 않는 차이를 위해 점을 계속 쌓고 있었다는 뜻이다. 펜슬은 손가락
+      // 보다 네 배 빠르게 좌표를 보내므로 그 낭비도 네 배로 쌓인다.
+      //
+      // 화면에서 0.6px에 해당하는 만큼으로 환산해 잡는다. 육안으로는 구분되지
+      // 않고, 기록되는 점 수는 눈에 띄게 줄어든다.
       const adv = Math.hypot(np.x - last.x, np.y - last.y);
-      if(adv < 0.7 && pts.length > 1) continue;
+      if(adv < minAdvance && pts.length > 1) continue;
       // The lazy brush lands the sample short of the pointer, but the pressure
       // that belongs to it is the one being applied RIGHT NOW, not an
       // interpolation toward a sample we never took.
