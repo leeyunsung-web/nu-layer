@@ -6649,7 +6649,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
                       texture: currentTexture, grain: currentGrain, seed: (Math.random()*2147483647)|0,
                       points:[penPoint(p, e)], layer: activeLayer().id };
     takeStrokeSnapshot();
-    repaintLiveStroke();
+    repaintLiveStrokeNow();   // 첫 점은 즉시 -- 톡 찍는 점이 한 프레임 늦으면 그게 더 답답하다
   });
 
   // ---- Live stroke: snapshot + full repaint ----
@@ -6679,7 +6679,21 @@ showLayerMenu(ev.clientX, ev.clientY, [
       (seenActive ? a : b).drawImage(l.canvas, 0, 0);
     }
   }
+  // ---- 프레임당 한 번만 그리기 ----
+  //
+  // 애플펜슬은 초당 240번 좌표를 보내지만 화면은 초당 120번만 갱신된다.
+  // 이벤트마다 그리면 화면에 나가지도 못할 그림을 절반 이상 그리는 셈이고,
+  // 그 시간에 다음 입력을 받지 못한다. 점 기록은 이벤트마다 전부 하되(선
+  // 모양은 그대로), 화면에 옮기는 일만 프레임에 맞춘다.
+  //
+  // GPU 전환으로 한 번 그리는 값이 싸진 지금도 이 절약은 유효하다 -- 절반의
+  // 그리기를 통째로 없애는 것이므로.
+  let _liveRaf = 0;
   function repaintLiveStroke(){
+    if(!currentAction || _liveRaf) return;
+    _liveRaf = requestAnimationFrame(()=>{ _liveRaf = 0; repaintLiveStrokeNow(); });
+  }
+  function repaintLiveStrokeNow(){
     if(!currentAction) return;
     const t = liveTemp.getContext('2d');
     t.clearRect(0,0,liveTemp.width,liveTemp.height);
@@ -7223,8 +7237,11 @@ showLayerMenu(ev.clientX, ev.clientY, [
         const last = pts[pts.length-1];
         if(lastRawPos && Math.hypot(lastRawPos.x-last.x, lastRawPos.y-last.y) > 0.5){
           pts.push({ x: lastRawPos.x, y: lastRawPos.y });
-          repaintLiveStroke();
         }
+        // 예약된 프레임이 남아 있으면 취소한다. 이 아래에서 획을 레이어에
+        // 확정하고 다시 합성하는데, 그 뒤에 낡은 라이브 프레임이 그려지면
+        // 방금 확정한 그림 위를 덮는다.
+        if(_liveRaf){ cancelAnimationFrame(_liveRaf); _liveRaf = 0; }
         // Commit the finished stroke into its layer, then recomposite.
         renderStrokeFull(activeLayer().ctx, currentAction);
         compositeLayers();
