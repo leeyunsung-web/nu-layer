@@ -207,6 +207,10 @@
   .draw-sidebar .nav-wrap, .draw-sidebar .palette-wrap, .draw-sidebar .layers-wrap { padding: 8px; }
   .draw-sidebar .nav-row { flex-wrap: wrap; }
   .draw-sidebar .nav-wrap button { padding: 3px 7px; }
+  /* MIRROR is a mode, not a one-shot action like the rotate nudges — it stays
+     lit while the view is flipped so the reversed image is never mistaken
+     for the real one. */
+  .nav-row button#flipViewBtn.on { background: var(--ink); color: #fff; border-color: var(--ink); }
   .draw-sidebar .layers-head { flex-wrap: wrap; gap: 4px; }
   .draw-sidebar .layers-head button { padding: 3px 6px; }
   .draw-sidebar .layer-row { padding: 5px 6px; gap: 5px; }
@@ -709,7 +713,8 @@
         <div class="nav-row">
           <button id="rotLeftBtn" title="Rotate view -15°">⟲</button>
           <button id="rotRightBtn" title="Rotate view +15°">⟳</button>
-          <button id="navResetBtn" style="flex:1;" title="Reset zoom, rotation and pan">RESET</button>
+          <button id="flipViewBtn" title="좌우 반전(미러) — 화면만 뒤집어 구도를 점검합니다. 트레이스 레이어도 함께 뒤집히며, 그림 픽셀은 그대로입니다. 단축키: M">⇆</button>
+          <button id="navResetBtn" style="flex:1;" title="Reset zoom, rotation, pan and mirror">RESET</button>
         </div>
       </div>
       <div class="palette-wrap">
@@ -972,6 +977,8 @@
         <div class="comp-btns">
           <button class="btn btn-accent" id="genCompBtn">GENERATE RANDOM ✦</button>
           <button class="btn" id="clearCompBtn">CLEAR</button>
+          <button class="btn btn-accent" id="genArchiveBtn" hidden
+                  title="샘플 목록(02)이 비어 있어도 온라인 아카이브 전체를 대상으로 무작위 구성을 만듭니다 (master). 고른 샘플은 02에도 불러오므로 그대로 편집할 수 있습니다. Shift+클릭 = 아카이브 목록 다시 스캔">☁ FROM ARCHIVE ✦</button>
           <button class="btn btn-ghost" id="openCompGalleryBtn" hidden
                   title="Reopen a saved composition from the gallery for editing (master)">OPEN GALLERY</button>
           <button class="btn btn-ghost" id="downloadCompBtn">SAVE PNG</button>
@@ -2813,6 +2820,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       if(k === 'r' && !e.repeat){ rotateKeyHeld = true; updateCursorState(); }
       if(e.key === ' '){ if(!e.repeat){ spaceKeyHeld = true; updateCursorState(); } e.preventDefault(); }
       if(k === 'i') { e.preventDefault(); activateEyedropper(); }
+      if(k === 'm') { e.preventDefault(); toggleViewFlip(); }
       // [ / ] : if a COMPOSITION element is selected → move layer down / up (one step)
       //         otherwise → brush size down / up
       if(e.key === '[') {
@@ -3024,8 +3032,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
   $('btnAdjustTrace').addEventListener('click', ()=>{
     if(!traceState.loaded){ toast('Load a reference image first.'); return; }
-    // Reference drag/resize math assumes an untransformed view.
-    if(!traceAdjustMode && (viewZoom !== 1 || viewRot !== 0 || viewPanX || viewPanY)) resetView();
+    // Reference drag/resize math assumes an untransformed view — the drag
+    // handler works in raw screen deltas, which run backwards under a mirror.
+    if(!traceAdjustMode && (viewZoom !== 1 || viewRot !== 0 || viewPanX || viewPanY || viewFlip < 0)) resetView();
     setTraceAdjustMode(!traceAdjustMode);
     if(traceAdjustMode) setTraceSelected(true);
   });
@@ -4977,15 +4986,24 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // navigator + Rotate View tool. getPos() inverts the transform so every
   // tool keeps drawing exactly under the pointer at any zoom/angle.
   let viewZoom = 1, viewRot = 0, viewPanX = 0, viewPanY = 0;
+  // Mirror preview: -1 flips the view left/right. scaleX sits INNERMOST in the
+  // transform chain, so it mirrors the artboard's own contents — #traceImage,
+  // the lasso overlay and the paper texture all live inside #canvasView and
+  // flip with it, which is the whole point (checking a composition against a
+  // flipped reference only works if both flip together). Pixels are untouched;
+  // exports, REGISTER and the composition are unaffected.
+  let viewFlip = 1;
   let rotateKeyHeld = false, spaceKeyHeld = false;
   let viewDrag = null;
 
   function applyViewTransform(){
     $('canvasView').style.transform =
-      `translate(${viewPanX}px, ${viewPanY}px) rotate(${viewRot}rad) scale(${viewZoom})`;
+      `translate(${viewPanX}px, ${viewPanY}px) rotate(${viewRot}rad) scale(${viewZoom}) scaleX(${viewFlip})`;
     let deg = Math.round(viewRot * 180 / Math.PI) % 360;
     if(deg > 180) deg -= 360; if(deg < -180) deg += 360;
-    $('navInfo').textContent = `${Math.round(viewZoom*100)}% · ${deg}°`;
+    $('navInfo').textContent = `${Math.round(viewZoom*100)}% · ${deg}°` + (viewFlip < 0 ? ' · ⇆' : '');
+    const fb = $('flipViewBtn');
+    if(fb) fb.classList.toggle('on', viewFlip < 0);
     $('zoomSlider').value = Math.max(20, Math.min(600, Math.round(viewZoom*100)));
     updateNavPreview();
     if($('canvasCursor').style.display === 'block') updateCursorState(); // ring size tracks zoom
@@ -4995,8 +5013,13 @@ showLayerMenu(ev.clientX, ev.clientY, [
     applyViewTransform();
   }
   function resetView(){
-    viewZoom = 1; viewRot = 0; viewPanX = 0; viewPanY = 0;
+    viewZoom = 1; viewRot = 0; viewPanX = 0; viewPanY = 0; viewFlip = 1;
     applyViewTransform();
+  }
+  function toggleViewFlip(){
+    viewFlip = -viewFlip;
+    applyViewTransform();
+    toast(viewFlip < 0 ? '좌우 반전(미러) — 화면만 뒤집혀 있습니다.' : '반전 해제.');
   }
 
   // ---- Stylus pressure -----------------------------------------------
@@ -5034,7 +5057,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const ux = vx*cos - vy*sin;
     const uy = vx*sin + vy*cos;
     const W0 = fr.width || 1, H0 = fr.height || 1; // exact fractional layout size
-    const lx = ux/viewZoom + W0/2, ly = uy/viewZoom + H0/2;        // local CSS coords
+    // viewFlip is innermost in the forward transform, so it is the LAST thing
+    // undone here — miss it and every stroke lands mirrored across the canvas.
+    const lx = (ux * viewFlip)/viewZoom + W0/2, ly = uy/viewZoom + H0/2;  // local CSS coords
     return { x: lx * (drawCanvas.width / W0), y: ly * (drawCanvas.height / H0), _lx: lx, _ly: ly };
   }
 
@@ -5045,7 +5070,13 @@ showLayerMenu(ev.clientX, ev.clientY, [
   function updateNavPreview(){
     const c = $('navPreview'); if(!c) return;
     const nx = c.getContext('2d');
+    nx.setTransform(1, 0, 0, 1, 0, 0);
     nx.clearRect(0, 0, c.width, c.height);
+    // The mini-map has to agree with what is on screen, thumbnail AND
+    // viewport outline. Mirroring the context covers both at once — the
+    // outline corners below come back from getPos() in canvas space, so
+    // flipping only the thumbnail would leave the red frame on the wrong side.
+    if(viewFlip < 0){ nx.translate(c.width, 0); nx.scale(-1, 1); }
     nx.drawImage(drawCanvas, 0, 0, c.width, c.height);
     if(viewZoom !== 1 || viewRot !== 0 || viewPanX || viewPanY){
       const frame = drawCanvas.closest('.canvas-frame');
@@ -5066,6 +5097,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         nx.restore();
       }
     }
+    nx.setTransform(1, 0, 0, 1, 0, 0);
   }
 
   // Pan so the given canvas point lands at the center of the frame.
@@ -5075,7 +5107,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const W0 = fr.width || 1, H0 = fr.height || 1;
     const lx = (cx / drawCanvas.width) * W0 - W0/2;
     const ly = (cy / drawCanvas.height) * H0 - H0/2;
-    const sx = lx * viewZoom, sy = ly * viewZoom;
+    const sx = lx * viewFlip * viewZoom, sy = ly * viewZoom;
     viewPanX = -(sx*Math.cos(viewRot) - sy*Math.sin(viewRot));
     viewPanY = -(sx*Math.sin(viewRot) + sy*Math.cos(viewRot));
     applyViewTransform();
@@ -5108,6 +5140,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
   $('zoomOutBtn').addEventListener('click', ()=> setViewZoom(viewZoom / 1.25));
   $('rotLeftBtn').addEventListener('click', ()=>{ viewRot -= Math.PI/12; applyViewTransform(); });
   $('rotRightBtn').addEventListener('click', ()=>{ viewRot += Math.PI/12; applyViewTransform(); });
+  $('flipViewBtn').addEventListener('click', toggleViewFlip);
   $('navResetBtn').addEventListener('click', resetView);
   // Ctrl/Cmd + wheel over the canvas = zoom
   drawCanvas.closest('.canvas-frame').addEventListener('wheel', e=>{
@@ -9061,17 +9094,15 @@ showLayerMenu(ev.clientX, ev.clientY, [
     toast('Element deleted.');
   });
 
-  $('genCompBtn').addEventListener('click', () => {
-    if(objects.length === 0){
-      toast('Register at least one object first.');
-      return;
-    }
-    
-    placedItems.length = 0; 
+  // ---- Shared placement pass -------------------------------------------
+  // GENERATE RANDOM and FROM ARCHIVE differ only in WHERE the pool of source
+  // objects comes from; the scatter itself is identical, so it lives here
+  // instead of being written twice and drifting apart.
+  function placeRandomComposition(pool, n){
+    placedItems.length = 0;
     selectedItemIdx = null;
     $('compItemEditor').hidden = true;
 
-    const n = parseInt($('compCount').value);
     let mn = parseInt($('scaleMin').value)/100;
     let mx = parseInt($('scaleMax').value)/100;
     if(mn > mx){ const t=mn; mn=mx; mx=t; }
@@ -9079,10 +9110,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const W = compCanvas.width, H = compCanvas.height;
 
     for(let i=0; i<n; i++){
-      const obj = objects[Math.floor(Math.random()*objects.length)];
+      const obj = pool[Math.floor(Math.random()*pool.length)];
       const scale = rand(mn, mx);
       const w = obj.w * scale, h = obj.h * scale;
-      const r = 0.5 * Math.sqrt(w*w + h*h); 
+      const r = 0.5 * Math.sqrt(w*w + h*h);
 
       const x = rand(r * 0.2, W - r * 0.2);
       const y = rand(r * 0.2, H - r * 0.2);
@@ -9092,7 +9123,139 @@ showLayerMenu(ev.clientX, ev.clientY, [
     }
 
     renderComposition();
+  }
+
+  $('genCompBtn').addEventListener('click', () => {
+    if(objects.length === 0){
+      toast('Register at least one object first.');
+      return;
+    }
+    const n = parseInt($('compCount').value);
+    placeRandomComposition(objects, n);
     toast(`Generated ${n} elements.`);
+  });
+
+  // ==================== FROM ARCHIVE (master only) ====================
+  // Composes from EVERYTHING in the online archive, whether or not panel 02
+  // holds anything. The samples panel is a working set, not the library —
+  // needing to hand-pick a folder before every random layout defeats the
+  // point of a random layout.
+  //
+  // The picked files are also loaded into panel 02 rather than being placed
+  // as anonymous bitmaps. That is deliberate: a placed item has to be a real
+  // object for click-to-edit, the live edit link, ⤓ SAVE and gallery
+  // round-trips to work, and the panel is then an honest record of what the
+  // composition is actually made of.
+  //
+  // Guests never see the button: listing the repository needs the GitHub
+  // token, which only the master has.
+
+  // The directory walk costs one API call per folder, so the flat file index
+  // is cached for the session and only re-walked when the archive version
+  // stamp moves (an upload/delete) or the user Shift-clicks to force it.
+  let archiveIndex = null, archiveIndexVer = null;
+
+  async function scanArchiveImages(){
+    const root = (ghConfig.path || 'gallery').replace(/^\/+|\/+$/g,'');
+    const out = [];
+    const queue = [root];
+    let visited = 0;
+    while(queue.length){
+      // Guard against a pathological tree: 400 folders is already ~400 API
+      // calls, well past the point where this stops being an instant action.
+      if(++visited > 400) break;
+      const path = queue.shift();
+      let items;
+      try { items = await ghLoadList(path); }
+      catch(e){ console.warn('archive scan skipped', path, e); continue; }
+      for(const it of items){
+        if(it.type === 'dir') queue.push(it.path);
+        else if(it.type === 'file' && /\.(png|jpe?g|webp)$/i.test(it.name))
+          out.push({ name: it.name, downloadUrl: it.download_url, path: it.path });
+      }
+      if(visited % 4 === 0) toast(`Scanning archive… ${out.length} images`);
+    }
+    return out;
+  }
+
+  async function getArchiveIndex(force){
+    const ver = archiveVer();
+    if(!force && archiveIndex && archiveIndexVer === ver) return archiveIndex;
+    toast('Scanning the online archive…');
+    archiveIndex = await scanArchiveImages();
+    archiveIndexVer = ver;
+    return archiveIndex;
+  }
+
+  $('genArchiveBtn').addEventListener('click', async (ev) => {
+    if(userRole !== 'master'){ toast('Master access required.'); return; }
+    if(!ghConfig || !ghConfig.owner || !ghConfig.repo || !ghConfig.token){
+      toast('Please configure GitHub first at the top.');
+      return;
+    }
+    const btn = $('genArchiveBtn');
+    if(btn.disabled) return;                 // a second click mid-download would
+    const label = btn.textContent;           // interleave two sets of fetches
+    btn.disabled = true;
+
+    try {
+      const index = await getArchiveIndex(!!ev.shiftKey);
+      if(!index.length){
+        toast('No images found in the online archive.');
+        return;
+      }
+
+      const n = Math.max(1, parseInt($('compCount').value, 10) || 1);
+      // Distinct SOURCES up to the element count — drawing n independent
+      // random files would repeat the same image on a small archive and
+      // download it twice. Repetition, if needed, happens at placement time.
+      const shuffled = index.slice();
+      for(let i = shuffled.length - 1; i > 0; i--){
+        const j = Math.floor(Math.random() * (i + 1));
+        const t = shuffled[i]; shuffled[i] = shuffled[j]; shuffled[j] = t;
+      }
+      const picks = shuffled.slice(0, Math.min(n, shuffled.length));
+
+      btn.textContent = '⟳ LOADING…';
+      const pool = [];
+      let fetched = 0, failed = 0;
+      for(let i = 0; i < picks.length; i++){
+        const f = picks[i];
+        // Already in panel 02 (loaded earlier, or drawn and registered under
+        // the same filename) → reuse it instead of downloading again.
+        let obj = objects.find(o => o.filename === f.name);
+        if(!obj){
+          try {
+            const res = await fetch(withArchiveVer(f.downloadUrl));
+            if(!res.ok) throw new Error('HTTP ' + res.status);
+            const blob = await res.blob();
+            const file = new File([blob], f.name, { type: blob.type || 'image/png' });
+            await loadImageFile(file, f.downloadUrl, f.path);
+            obj = objects.find(o => o.filename === f.name);
+            if(obj) fetched++;
+          } catch(e){ console.error(f.name, e); failed++; }
+        }
+        if(obj) pool.push(obj);
+        if((i + 1) % 5 === 0 || i === picks.length - 1)
+          toast(`Loading… ${i + 1}/${picks.length}`);
+      }
+
+      if(!pool.length){
+        toast('Could not load any images from the archive.');
+        return;
+      }
+
+      placeRandomComposition(pool, n);
+      toast(`Generated ${n} elements from ${pool.length} archive samples`
+            + (fetched ? ` · ${fetched} downloaded` : '')
+            + (failed  ? ` · ${failed} failed`     : '') + '.');
+    } catch(e){
+      console.error(e);
+      toast('Archive scan failed: ' + (e.message || e));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = label;
+    }
   });
 
   document.querySelectorAll('#bgSwatches .swatch[data-bg]').forEach(sw=>{
@@ -9321,6 +9484,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
     // OPEN GALLERY (reopen saved compositions for editing) — master only.
     const og = $('openCompGalleryBtn');
     if(og) og.hidden = userRole !== 'master';
+    // FROM ARCHIVE (compose straight from the online archive) — master only:
+    // it needs the GitHub token to list the repository, which guests do not have.
+    const ga = $('genArchiveBtn');
+    if(ga) ga.hidden = userRole !== 'master';
   }
   $('downloadCompBtn').addEventListener('click', ()=>{
     if(userRole === 'master') saveCompositionToGallery();
