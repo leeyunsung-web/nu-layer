@@ -50,7 +50,11 @@
   .stat-readout .dot { color: var(--accent); }
 
   /* ---------- layout ---------- */
-  .layout { display: grid; grid-template-columns: 1.25fr 1fr 1.05fr; gap: 22px; align-items: start; }
+  .layout { display: grid; grid-template-columns: 2.03fr 1fr 1.05fr; gap: 22px; align-items: start; }
+  /* 01 DRAWING 캔버스를 1.5배로 키운 비율.
+     그리기 캔버스 실폭 = 패널폭 - 40(패딩) - 144(사이드바) - 14(간격).
+     1.25fr(패널 530px → 캔버스 332px)을 2.03fr(패널 696px → 캔버스 498px)로 올리고,
+     늘어난 만큼을 02 SAMPLES / 03 COMPOSITION에서 원래 1:1.05 비율 그대로 덜어냈다. */
   @media (max-width:1240px) { .layout { grid-template-columns: 1fr; } }
 
   .panel {
@@ -363,7 +367,8 @@
 
   /* ---------- object gallery ---------- */
   .objects-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-height: 340px; overflow-y: auto; padding-right: 4px;
+    /* 패널이 좁아졌으므로 고정 3열 대신 최소 폭을 지키며 자동 배치 */
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 10px; max-height: 340px; overflow-y: auto; padding-right: 4px;
   }
   .objects-grid::-webkit-scrollbar { width: 6px; }
   .objects-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
@@ -389,7 +394,7 @@
   /* ---------- variation block ---------- */
   .variation-block { border-top: 1px solid var(--border); padding-top: 16px; display: flex; flex-direction: column; gap: 10px; }
   .panel-head-sub h3 { font-size: 13px; font-weight: 600; margin: 0; color: var(--ink); }
-  .variations-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .variations-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 10px; }
   .var-card {
     background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 6px;
     display: flex; flex-direction: column; gap: 6px;
@@ -406,13 +411,13 @@
   /* ---------- composition controls ---------- */
   .comp-controls { display: flex; flex-direction: column; gap: 12px; }
   /* Aligned rows: fixed label column | controls | right-aligned value */
-  .comp-row { display: grid; grid-template-columns: 96px 1fr 64px; align-items: center; gap: 10px; }
+  .comp-row { display: grid; grid-template-columns: 84px 1fr 56px; align-items: center; gap: 8px; }
   .comp-row .val { text-align: right; min-width: 0; width: auto; }
   .comp-row .dual { display: flex; gap: 8px; min-width: 0; }
   .comp-row .dual input[type=range] { flex: 1; min-width: 0; }
   .comp-row input[type=range] { min-width: 0; }
   .comp-row .bg-swatches { grid-column: 2 / -1; }
-  .comp-item-editor .range-row { display: grid; grid-template-columns: 96px 1fr 64px; align-items: center; gap: 10px; min-width: 0; }
+  .comp-item-editor .range-row { display: grid; grid-template-columns: 84px 1fr 56px; align-items: center; gap: 8px; min-width: 0; }
   .comp-item-editor .range-row .val { text-align: right; min-width: 0; }
   .comp-btns { display: flex; gap: 8px; }
   .comp-btns .btn { flex: 1; }
@@ -424,7 +429,7 @@
   .swatch.active { border-color: #fff; box-shadow: 0 0 0 2px var(--ink); }
   .swatch-custom { position: relative; overflow: hidden; }
   .swatch-custom input[type=color] { position: absolute; top: -4px; left: -4px; width: 36px; height: 36px; border: none; padding: 0; cursor: pointer; }
-  .label-mono { font-family: var(--font-mono); font-size: 11px; color: var(--ink-dim); min-width: 74px; }
+  .label-mono { font-family: var(--font-mono); font-size: 11px; color: var(--ink-dim); min-width: 0; }
 
   footer { margin-top: 30px; text-align: center; font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); }
 
@@ -461,7 +466,7 @@
     border-radius: 8px; padding: 14px;
   }
   .io-controls-row { display: flex; gap: 8px; flex-wrap: wrap; }
-  .io-controls-row .btn { flex: 1; min-width: 100px; }
+  .io-controls-row .btn { flex: 1; min-width: 84px; }
   .io-hint { font-family: var(--font-mono); font-size: 10px; color: var(--ink-faint); line-height: 1.5; margin: 0; }
   .io-hint code { color: var(--ink); background: rgba(0,0,0,0.05); padding: 2px 4px; border-radius: 4px; font-weight: 500; }
 
@@ -766,6 +771,8 @@
           <span class="val" id="toleranceVal">0</span>
         </div>
       </div>
+      <button class="btn btn-sm btn-ghost btn-full" id="resetPrefsBtn" style="padding:8px 6px;font-size:10px;"
+        title="SIZE / STABILIZER / TEXTURE / GRAIN / PRESSURE / TOLERANCE / 색, 그리고 COMPOSITION 수치를 공장 기본값으로 되돌립니다. 그림은 건드리지 않습니다.">↺ 설정 초기화</button>
       <div class="layers-wrap">
         <div class="layers-head">
           <span>LAYERS <span style="opacity:0.4;font-size:9px;">v3</span></span>
@@ -9727,6 +9734,198 @@ showLayerMenu(ev.clientX, ev.clientY, [
   updateDiscardBtn();
   renderLayersPanel();
   updateNavPreview();
+  // ==================== TOOL & COMPOSITION PREFERENCES ====================
+  // 도구 설정(SIZE / STABILIZER / TEXTURE / GRAIN / PRESSURE / TOLERANCE / 색 /
+  // 활성 도구)과 COMPOSITION 수치(COUNT / SCALE RANGE / ANTI-ALIAS / BACKGROUND)를
+  // 한 슬롯에 기억한다. 그림 내용은 AUTOSAVE가, 종이 질감과 리플레이 속도는 각자의
+  // 슬롯이 이미 맡고 있으므로 여기서는 건드리지 않는다.
+  //
+  // 주기적 타이머가 아니라 '마지막 조작 후 400ms' 디바운스다. 슬라이더 하나를
+  // 끌면 input이 수십 번 튀는데, 그때마다 동기 localStorage.setItem을 돌리면
+  // 펜 입력이 끊긴다. 탭을 닫거나 모바일에서 백그라운드로 가면 디바운스가
+  // 만료되기 전에 창이 사라질 수 있으므로 pagehide/visibilitychange에서 즉시 flush.
+  //
+  // 저장하지 않는 것: LINE WIDTH(활성 레이어의 실제 두께라 설정이 아니다),
+  // ADJUST ELEMENT의 SCALE/ROTATE(선택된 요소의 속성), TRACE 관련 값(참조
+  // 이미지가 새로고침에 남지 않는다), NAVIGATION 줌·회전·팬(그림별 뷰 상태),
+  // 그리고 LIVE → ACTIVE LAYER(켜진 채로 복원되면 앱을 열고 GRAIN을 살짝
+  // 건드리는 순간 활성 레이어 전체가 리텍스처된다 -- 항상 OFF로 시작한다).
+  const PREFS_KEY = 'nu_layer_prefs_v1';
+  const PREFS_DEFAULTS = {
+    v: 1,
+    sizes: { brush: 5, eraser: 5 },
+    tool: 'brush',
+    brushTex: { tex: 'smooth', grain: 100 },
+    eraserTex: { tex: 'smooth', grain: 100, customized: false },
+    stabilizer: 3,
+    pressure: 100,
+    tolerance: 0,
+    color: '#1d1d1f',
+    comp: { count: 14, scaleMin: 40, scaleMax: 160, aa: 50, bg: '#f5f5f7' }
+  };
+  const TEX_IDS  = ['smooth','pencil','spray','ink','gpen'];
+  const TOOL_IDS = ['brush','fill','select','eraser','lasso'];
+
+  // 저장값이 깨져 있어도 앱이 죽지 않도록 전부 범위 클램프 후 적용한다.
+  const pfInt = (v, lo, hi, d) => {
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d;
+  };
+  const pfHex = (v, d) => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)) ? v : d;
+  const pfPick = (v, list, d) => list.includes(v) ? v : d;
+
+  let prefsTimer = null;
+  let prefsLoaded = false;   // 복원 도중에 발생한 input으로 되받아 저장하지 않도록
+
+  function collectPrefs(){
+    return {
+      v: 1,
+      sizes: { brush: toolSizes.brush, eraser: toolSizes.eraser },
+      tool: currentTool,
+      brushTex: { tex: brushTex.tex, grain: brushTex.grain },
+      eraserTex: { tex: eraserTex.tex, grain: eraserTex.grain, customized: !!eraserTex.customized },
+      stabilizer: lazyRadius,
+      pressure: Math.round(pressureAmt * 100),
+      tolerance: tolerance,
+      color: strokeColor,
+      comp: {
+        count:    parseInt($('compCount').value, 10),
+        scaleMin: parseInt($('scaleMin').value, 10),
+        scaleMax: parseInt($('scaleMax').value, 10),
+        aa:       aaLevel,
+        bg:       compBg
+      }
+    };
+  }
+
+  function savePrefsNow(){
+    if(!prefsLoaded) return;
+    clearTimeout(prefsTimer); prefsTimer = null;
+    // 획을 긋는 중이면 미룬다 -- AUTOSAVE와 같은 이유로, 동기 쓰기가 펜을 끊는다.
+    if(typeof drawing !== 'undefined' && drawing){ schedulePrefs(); return; }
+    try { localStorage.setItem(PREFS_KEY, JSON.stringify(collectPrefs())); }
+    catch(e){ /* 용량 초과 등: 설정 정도는 조용히 포기해도 작업에 지장이 없다 */ }
+  }
+
+  function schedulePrefs(){
+    if(!prefsLoaded) return;
+    clearTimeout(prefsTimer);
+    prefsTimer = setTimeout(()=>{ prefsTimer = null; savePrefsNow(); }, 400);
+  }
+
+  function applyPrefs(p){
+    // --- 도구별 크기와 질감을 먼저 세팅한다. 아래에서 도구 버튼을 클릭하면
+    //     그 핸들러가 toolSizes / brushTex / eraserTex를 읽어 UI를 맞추므로,
+    //     순서가 뒤집히면 복원값이 기본값으로 덮인다.
+    toolSizes.brush  = pfInt(p.sizes && p.sizes.brush,  1, 60, 5);
+    toolSizes.eraser = pfInt(p.sizes && p.sizes.eraser, 1, 60, 5);
+
+    const bt = p.brushTex || {};
+    brushTex.tex   = pfPick(bt.tex, TEX_IDS, 'smooth');
+    brushTex.grain = pfInt(bt.grain, 0, 100, 100);
+    const et = p.eraserTex || {};
+    eraserTex.tex        = pfPick(et.tex, TEX_IDS, 'smooth');
+    eraserTex.grain      = pfInt(et.grain, 0, 100, 100);
+    eraserTex.customized = !!et.customized;
+
+    // --- 도구 선택: 버튼을 실제로 눌러 부수효과(크기·질감 스왑, TOLERANCE 행
+    //     흐림 처리, 브러시 미리보기)를 전부 태운다. 손으로 재현하면 빠뜨린다.
+    const wantTool = pfPick(p.tool, TOOL_IDS, 'brush');
+    const toolBtn = document.querySelector('.tool-select .tool-btn[data-tool="' + wantTool + '"]');
+    if(toolBtn) toolBtn.click();
+
+    // --- 손떨림 보정
+    lazyRadius = pfInt(p.stabilizer, 0, 20, 3);
+    $('stabilizer').value = lazyRadius;
+    $('stabilizerVal').textContent = lazyRadius;
+
+    // --- 감압 (G-PEN 전용 행이지만 값 자체는 항상 유지)
+    const pr = pfInt(p.pressure, 0, 100, 100);
+    pressureAmt = pr / 100;
+    $('prAmt').value = pr;
+    $('prAmtVal').textContent = pr;
+
+    // --- FILL 허용오차
+    tolerance = pfInt(p.tolerance, 0, 120, 0);
+    $('tolerance').value = tolerance;
+    $('toleranceVal').textContent = tolerance;
+
+    // --- 색: 팔레트에 같은 색이 있으면 그 칸도 선택 상태로 되돌린다.
+    const hex = pfHex(p.color, '#1d1d1f');
+    applyColor(hex);
+    document.querySelectorAll('.palette-cell').forEach(c=>{
+      c.classList.toggle('selected', (c.title || '').toLowerCase() === hex.toLowerCase());
+    });
+
+    // --- COMPOSITION
+    const c = p.comp || {};
+    const cnt = pfInt(c.count, 1, 60, 14);
+    $('compCount').value = cnt;
+    $('compCountVal').textContent = cnt;
+
+    let mn = pfInt(c.scaleMin, 10, 300, 40);
+    let mx = pfInt(c.scaleMax, 10, 300, 160);
+    if(mn > mx){ const t = mn; mn = mx; mx = t; }   // 저장값이 뒤집혀 있어도 안전하게
+    $('scaleMin').value = mn;
+    $('scaleMax').value = mx;
+    updateScaleLabel();
+
+    aaLevel = pfInt(c.aa, 0, 100, 50);
+    $('aaLevel').value = aaLevel;
+    $('aaLevelVal').textContent = aaLevel + '%';
+
+    // 배경은 '새 세션의 기본값' 역할만 한다 -- 갤러리에서 컴포지션을 열면
+    // 그 매니페스트의 bg가 이 값을 덮어쓰는 기존 동작을 그대로 둔다.
+    compBg = pfHex(c.bg, '#f5f5f7');
+    const cbg = $('customBg'); if(cbg) cbg.value = compBg;
+    document.querySelectorAll('#bgSwatches .swatch').forEach(sw=>{
+      sw.classList.toggle('active', sw.dataset.bg === compBg);
+    });
+    renderComposition();
+  }
+
+  function loadPrefs(){
+    let raw = null;
+    try { raw = localStorage.getItem(PREFS_KEY); } catch(e){}
+    if(raw){
+      try { applyPrefs(JSON.parse(raw) || {}); }
+      catch(e){ console.warn('prefs restore failed', e); }
+    }
+    prefsLoaded = true;
+  }
+
+  // 기존 핸들러를 하나하나 고치는 대신 버블 단계에서 위임 수신한다. 각 컨트롤의
+  // 자기 핸들러가 먼저 끝난 뒤에 호출되므로, 이 시점의 상태 변수는 이미 최신이다.
+  const PREF_INPUT_IDS = ['brushSize','stabilizer','grain','prAmt','tolerance',
+                          'compCount','scaleMin','scaleMax','aaLevel',
+                          'customBg','customColorPicker'];
+  document.addEventListener('input', e=>{
+    if(e.target && PREF_INPUT_IDS.indexOf(e.target.id) >= 0) schedulePrefs();
+  });
+  document.addEventListener('click', e=>{
+    const t = e.target;
+    if(!t || typeof t.closest !== 'function') return;
+    if(t.closest('.tool-select .tool-btn') || t.closest('.tex-btn') ||
+       t.closest('.palette-cell') || t.closest('#bgSwatches .swatch')) schedulePrefs();
+  });
+  // 스포이드는 캔버스 클릭으로 색을 바꾸므로 위 위임에 걸리지 않는다.
+  $('drawCanvas').addEventListener('pointerup', ()=> schedulePrefs());
+  // 탭이 닫히거나 백그라운드로 내려가기 직전에 즉시 flush.
+  window.addEventListener('pagehide', savePrefsNow);
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState === 'hidden') savePrefsNow();
+  });
+
+  $('resetPrefsBtn').addEventListener('click', ()=>{
+    prefsLoaded = false;                 // 되돌리는 동안 발생하는 이벤트는 무시
+    try { localStorage.removeItem(PREFS_KEY); } catch(e){}
+    applyPrefs(JSON.parse(JSON.stringify(PREFS_DEFAULTS)));
+    prefsLoaded = true;
+    toast('도구·컴포지션 설정을 기본값으로 되돌렸습니다.');
+  });
+
+  loadPrefs();
+
   const _origRenderAll = renderAll;
   renderAll = function(){
     _origRenderAll();
