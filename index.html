@@ -30,7 +30,88 @@
   html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
   ::selection { background: var(--ink-dim); color: #fff; }
 
-  .app { max-width: 1500px; margin: 0 auto; padding: 28px 28px 60px; }
+  /* The old 1500px cap left ~400px of dead margin on a 1920 display. The
+     splitters now decide how the width is divided, so the shell just needs to
+     stop wasting it. Still capped so an ultrawide does not stretch the
+     artboard past what fits vertically (78vh caps that separately). */
+  .app { max-width: min(2200px, 100%); margin: 0 auto; padding: 28px 28px 60px; position: relative; z-index: 1; }
+  @media (min-width: 1700px) { .app { padding-inline: 40px; } }
+
+  /* ================= LIQUID GLASS =================
+     Glass only reads as glass when there is something behind it to bend.
+     The old flat-white ground gave the panels nothing to refract, so this
+     lays a very pale wash underneath: four soft tints plus a faint rule grid
+     whose straight lines are what actually reveal the curvature at the rims.
+     It is deliberately near-invisible on its own -- turn the glass off and
+     the app still looks like the flat editorial thing it was. */
+  #glassBed {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+    opacity: var(--bed-strength, 1);
+  }
+  #glassBed .bed-blob { position: absolute; border-radius: 50%; filter: blur(90px); }
+  #glassBed .bb1 { width: 46vmax; height: 46vmax; left: -8%;  top: -14%; background: #ffd9cf; opacity: 0.55; }
+  #glassBed .bb2 { width: 40vmax; height: 40vmax; left: 46%;  top: 34%;  background: #cfe0ff; opacity: 0.50; }
+  #glassBed .bb3 { width: 34vmax; height: 34vmax; left: 18%;  top: 58%;  background: #d6f2e6; opacity: 0.45; }
+  #glassBed .bb4 { width: 28vmax; height: 28vmax; left: 74%;  top: -6%;  background: #fdf0c4; opacity: 0.50; }
+  #glassBed .bed-rule {
+    position: absolute; inset: 0;
+    background:
+      repeating-linear-gradient(90deg, rgba(29,29,31,0.045) 0 1px, transparent 1px 44px),
+      repeating-linear-gradient(0deg,  rgba(29,29,31,0.045) 0 1px, transparent 1px 44px);
+  }
+  html.no-glass #glassBed { display: none; }
+
+  /* Master-only parameter panel. It is itself glass, which makes it the
+     fastest way to judge a setting -- you are looking at the change. */
+  #glassPanel {
+    position: fixed; right: 18px; bottom: 18px; z-index: 120; width: 232px;
+    border: 1px solid var(--border); border-radius: 14px; padding: 12px 12px 8px;
+    font-family: var(--font-mono); font-size: 10px; color: var(--ink);
+    background: rgba(255,255,255,0.72);
+    backdrop-filter: blur(16px) saturate(1.6);
+    box-shadow: 0 16px 40px rgba(0,0,0,0.12);
+  }
+  #glassPanel[hidden] { display: none; }
+  .gp-head { display: flex; justify-content: space-between; align-items: center;
+             letter-spacing: 0.22em; color: var(--ink-dim); margin-bottom: 10px; }
+  .gp-row { display: grid; grid-template-columns: 1fr auto; align-items: center; margin-bottom: 8px; }
+  .gp-row label { letter-spacing: 0.1em; color: var(--ink-dim); }
+  .gp-row output { color: var(--accent); font-variant-numeric: tabular-nums; }
+  .gp-row input { grid-column: 1 / -1; width: 100%; margin-top: 4px; accent-color: var(--ink); min-width: 0; }
+  .gp-actions { display: flex; gap: 6px; margin-top: 10px; }
+  .gp-actions .btn { flex: 1; min-width: 0; padding: 5px 6px; font-size: 10px; }
+  .gp-note { margin: 8px 0 0; font-size: 9px; line-height: 1.6; color: var(--ink-faint); }
+  #glassPanel.off .gp-row { opacity: 0.35; pointer-events: none; }
+
+  /* Base coat. Every glass surface gets this; the refraction filter is layered
+     on top only where the engine supports url() inside backdrop-filter. */
+  .glass {
+    background: rgba(255,255,255, var(--glass-tint, 0.62));
+    backdrop-filter: blur(var(--glass-frost, 14px)) saturate(var(--glass-sat, 1.6));
+    -webkit-backdrop-filter: blur(var(--glass-frost, 14px)) saturate(var(--glass-sat, 1.6));
+    box-shadow:
+      inset 1px 1px 0 rgba(255,255,255,0.75),
+      inset -1px -1px 0 rgba(255,255,255,0.42),
+      0 4px 20px rgba(0,0,0,0.05);
+  }
+  /* Chromium only: url() inside backdrop-filter drives the displacement map.
+     Frost drops right down here -- with real refraction a heavy blur just
+     smears the thing the rim is supposed to be bending. */
+  html.glass-fx .glass {
+    background: rgba(255,255,255, var(--glass-tint-fx, 0.34));
+    backdrop-filter:
+      blur(0.4px) var(--glass-filter, none)
+      blur(var(--glass-frost-fx, 1.2px)) saturate(var(--glass-sat, 1.55));
+  }
+  html.no-glass .glass {
+    background: var(--panel);
+    backdrop-filter: none; -webkit-backdrop-filter: none;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+  }
+  /* Refraction is a per-frame recomposite of everything underneath. While a
+     panel is being carried across the others that is exactly the cost we do
+     not want on top of a 1080px canvas redraw. */
+  body.panel-reordering .glass, body.col-resizing .glass { --glass-filter: none; }
 
   /* ---------- topbar ---------- */
   .topbar {
@@ -50,25 +131,113 @@
   .stat-readout .dot { color: var(--accent); }
 
   /* ---------- layout ---------- */
-  .layout { display: grid; grid-template-columns: 2.03fr 1fr 1.05fr; gap: 22px; align-items: start; }
-  /* 01 DRAWING 캔버스를 1.5배로 키운 비율.
-     그리기 캔버스 실폭 = 패널폭 - 40(패딩) - 144(사이드바) - 14(간격).
-     1.25fr(패널 530px → 캔버스 332px)을 2.03fr(패널 696px → 캔버스 498px)로 올리고,
-     늘어난 만큼을 02 SAMPLES / 03 COMPOSITION에서 원래 1:1.05 비율 그대로 덜어냈다. */
-  @media (max-width:1240px) { .layout { grid-template-columns: 1fr; } }
+  /* 세 패널 사이에 드래그용 거터를 '진짜 그리드 트랙'으로 넣는다. 예전 22px
+     gap이 그대로 거터 폭이 되므로 기본 간격은 눈에 띄게 바뀌지 않는다.
+     폭은 px이 아니라 fr로 들고 있는다 -- px으로 굳히면 창 크기를 바꿨을 때
+     비율이 따라오지 않고 한쪽만 남거나 넘친다.
+     기본값 2.03 : 1 : 1.05는 01 DRAWING 캔버스를 1.5배로 키웠을 때의 비율.
+     (그리기 캔버스 실폭 = 패널폭 - 40 패딩 - 144 사이드바 - 14 간격) */
+  .layout {
+    --col-1: 2.03fr; --col-2: 1fr; --col-3: 1.05fr; --gutter-w: 22px;
+    display: grid;
+    grid-template-columns: var(--col-1) var(--gutter-w) var(--col-2) var(--gutter-w) var(--col-3);
+    gap: 0; align-items: start;
+  }
+  .col-gutter {
+    align-self: stretch;              /* align-items:start면 내용 없는 트랙은 높이 0이 된다 */
+    position: relative; cursor: col-resize; touch-action: none;
+    min-height: 120px;
+  }
+  /* 손잡이는 평소엔 흐릿한 실선, 올리면 진해진다. 거터 폭 전체가 히트박스라
+     22px 어디를 잡아도 걸린다 -- 2px 선을 정확히 노리게 만들면 못 쓴다. */
+  .col-gutter::after {
+    content: ''; position: absolute; top: 0; bottom: 0; left: 50%;
+    width: 2px; margin-left: -1px; border-radius: 1px;
+    background: var(--border-soft); transition: background 0.15s;
+  }
+  .col-gutter:hover::after, .col-gutter.dragging::after { background: var(--ink-dim); }
+  .col-gutter.dragging::after { width: 3px; margin-left: -1.5px; }
+  /* 드래그 중에는 문서 전체가 col-resize로 잠긴다. 포인터가 거터를 벗어나도
+     커서가 텍스트 I빔으로 바뀌지 않고, 패널 안 글자가 선택되지도 않는다. */
+  body.col-resizing { cursor: col-resize !important; user-select: none; }
+  body.col-resizing * { cursor: col-resize !important; }
+
+  @media (max-width:1240px) {
+    /* 세로 스택: 이 폭에서 3분할은 어차피 못 쓴다. 거터도 같이 사라지므로
+       드래그가 자동으로 비활성화된다 (JS에서 따로 막을 필요가 없다). */
+    .layout { grid-template-columns: 1fr; gap: 22px; }
+    .col-gutter { display: none; }
+  }
 
   .panel {
     background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
     padding: 20px; display: flex; flex-direction: column; gap: 14px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+    /* Grid and flex children default to min-width:auto -- "never narrower than
+       my contents". Without this the browser simply ignores a --col-* fr that
+       asks for less, the three tracks overflow the container, and everything
+       inside spills. It also means the panel never actually reaches the
+       @container thresholds, so the internal reflow never fires either. */
+    min-width: 0;
   }
-  .panel-head { display: flex; align-items: center; gap: 10px; }
+  /* Same reasoning, one level down: any row that has to give way. */
+  .panel-head, .tool-row, .nav-wrap, .nav-row, .draw-main, .draw-sidebar,
+  .obj-meta, .obj-actions, .io-controls-row, .comp-btns, .trace-tools,
+  .color-targets, .palette-wrap, .layers-wrap, .layer-row { min-width: 0; }
+  /* 패널 내부 반응형은 뷰포트가 아니라 '패널 자기 폭'에 반응해야 한다. 거터로
+     03을 200px까지 줄여도 창은 그대로이므로 미디어쿼리는 발동하지 않는다. */
+  .draw-panel, .objects-panel, .comp-panel { container-type: inline-size; }
+
+  .panel-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  /* 01/02/03 numbers claimed an order the panels no longer keep -- they can be
+     dragged into any arrangement, so "01" sitting on the right just read as a
+     bug. A shape is an identity, not a position, and survives the move. */
   .panel-index {
-    font-family: var(--font-mono); font-size: 11px; color: #fff; background: var(--ink);
-    width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; font-weight: 600;
+    width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; color: var(--ink);
   }
+  .panel-index svg { width: 22px; height: 22px; display: block; }
+  .panel-index.accent { color: var(--accent); }
+  .panel-head .panel-index svg { transition: transform 0.16s ease; }
+  .panel-head:hover .panel-index svg { transform: scale(1.12); }
   .panel-head h2 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.2px; }
+  /* The header is the drag handle for reordering the three columns. Only the
+     index chip + title are grabbable -- the count badge and any buttons that
+     live in a head stay clickable. */
+  .panel-head .panel-index, .panel-head h2 {
+    cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none;
+  }
+  /* The grabbed panel is lifted off the page and carried by the cursor:
+     translucent so the columns underneath stay readable while it passes over
+     them, shadowed so it reads as "above". No scale -- a scale shifts the
+     element's own bounding box, and the drag maths reads that box back to
+     work out how far it still has to travel. */
+  .panel.reordering {
+    opacity: 0.72;
+    box-shadow: 0 22px 52px rgba(0,0,0,0.22);
+    border-color: var(--ink);
+    z-index: 6;
+    will-change: transform;
+    transition: opacity 150ms ease, box-shadow 150ms ease;
+  }
+  /* Released: the panel glides from wherever the cursor left it into its slot. */
+  .panel.settling {
+    z-index: 6;   /* stay above its neighbours until it has actually landed */
+    transition: transform 338ms cubic-bezier(0.22, 0.72, 0.24, 1), opacity 260ms ease, box-shadow 260ms ease;
+  }
+  /* FLIP: after the DOM move each panel is snapped back to where it was and
+     then released, so the swap reads as travel rather than a jump cut.
+     `will-change` keeps the browser from re-rasterising a huge panel mid-slide. */
+  .panel.flipping { transition: transform 624ms cubic-bezier(0.22, 0.72, 0.24, 1); will-change: transform; }
+  body.panel-reordering { cursor: grabbing !important; user-select: none; }
+  body.panel-reordering * { cursor: grabbing !important; }
+  @media (prefers-reduced-motion: reduce) {
+    .panel.flipping, .panel.settling { transition: none; }
+  }
+  @container (max-width: 260px) {
+    /* At this width the readout is the first thing to spill out of the head. */
+    .panel-head .stat-readout { display: none; }
+  }
   .count-badge {
     margin-left: auto; font-family: var(--font-mono); font-size: 11px; color: var(--ink-dim);
     border: 1px solid var(--border); padding: 3px 10px; border-radius: 12px;
@@ -79,6 +248,11 @@
     position: relative; width: 100%; aspect-ratio: 1/1; border: 1px solid var(--border-soft);
     border-radius: 8px; overflow: hidden; background: var(--canvas-bg);
     touch-action: none;
+    /* 정사각이라 폭이 곧 높이다. 거터로 01을 크게 넓히면 캔버스가 화면 아래로
+       흘러넘치므로, max-height 대신 max-WIDTH를 뷰포트 높이로 묶는다 --
+       max-height를 걸면 aspect-ratio가 깨져 직사각형이 된다. */
+    max-width: min(100%, 78vh);
+    margin-inline: auto;
   }
 
   /* ---------- iOS: 글자 선택 판정 끄기 ----------
@@ -231,6 +405,15 @@
     .draw-body { flex-direction: column; }
     .draw-sidebar { width: 100%; position: static; }
   }
+  /* 사이드바 144 + 간격 14 + 패딩 40 = 198px가 캔버스보다 먼저 자리를 먹는다.
+     패널이 여기까지 좁아지면 사이드바를 캔버스 아래로 내려 캔버스가 폭을
+     전부 쓰게 한다 -- 그래야 250px까지 줄일 수 있다. */
+  @container (max-width: 430px) {
+    .draw-body { flex-direction: column; }
+    .draw-sidebar { width: 100%; position: static; }
+    .draw-sidebar .palette-grid { grid-template-columns: repeat(12, 1fr); }
+    .draw-sidebar .layer-row .layer-mini { display: flex; }
+  }
   /* ---------- layers panel ---------- */
   .layers-wrap {
     border: 1px solid var(--border); border-radius: 10px; background: var(--panel-alt);
@@ -291,7 +474,7 @@
     background-size: 10px 10px; background-position: 0 0, 5px 5px; background-color: #fff;
   }
   .layer-row.hidden-layer .layer-name { opacity: 0.35; text-decoration: line-through; }
-  .layer-row .layer-name { flex: 1; }
+  .layer-row .layer-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .layer-row .layer-mini {
     font-size: 10px; padding: 2px 6px; border-radius: 5px; border: 1px solid var(--border);
     background: var(--panel-alt); cursor: pointer; color: var(--ink-dim);
@@ -303,7 +486,7 @@
   .color-targets { display: flex; gap: 8px; flex-wrap: wrap; align-items: stretch; }
   .color-target {
     display: flex; align-items: center; gap: 7px; cursor: pointer; padding: 8px 12px;
-    border: 1px solid var(--border); border-radius: 8px; background: var(--panel); flex: 1; min-width: 120px;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--panel); flex: 1 1 120px; min-width: 0;
     transition: border-color 0.15s;
   }
   .color-target.active { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
@@ -331,11 +514,37 @@
   }
   .palette-cell:hover { transform: scale(1.1); z-index: 2; }
   .palette-cell.selected { outline: 2px solid var(--ink); outline-offset: 1px; z-index: 2; }
-  .palette-custom { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 11px; color: var(--ink-dim); }
-  .palette-custom input[type=color] { width: 32px; height: 24px; border: 1px solid var(--border); border-radius: 4px; background: none; padding: 0; cursor: pointer; }
 
-  .range-row { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 11px; color: var(--ink-dim); flex: 1; min-width: 120px; }
-  input[type=range] { flex: 1; accent-color: var(--ink); }
+  /* ---------- MY PALETTE (12 user slots) ---------- */
+  .my-pal-now {
+    width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.15);
+    flex-shrink: 0; align-self: center;
+  }
+  /* Each slot IS the colour picker. The native <input type=color> renders its
+     own swatch that cannot be styled to match the primary grid, so it is
+     stretched invisibly over a <label> that carries the real appearance;
+     clicking anywhere on the swatch opens the OS picker. */
+  .my-palette .palette-cell { overflow: hidden; }
+  .palette-cell .pal-input {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    opacity: 0; border: 0; padding: 0; margin: 0; cursor: pointer;
+  }
+  /* An empty slot has to look like an invitation, not a broken swatch. */
+  .palette-cell.empty {
+    background: transparent; border: 1px dashed var(--border);
+  }
+  .palette-cell.empty::after {
+    content: '+'; position: absolute; inset: 0; display: flex; align-items: center;
+    justify-content: center; font-family: var(--font-mono); font-size: 11px;
+    color: var(--ink-faint); line-height: 1; pointer-events: none;
+  }
+
+  .range-row { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 11px; color: var(--ink-dim); flex: 1 1 120px; min-width: 0; }
+  /* Browsers give <input type=range> an intrinsic width of roughly 129px, and
+     min-width:auto turns that into a hard floor no matter what flex says.
+     Every slider in the app has to opt out of it, not just the ones that
+     happened to break first. */
+  input[type=range] { flex: 1; accent-color: var(--ink); min-width: 0; }
   .val { min-width: 40px; text-align: right; color: var(--ink); font-weight: 500; }
 
   /* Standard Apple Style Buttons */
@@ -372,7 +581,7 @@
   /* ---------- object gallery ---------- */
   .objects-grid {
     /* 패널이 좁아졌으므로 고정 3열 대신 최소 폭을 지키며 자동 배치 */
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 10px; max-height: 340px; overflow-y: auto; padding-right: 4px;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; max-height: 340px; overflow-y: auto; padding-right: 4px;
   }
   .objects-grid::-webkit-scrollbar { width: 6px; }
   .objects-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
@@ -391,14 +600,28 @@
     background-size: 10px 10px; border: 1px solid var(--border-soft);
   }
   .obj-thumb canvas { width: 100%; height: 100%; object-fit: contain; image-rendering: auto; }
-  .obj-meta { font-family: var(--font-mono); font-size: 10px; color: var(--ink-dim); display: flex; justify-content: space-between; }
-  .obj-actions { display: flex; gap: 4px; }
-  .obj-actions .btn { flex: 1; padding: 6px 4px; font-size: 10px; text-align: center; }
+  .obj-meta { font-family: var(--font-mono); font-size: 10px; color: var(--ink-dim); display: flex; justify-content: space-between; gap: 4px; min-width: 0; }
+  /* The card can be as narrow as 86px; a long filename or a 1080x1080 label
+     has to give. text-overflow alone does nothing here -- the span needs
+     min-width:0 first, or the box never gets constrained enough to clip. */
+  .obj-meta > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Up to four buttons live here (→ DRAW / VARY / ▶ RP / DEL). A single flex
+     row divided them into ~20px slivers that their labels could not fit, so
+     the text ran outside the card. A wrapping grid gives each button a real
+     minimum and drops to fewer columns instead of overflowing. */
+  .obj-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(44px, 1fr)); gap: 4px; min-width: 0; }
+  .obj-actions .btn {
+    padding: 6px 4px; font-size: 10px; text-align: center; min-width: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  /* A button asked to span the row (the gallery's → COMPOSITION) should not
+     force a second column to appear. */
+  .obj-actions .btn-full { grid-column: 1 / -1; }
 
   /* ---------- variation block ---------- */
   .variation-block { border-top: 1px solid var(--border); padding-top: 16px; display: flex; flex-direction: column; gap: 10px; }
   .panel-head-sub h3 { font-size: 13px; font-weight: 600; margin: 0; color: var(--ink); }
-  .variations-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 10px; }
+  .variations-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
   .var-card {
     background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 6px;
     display: flex; flex-direction: column; gap: 6px;
@@ -423,8 +646,19 @@
   .comp-row .bg-swatches { grid-column: 2 / -1; }
   .comp-item-editor .range-row { display: grid; grid-template-columns: 84px 1fr 56px; align-items: center; gap: 8px; min-width: 0; }
   .comp-item-editor .range-row .val { text-align: right; min-width: 0; }
-  .comp-btns { display: flex; gap: 8px; }
-  .comp-btns .btn { flex: 1; }
+  .comp-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .comp-btns .btn { flex: 1 1 92px; min-width: 0; }
+  /* 라벨 84 + 값 56 + 간격 16 = 156px가 슬라이더가 시작되기도 전에 사라진다.
+     좁아지면 라벨을 윗줄로 빼고 슬라이더에 한 줄을 통째로 준다. */
+  @container (max-width: 310px) {
+    .comp-row, .comp-item-editor .range-row { grid-template-columns: 1fr 52px; row-gap: 3px; }
+    .comp-row > .label-mono,
+    .comp-item-editor .range-row > span:first-child { grid-column: 1 / -1; }
+    .comp-row .bg-swatches { grid-column: 1 / -1; }
+    .comp-btns .btn { flex: 1 1 100%; }
+    .comp-item-editor .btn-row { flex-wrap: wrap; }
+    .comp-item-editor .btn-row .btn { flex: 1 1 100%; }
+  }
   .bg-swatches { display: flex; gap: 6px; align-items: center; }
   .swatch {
     width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; cursor: pointer;
@@ -452,7 +686,7 @@
     color: var(--ink-dim); border: 1px solid var(--border); padding: 8px 12px; border-radius: 8px;
     background: var(--panel); flex-wrap: wrap;
   }
-  .folder-chip .folder-status { color: var(--ink); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+  .folder-chip .folder-status { color: var(--ink); min-width: 0; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
   .folder-chip.connected { border-color: var(--ink); }
   .folder-chip .link-btn {
     background: var(--border-soft); border: none; color: var(--ink);
@@ -470,7 +704,12 @@
     border-radius: 8px; padding: 14px;
   }
   .io-controls-row { display: flex; gap: 8px; flex-wrap: wrap; }
-  .io-controls-row .btn { flex: 1; min-width: 84px; }
+  .io-controls-row .btn { flex: 1 1 84px; min-width: 0; }
+  @container (max-width: 250px) {
+    .io-controls-row .btn { flex: 1 1 100%; }
+    .variation-actions { flex-wrap: wrap; }
+    .variation-actions .btn { flex: 1 1 100%; }
+  }
   .io-hint { font-family: var(--font-mono); font-size: 10px; color: var(--ink-faint); line-height: 1.5; margin: 0; }
   .io-hint code { color: var(--ink); background: rgba(0,0,0,0.05); padding: 2px 4px; border-radius: 4px; font-weight: 500; }
 
@@ -589,7 +828,7 @@
 
   /* ---------- archive manager window ---------- */
   .mgr-toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  .mgr-crumbs { font-family: var(--font-mono); font-size: 12px; color: var(--ink-dim); flex: 1; min-width: 160px; }
+  .mgr-crumbs { font-family: var(--font-mono); font-size: 12px; color: var(--ink-dim); flex: 1 1 160px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mgr-crumbs b { color: var(--ink); }
   .mgr-grid {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 12px;
@@ -644,6 +883,36 @@
 </style>
 </head>
 <body>
+<div id="glassBed" aria-hidden="true">
+  <div class="bed-blob bb1"></div><div class="bed-blob bb2"></div>
+  <div class="bed-blob bb3"></div><div class="bed-blob bb4"></div>
+  <div class="bed-rule"></div>
+</div>
+<svg id="glassDefs" width="0" height="0" aria-hidden="true" style="position:absolute"></svg>
+
+<div id="glassPanel" hidden>
+  <div class="gp-head">
+    <span>GLASS PARAMETERS</span>
+    <button class="link-btn" id="glassClose">✕</button>
+  </div>
+  <div class="gp-row"><label for="gsIor">IOR</label><output id="goIor">1.48</output>
+    <input id="gsIor" type="range" min="1" max="2.2" step="0.01" value="1.48"></div>
+  <div class="gp-row"><label for="gsBevel">BEVEL</label><output id="goBevel">28px</output>
+    <input id="gsBevel" type="range" min="6" max="90" step="1" value="28"></div>
+  <div class="gp-row"><label for="gsFrost">FROST</label><output id="goFrost">1.2px</output>
+    <input id="gsFrost" type="range" min="0" max="12" step="0.1" value="1.2"></div>
+  <div class="gp-row"><label for="gsDisp">DISPERSION</label><output id="goDisp">6%</output>
+    <input id="gsDisp" type="range" min="0" max="20" step="0.5" value="6"></div>
+  <div class="gp-row"><label for="gsTint">TINT</label><output id="goTint">34%</output>
+    <input id="gsTint" type="range" min="0" max="90" step="1" value="34"></div>
+  <div class="gp-row"><label for="gsBed">BACKDROP</label><output id="goBed">100%</output>
+    <input id="gsBed" type="range" min="0" max="100" step="1" value="100"></div>
+  <div class="gp-actions">
+    <button class="btn btn-sm btn-ghost" id="glassToggle">GLASS: ON</button>
+    <button class="btn btn-sm btn-ghost" id="glassReset">RESET</button>
+  </div>
+  <p class="gp-note" id="glassNote"></p>
+</div>
 
 <!-- ==================== LOGIN OVERLAY ==================== -->
 <div class="login-overlay" id="loginOverlay">
@@ -688,6 +957,7 @@
         <span class="role-badge" id="roleBadge">GUEST</span>
         <span class="role-name" id="roleName">Guest</span>
         <button class="link-btn" id="switchRoleBtn">SWITCH</button>
+        <button class="link-btn" id="glassOpenBtn" hidden title="유리 효과 파라미터 (master)">GLASS</button>
       </div>
       <div class="stat-readout"><span class="dot">●</span> <span id="statReadout">OBJ 0000 · READY</span></div>
     </div>
@@ -696,8 +966,8 @@
   <div class="layout">
 
     <!-- 01 DRAWING -->
-    <section class="panel draw-panel">
-      <div class="panel-head"><span class="panel-index">01</span><h2>DRAWING</h2></div>
+    <section class="panel draw-panel" id="panelDraw" data-panel="draw">
+      <div class="panel-head"><span class="panel-index accent" title="DRAWING"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.4" fill="currentColor"/></svg></span><h2>DRAWING</h2></div>
 
       <div class="draw-body">
         <!-- Photoshop-style left vertical menu: layers & everything after -->
@@ -720,10 +990,13 @@
       <div class="palette-wrap">
         <div class="palette-label"><span>PRIMARY PALETTE</span></div>
         <div class="palette-grid" id="paletteGrid"></div>
-        <div class="palette-custom">
-          <span>CUSTOM</span>
-          <input type="color" id="customColorPicker" value="#1d1d1f">
+      </div>
+      <div class="palette-wrap">
+        <div class="palette-label">
+          <span>MY PALETTE</span>
+          <span class="my-pal-now" id="myPalNow" title="현재 색"></span>
         </div>
+        <div class="palette-grid my-palette" id="myPaletteGrid"></div>
       </div>
       <div class="tool-row" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
         <div class="range-row">
@@ -862,7 +1135,7 @@
           <span class="val" id="paperDepthVal">45</span>
         </div>
       </div>
-      <button class="btn btn-accent btn-full" id="registerBtn" style="margin-top:6px;">REGISTER OBJECT →</button>
+      <button class="btn btn-accent btn-full" id="registerBtn" style="margin-top:6px;">REGISTER OBJECT</button>
       <div class="replay-row">
         <button class="btn" id="replayBtn" style="flex:1;" title="Replay the drawing process (trace layer hidden)">▶ REPLAY</button>
         <button class="btn" id="replaySaveBtn" style="flex:1;" title="Replay and save as a video — MP4 (H.264) when the browser supports it, WebM otherwise">⏺ SAVE REPLAY</button>
@@ -885,8 +1158,11 @@
     </section>
 
     <!-- 02 SAMPLES -->
-    <section class="panel objects-panel drop-target" id="samplesPanel">
-      <div class="panel-head"><span class="panel-index" style="background:var(--ink);">02</span><h2>SAMPLES</h2><span class="count-badge" id="objCount">0</span></div>
+    <div class="col-gutter" data-gutter="1" role="separator" aria-orientation="vertical"
+         title="드래그해서 01 / 02 폭을 조절 · 더블클릭하면 기본 비율로 되돌림"></div>
+
+    <section class="panel objects-panel drop-target" id="samplesPanel" data-panel="samples">
+      <div class="panel-head"><span class="panel-index" title="SAMPLES"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="3" fill="currentColor"/></svg></span><h2>SAMPLES</h2><span class="count-badge" id="objCount">0</span></div>
 
       <div class="io-controls">
         <div class="io-controls-row">
@@ -912,9 +1188,12 @@
       </div>
     </section>
 
+    <div class="col-gutter" data-gutter="2" role="separator" aria-orientation="vertical"
+         title="드래그해서 02 / 03 폭을 조절 · 더블클릭하면 기본 비율로 되돌림"></div>
+
     <!-- 03 COMPOSITION -->
-    <section class="panel comp-panel">
-      <div class="panel-head"><span class="panel-index" style="background:var(--ink);">03</span><h2>COMPOSITION</h2></div>
+    <section class="panel comp-panel" id="panelComp" data-panel="comp">
+      <div class="panel-head"><span class="panel-index" title="COMPOSITION"><svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12,2.6 19.4,16.0 4.6,16.0" fill="currentColor" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg></span><h2>COMPOSITION</h2></div>
 
       <div class="canvas-frame comp-frame">
         <canvas id="compCanvas" width="1080" height="1080"></canvas>
@@ -2874,10 +3153,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const natW = traceImg.naturalWidth, natH = traceImg.naturalHeight;
     const fit = Math.min(W / natW, H / natH);          // object-fit: contain
     const drawW = natW * fit, drawH = natH * fit;
-    // traceState.x/y are CSS px in the on-screen frame — convert to canvas px
-    const frameW = traceImg.parentElement.getBoundingClientRect().width || W;
-    const k = W / frameW;
-    ctx.translate(W / 2 + traceState.x * k, H / 2 + traceState.y * k);
+    // traceState.x/y are a fraction of the frame width → canvas px is a
+    // straight multiply, and it no longer depends on the on-screen size.
+    ctx.translate(W / 2 + traceState.x * W, H / 2 + traceState.y * W);
     ctx.rotate(traceState.rotate * Math.PI / 180);
     ctx.scale(traceState.scale, traceState.scale);
     ctx.drawImage(traceImg, -drawW / 2, -drawH / 2, drawW, drawH);
@@ -2916,12 +3194,27 @@ showLayerMenu(ev.clientX, ev.clientY, [
   const traceImg = $('traceImage');
   const traceControls = $('traceControls');
   const traceSelectBox = $('traceSelectBox');
+  // x/y are a FRACTION of the artboard frame's width, not screen pixels.
+  // The reference image is width:100% inside the frame, so it rescales with
+  // the frame; a pixel offset would not, and the reference would slide out of
+  // register with the drawing every time the 01 column is resized.
   const traceState = { scale: 1, rotate: 0, x: 0, y: 0, opacity: 0.3, loaded: false };
+  function traceFrameW(){
+    // Measure .canvas-frame, NOT traceImg.parentElement (#canvasView). The view
+    // element carries the zoom / rotate / mirror transform, so its bounding box
+    // grows and shrinks with the navigation state — normalising against it
+    // would make the reference jump whenever the user zoomed. The frame is
+    // untransformed and is the artboard's true on-screen size.
+    const fr = traceImg.closest('.canvas-frame');
+    const w = fr ? fr.getBoundingClientRect().width : 0;
+    return w || drawCanvas.width;   // pre-layout fallback: 1:1 with canvas px
+  }
   let traceAdjustMode = false;   // ADJUST mode: image is interactive / selectable
   let traceSelected = false;     // UI (controls + box) visible only when selected
 
   function applyTraceTransform(){
-    traceImg.style.transform = `translate(${traceState.x}px, ${traceState.y}px) rotate(${traceState.rotate}deg) scale(${traceState.scale})`;
+    const fw = traceFrameW();
+    traceImg.style.transform = `translate(${traceState.x * fw}px, ${traceState.y * fw}px) rotate(${traceState.rotate}deg) scale(${traceState.scale})`;
     traceImg.style.opacity = traceState.opacity;
   }
 
@@ -3055,12 +3348,13 @@ showLayerMenu(ev.clientX, ev.clientY, [
     setTraceSelected(true);
     const startX = e.clientX, startY = e.clientY;
     const ix = traceState.x, iy = traceState.y;
+    const dragFrameW = traceFrameW();   // screen px → fraction, fixed for this drag
     const frameW = traceImg.parentElement.getBoundingClientRect().width;
     const ratio = 1080 / frameW; // keep drag feel consistent regardless of display size
     traceImg.setPointerCapture(e.pointerId);
     function move(me){
-      traceState.x = ix + (me.clientX - startX);
-      traceState.y = iy + (me.clientY - startY);
+      traceState.x = ix + (me.clientX - startX) / dragFrameW;
+      traceState.y = iy + (me.clientY - startY) / dragFrameW;
       applyTraceTransform();
       updateTraceSelectBox();
     }
@@ -7540,13 +7834,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
     strokeColor = hex;
     fillColor = hex;
     updateColorPreviews();
-    $('customColorPicker').value = hex;
+    const now = $('myPalNow');
+    if(now) now.style.background = hex;
   }
-
-  $('customColorPicker').addEventListener('input', e=>{
-    applyColor(e.target.value);
-    document.querySelectorAll('.palette-cell.selected').forEach(c=>c.classList.remove('selected'));
-  });
 
   const paletteGrid = $('paletteGrid');
   PALETTE.forEach(hex=>{
@@ -7554,6 +7844,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     cell.className = 'palette-cell';
     cell.style.background = hex;
     cell.title = hex;
+    cell.dataset.hex = hex;
     cell.addEventListener('click', ()=>{
       applyColor(hex);
       document.querySelectorAll('.palette-cell.selected').forEach(c=>c.classList.remove('selected'));
@@ -7561,6 +7852,107 @@ showLayerMenu(ev.clientX, ev.clientY, [
     });
     paletteGrid.appendChild(cell);
   });
+
+  // ==================== MY PALETTE (12 user-assigned slots) ====================
+  // Twelve slots that hold whatever the user puts there. The eyedropper (I)
+  // already writes into the current colour, so "pick a colour off the canvas,
+  // then click an empty slot" needs no extra machinery.
+  //
+  // Interaction, kept to one rule per state so nothing needs explaining twice:
+  //   filled slot  + click        -> use that colour
+  //   empty slot   + click        -> store the current colour (an empty slot
+  //                                  reads as an invitation, so let it be one)
+  //   any slot     + long-press   -> clear it  (works on desktop and touch;
+  //                  / right-click   Alt+click is not reachable on an iPad)
+  //   ✎ 고침 mode  + click        -> overwrite, for changing a slot that is
+  //                                  already filled without emptying it first
+  const MY_PAL_SIZE = 12;
+  let myPalette = new Array(MY_PAL_SIZE).fill(null);
+  const myPaletteGrid = $('myPaletteGrid');
+  // Clearing a slot re-renders the whole grid, which destroys the cell the
+  // press started on -- so the click that follows pointerup lands on a BRAND
+  // NEW cell and would immediately re-open its picker. A per-cell flag cannot
+  // see across that rebuild; this timestamp can.
+  let myPalSuppressClickUntil = 0;
+
+  function normHex(v){
+    if(typeof v !== 'string') return null;
+    let h = v.trim();
+    if(/^[0-9a-f]{6}$/i.test(h)) h = '#' + h;
+    return /^#[0-9a-f]{6}$/i.test(h) ? h.toLowerCase() : null;
+  }
+
+  function renderMyPalette(){
+    myPaletteGrid.innerHTML = '';
+    myPalette.forEach((hex, i)=>{
+      const cell = document.createElement('label');
+      cell.className = 'palette-cell' + (hex ? '' : ' empty');
+      cell.dataset.slot = i;
+      if(hex){
+        cell.style.background = hex;
+        cell.dataset.hex = hex;
+        cell.title = `${hex} — 클릭: 색 고르기 · 길게 누르기: 비우기`;
+      } else {
+        cell.title = '빈 칸 — 클릭해서 색을 지정하세요';
+      }
+
+      const input = document.createElement('input');
+      input.type = 'color';
+      input.className = 'pal-input';
+      input.value = hex || normHex(strokeColor) || '#1d1d1f';
+
+      // `input` fires live while the user drags inside the OS picker, so the
+      // canvas colour tracks the swatch in real time rather than only on close.
+      const commit = ()=>{
+        const v = normHex(input.value);
+        if(!v) return;
+        myPalette[i] = v;
+        cell.classList.remove('empty');
+        cell.style.background = v;
+        cell.dataset.hex = v;
+        applyColor(v);
+        document.querySelectorAll('.palette-cell.selected').forEach(c=>c.classList.remove('selected'));
+        cell.classList.add('selected');
+        schedulePrefs();
+      };
+      input.addEventListener('input', commit);
+      input.addEventListener('change', commit);
+
+      let pressTimer = null;
+      const clearSlot = ()=>{
+        if(!myPalette[i]) return;
+        myPalette[i] = null;
+        myPalSuppressClickUntil = performance.now() + 500;
+        renderMyPalette();
+        schedulePrefs();
+        toast(`MY PALETTE ${i + 1}번을 비웠습니다.`);
+      };
+      cell.addEventListener('pointerdown', ()=>{
+        pressTimer = setTimeout(clearSlot, 550);
+        // Re-seed here, not at render time: an empty slot should open on
+        // whatever colour is in hand RIGHT NOW. Seeding once when the grid was
+        // built left every untouched slot showing a stale colour.
+        if(!myPalette[i]) input.value = normHex(strokeColor) || '#1d1d1f';
+      });
+      const cancelPress = ()=>{ clearTimeout(pressTimer); pressTimer = null; };
+      cell.addEventListener('pointerup', cancelPress);
+      cell.addEventListener('pointerleave', cancelPress);
+      cell.addEventListener('pointercancel', cancelPress);
+      cell.addEventListener('contextmenu', e=>{ e.preventDefault(); clearSlot(); });
+      // The label forwards clicks to its input; blocking the label's click is
+      // what stops a just-cleared slot from re-opening the picker.
+      cell.addEventListener('click', e=>{
+        if(performance.now() < myPalSuppressClickUntil) e.preventDefault();
+      });
+
+      cell.appendChild(input);
+      myPaletteGrid.appendChild(cell);
+    });
+    const now = $('myPalNow');
+    if(now) now.style.background = strokeColor;
+  }
+
+  renderMyPalette();
 
   // ==================== STROKE TEXTURES ====================
   // Per-tool texture memory (mirrors toolSizes): the ERASER follows the
@@ -8062,14 +8454,15 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
       const loadBtn = document.createElement('button');
       loadBtn.className = 'btn btn-sm btn-accent';
-      loadBtn.textContent = 'TO DRAWING';
+      loadBtn.textContent = 'TO DRAW';
       loadBtn.title = 'Load this sample onto the drawing canvas';
       loadBtn.addEventListener('click', ()=> loadSampleToDrawing(obj));
       actionsRow.appendChild(loadBtn);
 
       const varBtn = document.createElement('button');
       varBtn.className = 'btn btn-sm';
-      varBtn.textContent = 'VARIATION';
+      varBtn.textContent = 'VARY';
+      varBtn.title = 'Generate variations from this sample';
       varBtn.addEventListener('click', ()=> selectForVariation(obj));
       actionsRow.appendChild(varBtn);
 
@@ -9488,6 +9881,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
     // it needs the GitHub token to list the repository, which guests do not have.
     const ga = $('genArchiveBtn');
     if(ga) ga.hidden = userRole !== 'master';
+    // GLASS parameters — master only, and the panel closes with the role.
+    const gob = $('glassOpenBtn');
+    if(gob) gob.hidden = userRole !== 'master';
+    if(userRole !== 'master'){ const gp = $('glassPanel'); if(gp) gp.hidden = true; }
   }
   $('downloadCompBtn').addEventListener('click', ()=>{
     if(userRole === 'master') saveCompositionToGallery();
@@ -9901,6 +10298,635 @@ showLayerMenu(ev.clientX, ev.clientY, [
   updateDiscardBtn();
   renderLayersPanel();
   updateNavPreview();
+  // ==================== COLUMN SPLITTERS (01 / 02 / 03 widths) ====================
+  // The two gutters are real grid tracks, so dragging one only has to move
+  // fr weight between its two NEIGHBOURS — the third column's fr is never
+  // touched and its rendered width does not budge. Widths live as fr rather
+  // than px so the split survives a window resize.
+  const LAYOUT_DEFAULT = [2.03, 1, 1.05];
+  // Floors, in CSS px, keyed by PANEL rather than by slot -- the panels can be
+  // reordered, and 01's floor has to follow 01 wherever it lands. 01 reaches
+  // 250 only because the container query stacks its sidebar under the canvas
+  // first; above that it is 144(sidebar) + 14 + 40(padding) before a single
+  // pixel of canvas.
+  const PANEL_MIN_PX = { draw: 250, samples: 200, comp: 230 };
+  const minPxAt = i => PANEL_MIN_PX[panelOrder()[i]] ?? 200;
+  const layoutEl = document.querySelector('.layout');
+  let colFr = LAYOUT_DEFAULT.slice();
+
+  function applyLayoutCols(){
+    layoutEl.style.setProperty('--col-1', colFr[0] + 'fr');
+    layoutEl.style.setProperty('--col-2', colFr[1] + 'fr');
+    layoutEl.style.setProperty('--col-3', colFr[2] + 'fr');
+    // The reference image offset is a fraction of the frame width, so the
+    // pixel translate has to be recomputed whenever that width changes.
+    if(typeof applyTraceTransform === 'function' && traceState.loaded){
+      applyTraceTransform();
+      updateTraceSelectBox();
+    }
+    if(typeof updateNavPreview === 'function') updateNavPreview();
+  }
+
+  function layoutColWidths(){
+    return [...layoutEl.querySelectorAll(':scope > .panel')]
+      .map(p => p.getBoundingClientRect().width);
+  }
+
+  (function initColumnSplitters(){
+    let drag = null, raf = 0, pendingX = 0;
+
+    function commit(){
+      raf = 0;
+      if(!drag) return;
+      const delta = pendingX - drag.startX;
+      const [a, b] = drag.pair;
+      let wa = drag.startW[a] + delta;
+      let wb = drag.startW[b] - delta;
+      const total = drag.startW[a] + drag.startW[b];
+      const minA = drag.minPx[a], minB = drag.minPx[b];
+      // Clamp against BOTH floors: pushing past one has to stop the other
+      // too, or the pair silently stops summing to the space they share.
+      if(wa < minA){ wa = minA; wb = total - wa; }
+      if(wb < minB){ wb = minB; wa = total - wb; }
+      if(wa < minA || wb < minB) return; // no room at all
+      // px → fr at the pair's own exchange rate, so the untouched third
+      // column keeps exactly the width it had.
+      const rate = (drag.startFr[a] + drag.startFr[b]) / total;
+      colFr[a] = wa * rate;
+      colFr[b] = wb * rate;
+      applyLayoutCols();
+    }
+
+    layoutEl.querySelectorAll('.col-gutter').forEach(g => {
+      g.addEventListener('pointerdown', e => {
+        if(e.button !== 0) return;
+        e.preventDefault();
+        const i = parseInt(g.dataset.gutter, 10);   // 1 → panels 0/1, 2 → panels 1/2
+        drag = {
+          pair: [i - 1, i],
+          startX: e.clientX,
+          startW: layoutColWidths(),
+          startFr: colFr.slice(),
+          minPx: [0, 1, 2].map(minPxAt),   // snapshot: floors follow the panels
+          el: g
+        };
+        pendingX = e.clientX;
+        try { g.setPointerCapture(e.pointerId); } catch(err){}
+        g.classList.add('dragging');
+        document.body.classList.add('col-resizing');
+      });
+      g.addEventListener('pointermove', e => {
+        if(!drag) return;
+        pendingX = e.clientX;
+        // One style write per frame. Every write here relayouts three panels
+        // and two 1080px canvases; doing it per pointermove stutters badly.
+        if(!raf) raf = requestAnimationFrame(commit);
+      });
+      const end = e => {
+        if(!drag) return;
+        if(raf){ cancelAnimationFrame(raf); commit(); }
+        drag.el.classList.remove('dragging');
+        document.body.classList.remove('col-resizing');
+        try { drag.el.releasePointerCapture(e.pointerId); } catch(err){}
+        drag = null;
+        if(typeof schedulePrefs === 'function') schedulePrefs();
+      };
+      g.addEventListener('pointerup', end);
+      g.addEventListener('pointercancel', end);
+
+      // Escape hatch: one double-click anywhere on either gutter restores the
+      // whole three-column default, not just this boundary — after a few
+      // drags "which edge do I put back" is not a question worth asking.
+      g.addEventListener('dblclick', () => {
+        colFr = LAYOUT_DEFAULT.slice();
+        applyLayoutCols();
+        if(typeof schedulePrefs === 'function') schedulePrefs();
+        toast('패널 폭을 기본값으로 되돌렸습니다.');
+      });
+    });
+
+    // The frame width feeds the reference-image offset and the navigator
+    // outline, so a plain window resize needs the same follow-up as a drag.
+    let resizeRaf = 0;
+    window.addEventListener('resize', () => {
+      if(resizeRaf) return;
+      resizeRaf = requestAnimationFrame(() => {
+        resizeRaf = 0;
+        if(traceState.loaded){ applyTraceTransform(); updateTraceSelectBox(); }
+        updateNavPreview();
+        updateCursorState();
+      });
+    });
+  })();
+
+  // ==================== PANEL REORDER (drag 01 / 02 / 03 by the header) =========
+  // Grid tracks fill in DOM order, so reordering is a DOM move rather than an
+  // `order:` shuffle — that keeps the two gutters correctly interleaved and
+  // keeps `:scope > .panel` (which the splitter measures) in visual order.
+  //
+  // Moving a <canvas> node does not clear its bitmap and does not drop its
+  // listeners, so the drawing survives the trip intact.
+  //
+  // Widths travel WITH the panel. You dragged the panel, not the slot: if 01
+  // was the wide one it should still be wide after landing on the right.
+  // Set while a panel is being carried by the pointer, so the FLIP pass can
+  // skip it (see setPanelOrder).
+  let reorderDragEl = null;
+
+  function panelOrder(){
+    return [...layoutEl.querySelectorAll(':scope > .panel')].map(p => p.dataset.panel);
+  }
+
+  function setPanelOrder(order, frs, animate){
+    const byKey = {};
+    layoutEl.querySelectorAll(':scope > .panel').forEach(p => { byKey[p.dataset.panel] = p; });
+    const panels = order.map(k => byKey[k]).filter(Boolean);
+    // Bail rather than render a layout that is missing a panel.
+    if(panels.length !== 3) return false;
+    const guts = [...layoutEl.querySelectorAll(':scope > .col-gutter')];
+
+    // The panel being carried is excluded from FLIP -- its transform is owned
+    // by the pointer, and clearing it would drop the panel back into the grid
+    // mid-drag. The drag handler re-derives its offset right after this call.
+    const flipEls = animate ? panels.filter(el => el !== reorderDragEl) : [];
+
+    // FIRST: where is everything right now (before the DOM moves)?
+    const first = animate ? flipEls.map(el => ({ el, x: el.getBoundingClientRect().left })) : null;
+    if(animate) flipEls.forEach(el => { el.classList.remove('flipping'); el.style.transform = ''; });
+
+    // appendChild MOVES an existing node, so re-appending in the target
+    // sequence is the whole reorder. Gutters stay interleaved between panels.
+    [panels[0], guts[0], panels[1], guts[1], panels[2]]
+      .filter(Boolean)
+      .forEach(node => layoutEl.appendChild(node));
+    if(frs) colFr = frs.slice();
+    applyLayoutCols();
+
+    if(animate){
+      // LAST + INVERT: read the new positions, then pin each panel back to
+      // its old one with a transform. Reading getBoundingClientRect here also
+      // forces the layout the browser would otherwise batch away.
+      const inv = first.map(f => ({ el: f.el, dx: f.x - f.el.getBoundingClientRect().left }));
+      inv.forEach(v => { if(v.dx) v.el.style.transform = `translateX(${v.dx}px)`; });
+      // PLAY: next frame, hand the transform back to a transition.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        inv.forEach(v => {
+          if(!v.dx) return;
+          v.el.classList.add('flipping');
+          v.el.style.transform = '';
+          const done = () => {
+            v.el.classList.remove('flipping');
+            v.el.style.willChange = '';
+            v.el.removeEventListener('transitionend', done);
+          };
+          v.el.addEventListener('transitionend', done);
+        });
+      }));
+    }
+    return true;
+  }
+
+  // How far into a neighbour the carried panel's leading edge must reach
+  // before the two swap, as a fraction of that neighbour's width.
+  const REORDER_ENTER = 0.3;
+  // Pixels of committed travel in one direction before a swap that way counts.
+  const REORDER_INTENT = 6;
+
+  (function initPanelReorder(){
+    let drag = null;
+
+    function panelRects(){
+      return [...layoutEl.querySelectorAll(':scope > .panel')]
+        .map(p => ({ el: p, r: p.getBoundingClientRect() }));
+    }
+
+    // Pin the carried panel under the cursor. Its slot changes underneath it
+    // whenever a swap fires, so the offset is derived fresh every frame from
+    // where the panel WOULD sit with no transform (measured rect minus the
+    // translate we ourselves applied) -- never accumulated, so a swap cannot
+    // leave it drifting by the width of whatever it just passed.
+    function trackCarried(clientX){
+      const el = drag.panel;
+      const rect = el.getBoundingClientRect();
+      const layoutLeft = rect.left - drag.tx;
+      let desired = drag.grabLeft + (clientX - drag.startX);
+      // Keep it inside the shell; a panel dragged off into the margin looks
+      // dropped rather than held.
+      const bounds = layoutEl.getBoundingClientRect();
+      desired = Math.max(bounds.left, Math.min(bounds.right - rect.width, desired));
+      drag.tx = desired - layoutLeft;
+      el.style.transform = `translateX(${drag.tx}px)`;
+    }
+
+    function clearMarks(){
+      layoutEl.querySelectorAll(':scope > .panel').forEach(p => {
+        p.classList.remove('reordering', 'reorder-target');
+      });
+    }
+
+    layoutEl.addEventListener('pointerdown', e => {
+      const handle = e.target.closest('.panel-head .panel-index, .panel-head h2');
+      if(!handle || e.button !== 0) return;
+      const panel = handle.closest('.panel');
+      if(!panel || !panel.dataset.panel) return;
+      // Stacked layout: there are no columns to swap, so leave the header alone.
+      if(window.matchMedia('(max-width: 1240px)').matches) return;
+      e.preventDefault();
+      drag = {
+        panel, startX: e.clientX, moved: false, pid: e.pointerId,
+        grabLeft: panel.getBoundingClientRect().left,   // slot position at grab
+        tx: 0,                                          // translate applied so far
+        lastX: e.clientX, dirAccum: 0                   // travel direction so far
+      };
+      try { layoutEl.setPointerCapture(e.pointerId); } catch(err){}
+    });
+
+    layoutEl.addEventListener('pointermove', e => {
+      if(!drag) return;
+      if(!drag.moved){
+        // A 6px threshold so a plain click on the title is not a reorder.
+        if(Math.abs(e.clientX - drag.startX) < 6) return;
+        drag.moved = true;
+        drag.panel.classList.remove('settling');
+        drag.panel.classList.add('reordering');
+        reorderDragEl = drag.panel;
+        document.body.classList.add('panel-reordering');
+      }
+      // Which way is the pointer actually travelling? Accumulated, and reset
+      // whenever the direction flips, so a few pixels of hand tremor cannot
+      // register as intent.
+      const step = e.clientX - (drag.lastX ?? e.clientX);
+      drag.lastX = e.clientX;
+      if(step !== 0){
+        if(Math.sign(step) !== Math.sign(drag.dirAccum || 0)) drag.dirAccum = 0;
+        drag.dirAccum = (drag.dirAccum || 0) + step;
+      }
+
+      // Move the panel FIRST, then test. Testing before the transform is
+      // applied measures where the panel was on the previous frame, which
+      // delays every swap by one pointermove and quietly makes the 30% gate
+      // behave like slightly more than 30%.
+      trackCarried(e.clientX);
+
+      const rects = panelRects();
+      const meIdx = rects.findIndex(x => x.el === drag.panel);
+      const me = rects[meIdx].r;
+      let hitIdx = -1;
+      rects.forEach((x, i) => {
+        if(i === meIdx) return;
+        // Measured from the CARRIED PANEL'S LEADING EDGE, not the pointer.
+        // The title sits at the panel's top-left, so the pointer starts pinned
+        // to its left edge: dragging left put the cursor inside the neighbour
+        // immediately, while dragging right meant crossing the panel's own
+        // full width first -- 142px versus 742px for the same gesture. The
+        // panel's edge is equidistant from both neighbours, so both
+        // directions now answer after the same travel.
+        const enter = x.r.width * REORDER_ENTER;
+        if(i < meIdx && x.r.right - me.left  >= enter) hitIdx = i;  // moving left
+        if(i > meIdx && me.right - x.r.left  >= enter) hitIdx = i;  // moving right
+      });
+
+      // Direction gate. The instant a swap lands, the panel it displaced sits
+      // on the other side already deep enough to satisfy the reverse test, so
+      // a purely geometric rule oscillates. Requiring the pointer to be
+      // travelling THAT way means holding still settles, and swapping back
+      // takes a deliberate pull rather than a twitch.
+      if(hitIdx >= 0){
+        const dir = hitIdx > meIdx ? 1 : -1;
+        if(Math.sign(drag.dirAccum || 0) !== dir ||
+           Math.abs(drag.dirAccum || 0) < REORDER_INTENT) hitIdx = -1;
+      }
+      // While the FLIP is running the neighbours' rects are in motion, so a
+      // hit test would ping-pong between two orders. Hold off until they land.
+      const locked = drag.lockUntil && performance.now() < drag.lockUntil;
+      if(hitIdx >= 0 && !locked){
+        const order = panelOrder();
+        const frs = colFr.slice();
+        [order[meIdx], order[hitIdx]] = [order[hitIdx], order[meIdx]];
+        [frs[meIdx], frs[hitIdx]] = [frs[hitIdx], frs[meIdx]];
+        setPanelOrder(order, frs, true);
+        drag.lockUntil = performance.now() + 650;   // must outlast the 624ms slide
+        // The swap moved this panel's slot out from under it; re-derive the
+        // offset against the new one before the frame is painted, or it jumps.
+        trackCarried(e.clientX);
+      }
+    });
+
+    const end = e => {
+      if(!drag) return;
+      const wasMoved = drag.moved;
+      const carried = drag.panel;
+      const hadOffset = Math.abs(drag.tx) > 0.5;
+
+      layoutEl.querySelectorAll(':scope > .panel').forEach(p => {
+        if(p === carried) return;          // the carried panel settles, not snaps
+        p.classList.remove('flipping');
+        p.style.transform = '';
+        p.style.willChange = '';
+      });
+      document.body.classList.remove('panel-reordering');
+      try { layoutEl.releasePointerCapture(drag.pid); } catch(err){}
+      reorderDragEl = null;
+      drag = null;
+
+      if(wasMoved && hadOffset){
+        // Let go: transition the offset back to zero and drop the lifted look
+        // at the same time, so the panel lands instead of blinking into place.
+        carried.classList.add('settling');
+        carried.style.transform = '';
+        carried.classList.remove('reordering');
+        const done = () => {
+          carried.classList.remove('settling');
+          carried.style.willChange = '';
+          carried.removeEventListener('transitionend', done);
+        };
+        carried.addEventListener('transitionend', done);
+        // transitionend never fires if the offset was already zero or the user
+        // has reduced motion on, so guarantee the cleanup.
+        setTimeout(done, 520);
+      } else {
+        carried.classList.remove('reordering', 'settling');
+        carried.style.transform = '';
+        carried.style.willChange = '';
+      }
+      clearMarks();
+      if(wasMoved){
+        if(typeof schedulePrefs === 'function') schedulePrefs();
+        toast('패널 순서: ' + panelOrder().map(k => ({draw:'01',samples:'02',comp:'03'})[k]).join(' → '));
+      }
+    };
+    layoutEl.addEventListener('pointerup', end);
+    layoutEl.addEventListener('pointercancel', end);
+  })();
+
+  // ==================== LIQUID GLASS ====================
+  // Real refraction, not frosted glass. The rim of each surface bends what is
+  // behind it: an SVG displacement map built from the signed distance field of
+  // the surface's own rounded rectangle, driven through backdrop-filter. R, G
+  // and B are displaced at slightly different strengths so the rim throws a
+  // faint chromatic fringe, the way a real edge does.
+  //
+  // Only Chromium accepts url() inside backdrop-filter today. Safari parses
+  // -webkit-backdrop-filter but ignores the url(); Firefox rejects it outright.
+  // Both fall back to a plain frosted pane, which is what the .glass base coat
+  // already is -- so the fallback needs no separate code path.
+  //
+  // Deliberately NOT glass: the drawing canvas, the composition canvas, the
+  // palette swatches and the sample thumbnails. Those four are the ones that
+  // have to tell the truth about a colour or a value; a tint or a blur over
+  // any of them turns the tool into a liar.
+  const GLASS_DEFAULTS = { on: true, ior: 1.48, bevel: 28, frost: 1.2, disp: 6, tint: 34, bed: 100 };
+  let glassP = Object.assign({}, GLASS_DEFAULTS);
+
+  const glassDefs = $('glassDefs');
+  const glassSurfaces = [];          // { el, id, feImages[], feDisps[], w, h, r }
+
+  const glassSupported = (() => {
+    if(!('CSS' in window) || !CSS.supports) return false;
+    // Chromium is the only engine that accepts a url() reference here.
+    return CSS.supports('backdrop-filter', 'blur(1px) url(#x)');
+  })();
+
+  // ---- signed distance to a rounded rect centred on the origin ----
+  function sdRoundRect(px, py, hw, hh, r){
+    r = Math.min(r, hw, hh);
+    const qx = Math.abs(px) - (hw - r);
+    const qy = Math.abs(py) - (hh - r);
+    return Math.hypot(Math.max(qx,0), Math.max(qy,0)) + Math.min(Math.max(qx,qy), 0) - r;
+  }
+
+  const glassScratch = document.createElement('canvas');
+  const glassSctx = glassScratch.getContext('2d', { willReadFrequently: true });
+  const glassMapCache = new Map();
+
+  // The map is smooth, so it is built at reduced resolution and stretched back
+  // up -- a 900px panel would otherwise mean an 810,000-pixel loop every time a
+  // splitter moved. Both axes are divided by the SAME factor, so the bevel
+  // stays circular instead of being squashed on a wide panel.
+  function buildGlassMap(w, h, radius, bevel){
+    const key = `${w}x${h}r${radius}b${bevel}`;
+    const hit = glassMapCache.get(key);
+    if(hit) return hit;
+
+    const scale = Math.max(1, Math.max(w, h) / 180);
+    const mw = Math.max(8, Math.round(w / scale));
+    const mh = Math.max(8, Math.round(h / scale));
+    const mr = radius / scale, mb = Math.max(1, bevel / scale);
+
+    glassScratch.width = mw; glassScratch.height = mh;
+    const img = glassSctx.createImageData(mw, mh);
+    const d = img.data;
+    const hw = mw/2, hh = mh/2, e = 1;
+
+    for(let y=0; y<mh; y++){
+      const py = y + 0.5 - hh;
+      for(let x=0; x<mw; x++){
+        const px = x + 0.5 - hw;
+        const inward = -sdRoundRect(px, py, hw, hh, mr);   // >0 inside
+
+        // Gradient of the SDF points straight out of the shape, so it is the
+        // surface normal the rim should refract along.
+        let gx = sdRoundRect(px+e, py, hw, hh, mr) - sdRoundRect(px-e, py, hw, hh, mr);
+        let gy = sdRoundRect(px, py+e, hw, hh, mr) - sdRoundRect(px, py-e, hw, hh, mr);
+        const gl = Math.hypot(gx, gy) || 1;
+        gx /= gl; gy /= gl;
+
+        // Lens profile: dead flat across the middle, steep only at the rim.
+        let t = 1 - Math.min(Math.max(inward / mb, 0), 1);
+        t = t * t * Math.sqrt(t);            // ~pow 2.5, without the call
+        const ox = -gx * t, oy = -gy * t;    // sample inward -> the rim magnifies
+
+        const i = (y*mw + x) * 4;
+        d[i]   = Math.round(127.5 + 127.5 * Math.min(Math.max(ox,-1),1));
+        d[i+1] = Math.round(127.5 + 127.5 * Math.min(Math.max(oy,-1),1));
+        d[i+2] = 128;
+        d[i+3] = 255;
+      }
+    }
+    glassSctx.putImageData(img, 0, 0);
+    const uri = glassScratch.toDataURL();
+    // Bounded so a long splitter drag cannot grow this without limit.
+    if(glassMapCache.size > 60) glassMapCache.clear();
+    glassMapCache.set(key, uri);
+    return uri;
+  }
+
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  const svgEl = (tag, attrs) => {
+    const n = document.createElementNS(SVGNS, tag);
+    for(const k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  };
+
+  // Each surface needs its own filter: the displacement map has to match that
+  // surface's geometry, and a shared one would bend a wide panel's rim as if
+  // it were a small square.
+  function makeGlassFilter(id){
+    const f = svgEl('filter', { id, x:'0', y:'0', width:'100%', height:'100%',
+                                'color-interpolation-filters':'sRGB' });
+    const feImages = [], feDisps = [];
+    ['R','G','B'].forEach((ch, i) => {
+      const im = svgEl('feImage', { result: 'map'+ch, preserveAspectRatio: 'none' });
+      const dm = svgEl('feDisplacementMap', { in:'SourceGraphic', in2:'map'+ch,
+                        xChannelSelector:'R', yChannelSelector:'G', result:'d'+ch, scale:'0' });
+      f.appendChild(im); f.appendChild(dm);
+      feImages.push(im); feDisps.push(dm);
+    });
+    // Keep one channel out of each pass and add them back together: the three
+    // passes were displaced by slightly different amounts, so recombining them
+    // leaves the colour fringe at the rim.
+    const keep = [
+      '1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0',
+      '0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0',
+      '0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0'
+    ];
+    ['R','G','B'].forEach((ch,i) => f.appendChild(
+      svgEl('feColorMatrix', { in:'d'+ch, type:'matrix', result:'c'+ch, values: keep[i] })));
+    f.appendChild(svgEl('feComposite', { in:'cR', in2:'cG', operator:'arithmetic', k2:'1', k3:'1', result:'cRG' }));
+    f.appendChild(svgEl('feComposite', { in:'cRG', in2:'cB', operator:'arithmetic', k2:'1', k3:'1' }));
+    glassDefs.appendChild(f);
+    return { filter: f, feImages, feDisps };
+  }
+
+  function refreshGlassSurface(g, force){
+    const r = g.el.getBoundingClientRect();
+    const w = Math.round(r.width), h = Math.round(r.height);
+    if(w < 8 || h < 8) return;
+    const radius = parseFloat(getComputedStyle(g.el).borderTopLeftRadius) || 0;
+    const bevel = Math.min(glassP.bevel, Math.min(w, h)/2 - 1);
+    if(!force && w === g.w && h === g.h && radius === g.r && bevel === g.b) return;
+    g.w = w; g.h = h; g.r = radius; g.b = bevel;
+
+    const uri = buildGlassMap(w, h, radius, bevel);
+    g.feImages.forEach(im => {
+      im.setAttribute('href', uri);
+      im.setAttribute('width', w); im.setAttribute('height', h);
+    });
+  }
+
+  function applyGlassStrength(){
+    const spread = glassP.disp / 100;
+    glassSurfaces.forEach(g => {
+      // n = 1 is a flat window; everything above it bends harder.
+      const strength = (glassP.ior - 1) * (g.b || glassP.bevel) * 1.15;
+      g.feDisps.forEach((fe, i) => {
+        const k = 1 + (i - 1) * spread;    // R a touch under, B a touch over
+        fe.setAttribute('scale', (strength * 2 * k).toFixed(2));
+      });
+    });
+  }
+
+  function applyGlassCss(){
+    const root = document.documentElement;
+    root.classList.toggle('no-glass', !glassP.on);
+    root.classList.toggle('glass-fx', glassP.on && glassSupported);
+    root.style.setProperty('--glass-frost-fx', glassP.frost + 'px');
+    root.style.setProperty('--glass-tint-fx', (glassP.tint / 100).toFixed(3));
+    root.style.setProperty('--bed-strength', (glassP.bed / 100).toFixed(2));
+  }
+
+  function registerGlass(el){
+    if(!el || el.dataset.glassId) return;
+    el.classList.add('glass');
+    const id = 'glass-f-' + glassSurfaces.length;
+    el.dataset.glassId = id;
+    const { feImages, feDisps } = makeGlassFilter(id);
+    const g = { el, id, feImages, feDisps, w:0, h:0, r:0, b:0 };
+    glassSurfaces.push(g);
+    el.style.setProperty('--glass-filter', `url(#${id})`);
+    refreshGlassSurface(g, true);
+    applyGlassStrength();
+    if(typeof ResizeObserver === 'function'){
+      const ro = new ResizeObserver(() => {
+        clearTimeout(g.t);
+        // Debounced: a splitter drag fires this every frame, and rebuilding a
+        // map per frame would stall the drag it is trying to decorate.
+        g.t = setTimeout(() => { refreshGlassSurface(g); applyGlassStrength(); }, 140);
+      });
+      ro.observe(el);
+    }
+  }
+
+  function rebuildAllGlass(){
+    glassSurfaces.forEach(g => refreshGlassSurface(g, true));
+    applyGlassStrength();
+  }
+
+  // Surfaces that float above something. A flat panel on a flat ground would
+  // show nothing; these are the ones that actually sit on top of other content.
+  ['#panelDraw', '#samplesPanel', '#panelComp'].forEach(sel => registerGlass(document.querySelector(sel)));
+  document.querySelectorAll('.modal').forEach(registerGlass);
+  registerGlass($('traceControls'));
+  applyGlassCss();
+
+  // Menus and other nodes are created after boot, so pick them up on the fly.
+  const glassLater = new MutationObserver(muts => {
+    muts.forEach(m => m.addedNodes.forEach(n => {
+      if(n.nodeType !== 1) return;
+      if(n.classList && (n.classList.contains('layer-ctx-menu') || n.classList.contains('modal')))
+        registerGlass(n);
+    }));
+  });
+  glassLater.observe(document.body, { childList: true });
+
+  // ---- master-only parameter panel ----
+  const glassBind = (id, key, fmt, rebuild) => {
+    const input = $('gs' + id), out = $('go' + id);
+    const sync = () => {
+      glassP[key] = parseFloat(input.value);
+      out.textContent = fmt(glassP[key]);
+      applyGlassCss();
+      if(rebuild) rebuildAllGlass(); else applyGlassStrength();
+      schedulePrefs();
+    };
+    input.addEventListener('input', sync);
+    return sync;
+  };
+  const glassSyncs = [
+    glassBind('Ior',   'ior',   v => v.toFixed(2),        false),
+    glassBind('Bevel', 'bevel', v => v.toFixed(0) + 'px', true),
+    glassBind('Frost', 'frost', v => v.toFixed(1) + 'px', false),
+    glassBind('Disp',  'disp',  v => v.toFixed(0) + '%',  false),
+    glassBind('Tint',  'tint',  v => v.toFixed(0) + '%',  false),
+    glassBind('Bed',   'bed',   v => v.toFixed(0) + '%',  false)
+  ];
+
+  function syncGlassUI(){
+    $('gsIor').value = glassP.ior;     $('goIor').textContent   = glassP.ior.toFixed(2);
+    $('gsBevel').value = glassP.bevel; $('goBevel').textContent = glassP.bevel + 'px';
+    $('gsFrost').value = glassP.frost; $('goFrost').textContent = glassP.frost.toFixed(1) + 'px';
+    $('gsDisp').value = glassP.disp;   $('goDisp').textContent  = glassP.disp + '%';
+    $('gsTint').value = glassP.tint;   $('goTint').textContent  = glassP.tint + '%';
+    $('gsBed').value = glassP.bed;     $('goBed').textContent   = glassP.bed + '%';
+    $('glassToggle').textContent = 'GLASS: ' + (glassP.on ? 'ON' : 'OFF');
+    $('glassPanel').classList.toggle('off', !glassP.on);
+    $('glassNote').textContent = glassSupported
+      ? '굴절 활성 — 리퀴드 글래스가 실제로 배경을 휩니다.'
+      : '이 브라우저는 backdrop-filter의 url()을 지원하지 않아 프로스티드 글래스로 폴백합니다. 굴절은 Chromium 계열에서만 나옵니다.';
+  }
+
+  $('glassOpenBtn').addEventListener('click', ()=>{
+    const pnl = $('glassPanel');
+    pnl.hidden = !pnl.hidden;
+    if(!pnl.hidden){ syncGlassUI(); rebuildAllGlass(); }
+  });
+  $('glassClose').addEventListener('click', ()=>{ $('glassPanel').hidden = true; });
+  $('glassToggle').addEventListener('click', ()=>{
+    glassP.on = !glassP.on;
+    applyGlassCss(); syncGlassUI(); schedulePrefs();
+  });
+  $('glassReset').addEventListener('click', ()=>{
+    glassP = Object.assign({}, GLASS_DEFAULTS);
+    applyGlassCss(); syncGlassUI(); rebuildAllGlass(); schedulePrefs();
+    toast('유리 파라미터를 기본값으로 되돌렸습니다.');
+  });
+
+  let glassResizeT = 0;
+  window.addEventListener('resize', ()=>{
+    clearTimeout(glassResizeT);
+    glassResizeT = setTimeout(rebuildAllGlass, 180);
+  });
+
   // ==================== TOOL & COMPOSITION PREFERENCES ====================
   // 도구 설정(SIZE / STABILIZER / TEXTURE / GRAIN / PRESSURE / TOLERANCE / 색 /
   // 활성 도구)과 COMPOSITION 수치(COUNT / SCALE RANGE / ANTI-ALIAS / BACKGROUND)를
@@ -9928,7 +10954,11 @@ showLayerMenu(ev.clientX, ev.clientY, [
     pressure: 100,
     tolerance: 0,
     color: '#1d1d1f',
-    comp: { count: 14, scaleMin: 40, scaleMax: 160, aa: 50, bg: '#f5f5f7' }
+    comp: { count: 14, scaleMin: 40, scaleMax: 160, aa: 50, bg: '#f5f5f7' },
+    cols: LAYOUT_DEFAULT.slice(),
+    order: ['draw', 'samples', 'comp'],
+    myPal: new Array(12).fill(null),
+    glass: Object.assign({}, GLASS_DEFAULTS)
   };
   const TEX_IDS  = ['smooth','pencil','spray','ink','gpen'];
   const TOOL_IDS = ['brush','fill','select','eraser','lasso'];
@@ -9936,6 +10966,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // 저장값이 깨져 있어도 앱이 죽지 않도록 전부 범위 클램프 후 적용한다.
   const pfInt = (v, lo, hi, d) => {
     const n = parseInt(v, 10);
+    return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d;
+  };
+  const pfNum = (v, lo, hi, d) => {
+    const n = parseFloat(v);
     return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d;
   };
   const pfHex = (v, d) => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)) ? v : d;
@@ -9961,7 +10995,11 @@ showLayerMenu(ev.clientX, ev.clientY, [
         scaleMax: parseInt($('scaleMax').value, 10),
         aa:       aaLevel,
         bg:       compBg
-      }
+      },
+      cols: colFr.map(v => Math.round(v * 1000) / 1000),
+      order: panelOrder(),
+      myPal: myPalette.slice(),
+      glass: Object.assign({}, glassP)
     };
   }
 
@@ -10020,8 +11058,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
     // --- 색: 팔레트에 같은 색이 있으면 그 칸도 선택 상태로 되돌린다.
     const hex = pfHex(p.color, '#1d1d1f');
     applyColor(hex);
-    document.querySelectorAll('.palette-cell').forEach(c=>{
-      c.classList.toggle('selected', (c.title || '').toLowerCase() === hex.toLowerCase());
+    document.querySelectorAll('#paletteGrid .palette-cell').forEach(c=>{
+      c.classList.toggle('selected', (c.dataset.hex || '').toLowerCase() === hex.toLowerCase());
     });
 
     // --- COMPOSITION
@@ -10049,6 +11087,44 @@ showLayerMenu(ev.clientX, ev.clientY, [
       sw.classList.toggle('active', sw.dataset.bg === compBg);
     });
     renderComposition();
+
+    // --- 패널 순서. colFr은 '자리' 기준 배열이므로 폭보다 먼저 세워야 한다.
+    //     세 키가 정확히 한 번씩 들어있을 때만 적용한다 -- 하나라도 빠지면
+    //     패널이 통째로 사라진 화면이 나온다.
+    const KEYS = ['draw', 'samples', 'comp'];
+    const od = Array.isArray(p.order) ? p.order.filter(k => KEYS.includes(k)) : [];
+    const ordOK = od.length === 3 && new Set(od).size === 3;
+
+    // --- 패널 폭. 저장된 세 값이 전부 양수일 때만 적용하고, 아니면 기본 비율.
+    //     합만 맞으면 되는 상대값이라 스케일 자체는 검사하지 않는다.
+    const cs = Array.isArray(p.cols) ? p.cols.map(Number) : null;
+    const frs = (cs && cs.length === 3 && cs.every(v => Number.isFinite(v) && v > 0.05))
+      ? cs : LAYOUT_DEFAULT.slice();
+
+    if(ordOK) setPanelOrder(od, frs);
+    else { setPanelOrder(KEYS, frs); }
+
+    // --- MY PALETTE. Pad or trim to exactly 12 and drop anything that is not
+    //     a hex, so a hand-edited or half-written slot cannot poison a swatch.
+    const mp = Array.isArray(p.myPal) ? p.myPal : [];
+    myPalette = new Array(MY_PAL_SIZE).fill(null)
+      .map((_, i) => normHex(mp[i]));
+    renderMyPalette();
+
+    // --- 유리 파라미터. 값마다 범위가 달라 개별 클램프한다.
+    const gl = (p.glass && typeof p.glass === 'object') ? p.glass : {};
+    glassP = {
+      on:    typeof gl.on === 'boolean' ? gl.on : GLASS_DEFAULTS.on,
+      ior:   pfNum(gl.ior,   1,   2.2, GLASS_DEFAULTS.ior),
+      bevel: pfInt(gl.bevel, 6,   90,  GLASS_DEFAULTS.bevel),
+      frost: pfNum(gl.frost, 0,   12,  GLASS_DEFAULTS.frost),
+      disp:  pfNum(gl.disp,  0,   20,  GLASS_DEFAULTS.disp),
+      tint:  pfInt(gl.tint,  0,   90,  GLASS_DEFAULTS.tint),
+      bed:   pfInt(gl.bed,   0,   100, GLASS_DEFAULTS.bed)
+    };
+    applyGlassCss();
+    syncGlassUI();
+    rebuildAllGlass();
   }
 
   function loadPrefs(){
@@ -10065,7 +11141,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // 자기 핸들러가 먼저 끝난 뒤에 호출되므로, 이 시점의 상태 변수는 이미 최신이다.
   const PREF_INPUT_IDS = ['brushSize','stabilizer','grain','prAmt','tolerance',
                           'compCount','scaleMin','scaleMax','aaLevel',
-                          'customBg','customColorPicker'];
+                          'customBg'];
   document.addEventListener('input', e=>{
     if(e.target && PREF_INPUT_IDS.indexOf(e.target.id) >= 0) schedulePrefs();
   });
