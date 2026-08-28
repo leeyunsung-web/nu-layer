@@ -3835,6 +3835,12 @@ showLayerMenu(ev.clientX, ev.clientY, [
     // 결과가 비어 있다는 건 어디에도 기록되지 않았다는 뜻이다. 빈 토스트를
     // 띄우면 사용자는 저장됐다고 읽는다 -- 반드시 실패라고 말해야 한다.
     if(!results.length) results.push('저장 실패 — 어디에도 기록되지 않았습니다.');
+    // 아카이브 패널이 열려 있으면 방금 올린 파일이 보이도록 다시 읽는다.
+    // 목록은 패널을 열 때만 가져오므로 열어 둔 채로 저장하면 옛 목록이 남는다.
+    try {
+      const mm = $('mgrModal');
+      if(mm && mm.classList.contains('show') && typeof refreshMgr === 'function') refreshMgr();
+    } catch(e){}
     // 덮어쓸 생각이었는데 권한이 없어 새 파일이 된 경우, 그 사실을 말한다.
     // 원본이 바뀐 줄 알고 있으면 나중에 아카이브를 열었을 때 당황한다.
     if(wantedOverwrite && !overwrote)
@@ -4128,7 +4134,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     for(let i = 0; i < filesToLoad.length; i++){
       const f = filesToLoad[i];
       try {
-        const res = await fetch(f.downloadUrl);
+        const res = await fetch(withArchiveVer(f.downloadUrl), { cache:'no-store' });
         if(!res.ok) throw new Error('HTTP ' + res.status);
         const blob = await res.blob();
         const file = new File([blob], f.name, { type: blob.type || 'image/png' });
@@ -4355,7 +4361,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
   async function mgrGetBase64(item){
     // item.download_url or fetch blob via contents
-    const res = await fetch(item.download_url, { cache:'no-store' });
+    const res = await fetch(withArchiveVer(item.download_url), { cache:'no-store' });
     const blob = await res.blob();
     return await blobToBase64(blob);
   }
@@ -4881,7 +4887,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         try {
           let bytes;
           try {
-            const res = await fetch(f.download_url, { cache:'no-store' });
+            const res = await fetch(withArchiveVer(f.download_url), { cache:'no-store' });
             if(!res.ok) throw new Error('dl ' + res.status);
             bytes = new Uint8Array(await res.arrayBuffer());
           } catch(_){
