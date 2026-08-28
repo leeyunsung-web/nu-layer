@@ -1024,6 +1024,7 @@
           </div>
         </div>
         <div class="layer-list" id="layerList"></div>
+        <button class="btn btn-sm" id="strokeToFillBtn" title="잉크가 찍힌 면을 COLOR 레이어로, 그 윤곽을 벡터 LINE 레이어로 떠낸 뒤 원본을 숨깁니다 — TONE PLOT이 정확히 두 영역을 받습니다. Shift+클릭이면 안쪽에 갇힌 구멍까지 메셡니다.">▤ SPLIT COLOR + LINE</button>
         <button class="btn btn-sm" id="layerRecolorBtn" title="Recolor everything on the active layer with the selected color">◉ RECOLOR LAYER</button>
         <div class="range-row" id="layerWidthRow" title="Set the line thickness (px) of every stroke on the ACTIVE layer (live)">
           <span>LINE WIDTH</span>
@@ -1843,6 +1844,11 @@ showLayerMenu(ev.clientX, ev.clientY, [
         if(ev.shiftKey){ createFolderWithLayers(selectedLayerIds.size > 1 ? layers.filter(x=>selectedLayerIds.has(x.id)) : [l]); return; }
         const items = [
           { label: '✎ RENAME LAYER', fn: ()=> renameLayerById(l.id) },
+          { label: '✦ PURGE ERASER MARKS (' +
+              actions.filter(a => a.type === 'stroke' && a.tool === 'eraser' && a.layer === l.id).length +
+              ')', fn: ()=> purgeErasers(l.id) },
+          { label: '⌫ ERASED PIXELS → NEW LAYER',
+            fn: ()=> restoreErasedToLayer(l.id) },
           { label: selectedLayerIds.size > 1 ? ('📁 NEW FOLDER WITH ' + selectedLayerIds.size + ' SELECTED LAYERS') : '📁 NEW FOLDER WITH THIS LAYER',
             fn: ()=> createFolderWithLayers(selectedLayerIds.size > 1 ? layers.filter(x=>selectedLayerIds.has(x.id)) : [l]) }
         ];
@@ -7502,13 +7508,22 @@ showLayerMenu(ev.clientX, ev.clientY, [
       return wrap(base, parts || []);
     }
 
-    if(sm.length === 1){
-      return wrap(`<circle cx="${f(sm[0].x)}" cy="${f(sm[0].y)}" r="${f(a.width/2)}" fill="${a.color}"/>`);
+    // PIXEL은 캔버스에서 일부러 보정을 거치지 않는다 -- 격자에서 벗어난 중간점이
+    // 생기면 선이 두 칸 굵어진다. 여기서 보정을 걸면 계단이 곡선으로 뭉개져,
+    // 특히 SPLIT COLOR + LINE이 뽑아낸 윤곽선이 화면과 다른 모양으로 나간다.
+    const out = (_itx === 'pixel') ? pts : sm;
+    if(out.length === 1){
+      return wrap(`<circle cx="${f(out[0].x)}" cy="${f(out[0].y)}" r="${f(a.width/2)}" fill="${a.color}"/>`);
     }
     // 캔버스 PLOTTER 브러시와 같은 함수. 한쪽만 바뀔 수 없다 -- 그래서 캔버스가
     // 거치는 smoothPoints도 여기서 똑같이 거쳐야 한다. 안 그러면 화면의 선보다
     // 파일의 선이 미세하게 각져 나간다.
-    const d = plotterPathD(sm, f);
+    // PIXEL은 곡선 보정도 받으면 안 된다. plotterPathD는 점 사이를 2차 곡선으로
+    // 잇는데, 캔버스가 격자 칸을 네모로 채우는 브러시에는 그게 맞지 않는다.
+    // 곧게 이어야 화면 모양에 가깝고, TONE PLOT도 같은 좌표를 직선으로 잇는다.
+    const d = (_itx === 'pixel')
+      ? 'M' + out.map(p => f(p.x) + ' ' + f(p.y)).join('L')
+      : plotterPathD(out, f);
     return wrap(`<path d="${d}" fill="none" stroke="${a.color}" stroke-width="${f(a.width)}"` +
            ` stroke-linecap="round" stroke-linejoin="round"/>`);
   }
@@ -7594,7 +7609,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
         // INK·G-PEN은 윤곽 그대로, PENCIL·SPRAY는 같은 생성기로 표식을 다시
         // 찍어 내보낸다. 이제 평면화되는 건 PIXEL(격자 스냅은 래스터 전용)과,
         // 표식이 한도를 넘어 물러난 경우뿐이다.
-        if(sa.texture === 'pixel') texCount++;
+        // 칸 크기가 1이면(두께 1) 좌표가 그대로 나가므로 잃는 것이 없다.
+        // SPLIT COLOR + LINE의 윤곽선이 전부 여기 해당한다.
+        if(sa.texture === 'pixel' && Math.round(sa.width || 1) > 1) texCount++;
         const sb = bboxOf(sa), si = la.indexOf(sa);
         env.erasers = erBoxes.filter(({ e, i, b }) => {
           if(i <= si) return false;
@@ -10941,6 +10958,260 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // 파일명 의존이 사라지도록 Blob URL로 새창을 띄운다 -- blob은 이 문서의
   // 오리진을 물려받아 postMessage 연동이 file://에서도 그대로 동작한다.
   let tpUrl = null;
+  // 마스크의 경계를 픽셀 격자선을 따라 폐곡선 좌표로 뽑는다.
+  // TONE PLOT 의 '라인 유지'는 펜이 따라갈 좌표 나열을 요구하므로,
+  // 테두리를 도장처럼 찍어서는 안 되고 경로로 만들어야 한다.
+  function traceMaskContours(mask, w, h){
+    var edges = new Map();
+    var key = function(x, y){ return x + ',' + y; };
+    var add = function(x1, y1, x2, y2){
+      var k = key(x1, y1), arr = edges.get(k);
+      if(!arr){ arr = []; edges.set(k, arr); }
+      arr.push([x2, y2]);
+    };
+    // 각 칸의 네 변 중 바깥과 맞닿은 변만 시계방향으로 모은다.
+    for(var y = 0; y < h; y++) for(var x = 0; x < w; x++){
+      if(!mask[y*w + x]) continue;
+      if(!(y > 0   && mask[(y-1)*w + x])) add(x,   y,   x+1, y  );
+      if(!(x < w-1 && mask[y*w + x+1]))   add(x+1, y,   x+1, y+1);
+      if(!(y < h-1 && mask[(y+1)*w + x])) add(x+1, y+1, x,   y+1);
+      if(!(x > 0   && mask[y*w + x-1]))   add(x,   y+1, x,   y  );
+    }
+    var loops = [], guard = 0;
+    var keys = Array.from(edges.keys());
+    for(var ki = 0; ki < keys.length; ki++){
+      var k0 = keys[ki];
+      while((edges.get(k0) || []).length && guard++ < 4000000){
+        var s = k0.split(','), sx = +s[0], sy = +s[1];
+        var pts = [{ x:sx, y:sy }], cx = sx, cy = sy;
+        for(;;){
+          var arr = edges.get(key(cx, cy));
+          if(!arr || !arr.length) break;
+          var nxt = arr.shift();
+          pts.push({ x:nxt[0], y:nxt[1] });
+          cx = nxt[0]; cy = nxt[1];
+          if(cx === sx && cy === sy) break;
+          if(guard++ > 4000000) break;
+        }
+        if(pts.length >= 4) loops.push(pts);
+      }
+    }
+    return loops;
+  }
+
+  // 일직선으로 이어지는 중간점을 지운다. 계단 모양은 그대로 두고 점 수만 줄인다.
+  function dropCollinear(pts){
+    if(pts.length < 3) return pts;
+    var out = [pts[0]];
+    for(var i = 1; i < pts.length - 1; i++){
+      var a = out[out.length-1], b = pts[i], c = pts[i+1];
+      if((b.x-a.x)*(c.y-b.y) === (b.y-a.y)*(c.x-b.x)) continue;
+      out.push(b);
+    }
+    out.push(pts[pts.length-1]);
+    return out;
+  }
+
+  // ===== 색+선 분리 =====
+  // 잉크가 찍힌 픽셀 면적을 그대로 「색」으로 굳히고, 그 덩어리의 테두리를 「선」으로 뽑는다.
+  // 픽셀로 두껍게 만든 선에 아웃라인을 붙이는 용도라 구멍 메우기는 기본으로 하지 않는다.
+  // Shift+클릭이면 바깥에서 flood 한 뒤 반전해 안쪽 빈 구멍까지 메운다.
+  //
+  // 판정 기준을 알파 128로 잡는다. 지우개는 destination-out이라 안티앨리어싱된 붓
+  // 가장자리가 지나간 자리에 알파 10~150짜리 잔여를 남기고, G-PEN/SPRAY 텍스처도
+  // 알파 0.05짜리 점을 흩뿌린다. 눈에는 안 보여도 낮은 기준에서는 전부 잉크로 잡혀
+  // 엉뚱한 곳이 칠해진다. 픽셀로 변환한 선은 알파 255라 이 기준에 걸리지 않는다.
+  (function(){
+    var btn = document.getElementById('strokeToFillBtn');
+    if(!btn) return;                      // 버튼이 없으면 조용히 포기 (앱 전체를 죽이지 않는다)
+    var ALPHA_MIN = 128;
+    btn.addEventListener('click', function(ev){
+      if(typeof replaying !== 'undefined' && replaying){ toast('Replaying — please wait.'); return; }
+      var src = activeLayer();
+      if(!src){ toast('Select a layer first.'); return; }
+      try {
+        var w = drawCanvas.width, h = drawCanvas.height, N = w*h;
+        var sd = src.ctx.getImageData(0,0,w,h).data;
+
+        var ink = new Uint8Array(N), inkN = 0, faint = 0;
+        for(var i=0,p=0;i<N;i++,p+=4){
+          var A = sd[p+3];
+          if(A >= ALPHA_MIN){ ink[i] = 1; inkN++; }
+          else if(A > 8) faint++;          // 지운 자국·텍스처 잔여
+        }
+        if(!inkN){
+          toast(faint ? ('No solid ink — only ' + faint.toLocaleString() + 'px of faint residue.')
+                      : '이 레이어는 비어 있습니다.');
+          return;
+        }
+
+        // 빈 곳을 섬 단위로 훑는다. 캔버스 테두리에 닿으면 바깥, 아니면 갇힌 구멍.
+        // 지우개가 남긴 자국은 선 안에 갇힌 작은 구멍으로 나타나므로 기본으로 메운다.
+        var solid = ink, solidN = inkN;
+        if(ev.shiftKey){
+          // 테두리에서 출발해 잉크에 막힐 때까지 번진 곳이 바깥. 나머지가 실루엣.
+          var out = new Uint8Array(N), st = [];
+          var seed = function(i){ if(!ink[i] && !out[i]){ out[i] = 1; st.push(i); } };
+          for(var x=0;x<w;x++){ seed(x); seed((h-1)*w + x); }
+          for(var y=0;y<h;y++){ seed(y*w); seed(y*w + w - 1); }
+          while(st.length){
+            var c = st.pop(), cx = c % w, cy = (c / w) | 0;
+            if(cx > 0)   seed(c-1);
+            if(cx < w-1) seed(c+1);
+            if(cy > 0)   seed(c-w);
+            if(cy < h-1) seed(c+w);
+          }
+          solid = new Uint8Array(N); solidN = 0;
+          for(var i2=0;i2<N;i2++) if(!out[i2]){ solid[i2] = 1; solidN++; }
+        }
+
+        var colorHex = (typeof fillColor === 'string' && fillColor) ? fillColor : '#1d1d1f';
+        var baseIdx  = layers.findIndex(function(l){ return l.id === src.id; });
+        if(baseIdx < 0) baseIdx = layers.length - 1;
+
+        var fillLayer = createLayer(src.name + ' COLOR');
+        var lineLayer = createLayer(src.name + ' LINE');
+        if(src.folderId != null){ fillLayer.folderId = src.folderId; lineLayer.folderId = src.folderId; }
+
+        paintSplitFill(fillLayer.ctx, solid, colorHex, 0, 0, w, h);
+
+        // 색은 원본 아래, 선은 원본 위
+        layers.splice(baseIdx, 0, fillLayer);
+        layers.splice(layers.findIndex(function(l){ return l.id === src.id; }) + 1, 0, lineLayer);
+
+        actions.push({ type:'fill', id:++actionCounter, x:0, y:0, color:colorHex,
+                       tolerance:0, layer:fillLayer.id, m:encodeMask(solid), mw:w, mh:h });
+        // LINE 은 stroke 로만 채운다. fill 이 하나라도 섞이면 hasFill 이 켜져
+        // TONE PLOT 에서 '라인 유지'를 고를 수 없게 된다.
+        var loops = traceMaskContours(solid, w, h), pathN = 0, ptN = 0;
+        for(var li = 0; li < loops.length; li++){
+          var lp = dropCollinear(loops[li]);
+          if(lp.length < 2) continue;
+          pathN++; ptN += lp.length;
+          // texture 를 안 주면 strokeSmoothPath 가 smoothPoints() 로 스플라인
+          // 보간을 걸어 픽셀 계단이 곡선으로 뭉개진다. TONE PLOT 은 좌표를 그대로
+          // 직선으로 잇기 때문에 화면만 다르게 보였다. 'pixel' 은 cell=round(1)=1 이라
+          // 정수 좌표가 그대로 유지되고 안티앨리어싱도 타지 않는다.
+          actions.push({ type:'stroke', id:++actionCounter, tool:'pen',
+                         texture:'pixel', grain:0, seed:1,
+                         color:'#1d1d1f', width:1, points:lp, layer:lineLayer.id });
+        }
+        renderSingleLayer(lineLayer.id);
+
+        // 원본은 숨긴다. TONE PLOT은 「보이는 레이어 = 영역 하나」로 받고
+        // 위 레이어부터 픽셀을 선점하므로, 원본이 남아 있으면 가운데에서
+        // 안쪽을 통째로 가져가 COLOR가 빈 영역이 되고, 원본은 stroke만 있어
+        // '라인 유지'로 잡혀 변환 전 선이 그대로 나온다. 지우지는 않으므로
+        // 눈 아이콘으로 언제든 되돌릴 수 있다.
+        src.visible = false;
+
+        activeLayerId = fillLayer.id;
+        activeFolderId = null;
+        redoStack.length = 0;
+        compositeLayers();
+        renderLayersPanel();
+        if(typeof syncLiveEdit === 'function') syncLiveEdit(true);
+        toast('COLOR ' + solidN.toLocaleString() + 'px · LINE ' + pathN + ' path(s), ' + ptN + ' pts'
+              + (ev.shiftKey ? ' · holes filled' : '')
+              + (faint ? ' · skipped ' + faint.toLocaleString() + 'px faint' : '')
+              + ' — original hidden');
+      } catch(err){
+        console.error('[색+선 분리]', err);
+        toast('Split failed: ' + (err && err.message ? err.message : err));
+      }
+    });
+  })();
+
+  // ===== 지우개 자국 복원 =====
+  // 지우개 획을 뺀 채로 레이어를 다시 그려 보고, 그때 되살아난 픽셀만 새 레이어로
+  // 뽑는다. 원본 레이어와 actions 는 손대지 않으므로 복원 레이어를 지우면 즉시
+  // 원래대로 돌아간다. 지우개 액션을 아예 지워버리면 되돌릴 길이 없다.
+  function restoreErasedToLayer(layerId){
+    {
+      if(typeof replaying !== 'undefined' && replaying){ toast('Replaying — please wait.'); return; }
+      var src = layers.find(function(l){ return l.id === layerId; });
+      if(!src){ toast('Layer not found.'); return; }
+      var isEraser = function(a){ return a.type === 'stroke' && a.tool === 'eraser' && a.layer === src.id; };
+      var erN = actions.filter(isEraser).length;
+      if(!erN){ toast('No eraser strokes on this layer.'); return; }
+      var backup = null;
+      try {
+        var w = src.canvas.width, h = src.canvas.height;
+        var mk = function(){ var c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+
+        var before = mk();
+        before.getContext('2d').drawImage(src.canvas, 0, 0);
+
+        backup = actions.slice();
+        for(var i = actions.length - 1; i >= 0; i--) if(isEraser(actions[i])) actions.splice(i, 1);
+        renderSingleLayer(src.id);
+        var after = mk();
+        after.getContext('2d').drawImage(src.canvas, 0, 0);
+
+        actions.length = 0;
+        for(var j = 0; j < backup.length; j++) actions.push(backup[j]);
+        backup = null;
+        renderSingleLayer(src.id);
+
+        // 지우개를 뺐을 때 알파가 올라간 픽셀 = 지워졌던 부분
+        var bd = before.getContext('2d').getImageData(0, 0, w, h).data;
+        var actx = after.getContext('2d'), aimg = actx.getImageData(0, 0, w, h), ap = aimg.data;
+        var kept = 0;
+        for(var p = 0; p < ap.length; p += 4){
+          if(ap[p+3] > bd[p+3] + 8) kept++;
+          else ap[p+3] = 0;
+        }
+        if(!kept){ toast('The eraser did not remove anything here.'); return; }
+        actx.putImageData(aimg, 0, 0);
+
+        var rl = createLayer(src.name + ' ERASED');
+        if(src.folderId != null) rl.folderId = src.folderId;
+        rl.ctx.drawImage(after, 0, 0);
+        var at = layers.findIndex(function(l){ return l.id === src.id; });
+        layers.splice(at < 0 ? layers.length : at + 1, 0, rl);   // 원본 바로 위
+        actions.push({ type:'image', id:++actionCounter, img: after,
+                       x:0, y:0, w:w, h:h, layer: rl.id });
+
+        activeLayerId = rl.id;
+        activeFolderId = null;
+        redoStack.length = 0;
+        compositeLayers();
+        renderLayersPanel();
+        if(typeof syncLiveEdit === 'function') syncLiveEdit(true);
+        toast(kept.toLocaleString() + 'px removed by ' + erN + ' eraser stroke(s) restored to ' + rl.name);
+      } catch(err){
+        if(backup){ actions.length = 0; for(var k = 0; k < backup.length; k++) actions.push(backup[k]); renderSingleLayer(src.id); }
+        console.error('[지우개 자국 복원]', err);
+        toast('Restore failed: ' + (err && err.message ? err.message : err));
+      }
+    }
+  }
+
+
+  // 지우개 획만 골라 목록에서 뺀다. 지운 자리가 원래 선으로 되돌아온다.
+  // 픽셀 모드에서 격자가 어긋나 남은 계단 자국, 두께를 키웠을 때 선 한복판에
+  // 드러나는 구멍이 모두 이 지우개 획 때문이다.
+  function purgeErasers(layerId){
+    if(typeof replaying !== 'undefined' && replaying){ toast('Replaying — please wait.'); return; }
+    var target = layers.find(function(l){ return l.id === layerId; });
+    if(!target) return;
+    var hits = actions.filter(function(a){
+      return a.type === 'stroke' && a.tool === 'eraser' && a.layer === layerId;
+    });
+    if(!hits.length){ toast('「' + target.name + '」에는 지우개 자국이 없습니다.'); return; }
+    var prevOrder = actions.slice();
+    var kept = actions.filter(function(a){ return hits.indexOf(a) < 0; });
+    actions.length = 0;
+    Array.prototype.push.apply(actions, kept);
+    var nextOrder = actions.slice();
+    // lassoDelete 와 같은 스냅샷 형식이라 되돌리기가 그대로 동작한다.
+    actions.push({ type:'lassoDelete', id: ++actionCounter,
+                   prevOrder: prevOrder, nextOrder: nextOrder, layerName: target.name });
+    redoStack.length = 0;
+    renderAll();
+    toast('「' + target.name + '」의 지우개 획 ' + hits.length + '개를 제거했습니다 (Ctrl+Z 로 되돌리기).');
+  }
+
   function openTonePlot(){
     if(tpWin && !tpWin.closed){ tpWin.focus(); tpLastSig = null; toneplotSend(); return; }
     tpReady = false; tpLastSig = null; tpSource = 'drawing';
