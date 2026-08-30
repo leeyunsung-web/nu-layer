@@ -346,6 +346,9 @@
      단차가 남았다. 둘 다 없애고 우리가 쥔 마진 하나로 대신한다. */
   .draw-sidebar .range-row input[type=range] { flex: 1 1 100%; order: 3; min-width: 0; width: 100%; margin: var(--gap-labelbar, 4px) 0 0; }
   .draw-sidebar .range-row .val { margin-left: auto; min-width: 0; }
+  /* select 는 가장 긴 option 의 너비를 제 최소폭으로 삼는다. 사이드바가 2/3 폭으로
+     줄면 그 최소폭이 칸 밖으로 삐져나가므로, 줄어들 수 있게 열어 준다. */
+  .range-row select { min-width: 0; max-width: 100%; text-overflow: ellipsis; }
   .draw-sidebar .tool-row { gap: var(--gap-toolrow, 8px); }
   .draw-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
   .draw-sidebar .palette-grid { grid-template-columns: repeat(6, 1fr); }
@@ -900,7 +903,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b13</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b24</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -958,9 +961,6 @@
       <div class="palette-wrap">
         <div class="palette-label">
           <span>MY PALETTE</span>
-          <label class="chk" style="font-size:9px; gap:4px; margin-left:auto;"
-            title="Picked colours (eyedropper, hotkey I) are added to the first empty slot. When full, the oldest is pushed out.">
-            <input type="checkbox" id="myPalAuto" checked> AUTO</label>
           <span class="my-pal-now" id="myPalNow" title="Current colour"></span>
         </div>
         <div class="palette-grid my-palette" id="myPaletteGrid"></div>
@@ -1004,10 +1004,11 @@
         </div>
         <div class="range-row" id="texScopeRow" title="Which strokes TEXTURE / GRAIN / LINE WIDTH apply to">
           <span>SCOPE</span>
-          <select id="texScope" style="flex:1;">
-            <option value="layer">Active layer</option>
-            <option value="lines">All line layers</option>
-            <option value="comp">All objects in composition</option>
+          <select id="texScope" style="flex:1; min-width:0;">
+            <option value="layer" title="Only the layer you are working on">This layer</option>
+            <option value="lines" title="Every layer in THIS DRAWING that has strokes and no fill or image">This drawing</option>
+            <option value="comp" title="Every LINE layer of every object placed in 03 COMPOSITION — nothing needs to be selected first">Composition · lines</option>
+            <option value="compall" title="Every stroke of every object placed in 03 COMPOSITION, including strokes on colour layers — nothing needs to be selected first">Composition · all</option>
           </select>
         </div>
         <button class="btn btn-sm btn-full" id="liveTexBtn"
@@ -1092,7 +1093,7 @@
         <button class="tool-btn" data-tool="fill" title="Hotkey: G — fills a region and auto-splits it into a new layer">FILL</button>
         <button class="tool-btn" data-tool="select" title="Hotkey: V — drag on canvas to move the ACTIVE layer">SELECT</button>
         <button class="tool-btn" data-tool="eraser" title="Hotkey: E — erases on the ACTIVE layer only">ERASER</button>
-        <button class="tool-btn" data-tool="lasso" title="Hotkey: L — draw a selection, then press Delete to remove it from the ACTIVE layer">LASSO</button>
+        <button class="tool-btn" data-tool="lasso" title="Hotkey: L — draw a selection, then Delete to remove it from the ACTIVE layer, T to free-transform it, or Ctrl+Shift+X to cut it onto a new layer">LASSO</button>
         <button class="tool-btn" id="eyedropperBtn" title="Hotkey: I — click the canvas once to pick a color">EYEDROPPER</button>
       </div>
       <div class="history-select" style="display:flex; gap:6px; margin-top:-4px;">
@@ -1258,10 +1259,8 @@
         </div>
         <div class="comp-btns">
           <button class="btn btn-accent" id="genCompBtn">GENERATE RANDOM ✦</button>
-          <button class="btn btn-sm" id="autoGenBtn"
-            title="Open a review window with a whole batch generated from today's seed, using the COUNT and SCALE RANGE set here. Only the ones you tick are committed.">⚄ BATCH…</button>
-          <button class="btn btn-accent" id="genArchiveBtn" hidden
-                  title="Builds a random composition from the whole online archive even when the sample list (02) is empty (master). The chosen samples are loaded into 02 as well, so they stay editable. Shift+click = rescan the archive listing">☁ FROM ARCHIVE ✦</button>
+          <button class="btn btn-accent" id="autoGenBtn"
+            title="Opens a review window with a whole batch built from the ONLINE ARCHIVE using today's seed and the COUNT / SCALE RANGE set here. Only the ones you tick are committed (master).">⚄ BATCH…</button>
           <button class="btn" id="clearCompBtn">CLEAR</button>
           <button class="btn btn-ghost" id="openCompGalleryBtn" hidden
                   title="Reopen a saved composition from the gallery for editing (master)">OPEN GALLERY</button>
@@ -2671,6 +2670,130 @@ showLayerMenu(ev.clientX, ev.clientY, [
     } catch(err){ return null; }
   }
 
+  // subtractPolygonFromFill 의 반대 -- 폴리곤 안쪽만 남긴다.
+  function intersectPolygonWithFill(fa, poly){
+    const W = drawCanvas.width, H = drawCanvas.height;
+    const mw = fa.mw || W, mh = fa.mh || H;
+    const ox = Math.round(fa.ox || 0), oy = Math.round(fa.oy || 0);
+    const t = document.createElement('canvas');
+    t.width = mw; t.height = mh;
+    const tc = t.getContext('2d', { willReadFrequently: true });
+    tc.save();
+    tc.translate(-ox, -oy);
+    tc.beginPath();
+    tc.moveTo(poly[0].x, poly[0].y);
+    for(let i=1; i<poly.length; i++) tc.lineTo(poly[i].x, poly[i].y);
+    tc.closePath();
+    tc.fill();
+    tc.restore();
+    const d = tc.getImageData(0, 0, mw, mh).data;
+    const mask = decodeMask(fa.m, mw*mh);
+    let keep = 0;
+    for(let vi=0; vi<mw*mh; vi++){
+      if(!mask[vi]) continue;
+      if(d[vi*4+3] > 128) keep++;
+      else mask[vi] = 0;
+    }
+    return keep ? { ...fa, id: ++actionCounter, m: encodeMask(mask) } : null;
+  }
+
+  // punchImageByPolygon 의 반대 -- 폴리곤 밖을 지운 사본.
+  function cropImageByPolygon(im, poly){
+    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+    for(const p of poly){ minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y); }
+    if(maxX < im.x || minX > im.x+im.w || maxY < im.y || minY > im.y+im.h) return null;
+    try {
+      const t = document.createElement('canvas');
+      t.width = Math.max(1, Math.round(im.w));
+      t.height = Math.max(1, Math.round(im.h));
+      const tc = t.getContext('2d');
+      tc.save();
+      tc.scale(t.width / im.w, t.height / im.h);
+      tc.translate(-im.x, -im.y);
+      tc.beginPath();
+      tc.moveTo(poly[0].x, poly[0].y);
+      for(let i=1; i<poly.length; i++) tc.lineTo(poly[i].x, poly[i].y);
+      tc.closePath();
+      tc.clip();
+      tc.translate(im.x, im.y);
+      tc.scale(im.w / t.width, im.h / t.height);
+      tc.drawImage(im.img, 0, 0, t.width, t.height);
+      tc.restore();
+      return { ...im, id: ++actionCounter, img: t };
+    } catch(err){ return null; }
+  }
+
+  function lassoCutToNewLayer(){
+    if(replaying){ toast('Replaying — please wait.'); return; }
+    if(!lassoSelection || lassoSelection.length < 3){ toast('Make a lasso selection first (L).'); return; }
+    const al = activeLayer();
+    const poly = lassoSelection;
+    const prevOrder = actions.slice();
+
+    // 새 레이어는 원본 바로 위. 폴더 안이었다면 같은 폴더에 둔다.
+    const cut = createLayer(al.name + ' CUT');
+    if(al.folderId != null) cut.folderId = al.folderId;
+
+    const rest = [], taken = [];
+    let touched = false;
+    for(const a of actions){
+      if(a.layer !== al.id){ rest.push(a); continue; }
+      if(a.type === 'stroke' && a.tool !== 'eraser'){
+        const both = splitStrokeByPolygonBoth(a, poly);
+        if(!both || !both.inside || !both.inside.length){ rest.push(a); continue; }
+        touched = true;
+        for(const seg of both.inside)
+          taken.push({ ...a, id: ++actionCounter, layer: cut.id, points: seg });
+        for(const seg of (both.outside || []))
+          rest.push({ ...a, id: ++actionCounter, points: seg });
+      } else if(a.type === 'fill' && a.m){
+        const piece = intersectPolygonWithFill(a, poly);
+        if(!piece){ rest.push(a); continue; }
+        touched = true;
+        taken.push({ ...piece, layer: cut.id });
+        const left = subtractPolygonFromFill(a, poly);
+        if(left && left !== 'empty') rest.push(left);
+      } else if(a.type === 'image' && a.img){
+        const piece = cropImageByPolygon(a, poly);
+        if(!piece){ rest.push(a); continue; }
+        touched = true;
+        taken.push({ ...piece, layer: cut.id });
+        const left = punchImageByPolygon(a, poly);
+        rest.push(left || a);
+      } else {
+        rest.push(a);
+      }
+    }
+
+    if(!touched){
+      // 아무것도 못 오렸으면 만들어 둔 레이어도 되돌린다 -- 빈 레이어가
+      // 목록에 쌓이는 것만큼 성가신 것이 없다.
+      const at = layers.indexOf(cut);
+      if(at >= 0) layers.splice(at, 1);
+      toast('Nothing inside the selection on this layer.');
+      clearLasso();
+      return;
+    }
+
+    // 원본 바로 위로 옮긴다. createLayer 가 어디에 넣든 여기서 자리를 정한다.
+    const ci = layers.indexOf(cut);
+    if(ci >= 0) layers.splice(ci, 1);
+    layers.splice(layers.indexOf(al) + 1, 0, cut);
+
+    actions.length = 0;
+    Array.prototype.push.apply(actions, rest.concat(taken));
+    const nextOrder = actions.slice();
+    // 올가미 삭제와 같은 스냅샷 형식이라 Ctrl+Z 가 그대로 동작한다.
+    actions.push({ type:'lassoDelete', id: ++actionCounter,
+                   prevOrder, nextOrder, layerName: al.name });
+    redoStack.length = 0;
+    activeLayerId = cut.id;
+    clearLasso();
+    clearStrokeSelection();
+    renderAll();
+    toast(`Cut to "${cut.name}" (Ctrl+Z to undo).`);
+  }
+
   function lassoDeleteOnActiveLayer(){
     if(replaying){ toast('Replaying — please wait.'); return; }
     if(!lassoSelection || lassoSelection.length < 3) return;
@@ -2765,7 +2888,11 @@ showLayerMenu(ev.clientX, ev.clientY, [
     if(replaying) return;
     // 컴포지션 범위에서는 슬라이더를 놓는 순간(change) 한 번만 적용한다 --
     // 드래그하는 내내 오브젝트 수십 개를 다시 그리면 손이 멈춘다.
-    if(texScope === 'comp'){ $('layerWidthVal').textContent = e.target.value; return; }
+    if(compScope()){
+      compPendingWidth = Math.max(1, parseInt(e.target.value, 10) || 1);
+      $('layerWidthVal').textContent = e.target.value;
+      return;
+    }
     const scopeIds = texScope === 'lines' ? lineLayerIds() : [activeLayerId];
     const key = scopeIds.join(',');
     if(!layerWidthSession || layerWidthSession.layerId !== key){
@@ -3112,6 +3239,11 @@ showLayerMenu(ev.clientX, ev.clientY, [
       if(k === 'v') { document.querySelector('[data-tool="select"]').click(); }
       if(k === 'e') { document.querySelector('[data-tool="eraser"]').click(); }
       if(k === 'l') { document.querySelector('[data-tool="lasso"]').click(); }
+      if(e.key.toLowerCase() === 'x' && (e.ctrlKey || e.metaKey) && e.shiftKey && lassoSelection){
+        e.preventDefault();
+        lassoCutToNewLayer();
+        return;
+      }
       if((e.key === 'Delete' || e.key === 'Backspace') && lassoSelection){
         e.preventDefault();
         lassoDeleteOnActiveLayer();
@@ -8332,13 +8464,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
   //                                  already filled without emptying it first
   const MY_PAL_SIZE = 12;
   let myPalette = new Array(MY_PAL_SIZE).fill(null);
-  let myPalAuto = true;
 
   // 스포이드로 뽑은 색을 칸에 넣는다. 이미 있으면 넣지 않고, 빈 칸이 없으면
-  // 가장 오래된 것을 밀어낸다 -- 손으로 골라 둔 색이 소리 없이 사라지는 것이
-  // 싫다면 AUTO 를 끄면 된다.
+  // 가장 오래된 것을 밀어낸다.
   function myPaletteAdd(hex){
-    if(!myPalAuto) return;
     const h = normHex(hex);
     if(!h || myPalette.some(c => c === h)) return;
     const empty = myPalette.indexOf(null);
@@ -8486,17 +8615,35 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
   // 배치된 오브젝트 전부의 라인 레이어에 적용한다. 오브젝트 캔버스는 레시피에서
   // 다시 그린다 -- 픽셀만 고치면 다음에 열었을 때 원래 굵기로 돌아온다.
-  function applyToComposition(mut){
+  // 화면 액션의 이름으로 쓴 값을 레시피가 읽는 이름으로 옮긴다. 두 벌을
+  // 남겨 두면 어느 쪽이 진짜인지 다음에 읽는 사람이 알 수 없으므로 하나만 남긴다.
+  function recipeNormalizeStroke(a){
+    if(a.texture === undefined && a.grain === undefined && a.seed === undefined) return;
+    const tex = a.texture !== undefined ? a.texture : a.tx;
+    if(!tex || tex === 'smooth'){
+      delete a.tx; delete a.g; delete a.sd;
+    } else {
+      a.tx = tex;
+      if(a.grain !== undefined) a.g = a.grain;
+      if(a.seed !== undefined) a.sd = a.seed;
+      if(a.sd == null) a.sd = (Math.random()*2147483647)|0;
+    }
+    delete a.texture; delete a.grain; delete a.seed;
+  }
+
+  function applyToComposition(mut, everyLayer){
     const objs = [...new Set(placedItems.map(p => p.obj))].filter(o => o && o.recipe && o.recipe.length);
     if(!objs.length){ toast('No objects with vector recipes are placed.'); return 0; }
     let touched = 0;
     for(const o of objs){
-      const lines = recipeLineLayers(o.recipe);
+      const lines = everyLayer ? null : recipeLineLayers(o.recipe);
       let any = false;
       for(const a of o.recipe){
         if(a.type !== 'stroke' || a.tool === 'eraser') continue;
-        if(!lines.has(a.li || 0)) continue;
-        mut(a); any = true;
+        if(lines && !lines.has(a.li || 0)) continue;
+        mut(a);
+        recipeNormalizeStroke(a);
+        any = true;
       }
       if(!any) continue;
       const cs = recipeToLayerCanvases(o.recipe, o.w, o.h);
@@ -8518,22 +8665,23 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // (so dragging the GRAIN slider doesn't flood the history).
   function retextureActiveLayer(){
     if(replaying) return;
+    if(compScope() && !confirmCompScope()) return;
     // 컴포지션 전체는 되돌리기 대상이 아니다 -- 배치된 오브젝트의 레시피를
     // 직접 고치므로, 실수로 전체를 덮어쓰지 않게 확인을 받는다.
-    if(texScope === 'comp'){
+    if(texScope === 'comp' || texScope === 'compall'){
       const n = [...new Set(placedItems.map(p => p.obj))].length;
       if(!n) return;
-      if(!confirm(`This applies the texture to every LINE layer of ${n} placed object(s).\nUndo will not reverse it. Continue?`)) return;
+      const all = texScope === 'compall';
       const t = applyToComposition(a => {
         a.texture = currentTexture;
         a.grain = currentGrain;
         if(a.seed == null) a.seed = (Math.random()*2147483647)|0;
-      });
+      }, all);
       if(t) toast(`${t} object(s) retextured.`);
       return;
     }
     const ids = texScope === 'lines' ? lineLayerIds() : [activeLayerId];
-    if(texScope === 'lines' && !ids.length){ toast('No line-only layers found.'); return; }
+    if(texScope === 'lines' && !ids.length) return;
     if(ids.length > 1){
       for(const id of ids) retextureOneLayer(id);
       toast(`${ids.length} line layer(s) retextured.`);
@@ -8589,7 +8737,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       } else {
         brushTex.tex = currentTexture;
       }
-      if(liveTexApply) retextureActiveLayer();
+      if(liveTexApply || texScope !== 'layer') retextureActiveLayer();
     });
   });
   $('grain').addEventListener('input', e=>{
@@ -8604,31 +8752,59 @@ showLayerMenu(ev.clientX, ev.clientY, [
     }
     if(liveTexApply) retextureActiveLayer();
   });
-  $('myPalAuto').addEventListener('change', e => { myPalAuto = e.target.checked; schedulePrefs(); });
+  // 범위를 고르고 누르면 그 자리에서 적용된다. ◈ LIVE 와 무관하다.
+  const compScope = () => texScope === 'comp' || texScope === 'compall';
+  // 범위를 고른 뒤 처음 적용할 때 한 번만 묻는다. 범위를 다시 고르면 초기화된다.
+  let compScopeOk = false;
+  let compPendingWidth = null;
+  function confirmCompScope(){
+    if(compScopeOk) return true;
+    const n = [...new Set(placedItems.map(p => p.obj))].length;
+    if(!n){ toast('Nothing is placed in 03 COMPOSITION.'); return false; }
+    const all = texScope === 'compall';
+    if(!confirm(`Changes will now apply to `
+                + `${all ? 'EVERY stroke' : 'every LINE layer'} of ${n} placed object(s) `
+                + `in 03 COMPOSITION.\nUndo will not reverse it. Continue?`)) return false;
+    compScopeOk = true;
+    return true;
+  }
+
   $('texScope').addEventListener('change', e => {
     texScope = e.target.value;
+    compScopeOk = false;
+    syncLiveTexLabel();
     layerWidthSession = null;          // 범위가 바뀌면 진행 중인 두께 세션은 무효다
-    $('layerWidthRow').title = texScope === 'comp'
-      ? 'Set the line thickness of every stroke on every LINE layer of every placed object (applies on release)'
+    $('layerWidthRow').title = compScope()
+      ? 'Set the line thickness across every placed object in 03 COMPOSITION (applies on release)'
       : texScope === 'lines'
       ? 'Set the line thickness of every stroke on every LINE layer of this drawing (live)'
       : 'Set the line thickness (px) of every stroke on the ACTIVE layer (live)';
   });
   // 컴포지션 범위는 놓을 때 한 번.
   $('layerWidthSlider').addEventListener('change', e => {
-    if(replaying || texScope !== 'comp') return;
-    const v = Math.max(1, parseInt(e.target.value, 10) || 1);
-    const n = [...new Set(placedItems.map(p => p.obj))].length;
-    if(!n) return;
-    if(!confirm(`This sets every line on ${n} placed object(s) to ${v}px.\nUndo will not reverse it. Continue?`)) return;
-    const t = applyToComposition(a => { a.width = v; });
+    if(replaying || !compScope()) return;
+    // 값은 input 단계에서 붙잡아 둔 것을 쓴다. 원래 있던 change 리스너가 먼저
+    // 돌면서 syncLayerWidthSlider() 로 슬라이더를 활성 레이어 굵기로 되돌리기
+    // 때문에, 여기서 e.target.value 를 읽으면 사용자가 놓은 값이 아니다.
+    const v = compPendingWidth;
+    compPendingWidth = null;
+    if(v == null) return;
+    if(!confirmCompScope()) return;
+    const t = applyToComposition(a => { a.width = v; }, texScope === 'compall');
+    $('layerWidthSlider').value = String(v);
+    $('layerWidthVal').textContent = String(v);
     if(t) toast(`${t} object(s) set to ${v}px.`);
   });
-
+  function syncLiveTexLabel(){
+    const where = texScope === 'compall' ? 'COMPOSITION · ALL'
+                : texScope === 'comp' ? 'COMPOSITION · LINES'
+                : texScope === 'lines' ? 'THIS DRAWING' : 'THIS LAYER';
+    $('liveTexBtn').textContent = `◈ LIVE → ${where}: ${liveTexApply ? 'ON' : 'OFF'}`;
+  }
   $('liveTexBtn').addEventListener('click', ()=>{
     liveTexApply = !liveTexApply;
     $('liveTexBtn').classList.toggle('live-on', liveTexApply);
-    $('liveTexBtn').textContent = `◈ LIVE → ACTIVE LAYER: ${liveTexApply ? 'ON' : 'OFF'}`;
+    syncLiveTexLabel();
     if(liveTexApply) retextureActiveLayer();
   });
 
@@ -10242,12 +10418,52 @@ showLayerMenu(ev.clientX, ev.clientY, [
     return out;
   }
 
+  // 아카이브에서 씨앗대로 표본을 뽑아 내려받는다. 배치 창은 02에 무엇이
+  // 올라와 있든 온라인 아카이브 전체를 재료로 삼는다 -- 그게 애초에 하려던
+  // 것이다. 받아온 것은 02에도 들어가므로 그대로 편집할 수 있다.
+  async function archivePoolForSeed(seed, want, onProgress, files){
+    const index = files || await getArchiveIndex(false);
+    if(!index.length) return [];
+    // 씨앗으로 섞는다. 같은 날이면 같은 표본이 뽑히므로, 창을 다시 열어도
+    // 같은 100장이 나온다.
+    const rnd = mulberry32(seed);
+    const sh = index.slice();
+    for(let i = sh.length - 1; i > 0; i--){
+      const j = Math.floor(rnd() * (i + 1));
+      const t = sh[i]; sh[i] = sh[j]; sh[j] = t;
+    }
+    const picks = sh.slice(0, Math.min(want, sh.length));
+    const pool = [];
+    for(let i = 0; i < picks.length; i++){
+      const f = picks[i];
+      let obj = objects.find(o => o.filename === f.name);
+      if(!obj){
+        try {
+          const res = await fetch(withArchiveVer(f.downloadUrl));
+          if(!res.ok) throw new Error('HTTP ' + res.status);
+          const blob = await res.blob();
+          const file = new File([blob], f.name, { type: blob.type || 'image/png' });
+          await loadImageFile(file, f.downloadUrl, f.path);
+          obj = objects.find(o => o.filename === f.name);
+        } catch(e){ console.error(f.name, e); }
+      }
+      if(obj) pool.push(obj);
+      if(onProgress) onProgress(i + 1, picks.length);
+    }
+    return pool;
+  }
+
   let batchWin = null;
-  function openBatchWindow(){
-    if(!objects.length){ toast('Register at least one object first.'); return; }
+  async function openBatchWindow(){
+    if(userRole !== 'master'){ toast('Master access required.'); return; }
+    if(!ghConfig || !ghConfig.owner || !ghConfig.repo || !ghConfig.token){
+      toast('Please configure GitHub first at the top.');
+      return;
+    }
     const N = 100, THUMB = 270;
     let salt = 0;
     let date = compDateFolder();
+    let pool = [];
 
     if(batchWin && !batchWin.closed) batchWin.close();
     batchWin = window.open('', 'nulayer-batch', 'width=1180,height=880');
@@ -10271,19 +10487,56 @@ showLayerMenu(ev.clientX, ev.clientY, [
       .cell.on{outline:2px solid #e4442d;border-color:#e4442d}
       .cell canvas{display:block;width:100%;height:auto;background:#faf8f3}
       .cap{padding:4px 6px;font-size:10px;color:#9a9a96;display:flex;justify-content:space-between}
-      .muted{color:#9a9a96}`;
+      .muted{color:#9a9a96}
+      .src{border-bottom:1px solid #333;background:#171719}
+      .srchead{display:flex;gap:8px;align-items:center;padding:8px 14px;flex-wrap:wrap}
+      .srclist{max-height:34vh;overflow:auto;padding:0 14px 10px}
+      .fold{border-top:1px solid #262629}
+      .foldrow{display:flex;gap:8px;align-items:center;padding:5px 2px;cursor:pointer}
+      .foldrow .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .foldrow .ct{color:#9a9a96;font-size:10px}
+      .twist{width:14px;text-align:center;color:#9a9a96}
+      .files{display:none;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));
+             gap:8px;padding:4px 0 10px 26px}
+      .files.open{display:grid}
+      .files label{display:block;font-size:10px;color:#c9c7c2;cursor:pointer;position:relative}
+      .files .th{display:block;width:100%;aspect-ratio:1;object-fit:contain;
+                 background:#faf8f3;border:1px solid #333;border-radius:4px}
+      .files label.on .th{border-color:#e4442d;outline:1px solid #e4442d}
+      .files .fn{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+                 padding-top:3px}
+      .files input{position:absolute;top:4px;left:4px;margin:0}`;
     d.head.appendChild(style);
 
     const head = d.createElement('header');
     head.innerHTML = `<b>BATCH</b>
       <input type="date" id="bDate" value="${date}">
       <button id="bShuffle">↻ RESHUFFLE</button>
+      <button id="bReload" title="Rescan the online archive listing">⟳ RESCAN</button>
       <span class="muted" id="bInfo"></span>
       <span style="flex:1"></span>
+      <button id="bUse" disabled title="Load the single selected layout into 03 COMPOSITION for editing">→ USE IN 03</button>
       <button id="bAll">SELECT ALL</button>
       <button id="bNone">CLEAR</button>
       <button id="bSave" class="pri" disabled>SAVE SELECTED</button>`;
     d.body.appendChild(head);
+
+    // 재료 고르는 칸. 폴더 통째로도, 파일 하나씩도 고를 수 있다.
+    const srcPanel = d.createElement('section');
+    srcPanel.className = 'src';
+    srcPanel.innerHTML = `
+      <div class="srchead">
+        <b>SOURCE</b>
+        <button id="sAll">ALL FOLDERS</button>
+        <button id="sNone">NONE</button>
+        <button id="sOpen" title="Expand every folder and load its thumbnails">SHOW ALL THUMBS</button>
+        <span class="muted" id="sInfo">Scanning the archive…</span>
+        <span style="flex:1"></span>
+        <button id="bGen" class="pri" disabled>GENERATE 100 ✦</button>
+      </div>
+      <div class="srclist" id="sList"></div>`;
+    d.body.appendChild(srcPanel);
+
     const grid = d.createElement('div');
     grid.className = 'grid';
     d.body.appendChild(grid);
@@ -10292,11 +10545,147 @@ showLayerMenu(ev.clientX, ev.clientY, [
     let layouts = [];
     const sync = () => {
       d.getElementById('bSave').disabled = picked.size === 0;
+      // 03 으로 보내는 것은 한 장일 때만 뜻이 통한다.
+      d.getElementById('bUse').disabled = picked.size !== 1;
       d.getElementById('bSave').textContent = picked.size
         ? `SAVE ${picked.size} SELECTED` : 'SAVE SELECTED';
       d.getElementById('bInfo').textContent =
-        `${N} generated · ${picked.size} selected · COUNT ${$('compCount').value} · SCALE ${$('scaleMin').value}–${$('scaleMax').value}%`;
+        `${layouts.length} generated from ${pool.length} archive sample(s) · ${picked.size} selected`
+        + ` · COUNT ${$('compCount').value} · SCALE ${$('scaleMin').value}–${$('scaleMax').value}%`;
     };
+
+    // 표본은 최대 이만큼만 내려받는다. 고른 파일이 아무리 많아도 100장을
+    // 만드는 데 필요한 것은 한 줌이고, 전부 받으면 창이 열리지 않는다.
+    const POOL_MAX = 40;
+    const picked_src = new Set();          // 고른 파일의 path
+    let byFolder = new Map();              // 폴더 -> 파일 배열
+
+    function syncSrc(){
+      const total = [...byFolder.values()].reduce((s, a) => s + a.length, 0);
+      d.getElementById('sInfo').textContent =
+        `${picked_src.size} / ${total} file(s) selected · ${byFolder.size} folder(s)`;
+      d.getElementById('bGen').disabled = picked_src.size === 0;
+      for(const el of d.querySelectorAll('.foldrow input')){
+        const files = byFolder.get(el.dataset.folder) || [];
+        const on = files.filter(f => picked_src.has(f.path)).length;
+        el.checked = on > 0;
+        el.indeterminate = on > 0 && on < files.length;
+      }
+    }
+
+    async function loadFolders(force){
+      const list = d.getElementById('sList');
+      list.innerHTML = '<p class="muted" style="padding:10px 0">Scanning the archive…</p>';
+      let index = [];
+      try { index = await getArchiveIndex(!!force); }
+      catch(e){
+        list.innerHTML = `<p style="padding:10px 0;color:#e4442d">Archive scan failed: ${String(e.message||e)}</p>`;
+        return;
+      }
+      if(!index.length){
+        list.innerHTML = '<p style="padding:10px 0;color:#e4442d">No images found. Check the path and branch.</p>';
+        return;
+      }
+      byFolder = new Map();
+      for(const f of index){
+        const dir = (f.path || f.name).split('/').slice(0, -1).join('/') || '(root)';
+        if(!byFolder.has(dir)) byFolder.set(dir, []);
+        byFolder.get(dir).push(f);
+      }
+      picked_src.clear();
+      for(const f of index) picked_src.add(f.path);   // 처음엔 전부 고른 상태
+
+      list.innerHTML = '';
+      for(const [dir, files] of [...byFolder].sort((a,b) => b[0].localeCompare(a[0]))){
+        const wrap = d.createElement('div');
+        wrap.className = 'fold';
+        const row = d.createElement('div');
+        row.className = 'foldrow';
+        const cb = d.createElement('input');
+        cb.type = 'checkbox'; cb.dataset.folder = dir; cb.checked = true;
+        const tw = d.createElement('span');
+        tw.className = 'twist'; tw.textContent = '▸';
+        const nm = d.createElement('span');
+        nm.className = 'nm'; nm.textContent = dir;
+        const ct = d.createElement('span');
+        ct.className = 'ct'; ct.textContent = files.length;
+        row.append(cb, tw, nm, ct);
+        const box = d.createElement('div');
+        box.className = 'files';
+        for(const f of files){
+          const lab = d.createElement('label');
+          lab.className = 'on';
+          lab.title = f.name;
+          const th = d.createElement('img');
+          th.className = 'th';
+          th.loading = 'lazy';
+          th.alt = '';
+          const fc = d.createElement('input');
+          fc.type = 'checkbox'; fc.checked = true;
+          fc.addEventListener('change', ()=>{
+            if(fc.checked) picked_src.add(f.path); else picked_src.delete(f.path);
+            lab.classList.toggle('on', fc.checked);
+            syncSrc();
+          });
+          const nm2 = d.createElement('span');
+          nm2.className = 'fn';
+          nm2.textContent = f.name;
+          lab.append(th, fc, nm2);
+          box.appendChild(lab);
+        }
+        // 폴더 이름을 누르면 펼치고, 체크박스는 폴더 통째로 고른다.
+        let filled = false;
+        const toggle = () => {
+          box.classList.toggle('open');
+          const open = box.classList.contains('open');
+          tw.textContent = open ? '▾' : '▸';
+          if(open && !filled){
+            filled = true;
+            // 여기서 처음으로 그림을 요청한다. 쓰기가 있었으면 캐시를 비켜 간다.
+            [...box.querySelectorAll('img.th')].forEach((img, i) => {
+              img.src = withArchiveVer(files[i].downloadUrl);
+            });
+          }
+        };
+        tw.addEventListener('click', e => { e.stopPropagation(); toggle(); });
+        nm.addEventListener('click', toggle);
+        cb.addEventListener('change', ()=>{
+          const on = cb.checked;
+          files.forEach(f => on ? picked_src.add(f.path) : picked_src.delete(f.path));
+          box.querySelectorAll('input').forEach(x => { x.checked = on; });
+          syncSrc();
+        });
+        wrap.append(row, box);
+        list.appendChild(wrap);
+        if(byFolder.size === 1) toggle();
+      }
+      syncSrc();
+    }
+
+    // GENERATE 를 눌러야 내려받는다. 창을 여는 것만으로 네트워크를 쓰지 않는다.
+    async function refill(){
+      const chosen = [];
+      for(const files of byFolder.values())
+        for(const f of files) if(picked_src.has(f.path)) chosen.push(f);
+      if(!chosen.length){ toast('Pick at least one folder or file.'); return; }
+      const n = parseInt($('compCount').value, 10) || 14;
+      const want = Math.min(chosen.length, Math.max(n, Math.min(POOL_MAX, chosen.length)));
+      grid.innerHTML = '<p style="padding:20px;color:#9a9a96">Loading samples…</p>';
+      try {
+        pool = await archivePoolForSeed(daySeed(date, salt), want, (i, t)=>{
+          grid.innerHTML = `<p style="padding:20px;color:#9a9a96">Loading samples… ${i}/${t}</p>`;
+        }, chosen);
+      } catch(e){
+        console.error(e);
+        grid.innerHTML = `<p style="padding:20px;color:#e4442d">Loading failed: ${String(e.message||e)}</p>`;
+        return;
+      }
+      if(!pool.length){
+        grid.innerHTML = '<p style="padding:20px;color:#e4442d">None of the selected files could be loaded.</p>';
+        return;
+      }
+      build();
+    }
 
     function build(){
       picked.clear();
@@ -10308,7 +10697,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       const W = compCanvas.width, H = compCanvas.height;
       const base = daySeed(date, salt);
       for(let i=0;i<N;i++){
-        const items = batchLayout(objects, n, mn, mx, W, H, (base + i*2654435761) >>> 0);
+        const items = batchLayout(pool, n, mn, mx, W, H, (base + i*2654435761) >>> 0);
         layouts.push(items);
         const cell = d.createElement('div');
         cell.className = 'cell';
@@ -10341,9 +10730,42 @@ showLayerMenu(ev.clientX, ev.clientY, [
       sync();
     }
 
-    d.getElementById('bShuffle').addEventListener('click', ()=>{ salt++; build(); });
+    d.getElementById('bShuffle').addEventListener('click', ()=>{ salt++; refill(); });
     d.getElementById('bDate').addEventListener('change', e=>{
-      date = e.target.value || compDateFolder(); salt = 0; build();
+      date = e.target.value || compDateFolder(); salt = 0; refill();
+    });
+    d.getElementById('bReload').addEventListener('click', ()=> loadFolders(true));
+    d.getElementById('bGen').addEventListener('click', ()=> refill());
+    d.getElementById('sAll').addEventListener('click', ()=>{
+      picked_src.clear();
+      for(const files of byFolder.values()) for(const f of files) picked_src.add(f.path);
+      d.querySelectorAll('.files input').forEach(x => { x.checked = true; });
+      syncSrc();
+    });
+    d.getElementById('sOpen').addEventListener('click', ()=>{
+      // 한꺼번에 펼치면 그림을 전부 받는다. 그래서 버튼을 따로 뒀다.
+      d.querySelectorAll('.foldrow .nm').forEach(el => {
+        const box = el.parentElement.nextElementSibling;
+        if(box && !box.classList.contains('open')) el.dispatchEvent(new d.defaultView.Event('click'));
+      });
+    });
+    d.getElementById('sNone').addEventListener('click', ()=>{
+      picked_src.clear();
+      d.querySelectorAll('.files input').forEach(x => { x.checked = false; });
+      syncSrc();
+    });
+    d.getElementById('bUse').addEventListener('click', ()=>{
+      if(picked.size !== 1) return;
+      const i = [...picked][0];
+      placedItems.length = 0;
+      Array.prototype.push.apply(placedItems, layouts[i]);
+      selectedItemIdx = null;
+      $('compItemEditor').hidden = true;
+      currentCompPath = null;          // 배치에서 온 것은 원본이 없다
+      renderComposition();
+      if(typeof toneplotDirty === 'function') toneplotDirty();
+      toast(`Loaded #${String(i+1).padStart(3,'0')} into 03 COMPOSITION.`);
+      window.focus();
     });
     d.getElementById('bAll').addEventListener('click', ()=>{
       layouts.forEach((_, i)=> picked.add(i));
@@ -10386,7 +10808,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
       toast(`Batch: ${done} saved${failed ? ` · ${failed} failed` : ''}.`);
     });
 
-    build();
+    grid.innerHTML = '<p style="padding:20px;color:#9a9a96">'
+      + 'Pick your source folders above, then press GENERATE.</p>';
+    loadFolders(false);
   }
   $('autoGenBtn').addEventListener('click', openBatchWindow);
 
@@ -10472,84 +10896,6 @@ showLayerMenu(ev.clientX, ev.clientY, [
     return found;
   }
 
-  $('genArchiveBtn').addEventListener('click', async (ev) => {
-    if(userRole !== 'master'){ toast('Master access required.'); return; }
-    if(!ghConfig || !ghConfig.owner || !ghConfig.repo || !ghConfig.token){
-      toast('Please configure GitHub first at the top.');
-      return;
-    }
-    const btn = $('genArchiveBtn');
-    if(btn.disabled) return;                 // a second click mid-download would
-    const label = btn.textContent;           // interleave two sets of fetches
-    btn.disabled = true;
-
-    try {
-      const index = await getArchiveIndex(!!ev.shiftKey);
-      if(!index.length){
-        toast(`'${ghConfig.owner}/${ghConfig.repo}/${ghConfig.path || 'gallery'}' — no images found there. Check the path and branch.`);
-        return;
-      }
-
-      const n = Math.max(1, parseInt($('compCount').value, 10) || 1);
-      // Distinct SOURCES up to the element count — drawing n independent
-      // random files would repeat the same image on a small archive and
-      // download it twice. Repetition, if needed, happens at placement time.
-      const shuffled = index.slice();
-      for(let i = shuffled.length - 1; i > 0; i--){
-        const j = Math.floor(Math.random() * (i + 1));
-        const t = shuffled[i]; shuffled[i] = shuffled[j]; shuffled[j] = t;
-      }
-      const picks = shuffled.slice(0, Math.min(n, shuffled.length));
-
-      btn.textContent = '⟳ LOADING…';
-      const pool = [];
-      let fetched = 0, failed = 0;
-      for(let i = 0; i < picks.length; i++){
-        const f = picks[i];
-        // Already in panel 02 (loaded earlier, or drawn and registered under
-        // the same filename) → reuse it instead of downloading again.
-        let obj = objects.find(o => o.filename === f.name);
-        if(!obj){
-          try {
-            const res = await fetch(withArchiveVer(f.downloadUrl));
-            if(!res.ok) throw new Error('HTTP ' + res.status);
-            const blob = await res.blob();
-            const file = new File([blob], f.name, { type: blob.type || 'image/png' });
-            await loadImageFile(file, f.downloadUrl, f.path);
-            obj = objects.find(o => o.filename === f.name);
-            if(obj) fetched++;
-          } catch(e){ console.error(f.name, e); failed++; }
-        }
-        if(obj) pool.push(obj);
-        if((i + 1) % 5 === 0 || i === picks.length - 1)
-          toast(`Loading… ${i + 1}/${picks.length}`);
-      }
-
-      if(!pool.length){
-        toast('Could not load any images from the archive.');
-        return;
-      }
-
-      placeRandomComposition(pool, n);
-      toast(`Generated ${n} elements from ${pool.length} archive samples`
-            + (fetched ? ` · ${fetched} downloaded` : '')
-            + (failed  ? ` · ${failed} failed`     : '') + '.');
-    } catch(e){
-      console.error(e);
-      const m = String(e && e.message || e);
-      // 401/403은 거의 항상 토큰 문제다. 그냥 "실패"라고만 하면 저장소 경로를
-      // 뒤지느라 시간을 버린다.
-      const hint = /401|Bad credentials|Unauthorized/i.test(m)
-        ? ' — the token has expired or is invalid. Enter it again under GITHUB settings.'
-        : /403|404|Not Found|permission/i.test(m)
-        ? ' — the token is alive but has no access to this repository. Check its Repository access and Contents permission.'
-        : '';
-      toast('Archive scan failed: ' + m + hint);
-    } finally {
-      btn.disabled = false;
-      btn.textContent = label;
-    }
-  });
 
   document.querySelectorAll('#bgSwatches .swatch[data-bg]').forEach(sw=>{
     sw.addEventListener('click', ()=>{
@@ -10994,9 +11340,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
     // OPEN GALLERY (reopen saved compositions for editing) — master only.
     const og = $('openCompGalleryBtn');
     if(og) og.hidden = userRole !== 'master';
-    // FROM ARCHIVE (compose straight from the online archive) — master only:
-    // it needs the GitHub token to list the repository, which guests do not have.
-    const ga = $('genArchiveBtn');
+    // BATCH (compose from the online archive) — master only: it needs the
+    // GitHub token to list the repository, which guests do not have.
+    const ga = $('autoGenBtn');
     if(ga) ga.hidden = userRole !== 'master';
     const gb = $('gapOpenBtn');
     if(gb) gb.hidden = userRole !== 'master';
@@ -12322,7 +12668,6 @@ showLayerMenu(ev.clientX, ev.clientY, [
     cols: LAYOUT_DEFAULT.slice(),
     order: ['draw', 'samples', 'comp'],
     myPal: new Array(12).fill(null),
-    myPalAuto: true,
     gaps: Object.assign({}, GAP_DEFAULTS), gapsV: GAP_VERSION
   };
   // 'ink'는 선택 목록에서 뺐지만, 그걸로 그려둔 옛 획이 그대로 보이도록
@@ -12364,7 +12709,6 @@ showLayerMenu(ev.clientX, ev.clientY, [
       cols: colFr.map(v => Math.round(v * 1000) / 1000),
       order: panelOrder(),
       myPal: myPalette.slice(),
-      myPalAuto,
       gaps: Object.assign({}, gapP), gapsV: GAP_VERSION
     };
   }
@@ -12477,7 +12821,6 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
     // --- MY PALETTE. Pad or trim to exactly 12 and drop anything that is not
     //     a hex, so a hand-edited or half-written slot cannot poison a swatch.
-    if(typeof p.myPalAuto === 'boolean'){ myPalAuto = p.myPalAuto; $('myPalAuto').checked = myPalAuto; }
     const mp = Array.isArray(p.myPal) ? p.myPal : [];
     myPalette = new Array(MY_PAL_SIZE).fill(null)
       .map((_, i) => normHex(mp[i]));
