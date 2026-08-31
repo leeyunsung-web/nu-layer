@@ -903,7 +903,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b31</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b32</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -11346,7 +11346,6 @@ showLayerMenu(ev.clientX, ev.clientY, [
           + (how ? `  ·  via ${how}` : '');
       };
       bar.hidden = false;
-      compGalleryReload = openCompGallery;
       compGalleryDelete = async () => {
         if(!picked.size) return;
         if(!confirm(`${picked.size} file(s) will be deleted from the repository. This cannot be undone.\nContinue?`)) return;
