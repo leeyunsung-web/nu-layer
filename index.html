@@ -903,7 +903,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b26</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b29</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -918,7 +918,7 @@
         <button class="link-btn accent" id="connectGhBtn">CONFIG</button>
       </div>
       <a class="archive-link" href="archive.html" target="_blank">ARCHIVE →</a>
-      <a class="archive-link" href="gallery.html" target="_blank">GALLERY →</a>
+      <a class="archive-link" id="galleryLink" href="gallery.html" target="_blank">GALLERY →</a>
       <button class="link-btn accent" id="openMgrBtn" style="display:none; font-family:var(--font-mono); font-size:11px; padding:8px 12px; border-radius:8px; border:1px solid var(--ink); background:var(--ink); color:#fff; cursor:pointer; font-weight:600;">ARCHIVE MANAGER</button>
       <div class="role-chip" id="roleChip">
         <span class="role-badge" id="roleBadge">GUEST</span>
@@ -11241,21 +11241,79 @@ showLayerMenu(ev.clientX, ev.clientY, [
       const head = { 'Accept': 'application/vnd.github+json',
                      'Authorization': `Bearer ${token}`,
                      'X-GitHub-Api-Version': '2022-11-28' };
-      const res = await fetch(
-        `https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch||'main')}?recursive=1&t=${Date.now()}`,
-        { headers: head, cache: 'no-store' });
-      if(res.status === 404){ grid.innerHTML = '<p class="empty-hint">No compositions saved yet.</p>'; return; }
-      if(!res.ok) throw new Error('HTTP ' + res.status);
-      const tree = await res.json();
-      if(tree.truncated) console.warn('tree truncated — the listing may be incomplete');
-      const raw = `https://raw.githubusercontent.com/${owner}/${repo}/${branch||'main'}/`;
-      const items = (tree.tree || [])
-        .filter(t => t.type === 'blob' && /^compositions\//.test(t.path)
-                     && /\.(png|jpe?g)$/i.test(t.path))
-        .map(t => ({ path: t.path, name: t.path.split('/').pop(),
-                     download_url: raw + t.path.split('/').map(encodeURIComponent).join('/') }))
-        .sort((a,b)=> b.path.localeCompare(a.path));   // 최신순 (경로에 날짜가 들어 있다)
-      if(!items.length){ grid.innerHTML = '<p class="empty-hint">No compositions saved yet.</p>'; return; }
+      const br = branch || 'main';
+      const raw = `https://raw.githubusercontent.com/${owner}/${repo}/${br}/`;
+      const isImg = p => /\.(png|jpe?g)$/i.test(p);
+      const mk = p => ({ path: p, name: p.split('/').pop(),
+                         download_url: raw + p.split('/').map(encodeURIComponent).join('/') });
+      let items = null, how = '', why = [];
+
+      // ① 트리 한 번으로 전체 (날짜 폴더까지 한꺼번에)
+      const treeUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/`
+                    + `${encodeURIComponent(br)}?recursive=1&t=${Date.now()}`;
+      try {
+        const res = await fetch(treeUrl, { headers: head, cache: 'no-store' });
+        if(!res.ok){
+          const e = await res.json().catch(()=>({}));
+          throw new Error(`${res.status} ${e.message || res.statusText}`);
+        }
+        const tree = await res.json();
+        if(tree.truncated) why.push('tree truncated — the listing may be incomplete');
+        items = (tree.tree || [])
+          .filter(t => t.type === 'blob' && /^compositions\//.test(t.path) && isImg(t.path))
+          .map(t => mk(t.path));
+        how = 'git tree';
+      } catch(e){
+        why.push('tree: ' + (e.message || e));
+      }
+
+      // ② 물러설 곳 -- 예전 방식. compositions/ 바로 아래와 그 하위 폴더 한 겹.
+      if(items === null){
+        const listDir = async dir => {
+          const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/`
+                              + `${encodeURI(dir)}?ref=${encodeURIComponent(br)}&t=${Date.now()}`,
+                                { headers: head, cache: 'no-store' });
+          if(r.status === 404) return [];
+          if(!r.ok){
+            const e = await r.json().catch(()=>({}));
+            throw new Error(`${r.status} ${e.message || r.statusText}`);
+          }
+          return await r.json();
+        };
+        try {
+          const top = await listDir('compositions');
+          const out = [];
+          for(const it of top){
+            if(it.type === 'file' && isImg(it.name)) out.push(mk(it.path));
+            else if(it.type === 'dir'){
+              for(const f of await listDir(it.path))
+                if(f.type === 'file' && isImg(f.name)) out.push(mk(f.path));
+            }
+          }
+          items = out;
+          how = 'contents API';
+        } catch(e){
+          why.push('contents: ' + (e.message || e));
+        }
+      }
+
+      if(items === null){
+        // 무엇을 어디서 찾다 실패했는지 적는다.
+        grid.innerHTML = `<p class="empty-hint">Could not list <b>compositions/</b> in `
+          + `${escMgr(owner + '/' + repo + '@' + br)}.<br>${escMgr(why.join(' · '))}<br><br>`
+          + `Check that the token has <b>Contents: Read and write</b> for this repository, `
+          + `and that the branch name is right.</p>`;
+        return;
+      }
+      // 파일명에 ISO 시각이 들어 있다. 이름으로 정렬해야 폴더를 넘나들어도
+      // 최신순이 된다 -- 경로로 정렬하면 옛 평면 파일이 날짜 폴더보다 앞에 온다.
+      items.sort((a,b)=> b.name.localeCompare(a.name) || b.path.localeCompare(a.path));
+      if(!items.length){
+        grid.innerHTML = `<p class="empty-hint">No compositions found under <b>compositions/</b> in `
+          + `${escMgr(owner + '/' + repo + '@' + br)} (via ${how}).<br>`
+          + `Save one from 03 COMPOSITION, or check the branch name.</p>`;
+        return;
+      }
       grid.innerHTML = '';
       // 자동 생성이 붙으면 지울 것이 많아진다. 하나씩 지우게 두면 100개를
       // 정리하는 데 100번을 눌러야 한다.
@@ -11265,7 +11323,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
         $('compDelBtn').disabled = picked.size === 0;
         $('compDelBtn').textContent = picked.size
           ? `✕ DELETE ${picked.size} SELECTED` : '✕ DELETE SELECTED';
-        $('compPickInfo').textContent = `${picked.size} / ${items.length} selected`;
+        $('compPickInfo').textContent = `${picked.size} / ${items.length} selected`
+          + (how ? `  ·  via ${how}` : '');
       };
       bar.hidden = false;
       compGalleryReload = openCompGallery;
@@ -11326,7 +11385,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
           try {
             const r2 = await fetch(withArchiveVer(f.download_url), { cache:'no-store' });
             if(!r2.ok) throw new Error('HTTP ' + r2.status);
-            const man = extractCompositionAny(await r2.arrayBuffer());
+            const buf2 = await r2.arrayBuffer();
+            const man = extractCompositionAny(buf2);
+            if(!man) throw new Error('No composition data is embedded in this file '
+                                     + '(it may have been saved by an older build, or re-encoded).');
             if(!man){ toast('This file has no composition data (saved before this feature).'); openBtn.disabled = false; return; }
             await loadCompositionManifest(man);
             // 이 자리를 기억해 두면 다시 저장할 때 새 파일이 아니라 이 파일을
@@ -12912,6 +12974,19 @@ showLayerMenu(ev.clientX, ev.clientY, [
     prefsLoaded = true;
     toast('Tool and composition settings reset to defaults.');
   });
+
+  // 누를 때마다 주소를 새로 만든다. 저장이 있었으면 그 표식까지 붙어,
+  // 방금 올린 작품이 빠진 목록을 보게 되는 일도 없다.
+  {
+    const gl = $('galleryLink');
+    if(gl) gl.addEventListener('click', () => {
+      let v = '';
+      try { v = localStorage.getItem('nulayer_archive_ver') || ''; } catch(e){}
+      const b = $('buildTag') ? $('buildTag').textContent.trim() : '';
+      gl.href = 'gallery.html?b=' + encodeURIComponent(b)
+              + (v ? '&t=' + encodeURIComponent(v) : '');
+    });
+  }
 
   loadPrefs();
 

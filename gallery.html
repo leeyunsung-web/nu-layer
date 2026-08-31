@@ -92,7 +92,7 @@
 
 <div class="topbar">
   <div>
-    <h1>NU-LAYER / GALLERY</h1>
+    <h1>NU-LAYER / GALLERY <span style="font-size:9px;opacity:.5;letter-spacing:0">g2</span></h1>
   </div>
   <span class="count-chip" id="countChip">&mdash;</span>
 </div>
@@ -144,22 +144,77 @@
     return h;
   }
 
+  // 작업물은 compositions/YYYY-MM-DD/ 아래에 날짜별로 쌓인다. 한 디렉터리에
+  // 1000개까지만 돌려주는 contents API 로는 열흘이면 목록이 잘리기 때문이다.
+  // 그래서 기본은 트리 한 번으로 전체를 받고, 막히면 옛 방식으로 물러난다.
+  const IS_IMG = p => /\.(png|jpe?g)$/i.test(p);
+  const RAW = () => `https://raw.githubusercontent.com/${gh.owner}/${gh.repo}/`
+                  + `${gh.branch || 'main'}/`;
+  // 파일명에 ISO 시각이 들어 있으므로 이름으로 정렬해야 폴더를 넘나들어도
+  // 최신순이 된다. 경로로 정렬하면 옛 평면 파일이 날짜 폴더보다 앞에 온다.
+  const byNewest = (a, b) => b.name.localeCompare(a.name) || b.path.localeCompare(a.path);
+  const mkFile = (path, sha) => ({
+    path, sha,
+    name: path.split('/').pop(),
+    download_url: RAW() + path.split('/').map(encodeURIComponent).join('/')
+  });
+
+  // 스튜디오가 저장할 때마다 올리는 표식. raw 는 응답에 max-age=300 을 달아
+  // 주므로, 이걸 URL 에 붙이지 않으면 덮어쓴 그림이 최대 5분 동안 옛것으로 뜬다.
+  function archiveVer(){
+    try { return localStorage.getItem('nulayer_archive_ver') || ''; } catch(e){ return ''; }
+  }
+  function versioned(url){
+    const v = archiveVer();
+    if(!v) return url;
+    return url + (url.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(v);
+  }
+
   async function listGallery(){
-    const url = `https://api.github.com/repos/${gh.owner}/${gh.repo}/contents/${FOLDER}?ref=${encodeURIComponent(gh.branch || 'main')}`;
-    const res = await fetch(url, { headers: ghHeaders() });
-    if(res.status === 404) return []; // folder not created yet
-    if(!res.ok) throw new Error('GitHub ' + res.status);
-    const files = await res.json();
-    return (Array.isArray(files) ? files : [])
-      .filter(f => f.type === 'file' && /\.png$/i.test(f.name))
-      .sort((a, b) => b.name.localeCompare(a.name)); // newest first (timestamped names)
+    const br = gh.branch || 'main';
+    // ① 트리 한 번 -- 날짜 폴더가 몇 개든 요청은 하나다.
+    try {
+      const url = `https://api.github.com/repos/${gh.owner}/${gh.repo}/git/trees/`
+                + `${encodeURIComponent(br)}?recursive=1&t=${Date.now()}`;
+      const res = await fetch(url, { headers: ghHeaders(), cache: 'no-store' });
+      if(res.ok){
+        const tree = await res.json();
+        return (tree.tree || [])
+          .filter(t => t.type === 'blob'
+                       && t.path.indexOf(FOLDER + '/') === 0
+                       && IS_IMG(t.path))
+          .map(t => mkFile(t.path, t.sha))
+          .sort(byNewest);
+      }
+    } catch(e){ /* 아래로 */ }
+
+    // ② 물러설 곳 -- compositions/ 바로 아래와 그 하위 폴더 한 겹.
+    const listDir = async dir => {
+      const res = await fetch(
+        `https://api.github.com/repos/${gh.owner}/${gh.repo}/contents/${encodeURI(dir)}`
+        + `?ref=${encodeURIComponent(br)}&t=${Date.now()}`,
+        { headers: ghHeaders(), cache: 'no-store' });
+      if(res.status === 404) return [];
+      if(!res.ok) throw new Error('GitHub ' + res.status);
+      const j = await res.json();
+      return Array.isArray(j) ? j : [];
+    };
+    const out = [];
+    for(const it of await listDir(FOLDER)){
+      if(it.type === 'file' && IS_IMG(it.name)) out.push(mkFile(it.path, it.sha));
+      else if(it.type === 'dir'){
+        for(const f of await listDir(it.path))
+          if(f.type === 'file' && IS_IMG(f.name)) out.push(mkFile(f.path, f.sha));
+      }
+    }
+    return out.sort(byNewest);
   }
 
   // Real local download (cross-origin <a download> is ignored by browsers,
   // so fetch the bytes and hand over an object URL).
   async function downloadFile(f){
     try {
-      const res = await fetch(f.download_url);
+      const res = await fetch(versioned(f.download_url), { cache: 'no-store' });
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -175,11 +230,19 @@
   async function deleteFile(f, card){
     // master only; no confirm dialogs by design
     try {
-      const url = `https://api.github.com/repos/${gh.owner}/${gh.repo}/contents/${encodeURI(FOLDER + '/' + f.name)}`;
+      // 날짜 폴더가 생기면서 이름만으로는 파일을 찾을 수 없다. 전체 경로를 쓴다.
+      const url = `https://api.github.com/repos/${gh.owner}/${gh.repo}/contents/${encodeURI(f.path)}`;
+      let sha = f.sha;
+      if(!sha){
+        const g = await fetch(`${url}?ref=${encodeURIComponent(gh.branch || 'main')}`,
+                              { headers: ghHeaders(), cache: 'no-store' });
+        if(!g.ok) throw new Error('GitHub ' + g.status);
+        sha = (await g.json()).sha;
+      }
       const res = await fetch(url, {
         method: 'DELETE',
         headers: Object.assign(ghHeaders(), { 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ message: `Delete ${f.name}`, sha: f.sha, branch: gh.branch || 'main' })
+        body: JSON.stringify({ message: `Delete ${f.path}`, sha, branch: gh.branch || 'main' })
       });
       if(!res.ok){
         const err = await res.json().catch(()=>({}));
@@ -211,7 +274,7 @@
 
     const img = document.createElement('img');
     img.loading = 'lazy';
-    img.src = f.download_url;
+    img.src = versioned(f.download_url);
     img.alt = f.name;
     card.appendChild(img);
 
@@ -219,7 +282,10 @@
     meta.className = 'meta';
     const name = document.createElement('span');
     name.className = 'name';
-    name.textContent = f.name;
+    // compositions/2026-08-31/comp-….jpg -> "2026-08-31 · comp-….jpg"
+    const dir = f.path.split('/').slice(1, -1).join('/');
+    name.textContent = dir ? dir + ' \u00b7 ' + f.name : f.name;
+    name.title = f.path;
     meta.appendChild(name);
     card.appendChild(meta);
 
@@ -227,7 +293,7 @@
     const dl = document.createElement('button');
     dl.className = 'dl-btn';
     dl.textContent = '\u2b07 DOWNLOAD';
-    dl.title = 'Save the full-size PNG to your device';
+    dl.title = 'Save this work to your device';
     dl.addEventListener('click', ()=>{ downloadFile(f); hideAllActions(); });
     card.appendChild(dl);
 
@@ -263,7 +329,7 @@
       count = files.length;
       updateCount(0);
       if(!files.length){
-        empty.textContent = 'GALLERY IS EMPTY \u2014 press SAVE PNG \u2192 GALLERY in the studio composition.';
+        empty.textContent = 'GALLERY IS EMPTY \u2014 press SAVE TO GALLERY in the studio composition, or use \u2684 BATCH.';
         return;
       }
       empty.remove();
