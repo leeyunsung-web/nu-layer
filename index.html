@@ -903,7 +903,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b30</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b31</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -11228,12 +11228,31 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
   // ---- Gallery browser (master): list compositions/ and load one back ----
   async function openCompGallery(){
-    if(userRole !== 'master'){ toast('Master access required.'); return; }
-    if(!ghConfig || !ghConfig.token){ toast('Connect GitHub first.'); return; }
+    // 먼저 연다. 막히더라도 무엇이 막고 있는지 이 안에서 읽을 수 있어야 한다.
     const modal = $('compGalleryModal');
     const grid = $('compGalleryGrid');
+    const bar0 = $('compGalleryBar');
+    if(bar0) bar0.hidden = true;
     modal.classList.add('show');
     grid.innerHTML = '<p class="empty-hint">Loading…</p>';
+
+    if(userRole !== 'master'){
+      grid.innerHTML = '<p class="empty-hint">Saved compositions are <b>master only</b>.<br>'
+        + 'Press <b>SWITCH</b> at the top right and enter the master password.</p>';
+      return;
+    }
+    if(!ghConfig || !ghConfig.owner || !ghConfig.repo){
+      grid.innerHTML = '<p class="empty-hint">No GitHub repository is configured.<br>'
+        + 'Open <b>GITHUB</b> at the top and enter the owner, repository and branch.</p>';
+      return;
+    }
+    if(!ghConfig.token){
+      grid.innerHTML = `<p class="empty-hint">No GitHub token for `
+        + `${escMgr(ghConfig.owner + '/' + ghConfig.repo)}.<br>`
+        + `Open <b>GITHUB</b> at the top and paste a token with `
+        + `<b>Contents: Read and write</b>.</p>`;
+      return;
+    }
     try {
       const { owner, repo, branch, token } = ghConfig;
       // contents API 는 한 디렉터리에서 1000개까지만 돌려주고, 날짜 폴더마다
