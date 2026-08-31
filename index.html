@@ -903,7 +903,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b24</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b26</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -10488,6 +10488,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
       .cell canvas{display:block;width:100%;height:auto;background:#faf8f3}
       .cap{padding:4px 6px;font-size:10px;color:#9a9a96;display:flex;justify-content:space-between}
       .muted{color:#9a9a96}
+      .status{flex-basis:100%;font-size:11px;color:#9a9a96;min-height:1.4em}
+      .status.bad{color:#ff6a52}
+      .status.good{color:#7fd08a}
       .src{border-bottom:1px solid #333;background:#171719}
       .srchead{display:flex;gap:8px;align-items:center;padding:8px 14px;flex-wrap:wrap}
       .srclist{max-height:34vh;overflow:auto;padding:0 14px 10px}
@@ -10518,7 +10521,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
       <button id="bUse" disabled title="Load the single selected layout into 03 COMPOSITION for editing">→ USE IN 03</button>
       <button id="bAll">SELECT ALL</button>
       <button id="bNone">CLEAR</button>
-      <button id="bSave" class="pri" disabled>SAVE SELECTED</button>`;
+      <button id="bSave" class="pri" disabled>SAVE SELECTED</button>
+      <div id="bStatus" class="status"></div>`;
     d.body.appendChild(head);
 
     // 재료 고르는 칸. 폴더 통째로도, 파일 하나씩도 고를 수 있다.
@@ -10543,6 +10547,12 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
     const picked = new Set();
     let layouts = [];
+    const say = (msg, kind) => {
+      const el = d.getElementById('bStatus');
+      if(!el) return;
+      el.className = 'status' + (kind ? ' ' + kind : '');
+      el.textContent = msg || '';
+    };
     const sync = () => {
       d.getElementById('bSave').disabled = picked.size === 0;
       // 03 으로 보내는 것은 한 장일 때만 뜻이 통한다.
@@ -10786,6 +10796,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       const keepPath = currentCompPath;
       let done = 0, failed = 0;
       const list = [...picked].sort((a,b)=>a-b);
+      const why = [];
       for(const i of list){
         try {
           placedItems.length = 0;
@@ -10793,10 +10804,16 @@ showLayerMenu(ev.clientX, ev.clientY, [
           selectedItemIdx = null;
           renderComposition();
           currentCompPath = null;              // 언제나 새 파일로 등록
-          await saveCompositionToGallery();
-          done++;
-        } catch(e){ console.error(e); failed++; }
+          const r = await saveCompositionToGallery();
+          if(r && r.ok) done++;
+          else { failed++; why.push(`#${i+1}: ${lastCompSaveError || 'failed'}`); }
+        } catch(e){
+          console.error(e); failed++;
+          why.push(`#${i+1}: ${String(e && e.message || e)}`);
+        }
         btn.textContent = `SAVING ${done + failed}/${list.length}…`;
+        say(`Saving ${done + failed}/${list.length}…`
+            + (failed ? `  (${failed} failed)` : ''), failed ? 'bad' : '');
       }
       placedItems.length = 0;
       Array.prototype.push.apply(placedItems, keep);
@@ -10805,6 +10822,13 @@ showLayerMenu(ev.clientX, ev.clientY, [
       renderComposition();
       btn.disabled = false;
       sync();
+      // 부모 창의 토스트는 이 창 뒤에 가려 안 보인다. 결과는 여기 적는다.
+      if(failed){
+        say(`${done} saved · ${failed} FAILED — ` + why.slice(0, 3).join(' · ')
+            + (why.length > 3 ? ` (+${why.length - 3} more)` : ''), 'bad');
+      } else {
+        say(`${done} saved to compositions/${compDateFolder()}/`, 'good');
+      }
       toast(`Batch: ${done} saved${failed ? ` · ${failed} failed` : ''}.`);
     });
 
@@ -10935,12 +10959,21 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // SAVE PNG → uploads the full-size composition (1080×1080, untouched) to
   // the GALLERY page instead of downloading locally. Download later from
   // gallery.html.
+  // 마지막 실패 사유. 배치 창처럼 부모의 토스트를 볼 수 없는 곳에서 읽어 간다.
+  let lastCompSaveError = null;
+
   async function saveCompositionToGallery(){
-    if(replaying){ toast('Replaying — please wait.'); return; }
+    if(replaying){
+      toast('Replaying — please wait.');
+      lastCompSaveError = 'replay in progress';
+      return { ok: false };
+    }
     if(!ghConfig || !ghConfig.token){
       toast('Connect GitHub (master) first — compositions are saved to the GALLERY page.');
-      return;
+      lastCompSaveError = 'no GitHub token';
+      return { ok: false };
     }
+    lastCompSaveError = null;
     selectedItemIdx = null;
     renderComposition();
     toast('Saving to gallery…');
@@ -10955,9 +10988,13 @@ showLayerMenu(ev.clientX, ev.clientY, [
       // 갤러리에서 불러온 것을 고쳤으면 그 자리를 덮어쓴다. 새로 만든 것이면
       // 오늘 날짜 폴더에 새로 등록한다.
       const overwrite = !!currentCompPath;
+      // 이름은 밀리초까지다. 배치 저장은 한 장이 끝나면 바로 다음이라, 같은
+      // 밀리초에 두 장이 걸리면 뒤엣것이 앞엣것을 덮어쓴다 -- 조용히 한 장이
+      // 사라진다. 짧은 꼬리를 붙여 그 경우를 없앤다.
       const path = currentCompPath
         || ('compositions/' + compDateFolder() + '/comp-'
-            + new Date().toISOString().replace(/[:.]/g,'-') + '.jpg');
+            + new Date().toISOString().replace(/[:.]/g,'-')
+            + '-' + Math.random().toString(36).slice(2, 6) + '.jpg');
       const api = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURI(path)}`;
       const head = { 'Accept': 'application/vnd.github+json',
                      'Authorization': `Bearer ${token}`,
@@ -10982,8 +11019,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
       bumpArchiveVersion();
       currentCompPath = path;
       toast(sha ? `Overwrote ${path} ✓` : `Saved to GALLERY ✓ — ${path}`);
+      return { ok: true, path };
     } catch(err){
       console.error(err);
+      lastCompSaveError = String(err && err.message || err);
       toast('Gallery save failed: ' + (err.message || err));
     }
   }
