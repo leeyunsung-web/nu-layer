@@ -5,340 +5,398 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NU-LAYER / GALLERY</title>
 <style>
-  :root {
-    --bg: #f5f5f7;
-    --panel: #ffffff;
-    --ink: #1d1d1f;
-    --sub: #6e6e73;
-    --border: #d2d2d7;
-    --border-soft: #e8e8ed;
-    --accent-dim: #3a3a3c;
-    --font-mono: 'SF Mono', 'Consolas', 'Menlo', monospace;
+  :root{
+    --bg:#f5f5f7; --panel:#fff; --ink:#1d1d1f; --sub:#6e6e73;
+    --border:#d2d2d7; --soft:#e8e8ed; --red:#c0392b;
+    --mono:'SF Mono','Consolas','Menlo',monospace;
   }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    background: var(--bg); color: var(--ink);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    min-height: 100vh;
-  }
-  .topbar {
-    position: sticky; top: 0; z-index: 20;
-    display: flex; align-items: center; justify-content: center;
-    padding: 14px 22px; background: rgba(245,245,247,0.9);
-    backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-soft);
-  }
-  .topbar h1 { font-size: 15px; letter-spacing: 1.5px; font-weight: 700; text-align: center; }
-  .count-chip { position: absolute; right: 22px; top: 50%; transform: translateY(-50%); }
-  .topbar p { font-size: 11px; color: var(--sub); margin-top: 2px; }
-  .count-chip {
-    font-family: var(--font-mono); font-size: 11px; color: var(--sub);
-    border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; background: var(--panel);
-  }
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr); /* five per row */
-    gap: 14px; padding: 22px; max-width: 1600px; margin: 0 auto;
-  }
-  .card {
-    position: relative; background: var(--panel);
-    border: 1px solid var(--border-soft); border-radius: 14px; overflow: hidden;
-    opacity: 0; transform: translateY(6px); transition: opacity 0.5s ease, transform 0.5s ease;
-  }
-  .card.shown { opacity: 1; transform: none; }
-  .card img {
-    display: block; width: 100%; aspect-ratio: 1/1; object-fit: contain;
-    background:
-      linear-gradient(45deg, #fafafa 25%, transparent 25%, transparent 75%, #fafafa 75%),
-      linear-gradient(45deg, #fafafa 25%, #ffffff 25%, #ffffff 75%, #fafafa 75%);
-    background-size: 18px 18px; background-position: 0 0, 9px 9px;
-  }
-  .card .meta {
-    display: flex; align-items: center; justify-content: center;
-    gap: 6px; padding: 8px 10px; border-top: 1px solid var(--border-soft);
-  }
-  .card .name {
-    font-family: var(--font-mono); font-size: 10px; color: var(--sub);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    text-align: center;
-  }
-  /* action buttons: hidden until right-click reveals them */
-  .dl-btn, .del-btn {
-    position: absolute; right: 8px; display: none;
-    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.5px;
-    border-radius: 8px; padding: 4px 8px; cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-  }
-  .dl-btn {
-    top: 8px;
-    border: 1px solid var(--border); background: #fff; color: var(--ink);
-  }
-  .dl-btn:hover { background: var(--ink); color: #fff; border-color: var(--ink); }
-  .del-btn {
-    top: 40px;
-    border: 1px solid #c0392b; background: #fff; color: #c0392b;
-  }
-  .del-btn:hover { background: #c0392b; color: #fff; }
-  .card.show-actions .dl-btn,
-  .card.show-actions .del-btn { display: block; }
-  .empty {
-    grid-column: 1 / -1; text-align: center; color: var(--sub);
-    font-family: var(--font-mono); font-size: 12px; padding: 80px 0;
-  }
-  @media (max-width: 1100px){ .grid { grid-template-columns: repeat(3, 1fr); } }
-  @media (max-width: 640px){ .grid { grid-template-columns: repeat(2, 1fr); } }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);min-height:100vh;
+       font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+
+  .topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;
+          padding:12px 20px;background:rgba(245,245,247,.92);backdrop-filter:blur(10px);
+          border-bottom:1px solid var(--soft);flex-wrap:wrap}
+  .topbar h1{font-size:15px;letter-spacing:1.5px;font-weight:700}
+  .build{font-size:9px;opacity:.45;letter-spacing:0;font-weight:400}
+  .spacer{flex:1}
+  .chip{font-family:var(--mono);font-size:11px;color:var(--sub);background:var(--panel);
+        border:1px solid var(--border);border-radius:999px;padding:4px 10px}
+  button.chip{cursor:pointer}
+  button.chip:hover{border-color:var(--ink);color:var(--ink)}
+  button.chip[disabled]{opacity:.4;cursor:default}
+  button.danger{border-color:var(--red);color:var(--red)}
+  button.danger:hover{background:var(--red);color:#fff}
+  .note{font-family:var(--mono);font-size:11px;color:var(--sub);width:100%;min-height:1em}
+  .note.bad{color:var(--red)}
+
+  .grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;
+        padding:20px;max-width:1600px;margin:0 auto}
+  @media (max-width:1100px){.grid{grid-template-columns:repeat(3,1fr)}}
+  @media (max-width:640px){.grid{grid-template-columns:repeat(2,1fr)}}
+
+  .card{position:relative;background:var(--panel);border:1px solid var(--soft);
+        border-radius:14px;overflow:hidden;opacity:0;transform:translateY(6px);
+        transition:opacity .45s ease,transform .45s ease}
+  .card.shown{opacity:1;transform:none}
+  .card.picked{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+  .card img{display:block;width:100%;aspect-ratio:1/1;object-fit:contain;
+            background:linear-gradient(45deg,#fafafa 25%,transparent 25%,transparent 75%,#fafafa 75%),
+                       linear-gradient(45deg,#fafafa 25%,#fff 25%,#fff 75%,#fafafa 75%);
+            background-size:18px 18px;background-position:0 0,9px 9px;cursor:pointer}
+  .card .meta{display:flex;align-items:center;gap:6px;padding:7px 9px;
+              border-top:1px solid var(--soft)}
+  .card .name{font-family:var(--mono);font-size:10px;color:var(--sub);flex:1;
+              white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .acts{position:absolute;top:8px;right:8px;display:none;flex-direction:column;gap:6px}
+  .card.show-actions .acts{display:flex}
+  .acts button{font-family:var(--mono);font-size:10px;letter-spacing:.5px;
+               border-radius:8px;padding:4px 8px;cursor:pointer;background:#fff;
+               border:1px solid var(--border);color:var(--ink);
+               box-shadow:0 4px 12px rgba(0,0,0,.12)}
+  .acts button:hover{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .acts button.del{border-color:var(--red);color:var(--red)}
+  .acts button.del:hover{background:var(--red);color:#fff}
+
+  .empty{grid-column:1/-1;text-align:center;color:var(--sub);font-family:var(--mono);
+         font-size:12px;line-height:2;padding:70px 20px}
+  .empty b{color:var(--ink)}
 </style>
 </head>
 <body>
 
 <div class="topbar">
-  <div>
-    <h1>NU-LAYER / GALLERY <span style="font-size:9px;opacity:.5;letter-spacing:0">g2</span></h1>
-  </div>
-  <span class="count-chip" id="countChip">&mdash;</span>
+  <h1>NU-LAYER / GALLERY <span class="build" id="build">g3</span></h1>
+  <button class="chip" id="srcChip" title="Change the repository this gallery reads">—</button>
+  <span class="spacer"></span>
+  <span class="chip" id="count">—</span>
+  <button class="chip" id="reload" title="Read the listing again">⟳ RELOAD</button>
+  <button class="chip danger" id="delSel" hidden disabled>✕ DELETE SELECTED</button>
+  <div class="note" id="note"></div>
 </div>
 
-<div class="grid" id="grid">
-  <div class="empty" id="emptyMsg">LOADING&hellip;</div>
-</div>
+<div class="grid" id="grid"><div class="empty">LOADING…</div></div>
 
 <script>
 (function(){
-  const GH_STORAGE_KEY = 'objet_studio_gh_config';
+  'use strict';
+  const BUILD = 'g3';
   const FOLDER = 'compositions';
+  const GH_KEY = 'objet_studio_gh_config';   // 스튜디오와 같은 칸을 쓴다
+  const ROLE_KEY = 'nulayer_role';
+  const VER_KEY = 'nulayer_archive_ver';
+  const OWN_KEY = 'nulayer_gallery_src';     // 이 페이지에서 직접 지정한 저장소
 
-  // Visitors arriving from the public link have no saved config — derive the
-  // repo from the GitHub Pages URL itself (owner.github.io/repo). Listing a
-  // public repo needs no token, so read-only browsing just works.
-  function defaultCfgFromLocation(){
-    if(typeof location === 'undefined') return null;
+  const $ = id => document.getElementById(id);
+  const ls = {
+    get(k){ try { return localStorage.getItem(k); } catch(e){ return null; } },
+    set(k,v){ try { localStorage.setItem(k,v); } catch(e){} },
+  };
+  const esc = s => String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+  // ---- 어느 저장소를 읽을 것인가 -----------------------------------------
+  // 세 곳을 순서대로 본다. 스튜디오를 한 번도 안 열었거나 파일을 로컬에서
+  // 열어도 무언가는 보여야 한다 -- 여기서 막히면 페이지가 통째로 죽는다.
+  function fromPages(){
     const h = location.hostname || '';
     if(!/\.github\.io$/i.test(h)) return null;
     const owner = h.split('.')[0];
     const seg = location.pathname.split('/').filter(Boolean);
-    const repo = seg.length ? seg[0] : (owner + '.github.io');
-    return { owner, repo, branch: 'main', path: 'gallery' };
+    return { owner, repo: seg.length ? seg[0] : owner + '.github.io', branch: 'main' };
   }
-  function loadGh(){
-    try { return JSON.parse(localStorage.getItem(GH_STORAGE_KEY)) || null; } catch(e){ return null; }
+  function readCfg(){
+    let stored = null, mine = null;
+    try { stored = JSON.parse(ls.get(GH_KEY) || 'null'); } catch(e){}
+    try { mine = JSON.parse(ls.get(OWN_KEY) || 'null'); } catch(e){}
+    const base = (mine && mine.owner && mine.repo) ? mine
+               : (stored && stored.owner && stored.repo) ? stored
+               : fromPages();
+    if(!base) return null;
+    return { owner: base.owner, repo: base.repo, branch: base.branch || 'main',
+             // 토큰은 스튜디오 설정에서만 온다. 이 페이지는 토큰을 저장하지 않는다.
+             token: (stored && stored.token) || null };
   }
-  const stored = loadGh();
-  const gh = (stored && stored.owner && stored.repo) ? stored : defaultCfgFromLocation();
-  const token = stored && stored.token ? stored.token : null;
-  const ROLE_KEY = 'nulayer_role';
-  function roleIsMaster(){
-    try { return localStorage.getItem(ROLE_KEY) === 'master'; } catch(e){ return false; }
-  }
-  const isMaster = !!token && roleIsMaster();
+  let cfg = readCfg();
+  const isMaster = () => !!(cfg && cfg.token) && ls.get(ROLE_KEY) === 'master';
 
-  // If the studio switches back to guest while the gallery is open,
-  // delete buttons disappear immediately.
-  window.addEventListener('storage', ev=>{
-    if(ev.key === ROLE_KEY && !roleIsMaster()){
-      document.querySelectorAll('.del-btn').forEach(b=> b.remove());
-    }
-  });
-
-  function ghHeaders(){
-    const h = { 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
-    if(token) h['Authorization'] = 'Bearer ' + token;
+  function headers(){
+    const h = { 'Accept':'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28' };
+    if(cfg && cfg.token) h['Authorization'] = 'Bearer ' + cfg.token;
     return h;
   }
+  function bust(url){
+    const v = ls.get(VER_KEY) || '';
+    return v ? url + (url.indexOf('?') >= 0 ? '&' : '?') + 'v=' + encodeURIComponent(v) : url;
+  }
 
-  // 작업물은 compositions/YYYY-MM-DD/ 아래에 날짜별로 쌓인다. 한 디렉터리에
-  // 1000개까지만 돌려주는 contents API 로는 열흘이면 목록이 잘리기 때문이다.
-  // 그래서 기본은 트리 한 번으로 전체를 받고, 막히면 옛 방식으로 물러난다.
-  const IS_IMG = p => /\.(png|jpe?g)$/i.test(p);
-  const RAW = () => `https://raw.githubusercontent.com/${gh.owner}/${gh.repo}/`
-                  + `${gh.branch || 'main'}/`;
+  // ---- 목록 --------------------------------------------------------------
+  const isImg = p => /\.(png|jpe?g|webp)$/i.test(p);
   // 파일명에 ISO 시각이 들어 있으므로 이름으로 정렬해야 폴더를 넘나들어도
   // 최신순이 된다. 경로로 정렬하면 옛 평면 파일이 날짜 폴더보다 앞에 온다.
-  const byNewest = (a, b) => b.name.localeCompare(a.name) || b.path.localeCompare(a.path);
-  const mkFile = (path, sha) => ({
-    path, sha,
-    name: path.split('/').pop(),
-    download_url: RAW() + path.split('/').map(encodeURIComponent).join('/')
-  });
+  const newest = (a,b) => b.name.localeCompare(a.name) || b.path.localeCompare(a.path);
+  const raw = path => 'https://raw.githubusercontent.com/' + cfg.owner + '/' + cfg.repo
+                    + '/' + cfg.branch + '/' + path.split('/').map(encodeURIComponent).join('/');
+  const mk = (path, sha) => ({ path, sha, name: path.split('/').pop(), url: raw(path) });
 
-  // 스튜디오가 저장할 때마다 올리는 표식. raw 는 응답에 max-age=300 을 달아
-  // 주므로, 이걸 URL 에 붙이지 않으면 덮어쓴 그림이 최대 5분 동안 옛것으로 뜬다.
-  function archiveVer(){
-    try { return localStorage.getItem('nulayer_archive_ver') || ''; } catch(e){ return ''; }
-  }
-  function versioned(url){
-    const v = archiveVer();
-    if(!v) return url;
-    return url + (url.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(v);
-  }
-
-  async function listGallery(){
-    const br = gh.branch || 'main';
-    // ① 트리 한 번 -- 날짜 폴더가 몇 개든 요청은 하나다.
-    try {
-      const url = `https://api.github.com/repos/${gh.owner}/${gh.repo}/git/trees/`
-                + `${encodeURIComponent(br)}?recursive=1&t=${Date.now()}`;
-      const res = await fetch(url, { headers: ghHeaders(), cache: 'no-store' });
-      if(res.ok){
-        const tree = await res.json();
-        return (tree.tree || [])
-          .filter(t => t.type === 'blob'
-                       && t.path.indexOf(FOLDER + '/') === 0
-                       && IS_IMG(t.path))
-          .map(t => mkFile(t.path, t.sha))
-          .sort(byNewest);
-      }
-    } catch(e){ /* 아래로 */ }
-
-    // ② 물러설 곳 -- compositions/ 바로 아래와 그 하위 폴더 한 겹.
-    const listDir = async dir => {
-      const res = await fetch(
-        `https://api.github.com/repos/${gh.owner}/${gh.repo}/contents/${encodeURI(dir)}`
-        + `?ref=${encodeURIComponent(br)}&t=${Date.now()}`,
-        { headers: ghHeaders(), cache: 'no-store' });
-      if(res.status === 404) return [];
-      if(!res.ok) throw new Error('GitHub ' + res.status);
-      const j = await res.json();
-      return Array.isArray(j) ? j : [];
-    };
-    const out = [];
-    for(const it of await listDir(FOLDER)){
-      if(it.type === 'file' && IS_IMG(it.name)) out.push(mkFile(it.path, it.sha));
-      else if(it.type === 'dir'){
-        for(const f of await listDir(it.path))
-          if(f.type === 'file' && IS_IMG(f.name)) out.push(mkFile(f.path, f.sha));
-      }
+  async function api(url){
+    const res = await fetch(url, { headers: headers(), cache:'no-store' });
+    if(!res.ok){
+      let msg = res.statusText;
+      try { const j = await res.json(); if(j && j.message) msg = j.message; } catch(e){}
+      const err = new Error(res.status + ' ' + msg);
+      err.status = res.status;
+      throw err;
     }
-    return out.sort(byNewest);
+    return res.json();
   }
 
-  // Real local download (cross-origin <a download> is ignored by browsers,
-  // so fetch the bytes and hand over an object URL).
-  async function downloadFile(f){
+  // 트리 한 번이면 날짜 폴더가 몇 개든 요청이 하나다. 막히면 옛 방식으로 물러난다.
+  async function listAll(){
+    const tried = [];
     try {
-      const res = await fetch(versioned(f.download_url), { cache: 'no-store' });
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
+      const t = await api('https://api.github.com/repos/' + cfg.owner + '/' + cfg.repo
+        + '/git/trees/' + encodeURIComponent(cfg.branch) + '?recursive=1&t=' + Date.now());
+      const out = (t.tree || [])
+        .filter(x => x.type === 'blob' && x.path.indexOf(FOLDER + '/') === 0 && isImg(x.path))
+        .map(x => mk(x.path, x.sha));
+      return { files: out.sort(newest), how: 'git tree',
+               warn: t.truncated ? 'the tree was truncated — some works may be missing' : '' };
+    } catch(e){ tried.push('tree: ' + e.message); }
+
+    try {
+      const dir = async d => {
+        try {
+          const j = await api('https://api.github.com/repos/' + cfg.owner + '/' + cfg.repo
+            + '/contents/' + encodeURI(d) + '?ref=' + encodeURIComponent(cfg.branch)
+            + '&t=' + Date.now());
+          return Array.isArray(j) ? j : [];
+        } catch(e){ if(e.status === 404) return []; throw e; }
+      };
+      const out = [];
+      for(const it of await dir(FOLDER)){
+        if(it.type === 'file' && isImg(it.name)) out.push(mk(it.path, it.sha));
+        else if(it.type === 'dir')
+          for(const f of await dir(it.path))
+            if(f.type === 'file' && isImg(f.name)) out.push(mk(f.path, f.sha));
+      }
+      return { files: out.sort(newest), how: 'contents API', warn: '' };
+    } catch(e){ tried.push('contents: ' + e.message); }
+
+    throw new Error(tried.join(' · '));
+  }
+
+  // ---- 화면 --------------------------------------------------------------
+  let files = [], how = '';
+  const picked = new Set();
+
+  function say(msg, bad){
+    $('note').className = 'note' + (bad ? ' bad' : '');
+    $('note').textContent = msg || '';
+  }
+  function syncCount(){
+    $('count').textContent = files.length + ' WORK' + (files.length === 1 ? '' : 'S');
+    $('delSel').hidden = !isMaster();
+    $('delSel').disabled = picked.size === 0;
+    $('delSel').textContent = picked.size ? '✕ DELETE ' + picked.size + ' SELECTED'
+                                          : '✕ DELETE SELECTED';
+  }
+  function syncSrcChip(){
+    $('srcChip').textContent = cfg
+      ? cfg.owner + '/' + cfg.repo + '@' + cfg.branch : 'SET REPOSITORY';
+  }
+  const showEmpty = html => { $('grid').innerHTML = '<div class="empty">' + html + '</div>'; };
+
+  async function download(f){
+    try {
+      const res = await fetch(bust(f.url), { cache:'no-store' });
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      const url = URL.createObjectURL(await res.blob());
       const a = document.createElement('a');
-      a.href = url;
-      a.download = f.name;
-      a.click();
+      a.href = url; a.download = f.name; a.click();
       setTimeout(()=> URL.revokeObjectURL(url), 3000);
-    } catch(err){
-      alert('Download failed: ' + (err.message || err));
+    } catch(e){ say('Download failed: ' + (e.message || e), true); }
+  }
+
+  async function removeOne(f){
+    // 경로로 지운다. 날짜 폴더가 생기면서 이름만으로는 파일을 찾을 수 없다.
+    const url = 'https://api.github.com/repos/' + cfg.owner + '/' + cfg.repo
+              + '/contents/' + encodeURI(f.path);
+    let sha = f.sha;
+    if(!sha) sha = (await api(url + '?ref=' + encodeURIComponent(cfg.branch))).sha;
+    const res = await fetch(url, {
+      method:'DELETE',
+      headers: Object.assign(headers(), { 'Content-Type':'application/json' }),
+      body: JSON.stringify({ message:'Delete ' + f.path, sha, branch: cfg.branch }),
+    });
+    if(!res.ok){
+      let m = res.statusText;
+      try { const j = await res.json(); if(j && j.message) m = j.message; } catch(e){}
+      throw new Error(res.status + ' ' + m);
     }
   }
 
-  async function deleteFile(f, card){
-    // master only; no confirm dialogs by design
-    try {
-      // 날짜 폴더가 생기면서 이름만으로는 파일을 찾을 수 없다. 전체 경로를 쓴다.
-      const url = `https://api.github.com/repos/${gh.owner}/${gh.repo}/contents/${encodeURI(f.path)}`;
-      let sha = f.sha;
-      if(!sha){
-        const g = await fetch(`${url}?ref=${encodeURIComponent(gh.branch || 'main')}`,
-                              { headers: ghHeaders(), cache: 'no-store' });
-        if(!g.ok) throw new Error('GitHub ' + g.status);
-        sha = (await g.json()).sha;
-      }
-      const res = await fetch(url, {
-        method: 'DELETE',
-        headers: Object.assign(ghHeaders(), { 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ message: `Delete ${f.path}`, sha, branch: gh.branch || 'main' })
-      });
-      if(!res.ok){
-        const err = await res.json().catch(()=>({}));
-        throw new Error(err.message || res.status);
-      }
-      card.remove();
-      updateCount(-1);
-    } catch(err){
-      alert('Delete failed: ' + (err.message || err));
-    }
+  function hideActions(){
+    const list = document.querySelectorAll('.card.show-actions');
+    for(let i=0;i<list.length;i++) list[i].classList.remove('show-actions');
   }
-
-  let count = 0;
-  function updateCount(delta){
-    if(delta) count += delta;
-    document.getElementById('countChip').textContent = count + ' WORK' + (count === 1 ? '' : 'S');
-  }
-
-  function hideAllActions(){
-    document.querySelectorAll('.card.show-actions').forEach(c => c.classList.remove('show-actions'));
-  }
-  document.addEventListener('pointerdown', e=>{
-    if(!e.target.closest('.dl-btn') && !e.target.closest('.del-btn')) hideAllActions();
+  document.addEventListener('pointerdown', e => {
+    if(!(e.target.closest && e.target.closest('.acts'))) hideActions();
   });
 
-  function makeCard(f, i){
-    const card = document.createElement('div');
-    card.className = 'card';
+  function card(f, i){
+    const el = document.createElement('div');
+    el.className = 'card';
 
     const img = document.createElement('img');
     img.loading = 'lazy';
-    img.src = versioned(f.download_url);
     img.alt = f.name;
-    card.appendChild(img);
+    img.src = bust(f.url);
+    img.addEventListener('error', ()=>{ img.style.opacity = .25; });
+    el.appendChild(img);
 
     const meta = document.createElement('div');
     meta.className = 'meta';
-    const name = document.createElement('span');
-    name.className = 'name';
-    // compositions/2026-08-31/comp-….jpg -> "2026-08-31 · comp-….jpg"
-    const dir = f.path.split('/').slice(1, -1).join('/');
-    name.textContent = dir ? dir + ' \u00b7 ' + f.name : f.name;
-    name.title = f.path;
-    meta.appendChild(name);
-    card.appendChild(meta);
-
-    // hidden actions \u2014 revealed by right-click on the work
-    const dl = document.createElement('button');
-    dl.className = 'dl-btn';
-    dl.textContent = '\u2b07 DOWNLOAD';
-    dl.title = 'Save this work to your device';
-    dl.addEventListener('click', ()=>{ downloadFile(f); hideAllActions(); });
-    card.appendChild(dl);
-
-    if(isMaster){
-      const del = document.createElement('button');
-      del.className = 'del-btn';
-      del.textContent = '\u2715 DELETE';
-      del.title = 'Remove this work from the gallery';
-      del.addEventListener('click', ()=> deleteFile(f, card));
-      card.appendChild(del);
+    if(isMaster()){
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.addEventListener('change', ()=>{
+        if(cb.checked) picked.add(f.path); else picked.delete(f.path);
+        el.classList.toggle('picked', cb.checked);
+        syncCount();
+      });
+      meta.appendChild(cb);
+      // 그림을 눌러도 골라지게 -- 작은 체크칸만 노리는 것은 성가시다.
+      img.addEventListener('click', ()=>{
+        cb.checked = !cb.checked;
+        cb.dispatchEvent(new Event('change'));
+      });
     }
+    const nm = document.createElement('span');
+    nm.className = 'name';
+    const dir = f.path.split('/').slice(1, -1).join('/');
+    nm.textContent = dir ? dir + ' · ' + f.name : f.name;
+    nm.title = f.path;
+    meta.appendChild(nm);
+    el.appendChild(meta);
 
-    card.addEventListener('contextmenu', e=>{
-      e.preventDefault();
-      hideAllActions();
-      card.classList.add('show-actions');
+    const acts = document.createElement('div');
+    acts.className = 'acts';
+    const dl = document.createElement('button');
+    dl.textContent = '⬇ DOWNLOAD';
+    dl.addEventListener('click', ()=>{ download(f); hideActions(); });
+    acts.appendChild(dl);
+    if(isMaster()){
+      const del = document.createElement('button');
+      del.className = 'del';
+      del.textContent = '✕ DELETE';
+      del.addEventListener('click', async ()=>{
+        hideActions();
+        if(!confirm(f.path + '\nDelete this work? It cannot be undone.')) return;
+        try {
+          await removeOne(f);
+          files = files.filter(x => x.path !== f.path);
+          picked.delete(f.path);
+          el.remove();
+          syncCount();
+          say('Deleted ' + f.path + '. It remains in the git history.');
+        } catch(e){ say('Delete failed: ' + (e.message || e), true); }
+      });
+      acts.appendChild(del);
+    }
+    el.appendChild(acts);
+
+    el.addEventListener('contextmenu', e => {
+      e.preventDefault(); hideActions(); el.classList.add('show-actions');
     });
-
-    setTimeout(()=> card.classList.add('shown'), 40 * (i % 15));
-    return card;
+    setTimeout(()=> el.classList.add('shown'), 30 * (i % 15));
+    return el;
   }
 
-  async function init(){
-    const grid = document.getElementById('grid');
-    const empty = document.getElementById('emptyMsg');
-    if(!gh || !gh.owner || !gh.repo){
-      empty.textContent = 'NO GITHUB CONFIG \u2014 connect GitHub in the studio first.';
-      updateCount(0);
+  $('delSel').addEventListener('click', async ()=>{
+    const list = [];
+    for(const p of picked) list.push(p);
+    if(!list.length) return;
+    if(!confirm(list.length + ' work(s) will be deleted from the repository.\n'
+              + 'This cannot be undone. Continue?')) return;
+    $('delSel').disabled = true;
+    let done = 0; const bad = [];
+    for(const p of list){
+      const f = files.filter(x => x.path === p)[0];
+      if(!f) continue;
+      try { await removeOne(f); done++; }
+      catch(e){ bad.push(f.name + ': ' + (e.message || e)); }
+      say('Deleting ' + (done + bad.length) + '/' + list.length + '…');
+    }
+    say(done + ' deleted' + (bad.length ? ' · ' + bad.length + ' FAILED — ' + bad[0] : '')
+        + '. They remain in the git history.', bad.length > 0);
+    picked.clear();
+    await load();
+  });
+
+  // 저장소를 직접 지정한다. 스튜디오를 한 번도 안 열었어도 볼 수 있어야 한다.
+  $('srcChip').addEventListener('click', ()=>{
+    const cur = cfg || { owner:'', repo:'', branch:'main' };
+    const owner = prompt('GitHub owner (user or org)', cur.owner || '');
+    if(owner === null) return;
+    const repo = prompt('Repository name', cur.repo || '');
+    if(repo === null) return;
+    const branch = prompt('Branch', cur.branch || 'main');
+    if(branch === null) return;
+    ls.set(OWN_KEY, JSON.stringify({ owner: owner.trim(), repo: repo.trim(),
+                                     branch: (branch || 'main').trim() }));
+    cfg = readCfg();
+    load();
+  });
+  $('reload').addEventListener('click', ()=> load());
+
+  async function load(){
+    picked.clear();
+    syncSrcChip();
+    if(!cfg){
+      files = []; syncCount(); say('');
+      showEmpty('NO REPOSITORY SET.<br>Open the studio and connect GitHub, '
+              + 'or <b>click the chip at the top</b> to enter it here.');
       return;
     }
+    $('grid').innerHTML = '<div class="empty">LOADING…</div>';
+    say('');
     try {
-      const files = await listGallery();
-      count = files.length;
-      updateCount(0);
+      const r = await listAll();
+      files = r.files; how = r.how;
+      syncCount();
+      if(r.warn) say(r.warn, true);
       if(!files.length){
-        empty.textContent = 'GALLERY IS EMPTY \u2014 press SAVE TO GALLERY in the studio composition, or use \u2684 BATCH.';
+        showEmpty('NO WORKS UNDER <b>' + esc(FOLDER) + '/</b> IN '
+                + esc(cfg.owner + '/' + cfg.repo + '@' + cfg.branch) + '.<br>'
+                + 'Save one from 03 COMPOSITION in the studio, or press ⚄ BATCH.<br>'
+                + '<span style="opacity:.6">read via ' + esc(how) + '</span>');
         return;
       }
-      empty.remove();
-      files.forEach((f, i)=> grid.appendChild(makeCard(f, i)));
-    } catch(err){
-      empty.textContent = 'LOAD ERROR: ' + (err.message || err);
+      const grid = $('grid');
+      grid.innerHTML = '';
+      for(let i=0;i<files.length;i++) grid.appendChild(card(files[i], i));
+      say(files.length + ' work(s) · read via ' + how
+          + (isMaster() ? ' · master' : ' · read-only'));
+    } catch(e){
+      files = []; syncCount(); say('');
+      // 무엇을 어디서 찾다 실패했는지 적는다. "안 열린다"만 남으면 고칠 수가 없다.
+      showEmpty('COULD NOT READ <b>' + esc(FOLDER) + '/</b> IN '
+        + esc(cfg.owner + '/' + cfg.repo + '@' + cfg.branch) + '.<br>'
+        + esc(e.message || e) + '<br><br>'
+        + 'If the repository is private, open the studio and connect GitHub first.<br>'
+        + 'If it is public, check the owner, repository and branch names — '
+        + '<b>click the chip at the top</b> to change them.');
     }
   }
-  init();
+
+  // 다른 탭에서 마스터를 풀거나 설정을 바꾸면 여기도 따라간다.
+  window.addEventListener('storage', ev => {
+    if(ev.key === ROLE_KEY || ev.key === GH_KEY){ cfg = readCfg(); load(); }
+  });
+
+  $('build').textContent = BUILD;
+  load();
 })();
 </script>
 </body>
