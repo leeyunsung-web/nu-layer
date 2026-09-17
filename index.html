@@ -903,7 +903,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b48</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b50</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -920,6 +920,8 @@
       <a class="archive-link" href="archive.html" target="_blank">ARCHIVE →</a>
       <a class="archive-link" id="galleryLink" href="gallery.html" target="_blank">GALLERY →</a>
       <button class="link-btn accent" id="openMgrBtn" style="display:none; font-family:var(--font-mono); font-size:11px; padding:8px 12px; border-radius:8px; border:1px solid var(--ink); background:var(--ink); color:#fff; cursor:pointer; font-weight:600;">ARCHIVE MANAGER</button>
+      <button class="link-btn accent" id="tonePlotBtn" style="display:none; font-family:var(--font-mono); font-size:11px; padding:8px 12px; border-radius:8px; border:1px solid var(--ink); background:var(--ink); color:#fff; cursor:pointer; font-weight:600;" title="TONE PLOT 을 새 창으로 열고 지금 그림을 보냅니다 — 색 영역마다 해칭이나 스크린톤을 골라 플로터 SVG 로 바꿉니다" data-tp="v9.2">◫ TONE PLOT</button>
+      <button class="link-btn accent" id="stitchPaintBtn" style="display:none; font-family:var(--font-mono); font-size:11px; padding:8px 12px; border-radius:8px; border:1px solid var(--ink); background:var(--ink); color:#fff; cursor:pointer; font-weight:600;" title="STITCH PAINT 를 새 창으로 엽니다 — Brother NV180D 용 자수 그림판 (stitch-paint.html 이 같은 폴더에 있어야 합니다)">✂ STITCH PAINT</button>
       <div class="role-chip" id="roleChip">
         <span class="role-badge" id="roleBadge">GUEST</span>
         <span class="role-name" id="roleName">Guest</span>
@@ -1122,7 +1124,6 @@
         <button class="btn" id="replayBtn" style="flex:1;" title="Replay the drawing process (trace layer hidden)">▶ REPLAY</button>
         <button class="btn" id="replaySaveBtn" style="flex:1;" title="Replay and save as a video — MP4 (H.264) when the browser supports it, WebM otherwise">⏺ SAVE REPLAY</button>
         <button class="btn" id="exportSvgBtn" style="flex:1;" title="Export the visible drawing as a vector SVG (final lines only — erasers baked in)">⬡ EXPORT SVG</button>
-        <button class="btn" id="tonePlotBtn" style="flex:1;" title="Opens TONE PLOT in a new window and streams the drawing to it — pick hatching or screentone per colour region and convert to plotter SVG (embedded in this file, no separate file needed)" data-tp="v9.2">◫ TONE PLOT</button>
         <select id="replaySpeed" title="Replay speed" style="font-family:var(--font-mono); font-size:12px; padding:0 8px; border-radius:8px; border:1px solid var(--border); background:var(--panel); color:var(--ink); cursor:pointer;">
           <option value="0.25">0.25x</option>
           <option value="0.5">0.5x</option>
@@ -1463,6 +1464,11 @@
     const sw = $('switchRoleBtn');
     if(sw) sw.textContent = isMaster ? '⇄ GUEST' : '⇄ MASTER';
     $('openMgrBtn').style.display = isMaster ? 'inline-flex' : 'none';
+    // 창을 여는 도구들. 아카이브 매니저와 같은 성격이라 나란히 두고 함께 여닫는다.
+    for(const id of ['tonePlotBtn', 'stitchPaintBtn']){
+      const b = $(id);
+      if(b) b.style.display = isMaster ? 'inline-flex' : 'none';
+    }
     // GitHub repo config chip: master only (hidden entirely for guests)
     const ghChip = $('ghChip');
     if(ghChip) ghChip.style.display = isMaster ? 'flex' : 'none';
@@ -5074,6 +5080,14 @@ showLayerMenu(ev.clientX, ev.clientY, [
   $('mgrOfflineSave').addEventListener('click', mgrOfflineSave);
   $('mgrRestoreBackup').addEventListener('click', mgrRestoreBackup);
 
+  let spWin = null;
+  function openStitchPaint(){
+    if(spWin && !spWin.closed){ spWin.focus(); return; }
+    spWin = window.open('stitch-paint.html', 'stitchpaint');
+    if(!spWin) alert('팝업이 막혀 있습니다 — 이 사이트의 팝업을 허용해 주세요.');
+  }
+  $('stitchPaintBtn').addEventListener('click', openStitchPaint);
+
   $('openMgrBtn').addEventListener('click', openMgr);
   $('mgrClose').addEventListener('click', closeMgr);
   $('mgrRefresh').addEventListener('click', refreshMgr);
@@ -5734,7 +5748,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
         if(y>0) nbs.push(vi-w);
         if(y<h-1) nbs.push(vi+w);
         for(const ni of nbs){
-          if(!mask[ni]){ mask[ni]=2; next.push(ni); }
+          // 획이 덮은 자리로만 번진다. 다시 빈 자리를 만나면 획을 다 건넌
+          // 것이므로 멈춘다 -- 이게 없으면 1px 선을 뚫고 반대편까지 칠한다.
+          if(!mask[ni] && data[ni*4+3] > 24){ mask[ni]=2; next.push(ni); }
         }
       }
       frontier = next;
@@ -5859,7 +5875,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
         if(y>0) nbs.push(vi-w);
         if(y<h-1) nbs.push(vi+w);
         for(const ni of nbs){
-          if(!mask[ni]){ mask[ni]=2; next.push(ni); }
+          // 획이 덮은 자리로만 번진다. 다시 빈 자리를 만나면 획을 다 건넌
+          // 것이므로 멈춘다 -- 이게 없으면 1px 선을 뚫고 반대편까지 칠한다.
+          if(!mask[ni] && data[ni*4+3] > 24){ mask[ni]=2; next.push(ni); }
         }
       }
       frontier = next;
