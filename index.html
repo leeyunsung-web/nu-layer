@@ -903,7 +903,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b56</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b57</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -1793,6 +1793,8 @@
         ev.preventDefault();
 showLayerMenu(ev.clientX, ev.clientY, [
           { label: '✎ RENAME FOLDER', fn: ()=> renameFolderById(f.id) },
+          { label: '⧉ DUPLICATE FOLDER (' + layers.filter(x=>x.folderId===f.id).length + ' layers)',
+            fn: ()=> duplicateFolderById(f.id) },
           { label: '▣ REGISTER FOLDER AS OBJECT', fn: ()=> registerFolderAsObject(f.id) },
           { label: '⭳ DISSOLVE FOLDER', fn: ()=> dissolveFolder(f.id) }
         ]);
@@ -1898,6 +1900,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
         if(ev.shiftKey){ createFolderWithLayers(selectedLayerIds.size > 1 ? layers.filter(x=>selectedLayerIds.has(x.id)) : [l]); return; }
         const items = [
           { label: '✎ RENAME LAYER', fn: ()=> renameLayerById(l.id) },
+          { label: '⧉ DUPLICATE LAYER', fn: ()=> duplicateLayerById(l.id) },
+          { label: l.asFill ? '▣ 면 취급 해제 (선/면 자동 분류로)' : '▣ MAKE INTO FILL — 섞인 획을 면에 녹이기',
+            fn: ()=> setLayerAsFill(l.id, !l.asFill) },
           { label: '✦ PURGE ERASER MARKS (' +
               actions.filter(a => a.type === 'stroke' && a.tool === 'eraser' && a.layer === l.id).length +
               ')', fn: ()=> purgeErasers(l.id) },
@@ -1918,6 +1923,13 @@ showLayerMenu(ev.clientX, ev.clientY, [
       // ---- Drag a layer row onto another row \u2192 merge; onto a FOLDER row
       // \u2192 move it into that folder. Pointer Events: mouse, touch, pen.
       row.dataset.layerId = l.id;
+      if(l.asFill){
+        const fb = document.createElement('span');
+        fb.textContent = '▣';
+        fb.title = '면 취급 — 이 레이어의 획은 선으로 나가지 않고 면에 녹아듭니다 (우클릭으로 해제)';
+        fb.style.cssText = 'font-size:10px;margin-right:4px;color:var(--accent,#e4442d);';
+        row.appendChild(fb);
+      }
       row.style.touchAction = 'none';
       row.title = 'Drag onto a layer to merge, onto a folder to move in. Right-click for folder options (Shift+right-click = instant folder).';
       row.addEventListener('pointerdown', ev=>{
@@ -3668,7 +3680,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
       // structural meta (layer names + folder grouping) must survive the
       // save — it used to fall through to null and vanish from the PNG.
       if(a.type==='meta'){
-        return { type:'meta', v: a.v || 1, layers: a.layers || [], folders: a.folders || [] };
+        return { type:'meta', v: a.v || 1,
+                 layers: (a.layers || []).map(x => x.af ? x : (x.asFill ? { ...x, af:1 } : x)),
+                 folders: a.folders || [] };
       }
       if(a.type==='stroke'){
         const o = { type:'stroke', tool:a.tool, color:a.color, width:a.width, li,
@@ -7898,6 +7912,117 @@ showLayerMenu(ev.clientX, ev.clientY, [
     if(oc) oc.getContext('2d').clearRect(0, 0, oc.width, oc.height);
   }
 
+
+  // ---- 레이어 복사 ----
+  function cloneActionForLayer(a, newLayerId){
+    const c = JSON.parse(JSON.stringify(a, (k, v) => (k === 'img' ? undefined : v)));
+    // 불러온 기록은 id 를 카운터 밖에서 받았을 수 있다. 겹치면 되돌리기와
+    // 앵커 편집이 엉뚱한 획을 잡는다.
+    for(const x of actions) if(x.id >= actionCounter) actionCounter = x.id;
+    c.id = ++actionCounter;
+    c.layer = newLayerId;
+    if(a.img) c.img = a.img;               // 이미지는 공유해도 된다 -- 읽기만 한다
+    return c;
+  }
+
+  function duplicateLayerById(layerId, opts){
+    const src = layerById(layerId);
+    if(!src) return null;
+    const quiet = opts && opts.quiet;
+    const prevOrder = actions.slice();
+    const nl = createLayer((opts && opts.name) || (src.name + ' copy'));
+    nl.visible = src.visible;
+    if(src.folderId != null) nl.folderId = (opts && opts.folderId != null) ? opts.folderId : src.folderId;
+    if(src.asFill) nl.asFill = true;
+    // 바로 위에
+    const idx = layers.findIndex(x => x.id === src.id);
+    layers.splice(idx + 1, 0, nl);
+    const copied = [];
+    for(const a of prevOrder){
+      if(a.layer !== src.id) continue;
+      if(a.type === 'strokeEdit' || a.type === 'lassoDelete' || a.type === 'mergeLayers' ||
+         a.type === 'dupLayer') continue;
+      copied.push(cloneActionForLayer(a, nl.id));
+    }
+    actions.push(...copied);
+    if(!quiet){
+      actions.push({ type:'dupLayer', id:++actionCounter, newIds:[nl.id], prevOrder,
+                     label: src.name + ' 복사' });
+      redoStack.length = 0;
+      renderSingleLayer(nl.id);
+      activeLayerId = nl.id;
+      renderLayersPanel();
+      toast(src.name + ' 복사됨 (Ctrl+Z 로 되돌리기)');
+    }
+    return { layer: nl, copied };
+  }
+
+  function duplicateFolderById(folderId){
+    const f = folders.find(x => x.id === folderId);
+    if(!f) return;
+    const members = layers.filter(l => l.folderId === f.id);
+    if(!members.length){ toast('빈 폴더입니다.'); return; }
+    const prevOrder = actions.slice();
+    const nf = { id: ++folderIdCounter, name: f.name + ' copy', collapsed: !!f.collapsed };
+    folders.push(nf);
+    // 아래에서 위로 넣어야 원래 순서가 유지된다 (각각 '바로 위'에 들어가므로)
+    const newIds = [];
+    const ordered = members.slice();          // layers 배열 순서(아래→위)
+    let anchorId = ordered[ordered.length - 1].id;   // 폴더 맨 위 레이어 위에 쌓는다
+    for(const m of ordered){
+      const nl = createLayer(m.name);
+      nl.visible = m.visible; nl.folderId = nf.id; if(m.asFill) nl.asFill = true;
+      const idx = layers.findIndex(x => x.id === anchorId);
+      layers.splice(idx + 1, 0, nl);
+      anchorId = nl.id;
+      newIds.push(nl.id);
+      for(const a of prevOrder){
+        if(a.layer !== m.id) continue;
+        if(a.type === 'strokeEdit' || a.type === 'lassoDelete' || a.type === 'mergeLayers' ||
+           a.type === 'dupLayer') continue;
+        actions.push(cloneActionForLayer(a, nl.id));
+      }
+    }
+    actions.push({ type:'dupLayer', id:++actionCounter, newIds, newFolderId: nf.id, prevOrder,
+                   label: f.name + ' 폴더 복사' });
+    redoStack.length = 0;
+    for(const id of newIds) renderSingleLayer(id);
+    activeFolderId = nf.id;
+    activeLayerId = newIds[newIds.length - 1];
+    renderLayersPanel();
+    toast(f.name + ' 폴더 복사됨 (' + newIds.length + '개 레이어)');
+  }
+
+  function undoDuplicate(marker){
+    for(const id of marker.newIds){
+      const i = layers.findIndex(l => l.id === id);
+      if(i >= 0) layers.splice(i, 1);
+    }
+    if(marker.newFolderId != null){
+      const fi = folders.findIndex(f => f.id === marker.newFolderId);
+      if(fi >= 0) folders.splice(fi, 1);
+      if(activeFolderId === marker.newFolderId) activeFolderId = null;
+    }
+    actions.length = 0;
+    actions.push(...marker.prevOrder);
+    if(!layerById(activeLayerId)) activeLayerId = layers[layers.length - 1].id;
+  }
+
+  // ---- 면 취급 ----
+  function setLayerAsFill(layerId, on){
+    const l = layerById(layerId);
+    if(!l) return;
+    l.asFill = !!on;
+    renderLayersPanel();
+    if(typeof syncLiveEdit === 'function') syncLiveEdit(true);
+    toast(l.name + (on ? ' → 면으로 취급합니다. 메꾼 획은 선으로 나가지 않습니다.'
+                        : ' → 다시 선/면 자동 분류.'));
+  }
+  function isFillLayer(id){
+    const l = layerById(id);
+    return !!(l && l.asFill);
+  }
+
   function clearStrokeSelection(){
     selectedStrokeId = null;
     renderAll();
@@ -9121,6 +9246,14 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const undoneAction = actions.pop();
     redoStack.push(undoneAction);
     // 획을 고친 표시 — 그림을 지우는 게 아니라 이전 모양으로 되돌린다.
+    if(undoneAction.type === 'dupLayer'){
+      undoDuplicate(undoneAction);
+      clearStrokeSelection();
+      renderAll();
+      renderLayersPanel();
+      toast(undoneAction.label + ' 되돌림.');
+      return;
+    }
     if(undoneAction.type === 'strokeEdit'){
       const t = actions.find(a => a.id === undoneAction.targetId);
       if(t){ restoreStroke(t, undoneAction.before); renderSingleLayer(t.layer); }
@@ -9236,6 +9369,12 @@ showLayerMenu(ev.clientX, ev.clientY, [
       return;
     }
     const redoneAction = redoStack.pop();
+    if(redoneAction.type === 'dupLayer'){
+      // 다시 하려면 복사를 새로 하는 편이 정확하다 -- 이전 마커는 버린다.
+      const src = redoneAction.prevOrder;
+      toast('복사는 되돌린 뒤 다시 실행할 수 없습니다. 메뉴에서 다시 복사해 주세요.');
+      return;
+    }
     if(redoneAction.type === 'strokeEdit'){
       const t = actions.find(a => a.id === redoneAction.targetId);
       if(t){ restoreStroke(t, redoneAction.after); renderSingleLayer(t.layer); }
@@ -10144,11 +10283,14 @@ showLayerMenu(ev.clientX, ev.clientY, [
       if(a.type === 'fill' || a.type === 'image') bad.add(a.layer);
       else if(a.type === 'stroke' && a.tool !== 'eraser') seen.add(a.layer);
     }
+    for(const l of layers) if(l.asFill) bad.add(l.id);   // 면 취급이면 선 레이어가 아니다
     return [...seen].filter(id => !bad.has(id));
   }
   // 레시피(오브젝트 안의 획 목록)에서도 같은 판정을 한다. 여기서는 li 가 레이어다.
   function recipeLineLayers(recipe){
     const bad = new Set(), seen = new Set();
+    const meta = recipe.find(a => a.type === 'meta');
+    if(meta && meta.layers) for(const x of meta.layers) if(x.af) bad.add(x.li);
     for(const a of recipe){
       const li = a.li || 0;
       if(a.type === 'fill' || a.type === 'image') bad.add(li);
@@ -10580,7 +10722,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
     )].sort((x, y) => x - y);
     const layersMeta = usedLis.map(li => {
       const l = layers[li];
-      return { li, name: l ? l.name : ('LAYER ' + (li + 1)), f: (l && l.folderId) ? l.folderId : 0 };
+      const m = { li, name: l ? l.name : ('LAYER ' + (li + 1)), f: (l && l.folderId) ? l.folderId : 0 };
+      if(l && l.asFill) m.af = 1;
+      return m;
     });
     const foldersMeta = folders
       .filter(f => layersMeta.some(m => m.f === f.id))
@@ -10875,6 +11019,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         usedLis.forEach((li, k) => {
           const m = meta && meta.layers ? meta.layers.find(x => x.li === li) : null;
           const nl = createLayer(m && m.name ? m.name : `${tag}${usedLis.length > 1 ? ' L' + (k+1) : ''}`);
+          if(m && m.af) nl.asFill = true;
           layers.push(nl);
           fresh.push(nl);
           liMap.set(li, nl);
@@ -13590,7 +13735,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
     }
     return JSON.stringify({
       v: 1, ts: Date.now(),
-      layers: layers.map(l=>({ id:l.id, name:l.name, visible:l.visible, f: l.folderId || 0 })),
+      layers: layers.map(l=>({ id:l.id, name:l.name, visible:l.visible, f: l.folderId || 0,
+                                 af: l.asFill ? 1 : 0 })),
       folders: folders.map(f=>({ id:f.id, name:f.name, c: f.collapsed ? 1 : 0 })),
       active: activeLayerId,
       acts
@@ -13631,6 +13777,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         l.id = ld.id;
         l.visible = ld.visible !== false;
         if(ld.f) l.folderId = ld.f;
+        if(ld.af) l.asFill = true;
         return l;
       });
       layerIdCounter = Math.max(layerIdCounter, ...st.layers.map(l=>l.id));
@@ -13952,6 +14099,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         for(const a of finalActs){
           if(a.type !== 'stroke') continue;
           if(!a.points || !a.points.length) continue;
+          if(isFillLayer(a.layer)){ fillSet.add(a.layer); continue; }   // 면에 녹인다
           let arr = lineMap.get(a.layer);
           if(!arr){ arr = []; lineMap.set(a.layer, arr); }
           // 굵기를 같이 보낸다. 톤 창은 굵은 획을 중심선 한 줄이 아니라
@@ -13972,8 +14120,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
         if(l.isTone) continue;                     // 톤 레이어를 다시 톤 뜨지 않는다
         if(!getBBox(l.canvas)) continue;           // 빈 레이어는 보내지 않는다
         payload.push({ name: l.name, png: l.canvas.toDataURL('image/png'),
-                       lines: lineMap.get(l.id) || [],
-                       hasFill: fillSet.has(l.id) });
+                       lines: l.asFill ? [] : (lineMap.get(l.id) || []),
+                       hasFill: fillSet.has(l.id) || !!l.asFill });
       }
       if(!payload.length) return;                  // 빈 그림으로 톤 창을 지우지 않는다
       // 톤 창이 레이어를 만들면 compositeLayers가 다시 돌고, 그게 또 전송을
