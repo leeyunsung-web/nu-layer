@@ -903,7 +903,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b64</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b65</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -11464,6 +11464,12 @@ showLayerMenu(ev.clientX, ev.clientY, [
         let inside;
         if(only){
           inside = true; // the layer was explicitly selected for capture
+        } else if(a.poly){
+          let px0 = Infinity, py0 = Infinity, px1 = -Infinity, py1 = -Infinity;
+          for(const p of a.poly){ px0 = Math.min(px0, p[0]); py0 = Math.min(py0, p[1]); px1 = Math.max(px1, p[0]); py1 = Math.max(py1, p[1]); }
+          const ox = a.ox || 0, oy = a.oy || 0;
+          inside = px1+ox>=bbox.minX-margin && px0+ox<=bbox.minX+bbox.w+margin &&
+                   py1+oy>=bbox.minY-margin && py0+oy<=bbox.minY+bbox.h+margin;
         } else if(a.m){
           const mb = maskFillBounds(a);
           inside = !!mb && mb.maxX>=bbox.minX-margin && mb.minX<=bbox.minX+bbox.w+margin &&
@@ -11484,6 +11490,14 @@ showLayerMenu(ev.clientX, ev.clientY, [
           }
           if(a.m){ o.m = a.m; o.ox = Math.round(a.ox||0) - bbox.minX; o.oy = Math.round(a.oy||0) - bbox.minY;
                    o.mw = a.mw || drawCanvas.width; o.mh = a.mh || drawCanvas.height; }
+          if(a.poly){
+            // 벡터 채움: 다각형을 bbox 기준으로 옮겨 싣는다. 이게 없으면 돌아올 때
+            // 다각형 없는 페인트통이 된다.
+            const ox = (a.ox || 0) - bbox.minX, oy = (a.oy || 0) - bbox.minY;
+            o.poly = a.poly.map(p => [Math.round((p[0] + ox)*10)/10, Math.round((p[1] + oy)*10)/10]);
+            if(a.holes && a.holes.length)
+              o.holes = a.holes.map(h => h.map(p => [Math.round((p[0] + ox)*10)/10, Math.round((p[1] + oy)*10)/10]));
+          }
           result.push(o);
         }
       } else if(a.type==='layerRecolor'){
@@ -11852,6 +11866,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
             }
             if(a.m){ act.m = a.m; act.ox = (a.ox||0) + offX; act.oy = (a.oy||0) + offY;
                      if(a.mw){ act.mw = a.mw; act.mh = a.mh; } }
+            if(a.poly){ act.poly = a.poly; act.holes = a.holes || []; act.ox = offX; act.oy = offY; }
             actions.push(act);
           } else if(a.type === 'layerRecolor'){
             actions.push({ type:'layerRecolor', id:++actionCounter, color:a.color, layer: layerIdFor(a) });
