@@ -903,7 +903,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b57</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b59</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -1045,6 +1045,31 @@
           끌기=옮기기 · Alt+클릭=코너↔부드럽게 · Ctrl+클릭=앵커 넣기<br>
           Delete=앵커 지우기 · Shift+클릭=여럿 고르기 · Esc=놓기
         </div>
+      </div>
+      <div class="tool-row" id="vfillRow" style="display:flex;gap:8px;flex-wrap:wrap;">
+        <label class="chk-row" style="display:flex;align-items:center;gap:6px;font-size:10px;font-family:var(--font-mono);cursor:pointer;"
+          title="획 좌표로 닫힌 영역을 계산해 다각형 면을 만듭니다. 틈에 안 새고, 확대해도 계단이 없고, 플로터·SVG 로 그대로 갑니다. 닫힌 영역을 못 찾으면 페인트통으로 떨어집니다.">
+          <input type="checkbox" id="vfillOn" checked> 벡터 채움
+        </label>
+        <div class="range-row" title="두 획의 끝이 서로 이만큼 가까우면 이어진 것으로 봅니다 (모서리). 가장 흔하고 가장 안전한 잇기입니다.">
+          <span>끝-끝</span>
+          <input type="range" id="vfEndEnd" min="0" max="40" value="10">
+          <span class="val" id="vfEndEndVal">10</span>
+        </div>
+        <div class="range-row" title="한 획의 끝이 다른 획의 중간에 이만큼 가까우면 닿은 것으로 봅니다 (T 자). 끝-끝보다 잘못 이을 위험이 커서 보통 더 좁게 둡니다.">
+          <span>끝-몸통</span>
+          <input type="range" id="vfEndBody" min="0" max="30" value="6">
+          <span class="val" id="vfEndBodyVal">6</span>
+        </div>
+        <div class="range-row" title="끝의 진행 방향과 잇는 방향의 각도가 이 안에 있어야 잇습니다. 옆으로 지나가는 선(90도)은 걸러집니다 — '잘못 잇지 않는' 기준입니다.">
+          <span>각도</span>
+          <input type="range" id="vfAngle" min="10" max="90" value="60">
+          <span class="val" id="vfAngleVal">60°</span>
+        </div>
+        <label class="chk-row" style="display:flex;align-items:center;gap:6px;font-size:10px;font-family:var(--font-mono);cursor:pointer;"
+          title="어디를 이었는지 보여 줍니다. 값을 돌릴 때 켜 두면 잘못 잇는 자리가 바로 보입니다.">
+          <input type="checkbox" id="vfShow"> 잇기 보기
+        </label>
       </div>
       <div class="tool-row" id="toleranceRow" style="display:flex;gap:10px;flex-wrap:wrap;">
         <div class="range-row">
@@ -2443,7 +2468,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
               }
             } else if(a.type === 'stroke') renderStrokeFull(l.ctx, a);
             else if(a.type === 'fill'){
-              if(a.m || a.src) replaySplitFill(a);
+              if(a.poly) paintVectorFill(l.ctx, a);
+              else if(a.m || a.src) replaySplitFill(a);
               else floodFillApply(l.ctx, a.x, a.y, a.color, a.tolerance);
             }
             else if(a.type === 'layerRecolor') applyLayerRecolor(l.ctx, a.color);
@@ -2903,7 +2929,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
       try {
         if(a.type === 'stroke') renderStrokeFull(l.ctx, a);
         else if(a.type === 'fill'){
-          if(a.m || a.src) replaySplitFill(a);
+          if(a.poly) paintVectorFill(l.ctx, a);
+          else if(a.m || a.src) replaySplitFill(a);
           else floodFillApply(l.ctx, a.x, a.y, a.color, a.tolerance);
         }
         else if(a.type === 'layerRecolor') applyLayerRecolor(l.ctx, a.color);
@@ -3187,7 +3214,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
         blit();
         await raf();
       } else if(a.type === 'fill'){
-        if(a.m){
+        if(a.poly){
+          paintVectorFill(doneCtx(lid), a);
+        } else if(a.m){
           // Frozen mask → repaint the exact recorded region.
           const dc = doneCtx(lid);
           const mw = a.mw || dc.canvas.width, mh = a.mh || dc.canvas.height;
@@ -3705,6 +3734,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
         if(a.src){ o.sli = a.src.map(id => layers.findIndex(l=>l.id===id)).filter(i=>i>=0); }
         else if(Array.isArray(a.sli) && a.sli.length){ o.sli = a.sli; } // recipe-built fills already carry indices
         if(a.m){ o.m = a.m; if(a.mw){ o.mw = a.mw; o.mh = a.mh; } }
+        if(a.poly){
+          o.poly = a.poly.map(p => [Math.round(p[0]*10)/10, Math.round(p[1]*10)/10]);
+          if(a.holes && a.holes.length) o.holes = a.holes.map(h => h.map(p => [Math.round(p[0]*10)/10, Math.round(p[1]*10)/10]));
+        }
         if(a.ox || a.oy){ o.ox = Math.round(a.ox||0); o.oy = Math.round(a.oy||0); }
         return o;
       }
@@ -5297,7 +5330,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
         blit(); await raf();
       } else if(a.type === 'fill'){
         const dc = ensure(li);
-        if(a.m){
+        if(a.poly){ paintVectorFill(dc, a); }
+        else if(a.m){
           // Recipes omit mw/mh ONLY for masks recorded on the full studio
           // canvas (1080²). Defaulting to the piece's own size wrapped the
           // RLE rows and painted fills as horizontal color bands on
@@ -5504,7 +5538,46 @@ showLayerMenu(ev.clientX, ev.clientY, [
   function layerById(id){
     return layers.find(l => l.id === id) || layers[0];
   }
+  // 노드 편집·펜툴에서는 정확한 선으로 본다. 레이어 캔버스는 그대로 두고
+  // 화면 합성에서만 바꾼다.
+  function preciseViewOn(){
+    return typeof currentTool !== 'undefined' && (currentTool === 'node' || currentTool === 'pen');
+  }
+  function compositePrecise(){
+    dctx.save();
+    dctx.globalCompositeOperation = 'source-over';
+    dctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+    // 채우기·이미지는 흐리게 깔아 위치만 알린다. 안 그리면 어느 면 안의
+    // 선인지 모르고, 진하게 그리면 선이 묻힌다.
+    dctx.globalAlpha = 0.28;
+    for(const l of layers) if(l.visible) dctx.drawImage(l.canvas, 0, 0);
+    dctx.globalAlpha = 1;
+    // 지우개가 지운 자리는 정확한 선에서도 지워져 있어야 한다. 굽기를
+    // 거치면 살아남은 획만 남는다.
+    let acts;
+    try { acts = bakeErasers(actions.filter(a => a.type === 'stroke').map(a => ({ ...a, points: a.points.slice() })),
+                             a => a.layer, { preserveTextured: false }); }
+    catch(err){ acts = actions.filter(a => a.type === 'stroke'); }
+    const vis = new Set(layers.filter(l => l.visible).map(l => l.id));
+    // 흐린 밑그림 위에 흰 종이를 살짝 깔아 선이 또렷하게
+    dctx.fillStyle = 'rgba(255,255,255,0.55)';
+    dctx.fillRect(0, 0, drawCanvas.width, drawCanvas.height);
+    for(const a of acts){
+      if(a.tool === 'eraser' || !vis.has(a.layer)) continue;
+      if(!a.points || !a.points.length) continue;
+      strokePlotterPath(dctx, a.points, Math.max(0.8, a.width || 1), a.color || '#111', false);
+    }
+    dctx.restore();
+  }
+
   function compositeLayers(){
+    if(preciseViewOn()){
+      compositePrecise();
+      if(typeof updateNavPreview === 'function') updateNavPreview();
+      if(typeof scheduleLiveSync === 'function') scheduleLiveSync();
+      if(typeof toneplotDirty === 'function') toneplotDirty();
+      return;
+    }
     dctx.save();
     dctx.globalCompositeOperation = 'source-over';
     dctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
@@ -5798,6 +5871,83 @@ showLayerMenu(ev.clientX, ev.clientY, [
   //     while semi-transparent AA edge pixels blend into the fill color —
   //     eliminating the white halo/gap completely.
   const FILL_EXPAND = 4; // px of dilation under the AA edge
+
+  // 다각형 채움. 구멍은 evenodd 로 뺀다.
+  let vectorFillOn = true;
+  let vfillCounter = 0;
+
+  // 이은 자리를 덧그림판에 보여 준다. 값을 돌릴 때 켜 두면 잘못 잇는 자리가
+  // 바로 보인다 -- 숫자만 보고는 알 수 없다.
+  function drawBridgeOverlay(){
+    const oc = $('lassoOverlay');
+    if(!oc) return;
+    const c = oc.getContext('2d');
+    c.clearRect(0, 0, oc.width, oc.height);
+    if(!$('vfShow') || !$('vfShow').checked) return;
+    const vis = new Set(layers.filter(l => l.visible).map(l => l.id));
+    const strokes = actions.filter(a => a.type === 'stroke' && a.tool !== 'eraser' && vis.has(a.layer));
+    const segs = vfCollectSegments(strokes);
+    if(!segs.length) return;
+    vfFindCuts(segs);
+    vfBridgeGaps(segs, strokes, 0, vfOpts);
+    const z = viewZoom || 1;
+    c.save();
+    c.lineWidth = 1.5 / z;
+    for(const b of vfLastBridges){
+      c.strokeStyle = b.kind === 'end' ? '#e4442d' : '#2b7de9';   // 빨강=끝-끝, 파랑=끝-몸통
+      c.beginPath(); c.moveTo(b.x0, b.y0); c.lineTo(b.x1, b.y1); c.stroke();
+      c.beginPath(); c.arc(b.x1, b.y1, 2.5/z, 0, Math.PI*2); c.fillStyle = c.strokeStyle; c.fill();
+    }
+    c.restore();
+  }
+
+  {
+    const on = $('vfillOn'), ee = $('vfEndEnd'), eb = $('vfEndBody'), an = $('vfAngle'), sh = $('vfShow');
+    try {
+      const saved = JSON.parse(localStorage.getItem('nulayer_vfill') || 'null');
+      if(saved){
+        vectorFillOn = saved.on !== false;
+        vfOpts = { endEnd: saved.endEnd ?? 10, endBody: saved.endBody ?? 6, angle: saved.angle ?? 60 };
+        if(on) on.checked = vectorFillOn;
+        if(ee){ ee.value = vfOpts.endEnd; $('vfEndEndVal').textContent = vfOpts.endEnd; }
+        if(eb){ eb.value = vfOpts.endBody; $('vfEndBodyVal').textContent = vfOpts.endBody; }
+        if(an){ an.value = vfOpts.angle; $('vfAngleVal').textContent = vfOpts.angle + '°'; }
+      }
+    } catch(err){}
+    const save = () => { try { localStorage.setItem('nulayer_vfill',
+      JSON.stringify({ on: vectorFillOn, ...vfOpts })); } catch(err){} };
+    if(on) on.addEventListener('change', () => { vectorFillOn = on.checked; save(); });
+    const upd = () => {
+      vfOpts = { endEnd: parseInt(ee.value, 10) || 0, endBody: parseInt(eb.value, 10) || 0,
+                 angle: parseInt(an.value, 10) || 60 };
+      $('vfEndEndVal').textContent = vfOpts.endEnd;
+      $('vfEndBodyVal').textContent = vfOpts.endBody;
+      $('vfAngleVal').textContent = vfOpts.angle + '°';
+      save();
+      drawBridgeOverlay();
+    };
+    if(ee && eb && an){ for(const el of [ee, eb, an]) el.addEventListener('input', upd); }
+    if(sh) sh.addEventListener('change', drawBridgeOverlay);
+  }
+
+  function paintVectorFill(ctx, a){
+    if(!a.poly || a.poly.length < 3) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = a.color;
+    const ox = a.ox || 0, oy = a.oy || 0;
+    ctx.beginPath();
+    const ring = poly => {
+      ctx.moveTo(poly[0][0] + ox, poly[0][1] + oy);
+      for(let i = 1; i < poly.length; i++) ctx.lineTo(poly[i][0] + ox, poly[i][1] + oy);
+      ctx.closePath();
+    };
+    ring(a.poly);
+    for(const h of (a.holes || [])) if(h.length >= 3) ring(h);
+    ctx.fill('evenodd');
+    ctx.restore();
+  }
+
   function floodFillApply(ctx, seedX, seedY, hexColor, tol){
     const w = ctx.canvas.width, h = ctx.canvas.height;
     seedX = Math.max(0, Math.min(w-1, Math.floor(seedX)));
@@ -7268,7 +7418,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
           // have m but no src — routing them by src alone sent them to the
           // legacy flood, whose empty-layer guard then skipped them entirely
           // (fills silently disappearing on TO DRAWING).
-          if(a.m || a.src) replaySplitFill(a);
+          if(a.poly) paintVectorFill(lc, a);
+          else if(a.m || a.src) replaySplitFill(a);
           else floodFillApply(lc, a.x, a.y, a.color, a.tolerance);  // legacy action compat
         }
         else if(a.type==='layerRecolor') applyLayerRecolor(lc, a.color);
@@ -7793,7 +7944,18 @@ showLayerMenu(ev.clientX, ev.clientY, [
     else penCancel();
   }
 
+  let _lastPrecise = false;
+  function refreshPreciseView(){
+    const now = preciseViewOn();
+    if(now !== _lastPrecise){
+      _lastPrecise = now;
+      compositeLayers();
+      if(now && nodeSel) drawNodeOverlay();
+    }
+  }
+
   function updateNodePanel(){
+    refreshPreciseView();
     const row = $('nodeRow');
     if(!row) return;
     row.style.display = (currentTool === 'node') ? 'flex' : 'none';
@@ -8023,6 +8185,296 @@ showLayerMenu(ev.clientX, ev.clientY, [
     return !!(l && l.asFill);
   }
 
+
+  // ---- 벡터 채움: 기하 ----
+  const VF_EPS = 0.05;
+
+  function segIntersect(ax, ay, bx, by, cx, cy, dx, dy){
+    const r0 = bx - ax, r1 = by - ay, s0 = dx - cx, s1 = dy - cy;
+    const den = r0 * s1 - r1 * s0;
+    if(Math.abs(den) < 1e-9) return null;                 // 평행
+    const t = ((cx - ax) * s1 - (cy - ay) * s0) / den;
+    const u = ((cx - ax) * r1 - (cy - ay) * r0) / den;
+    if(t < -1e-9 || t > 1 + 1e-9 || u < -1e-9 || u > 1 + 1e-9) return null;
+    return { t: Math.max(0, Math.min(1, t)), u: Math.max(0, Math.min(1, u)) };
+  }
+
+  // 획 → 선분 목록. closed 획은 끝과 처음을 잇는다.
+  function vfCollectSegments(strokes){
+    const segs = [];
+    for(const a of strokes){
+      const p = a.points;
+      if(!p || p.length < 2) continue;
+      const n = p.length, last = a.closed ? n : n - 1;
+      for(let i = 0; i < last; i++){
+        const q0 = p[i], q1 = p[(i + 1) % n];
+        if(Math.abs(q0.x - q1.x) < VF_EPS && Math.abs(q0.y - q1.y) < VF_EPS) continue;
+        segs.push({ x0: q0.x, y0: q0.y, x1: q1.x, y1: q1.y, sid: a.id, cuts: [] });
+      }
+    }
+    return segs;
+  }
+
+  // 서로 만나는 자리를 찾는다. 격자에 담아 같은 칸의 것끼리만 본다.
+  function vfFindCuts(segs, cell){
+    cell = cell || 24;
+    const grid = new Map();
+    const key = (gx, gy) => gx + ',' + gy;
+    segs.forEach((s, i) => {
+      const gx0 = Math.floor(Math.min(s.x0, s.x1) / cell), gx1 = Math.floor(Math.max(s.x0, s.x1) / cell);
+      const gy0 = Math.floor(Math.min(s.y0, s.y1) / cell), gy1 = Math.floor(Math.max(s.y0, s.y1) / cell);
+      for(let gx = gx0; gx <= gx1; gx++) for(let gy = gy0; gy <= gy1; gy++){
+        const k = key(gx, gy);
+        let b = grid.get(k); if(!b){ b = []; grid.set(k, b); }
+        b.push(i);
+      }
+    });
+    const seen = new Set();
+    for(const bucket of grid.values()){
+      for(let i = 0; i < bucket.length; i++) for(let j = i + 1; j < bucket.length; j++){
+        const a = bucket[i], b = bucket[j];
+        const pk = a < b ? a + ':' + b : b + ':' + a;
+        if(seen.has(pk)) continue;
+        seen.add(pk);
+        const S = segs[a], T = segs[b];
+        // 같은 획의 이웃 선분은 끝점을 공유할 뿐이다
+        const h = segIntersect(S.x0, S.y0, S.x1, S.y1, T.x0, T.y0, T.x1, T.y1);
+        if(!h) continue;
+        S.cuts.push(h.t); T.cuts.push(h.u);
+      }
+    }
+  }
+
+  // 늘어진 끝을 가까운 선에 잇는다. 끝점마다 허용 거리 안의 가장 가까운
+  // 선분 위 점을 찾아 다리를 놓는다. 자기 획의 이웃 선분은 뺀다 -- 그건
+  // 이미 붙어 있다.
+  function vfBridgeGaps(segs, strokes, tol, opt){
+    opt = opt || {};
+    const endTol  = opt.endEnd  != null ? opt.endEnd  : (tol || 0);   // 끝-끝
+    const bodyTol = opt.endBody != null ? opt.endBody : (tol || 0);   // 끝-몸통
+    const angMax  = opt.angle   != null ? opt.angle   : 60;           // 도
+    const cosMin  = Math.cos(angMax * Math.PI / 180);
+    tol = Math.max(endTol, bodyTol);
+    if(!(tol > 0)) return 0;
+    const cell = Math.max(8, tol * 2);
+    const grid = new Map();
+    segs.forEach((s, i) => {
+      const gx0 = Math.floor((Math.min(s.x0, s.x1) - tol) / cell), gx1 = Math.floor((Math.max(s.x0, s.x1) + tol) / cell);
+      const gy0 = Math.floor((Math.min(s.y0, s.y1) - tol) / cell), gy1 = Math.floor((Math.max(s.y0, s.y1) + tol) / cell);
+      for(let gx = gx0; gx <= gx1; gx++) for(let gy = gy0; gy <= gy1; gy++){
+        const k = gx + ',' + gy;
+        let b = grid.get(k); if(!b){ b = []; grid.set(k, b); }
+        b.push(i);
+      }
+    });
+    const ends = [];
+    for(const a of strokes){
+      const p = a.points;
+      if(!p || p.length < 2 || a.closed) continue;
+      ends.push({ x: p[0].x, y: p[0].y, sid: a.id, ex: p[1].x, ey: p[1].y });
+      const n = p.length;
+      ends.push({ x: p[n-1].x, y: p[n-1].y, sid: a.id, ex: p[n-2].x, ey: p[n-2].y });
+    }
+    const bridges = [];
+    vfLastBridges = bridges;                  // 화면에 보여 주려고 남긴다
+    for(const e of ends){
+      // 끝의 진행 방향 (마지막 두 점). 이 방향으로 나아가 닿는 것만 잇는다.
+      let ux = e.x - e.ex, uy = e.y - e.ey;
+      const ul = Math.hypot(ux, uy) || 1; ux /= ul; uy /= ul;
+      const gx = Math.floor(e.x / cell), gy = Math.floor(e.y / cell);
+      let best = null, bestScore = Infinity;
+      for(let ay = -1; ay <= 1; ay++) for(let ax = -1; ax <= 1; ax++){
+        const bucket = grid.get((gx+ax) + ',' + (gy+ay));
+        if(!bucket) continue;
+        for(const i of bucket){
+          const s = segs[i];
+          if(s.sid === e.sid){
+            const touches = (Math.abs(s.x0-e.x) < VF_EPS && Math.abs(s.y0-e.y) < VF_EPS) ||
+                            (Math.abs(s.x1-e.x) < VF_EPS && Math.abs(s.y1-e.y) < VF_EPS);
+            if(touches) continue;
+          }
+          const dx = s.x1 - s.x0, dy = s.y1 - s.y0;
+          const l2 = dx*dx + dy*dy;
+          let t = l2 > 0 ? ((e.x - s.x0)*dx + (e.y - s.y0)*dy) / l2 : 0;
+          t = Math.max(0, Math.min(1, t));
+          const px = s.x0 + dx*t, py = s.y0 + dy*t;
+          const d = Math.hypot(e.x - px, e.y - py);
+          if(d < VF_EPS) continue;
+          // 끝에 닿았나(끝-끝), 몸통에 닿았나(끝-몸통)
+          const atEnd = t < 0.02 || t > 0.98;
+          const lim = atEnd ? endTol : bodyTol;
+          if(d >= lim) continue;
+          // 진행 방향과의 각도. 뒤로 가거나 옆으로 새는 것은 잇지 않는다.
+          const vx = (px - e.x) / d, vy = (py - e.y) / d;
+          const cs = ux*vx + uy*vy;
+          if(cs < cosMin) continue;
+          // 가까울수록, 방향이 맞을수록 좋다
+          const score = d * (2 - cs);
+          if(score < bestScore){ bestScore = score; best = { px, py, i, t, d, atEnd }; }
+        }
+      }
+      if(!best) continue;
+      segs[best.i].cuts.push(best.t);
+      bridges.push({ x0: e.x, y0: e.y, x1: best.px, y1: best.py, sid: -1, cuts: [],
+                     kind: best.atEnd ? 'end' : 'body', d: best.d });
+    }
+    segs.push(...bridges);
+    return bridges.length;
+  }
+
+  // 자른 선분들로 정점·변을 만든다. 정점은 좌표를 반올림해 합친다.
+  function vfBuildGraph(segs){
+    const verts = [], vmap = new Map();
+    const vid = (x, y) => {
+      const k = Math.round(x / VF_EPS) + ',' + Math.round(y / VF_EPS);
+      let id = vmap.get(k);
+      if(id == null){ id = verts.length; verts.push({ x, y, out: [] }); vmap.set(k, id); }
+      return id;
+    };
+    const edges = [];   // 반변: {from,to,twin,next,face,ang}
+    // 같은 두 정점 사이 변은 하나만. 나중에 지우면 반변 구조가 어긋나
+    // 면 뜨기가 조각난다 -- 만들 때부터 거른다.
+    const pairSeen = new Set();
+    const addEdge = (a, b) => {
+      if(a === b) return;
+      const pk = a < b ? a + ':' + b : b + ':' + a;
+      if(pairSeen.has(pk)) return;
+      pairSeen.add(pk);
+      const A = verts[a], B = verts[b];
+      const e1 = { from: a, to: b, twin: null, next: null, face: -1,
+                   ang: Math.atan2(B.y - A.y, B.x - A.x) };
+      const e2 = { from: b, to: a, twin: null, next: null, face: -1,
+                   ang: Math.atan2(A.y - B.y, A.x - B.x) };
+      e1.twin = e2; e2.twin = e1;
+      edges.push(e1, e2);
+      A.out.push(e1); B.out.push(e2);
+    };
+    for(const s of segs){
+      const ts = [0, 1, ...s.cuts].sort((p, q) => p - q);
+      let prev = null;
+      for(const t of ts){
+        if(prev != null && t - prev < 1e-6) continue;
+        const x = s.x0 + (s.x1 - s.x0) * t, y = s.y0 + (s.y1 - s.y0) * t;
+        const v = vid(x, y);
+        if(prev != null){
+          const px = s.x0 + (s.x1 - s.x0) * prev, py = s.y0 + (s.y1 - s.y0) * prev;
+          addEdge(vid(px, py), v);
+        }
+        prev = t;
+      }
+    }
+    // 정점마다 나가는 변을 각도순으로. 면을 뜰 때 '가장 오른쪽 꺾임'을 고른다.
+    for(const v of verts) v.out.sort((p, q) => p.ang - q.ang);
+    return { verts, edges };
+  }
+
+  // 반변을 따라 면을 뜬다. 들어온 변의 반대 방향에서 시계 방향으로 가장
+  // 먼저 만나는 나가는 변이 다음이다.
+  function vfTraceFaces(g){
+    const faces = [];
+    const nextOf = e => {
+      const v = g.verts[e.to];
+      const out = v.out;
+      if(!out.length) return null;
+      const back = e.twin.ang;
+      let best = null, bestD = Infinity;
+      for(const o of out){
+        let d = back - o.ang;          // 시계 방향 각차
+        while(d <= 1e-9) d += Math.PI * 2;
+        while(d > Math.PI * 2) d -= Math.PI * 2;
+        if(d < bestD){ bestD = d; best = o; }
+      }
+      return best;
+    };
+    for(const e of g.edges){
+      if(e.face >= 0) continue;
+      const fid = faces.length;
+      const poly = [];
+      let cur = e, guard = 0, broken = false;
+      while(cur && guard++ < 200000){
+        if(cur.face >= 0){ broken = cur !== e; break; }   // 출발점으로 돌아오면 정상
+        cur.face = fid;
+        poly.push([g.verts[cur.from].x, g.verts[cur.from].y]);
+        cur = nextOf(cur);
+      }
+      if(!broken && poly.length >= 3) faces.push({ poly, area: vfArea(poly) });
+      else faces.push({ poly: [], area: 0 });
+    }
+    return faces;
+  }
+
+  function vfArea(poly){
+    let s = 0;
+    for(let i = 0, n = poly.length; i < n; i++){
+      const a = poly[i], b = poly[(i + 1) % n];
+      s += a[0] * b[1] - b[0] * a[1];
+    }
+    return s / 2;
+  }
+
+  function vfPointIn(poly, x, y){
+    let inside = false;
+    for(let i = 0, j = poly.length - 1; i < poly.length; j = i++){
+      const xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1];
+      // 교차할 때마다 뒤집는다. true 로 굳히면 홀짝이 무너져 150px 떨어진
+      // 면도 '담는다'고 나온다 -- 실제로 그랬다.
+      if(((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+    }
+    return inside;
+  }
+
+  // 클릭한 점을 담는 가장 작은 유계 면. 없으면 null -- 닫혀 있지 않다는 뜻.
+  let vfLastBridges = [];
+  // 기본값. 화면 손잡이가 덮어쓴다.
+  let vfOpts = { endEnd: 10, endBody: 6, angle: 60 };
+
+  function findClosedRegion(strokes, x, y, gapTol, opt){
+    const segs = vfCollectSegments(strokes);
+    if(!segs.length) return null;
+    vfFindCuts(segs);
+    const o = opt || (gapTol != null ? { endEnd: gapTol, endBody: gapTol, angle: 60 } : vfOpts);
+    vfBridgeGaps(segs, strokes, 0, o);
+    const g = vfBuildGraph(segs);
+    const faces = vfTraceFaces(g);
+    // 반변 방향 규약상 유계 면은 한쪽 부호로 나온다. 둘 다 시험해 작은 쪽을
+    // 고르되, 바깥 면(가장 큰 것)은 제외한다.
+    let best = null;
+    for(const f of faces){
+      if(f.poly.length < 3 || Math.abs(f.area) < 1) continue;
+      if(!vfPointIn(f.poly, x, y)) continue;
+      if(!best || Math.abs(f.area) < Math.abs(best.area)) best = f;
+    }
+    if(!best) return null;
+    // 점을 담는 면 중 가장 큰 것이 바깥 면이면서 다른 후보가 없을 때
+    // best 가 바깥 면일 수 있다. 바깥 면은 방향이 반대라 부호로 가려진다.
+    const bounded = faces.filter(f => f.poly.length >= 3 && Math.abs(f.area) >= 1);
+    const maxAbs = Math.max(...bounded.map(f => Math.abs(f.area)));
+    if(Math.abs(best.area) === maxAbs && bounded.length > 1){
+      // 가장 큰 면이 곧 바깥이면, 안쪽 후보가 없다
+      const inner = bounded.filter(f => f !== best && vfPointIn(f.poly, x, y));
+      if(!inner.length) return null;
+    }
+    // 구멍: 고른 면 안에 통째로 들어 있으면서 클릭한 점은 담지 않는 면.
+    // 도넛의 바깥을 찍으면 안쪽 사각형이 구멍이다. 반변 규약상 같은 다각형이
+    // 두 방향으로 나오므로 넓이·중심으로 하나만 남긴다.
+    const holes = [], hk = new Set();
+    for(const f of bounded){
+      if(f === best || Math.abs(f.area) >= Math.abs(best.area)) continue;
+      if(vfPointIn(f.poly, x, y)) continue;
+      const c = f.poly[0];
+      if(!vfPointIn(best.poly, c[0], c[1])) continue;
+      // 고른 면의 변에 붙어 있는 이웃 면은 구멍이 아니다 -- 꼭짓점을 공유한다
+      const shares = f.poly.some(q => best.poly.some(b => Math.abs(b[0]-q[0]) < VF_EPS && Math.abs(b[1]-q[1]) < VF_EPS));
+      if(shares) continue;
+      let cx = 0, cy = 0; for(const q of f.poly){ cx += q[0]; cy += q[1]; }
+      const key = Math.round(Math.abs(f.area)) + ':' + Math.round(cx/f.poly.length) + ':' + Math.round(cy/f.poly.length);
+      if(hk.has(key)) continue;
+      hk.add(key);
+      holes.push(f.poly);
+    }
+    return { poly: best.poly, area: Math.abs(best.area), holes };
+  }
+
   function clearStrokeSelection(){
     selectedStrokeId = null;
     renderAll();
@@ -8084,6 +8536,32 @@ showLayerMenu(ev.clientX, ev.clientY, [
       const b = $('eyedropperBtn'); if(b) b.classList.remove('active');
       updateCursorState(e);
       return;
+    }
+
+    if(currentTool === 'fill' && vectorFillOn){
+      // 보이는 레이어의 획으로 닫힌 영역을 찾는다. 찾으면 다각형 면을,
+      // 못 찾으면 페인트통으로 떨어진다 -- 그래서 켜 둬도 손해가 없다.
+      const vis = new Set(layers.filter(l => l.visible).map(l => l.id));
+      const strokes = actions.filter(a => a.type === 'stroke' && a.tool !== 'eraser' && vis.has(a.layer));
+      let region = null;
+      try { region = findClosedRegion(strokes, p.x, p.y, null, vfOpts); } catch(err){ console.error('vector fill', err); }
+      if(region){
+        const fl = createLayer('VFILL ' + (++vfillCounter));
+        const idx = layers.findIndex(x => x.id === activeLayerId);
+        layers.splice(Math.max(0, idx), 0, fl);          // 활성 레이어 아래
+        const act = { type:'fill', id:++actionCounter, x:p.x, y:p.y, color:fillColor, tolerance:0,
+                      layer: fl.id, poly: region.poly, holes: region.holes || [] };
+        paintVectorFill(fl.ctx, act);
+        compositeLayers();
+        actions.push(act);
+        renderLayersPanel();
+        redoStack.length = 0;
+        if(typeof syncLiveEdit === 'function') syncLiveEdit(true);
+        toast('벡터 채움 → ' + fl.name + ' (면적 ' + Math.round(region.area) + 'px²' +
+              (region.holes && region.holes.length ? ', 구멍 ' + region.holes.length : '') + ')');
+        return;
+      }
+      toast('닫힌 영역을 못 찾아 페인트통으로 채웁니다.');
     }
 
     if(currentTool === 'fill'){
@@ -8364,6 +8842,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       // from REGISTER FOLDER AS OBJECT → TO DRAWING round-trips.
       a.x += dx; a.y += dy;
       if(a.m){ a.ox = (a.ox||0) + dx; a.oy = (a.oy||0) + dy; }
+      if(a.poly){ a.ox = (a.ox||0) + dx; a.oy = (a.oy||0) + dy; }
     } else if(a.type === 'image'){
       a.x += dx; a.y += dy;
     }
@@ -9487,8 +9966,12 @@ showLayerMenu(ev.clientX, ev.clientY, [
     btn.addEventListener('click', ()=>{
       document.querySelectorAll('.tool-select .tool-btn:not(.tool-clear-btn):not(#eyedropperBtn)').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
+      const prevTool = currentTool;
       currentTool = btn.dataset.tool;
       if(currentTool !== 'lasso') clearLasso();
+      if(prevTool === 'pen' && currentTool !== 'pen' && typeof penFinishIfDrawing === 'function') penFinishIfDrawing();
+      if(prevTool === 'node' && currentTool !== 'node' && typeof clearNodeSelection === 'function') clearNodeSelection();
+      if(typeof updateNodePanel === 'function') updateNodePanel();
       // STROKE and ERASER keep independent sizes — swap on tool change.
       brushSize = toolSizes[currentTool === 'eraser' ? 'eraser' : 'brush'];
       $('brushSize').value = brushSize;
@@ -9497,6 +9980,11 @@ showLayerMenu(ev.clientX, ev.clientY, [
       // it's adjusted while the eraser is active (then it stays independent).
       syncTexUIForTool();
       $('toleranceRow').style.opacity = (currentTool === 'fill') ? '1' : '0.4';
+      if($('vfillRow')) $('vfillRow').style.opacity = (currentTool === 'fill') ? '1' : '0.4';
+      if(currentTool !== 'fill' && $('vfShow') && $('vfShow').checked){
+        $('vfShow').checked = false;
+        const oc = $('lassoOverlay'); if(oc) oc.getContext('2d').clearRect(0, 0, oc.width, oc.height);
+      }
       updateBrushPreview();
       clearStrokeSelection();
     });
@@ -10627,7 +11115,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
                            a.tool === 'eraser', a.tx || 'smooth', a.g, a.sd);
         } else if(a.type === 'fill'){
           const dc = ensure(li);
-          if(a.m){
+          if(a.poly){ paintVectorFill(dc, a); }
+          else if(a.m){
             // mw/mh가 없는 레시피는 1080 캔버스에서 기록된 것이다. 조각 크기로
             // 잘못 기본값을 주면 RLE 행이 가로 띠로 풀린다.
             const mw = a.mw || 1080, mh = a.mh || 1080;
@@ -13719,6 +14208,11 @@ showLayerMenu(ev.clientX, ev.clientY, [
           if(a.ox || a.oy){ o.ox = Math.round(a.ox||0); o.oy = Math.round(a.oy||0); }
         }
         if(a.src) o.src = a.src;
+        if(a.poly){
+          o.poly = a.poly.map(p => [Math.round(p[0]*10)/10, Math.round(p[1]*10)/10]);
+          if(a.holes && a.holes.length) o.holes = a.holes.map(h => h.map(p => [Math.round(p[0]*10)/10, Math.round(p[1]*10)/10]));
+          if(a.ox || a.oy){ o.ox = Math.round(a.ox||0); o.oy = Math.round(a.oy||0); }
+        }
         acts.push(o);
       } else if(a.type === 'layerRecolor'){
         acts.push({ t:'r', color:a.color, layer:a.layer });
@@ -13802,6 +14296,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
                       tolerance:a.tolerance, layer:a.layer };
           if(a.m){ o.m = a.m; if(a.mw){ o.mw = a.mw; o.mh = a.mh; } o.ox = a.ox || 0; o.oy = a.oy || 0; }
           if(a.src) o.src = a.src;
+          if(a.poly){ o.poly = a.poly; if(a.holes) o.holes = a.holes; o.ox = a.ox || 0; o.oy = a.oy || 0; }
           actions.push(o);
         } else if(a.t === 'r'){
           actions.push({ type:'layerRecolor', id:++actionCounter, color:a.color, layer:a.layer });
