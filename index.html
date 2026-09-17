@@ -903,7 +903,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b61</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b62</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -5615,11 +5615,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
   }
 
   function refreshPreciseRes(){
-    if(!preciseViewOn()){
-      if(preciseK !== 1){ preciseK = 1; syncOverlayRes(1); }
-      preciseCanvas.style.display = 'none';
-      return;
-    }
+    // 정확한 보기가 아닐 때는 보통 고해상도(scheduleHiRes)가 맡는다.
+    // 여기서 판을 숨기면 배율을 바꿀 때마다 흐린 화면이 한 번 스친다.
+    if(!preciseViewOn()) return;
     const k = hiResK();
     if(k !== preciseK){
       preciseK = k;
@@ -5628,6 +5626,105 @@ showLayerMenu(ev.clientX, ev.clientY, [
       if(nodeSel) drawNodeOverlay();
       else if(penDraft) penPreview(null);
     }
+  }
+
+
+  // ---- 모든 화면 고해상도 ----
+  const hiresScratch = document.createElement('canvas');
+  let hiresTimer = null, hiresBusy = false, hiresDirty = false;
+  let hiresShownK = 1;       // 지금 화면에 붙은 판의 배율
+
+  function scaledStroke(a, k){
+    if(k === 1) return a;
+    return { ...a, width: (a.width || 1) * k,
+             points: a.points.map(p => (p.p == null ? { x: p.x*k, y: p.y*k } : { x: p.x*k, y: p.y*k, p: p.p })) };
+  }
+
+  // 한 레이어를 k 배 버퍼에 처음부터 다시 그린다. 액션 순서를 그대로 밟는다.
+  function renderLayerHiRes(l, k, target){
+    for(const a of actions){
+      if(a.layer !== l.id) continue;
+      try {
+        if(a.type === 'stroke'){
+          renderStrokeFull(target, scaledStroke(a, k));
+        } else if(a.type === 'fill'){
+          if(a.poly){
+            paintVectorFill(target, { ...a,
+              poly: a.poly.map(p => [p[0]*k, p[1]*k]),
+              holes: (a.holes || []).map(h => h.map(p => [p[0]*k, p[1]*k])),
+              ox: (a.ox || 0) * k, oy: (a.oy || 0) * k });
+          } else if(a.m){
+            // 마스크 채움은 1080 마스크를 부드럽게 키운다 -- 마스크 자체가 그 해상도다
+            const mw = a.mw || drawCanvas.width, mh = a.mh || drawCanvas.height;
+            const t = document.createElement('canvas'); t.width = mw; t.height = mh;
+            const tc = t.getContext('2d');
+            paintSplitFill(tc, decodeMask(a.m, mw*mh), a.color, 0, 0, mw, mh);
+            target.save(); target.imageSmoothingEnabled = true; target.imageSmoothingQuality = 'high';
+            target.drawImage(t, (a.ox || 0) * k, (a.oy || 0) * k, mw * k, mh * k);
+            target.restore();
+          } else {
+            floodFillApply(target, a.x * k, a.y * k, a.color, a.tolerance || 0);
+          }
+        } else if(a.type === 'layerRecolor'){
+          applyLayerRecolor(target, a.color);
+        } else if(a.type === 'image' && a.img && a.w > 0 && a.h > 0){
+          target.save(); target.imageSmoothingEnabled = true; target.imageSmoothingQuality = 'high';
+          if(a.isTrace) target.globalAlpha = 0.35;
+          target.drawImage(a.img, a.x * k, a.y * k, a.w * k, a.h * k);
+          target.restore();
+        }
+      } catch(err){ console.error('hires: skipped an action', err, a); }
+    }
+  }
+
+  function renderHiResNow(){
+    if(preciseViewOn()) return;          // 정확한 보기는 제 길로 그린다
+    const k = hiResK();
+    if(k === 1){ hiresShownK = 1; preciseCanvas.style.display = 'none'; syncOverlayRes(1); return; }
+    const W = drawCanvas.width, H = drawCanvas.height;
+    if(preciseCanvas.width !== W*k || preciseCanvas.height !== H*k){ preciseCanvas.width = W*k; preciseCanvas.height = H*k; }
+    if(hiresScratch.width !== W*k || hiresScratch.height !== H*k){ hiresScratch.width = W*k; hiresScratch.height = H*k; }
+    const out = preciseCanvas.getContext('2d');
+    out.setTransform(1, 0, 0, 1, 0, 0);
+    out.clearRect(0, 0, W*k, H*k);
+    const sc = hiresScratch.getContext('2d', { willReadFrequently: true });
+    for(const l of layers){
+      if(!l.visible) continue;
+      sc.setTransform(1, 0, 0, 1, 0, 0);
+      sc.clearRect(0, 0, W*k, H*k);
+      renderLayerHiRes(l, k, sc);
+      out.drawImage(hiresScratch, 0, 0);
+    }
+    hiresShownK = k;
+    preciseK = k;
+    syncOverlayRes(k);
+    if(!drawing) preciseCanvas.style.display = '';
+  }
+
+  // 잠깐 뒤에 그린다. 그리는 사이 또 바뀌면 끝나고 한 번 더.
+  function scheduleHiRes(){
+    if(preciseViewOn()) return;
+    if(hiResK() === 1){ renderHiResNow(); return; }
+    hiresDirty = true;
+    if(hiresTimer) return;
+    hiresTimer = setTimeout(() => {
+      hiresTimer = null;
+      if(hiresBusy){ return; }
+      hiresBusy = true; hiresDirty = false;
+      try { renderHiResNow(); } finally { hiresBusy = false; }
+      if(hiresDirty) scheduleHiRes();
+    }, 160);
+  }
+
+  // 끝낸 획 하나만 바로 얹는다 -- 다시 그리기를 기다리면 방금 그린 선이
+  // 보이지 않는 순간이 생긴다.
+  function hiresAddStroke(a){
+    if(preciseViewOn() || hiresShownK === 1) return;
+    try {
+      const out = preciseCanvas.getContext('2d');
+      out.setTransform(1, 0, 0, 1, 0, 0);
+      renderStrokeFull(out, scaledStroke(a, hiresShownK));
+    } catch(err){}
   }
 
   function preciseViewOn(){
@@ -5687,6 +5784,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       if(l.visible) dctx.drawImage(l.canvas, 0, 0);
     }
     dctx.restore();
+    if(typeof scheduleHiRes === 'function') scheduleHiRes();
     if(typeof updateNavPreview === 'function') updateNavPreview();
     // Live link: compositeLayers is the single choke point every canvas
     // change flows through (recolor, fills, eye toggles, undo\u2026) \u2014 hooking
@@ -5804,6 +5902,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     viewZoom = Math.max(0.2, Math.min(6, z));
     applyViewTransform();
     if(typeof refreshPreciseRes === 'function') refreshPreciseRes();
+    if(typeof scheduleHiRes === 'function') scheduleHiRes();
   }
   function resetView(){
     viewZoom = 1; viewRot = 0; viewPanX = 0; viewPanY = 0; viewFlip = 1;
@@ -8052,7 +8151,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const now = preciseViewOn();
     if(now !== _lastPrecise){
       _lastPrecise = now;
-      if(!now){ preciseK = 1; syncOverlayRes(1); preciseCanvas.style.display = 'none'; }
+      if(!now){ preciseK = 1; hiresShownK = 1; syncOverlayRes(1); preciseCanvas.style.display = 'none'; }
       compositeLayers();
       if(now && nodeSel) drawNodeOverlay();
     }
@@ -9020,6 +9119,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       return;
     }
     drawing = true;
+    if(!preciseViewOn() && hiresShownK > 1) preciseCanvas.style.display = 'none';
     drawCanvas.setPointerCapture(e.pointerId);
     lastRawPos = p;
     // 이미 있는 획의 끝에서 시작하면 그 점에 딱 붙인다. 이어 그린 선의
@@ -9987,8 +10087,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
         }
         // Commit the finished stroke into its layer, then recomposite.
         renderStrokeFull(activeLayer().ctx, currentAction);
-        compositeLayers();
         actions.push(currentAction);
+        hiresAddStroke(currentAction);
+        if(!preciseViewOn() && hiresShownK > 1) preciseCanvas.style.display = '';
+        compositeLayers();
         invalidateSnapCache();
         renderLayersPanel();
         redoStack.length = 0; 
