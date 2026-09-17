@@ -903,7 +903,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b65</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b66</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -5612,6 +5612,20 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
   // 한 레이어를 k 배 버퍼에 처음부터 다시 그린다. 액션 순서를 그대로 밟는다.
   function renderLayerHiRes(l, k, target){
+    // 페인트통(마스크 없는 채움)이 있는 레이어는 1080 결과를 부드럽게 키운다.
+    // 3배 크기에서 다시 번지면 픽셀이 9배라 채움 몇 개로 초 단위가 된다.
+    // 페인트통은 어차피 1080 픽셀의 결과이니 키우는 편이 정직하다.
+    let hasFlood = false;
+    for(const a of actions){
+      if(a.layer === l.id && a.type === 'fill' && !a.poly && !a.m){ hasFlood = true; break; }
+    }
+    if(hasFlood){
+      target.save();
+      target.imageSmoothingEnabled = true; target.imageSmoothingQuality = 'high';
+      target.drawImage(l.canvas, 0, 0, l.canvas.width * k, l.canvas.height * k);
+      target.restore();
+      return;
+    }
     for(const a of actions){
       if(a.layer !== l.id) continue;
       try {
@@ -8410,10 +8424,12 @@ showLayerMenu(ev.clientX, ev.clientY, [
       const p = a.points;
       if(!p || p.length < 2) continue;
       const n = p.length, last = a.closed ? n : n - 1;
+      let si = 0;
       for(let i = 0; i < last; i++){
         const q0 = p[i], q1 = p[(i + 1) % n];
         if(Math.abs(q0.x - q1.x) < VF_EPS && Math.abs(q0.y - q1.y) < VF_EPS) continue;
-        segs.push({ x0: q0.x, y0: q0.y, x1: q1.x, y1: q1.y, sid: a.id, cuts: [] });
+        segs.push({ x0: q0.x, y0: q0.y, x1: q1.x, y1: q1.y, sid: a.id, si: si++, cuts: [],
+                    closedLast: a.closed && i === last - 1 });
       }
     }
     return segs;
@@ -8422,29 +8438,45 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // 서로 만나는 자리를 찾는다. 격자에 담아 같은 칸의 것끼리만 본다.
   function vfFindCuts(segs, cell){
     cell = cell || 24;
+    const n = segs.length;
+    // bbox 를 미리 재 둔다
+    const bx0 = new Float32Array(n), bx1 = new Float32Array(n), by0 = new Float32Array(n), by1 = new Float32Array(n);
+    for(let i = 0; i < n; i++){
+      const s = segs[i];
+      bx0[i] = Math.min(s.x0, s.x1); bx1[i] = Math.max(s.x0, s.x1);
+      by0[i] = Math.min(s.y0, s.y1); by1[i] = Math.max(s.y0, s.y1);
+    }
+    // 숫자 열쇠 격자. 문자열이면 3만 선분에 문자열 수십만 개가 생긴다.
     const grid = new Map();
-    const key = (gx, gy) => gx + ',' + gy;
-    segs.forEach((s, i) => {
-      const gx0 = Math.floor(Math.min(s.x0, s.x1) / cell), gx1 = Math.floor(Math.max(s.x0, s.x1) / cell);
-      const gy0 = Math.floor(Math.min(s.y0, s.y1) / cell), gy1 = Math.floor(Math.max(s.y0, s.y1) / cell);
+    const KEY = 65536;
+    for(let i = 0; i < n; i++){
+      const gx0 = Math.floor(bx0[i] / cell), gx1 = Math.floor(bx1[i] / cell);
+      const gy0 = Math.floor(by0[i] / cell), gy1 = Math.floor(by1[i] / cell);
       for(let gx = gx0; gx <= gx1; gx++) for(let gy = gy0; gy <= gy1; gy++){
-        const k = key(gx, gy);
+        const k = (gx + 32768) * KEY + (gy + 32768);
         let b = grid.get(k); if(!b){ b = []; grid.set(k, b); }
         b.push(i);
       }
-    });
-    const seen = new Set();
-    for(const bucket of grid.values()){
-      for(let i = 0; i < bucket.length; i++) for(let j = i + 1; j < bucket.length; j++){
-        const a = bucket[i], b = bucket[j];
-        const pk = a < b ? a + ':' + b : b + ':' + a;
-        if(seen.has(pk)) continue;
-        seen.add(pk);
-        const S = segs[a], T = segs[b];
-        // 같은 획의 이웃 선분은 끝점을 공유할 뿐이다
-        const h = segIntersect(S.x0, S.y0, S.x1, S.y1, T.x0, T.y0, T.x1, T.y1);
-        if(!h) continue;
-        S.cuts.push(h.t); T.cuts.push(h.u);
+    }
+    // 한 쌍이 여러 칸에 걸치면 한 번만 본다: 두 bbox 가 겹치는 영역의 왼쪽 위
+    // 칸에서만 검사한다. Set 없이도 중복이 없다.
+    for(const [k, bucket] of grid){
+      const gx = Math.floor(k / KEY) - 32768, gy = (k % KEY) - 32768;
+      for(let i = 0; i < bucket.length; i++){
+        const a = bucket[i], S = segs[a];
+        for(let j = i + 1; j < bucket.length; j++){
+          const b = bucket[j], T = segs[b];
+          // 같은 획의 이웃 선분은 끝점을 공유할 뿐 교차가 아니다
+          if(S.sid === T.sid && S.sid >= 0 && Math.abs(S.si - T.si) === 1) continue;
+          // bbox 겹침
+          if(bx1[a] < bx0[b] || bx1[b] < bx0[a] || by1[a] < by0[b] || by1[b] < by0[a]) continue;
+          // 겹치는 영역의 왼쪽 위 칸이 이 칸인가 (중복 방지)
+          const ox = Math.max(bx0[a], bx0[b]), oy = Math.max(by0[a], by0[b]);
+          if(Math.floor(ox / cell) !== gx || Math.floor(oy / cell) !== gy) continue;
+          const h = segIntersect(S.x0, S.y0, S.x1, S.y1, T.x0, T.y0, T.x1, T.y1);
+          if(!h) continue;
+          S.cuts.push(h.t); T.cuts.push(h.u);
+        }
       }
     }
   }
@@ -8462,11 +8494,12 @@ showLayerMenu(ev.clientX, ev.clientY, [
     if(!(tol > 0)) return 0;
     const cell = Math.max(8, tol * 2);
     const grid = new Map();
+    const GK = 65536, GO = 32768;
     segs.forEach((s, i) => {
       const gx0 = Math.floor((Math.min(s.x0, s.x1) - tol) / cell), gx1 = Math.floor((Math.max(s.x0, s.x1) + tol) / cell);
       const gy0 = Math.floor((Math.min(s.y0, s.y1) - tol) / cell), gy1 = Math.floor((Math.max(s.y0, s.y1) + tol) / cell);
       for(let gx = gx0; gx <= gx1; gx++) for(let gy = gy0; gy <= gy1; gy++){
-        const k = gx + ',' + gy;
+        const k = (gx + GO) * GK + (gy + GO);
         let b = grid.get(k); if(!b){ b = []; grid.set(k, b); }
         b.push(i);
       }
@@ -8488,7 +8521,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       const gx = Math.floor(e.x / cell), gy = Math.floor(e.y / cell);
       let best = null, bestScore = Infinity;
       for(let ay = -1; ay <= 1; ay++) for(let ax = -1; ax <= 1; ax++){
-        const bucket = grid.get((gx+ax) + ',' + (gy+ay));
+        const bucket = grid.get((gx+ax + GO) * GK + (gy+ay + GO));
         if(!bucket) continue;
         for(const i of bucket){
           const s = segs[i];
@@ -8530,7 +8563,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
   function vfBuildGraph(segs){
     const verts = [], vmap = new Map();
     const vid = (x, y) => {
-      const k = Math.round(x / VF_EPS) + ',' + Math.round(y / VF_EPS);
+      // 0.05px 눈금. 좌표는 캔버스 안팎 몇천 px 라 2^21 안에 든다.
+      const k = (Math.round(x / VF_EPS) + 1048576) * 2097152 + (Math.round(y / VF_EPS) + 1048576);
       let id = vmap.get(k);
       if(id == null){ id = verts.length; verts.push({ x, y, out: [] }); vmap.set(k, id); }
       return id;
@@ -8601,8 +8635,11 @@ showLayerMenu(ev.clientX, ev.clientY, [
         poly.push([g.verts[cur.from].x, g.verts[cur.from].y]);
         cur = nextOf(cur);
       }
-      if(!broken && poly.length >= 3) faces.push({ poly, area: vfArea(poly) });
-      else faces.push({ poly: [], area: 0 });
+      if(!broken && poly.length >= 3){
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        for(const q of poly){ if(q[0] < x0) x0 = q[0]; if(q[0] > x1) x1 = q[0]; if(q[1] < y0) y0 = q[1]; if(q[1] > y1) y1 = q[1]; }
+        faces.push({ poly, area: vfArea(poly), x0, y0, x1, y1 });
+      } else faces.push({ poly: [], area: 0 });
     }
     return faces;
   }
@@ -8632,19 +8669,44 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // 기본값. 화면 손잡이가 덮어쓴다.
   let vfOpts = { endEnd: 10, endBody: 6, angle: 60 };
 
+  // 획 목록의 서명. 획이 늘거나 줄거나, 어느 획이든 점이 바뀌면 달라진다.
+  function vfSignature(strokes, o){
+    let h = strokes.length * 2654435761 >>> 0;
+    for(const a of strokes){
+      const p = a.points; if(!p || !p.length) continue;
+      const q = p[p.length-1];
+      h = (h ^ (a.id|0)) * 16777619 >>> 0;
+      h = (h ^ p.length) * 16777619 >>> 0;
+      h = (h ^ ((q.x*10)|0)) * 16777619 >>> 0;
+      h = (h ^ ((q.y*10)|0)) * 16777619 >>> 0;
+      if(a.closed) h = (h ^ 1) * 16777619 >>> 0;
+    }
+    return h + '|' + o.endEnd + '|' + o.endBody + '|' + o.angle;
+  }
+  let vfCache = null;   // { key, faces, bounded, bridges }
+
   function findClosedRegion(strokes, x, y, gapTol, opt){
-    const segs = vfCollectSegments(strokes);
-    if(!segs.length) return null;
-    vfFindCuts(segs);
     const o = opt || (gapTol != null ? { endEnd: gapTol, endBody: gapTol, angle: 60 } : vfOpts);
-    vfBridgeGaps(segs, strokes, 0, o);
-    const g = vfBuildGraph(segs);
-    const faces = vfTraceFaces(g);
+    const key = vfSignature(strokes, o);
+    let faces;
+    if(vfCache && vfCache.key === key){
+      faces = vfCache.faces;
+      vfLastBridges = vfCache.bridges;
+    } else {
+      const segs = vfCollectSegments(strokes);
+      if(!segs.length) return null;
+      vfFindCuts(segs);
+      vfBridgeGaps(segs, strokes, 0, o);
+      const g = vfBuildGraph(segs);
+      faces = vfTraceFaces(g);
+      vfCache = { key, faces, bridges: vfLastBridges };
+    }
     // 반변 방향 규약상 유계 면은 한쪽 부호로 나온다. 둘 다 시험해 작은 쪽을
     // 고르되, 바깥 면(가장 큰 것)은 제외한다.
     let best = null;
     for(const f of faces){
       if(f.poly.length < 3 || Math.abs(f.area) < 1) continue;
+      if(f.x0 !== undefined && (x < f.x0 || x > f.x1 || y < f.y0 || y > f.y1)) continue;
       if(!vfPointIn(f.poly, x, y)) continue;
       if(!best || Math.abs(f.area) < Math.abs(best.area)) best = f;
     }
@@ -8652,7 +8714,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     // 점을 담는 면 중 가장 큰 것이 바깥 면이면서 다른 후보가 없을 때
     // best 가 바깥 면일 수 있다. 바깥 면은 방향이 반대라 부호로 가려진다.
     const bounded = faces.filter(f => f.poly.length >= 3 && Math.abs(f.area) >= 1);
-    const maxAbs = Math.max(...bounded.map(f => Math.abs(f.area)));
+    let maxAbs = 0; for(const f of bounded) if(Math.abs(f.area) > maxAbs) maxAbs = Math.abs(f.area);
     if(Math.abs(best.area) === maxAbs && bounded.length > 1){
       // 가장 큰 면이 곧 바깥이면, 안쪽 후보가 없다
       const inner = bounded.filter(f => f !== best && vfPointIn(f.poly, x, y));
@@ -8662,13 +8724,21 @@ showLayerMenu(ev.clientX, ev.clientY, [
     // 도넛의 바깥을 찍으면 안쪽 사각형이 구멍이다. 반변 규약상 같은 다각형이
     // 두 방향으로 나오므로 넓이·중심으로 하나만 남긴다.
     const holes = [], hk = new Set();
+    const bestKeys = new Set();
+    for(const b of best.poly) bestKeys.add((Math.round(b[0]/VF_EPS) + 1048576) * 2097152 + (Math.round(b[1]/VF_EPS) + 1048576));
     for(const f of bounded){
       if(f === best || Math.abs(f.area) >= Math.abs(best.area)) continue;
+      // 고른 면의 bbox 밖이면 구멍일 수 없다
+      if(f.x0 !== undefined && best.x0 !== undefined &&
+         (f.x1 < best.x0 || f.x0 > best.x1 || f.y1 < best.y0 || f.y0 > best.y1)) continue;
       if(vfPointIn(f.poly, x, y)) continue;
       const c = f.poly[0];
       if(!vfPointIn(best.poly, c[0], c[1])) continue;
       // 고른 면의 변에 붙어 있는 이웃 면은 구멍이 아니다 -- 꼭짓점을 공유한다
-      const shares = f.poly.some(q => best.poly.some(b => Math.abs(b[0]-q[0]) < VF_EPS && Math.abs(b[1]-q[1]) < VF_EPS));
+      let shares = false;
+      for(const q of f.poly){
+        if(bestKeys.has((Math.round(q[0]/VF_EPS) + 1048576) * 2097152 + (Math.round(q[1]/VF_EPS) + 1048576))){ shares = true; break; }
+      }
       if(shares) continue;
       let cx = 0, cy = 0; for(const q of f.poly){ cx += q[0]; cy += q[1]; }
       const key = Math.round(Math.abs(f.area)) + ':' + Math.round(cx/f.poly.length) + ':' + Math.round(cy/f.poly.length);
@@ -11867,6 +11937,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
             if(a.m){ act.m = a.m; act.ox = (a.ox||0) + offX; act.oy = (a.oy||0) + offY;
                      if(a.mw){ act.mw = a.mw; act.mh = a.mh; } }
             if(a.poly){ act.poly = a.poly; act.holes = a.holes || []; act.ox = offX; act.oy = offY; }
+            else if(!a.m && !(a.sli && a.sli.length)) act.vfRepair = true;   // 다각형이 빠진 벡터 채움
             actions.push(act);
           } else if(a.type === 'layerRecolor'){
             actions.push({ type:'layerRecolor', id:++actionCounter, color:a.color, layer: layerIdFor(a) });
@@ -11892,6 +11963,25 @@ showLayerMenu(ev.clientX, ev.clientY, [
           const baked = bakeErasers(added, a => a.layer, { preserveTextured: true });
           baked.forEach(a => { a.id = ++actionCounter; });
           actions.push(...baked);
+          const repairFills = baked.filter(x => x.type === 'fill' && x.vfRepair);
+          repairFills.forEach(x => { delete x.vfRepair; });
+          if(repairFills.length && typeof findClosedRegion === 'function'){
+            // 이 오브젝트의 획으로 닫힌 면을 다시 찾는다. 그래프는 한 번만 만들어진다.
+            const freshIds = new Set(fresh.map(l => l.id));
+            const strokes = actions.filter(x => x.type === 'stroke' && x.tool !== 'eraser' && freshIds.has(x.layer));
+            let fixed = 0;
+            for(const f of repairFills){
+              let region = null;
+              try { region = findClosedRegion(strokes, f.x, f.y, null, vfOpts); } catch(err){}
+              if(region){ f.poly = region.poly; f.holes = region.holes || []; f.ox = 0; f.oy = 0; fixed++; }
+              // 못 찾은 것은 그리지 않는다. 페인트통으로 돌리면 틈으로 새어
+              // 화면이 통째로 그 색이 된다 -- 점 하나 빠지는 쪽이 낫다.
+              else { f.poly = []; f.holes = []; }
+            }
+            const lost = repairFills.length - fixed;
+            if(fixed || lost) toast('옛 파일의 벡터 채움 ' + fixed + '/' + repairFills.length + '개를 다각형으로 되살렸습니다.' +
+                                    (lost ? ' 못 찾은 ' + lost + '개는 비워 둡니다.' : ''));
+          }
         }
         renderLayersPanel();
         redoStack.length = 0;
