@@ -903,7 +903,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b52</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b53</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -1029,6 +1029,23 @@
           <span class="val" id="snapRadiusVal">12</span>
         </div>
       </div>
+      <div class="tool-row" id="nodeRow" style="display:none;gap:10px;flex-wrap:wrap;">
+        <div style="font-size:10px;font-family:var(--font-mono);color:var(--ink-dim);" id="nodeInfo">획을 누르세요</div>
+        <div class="range-row">
+          <span>앵커 성김</span>
+          <input type="range" id="nodeTol" min="2" max="80" value="10"
+            title="작을수록 앵커가 촘촘하고 원래 선에 가깝습니다. 크면 다루기 쉬운 대신 선이 조금 달라집니다.">
+          <span class="val" id="nodeTolVal">1.0</span>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-sm" id="nodeModeBezier" title="점들을 앵커로 맞춰 핸들을 답니다 — 자유롭게 휘지만 선이 살짝 변합니다">베지어</button>
+          <button class="btn btn-sm" id="nodeModePoints" title="원래 점을 그대로 앵커로 씁니다 — 선이 안 변하는 대신 핸들이 없습니다">점 그대로</button>
+        </div>
+        <div style="font-size:9px;font-family:var(--font-mono);color:var(--ink-dim);line-height:1.5;">
+          끌기=옮기기 · Alt+클릭=코너↔부드럽게 · Ctrl+클릭=앵커 넣기<br>
+          Delete=앵커 지우기 · Shift+클릭=여럿 고르기 · Esc=놓기
+        </div>
+      </div>
       <div class="tool-row" id="toleranceRow" style="display:flex;gap:10px;flex-wrap:wrap;">
         <div class="range-row">
           <span>TOLERANCE</span>
@@ -1106,6 +1123,8 @@
         <button class="tool-btn" data-tool="fill" title="Hotkey: G — fills a region and auto-splits it into a new layer">FILL</button>
         <button class="tool-btn" data-tool="select" title="Hotkey: V — drag on canvas to move the ACTIVE layer">SELECT</button>
         <button class="tool-btn" data-tool="eraser" title="Hotkey: E — erases on the ACTIVE layer only">ERASER</button>
+        <button class="tool-btn" data-tool="pen" title="Hotkey: P — 톡 누르면 꺾인 점, 끌면 부드러운 점. 첫 앵커를 다시 누르면 닫힙니다. Enter 로 끝냅니다.">PEN</button>
+        <button class="tool-btn" data-tool="node" title="Hotkey: A — 그려 둔 획을 눌러 앵커를 끌거나, 넣거나, 지웁니다">NODE EDIT</button>
         <button class="tool-btn" data-tool="lasso" title="Hotkey: L — draw a selection, then Delete to remove it from the ACTIVE layer, T to free-transform it, or Ctrl+Shift+X to cut it onto a new layer">LASSO</button>
         <button class="tool-btn" id="eyedropperBtn" title="Hotkey: I — click the canvas once to pick a color">EYEDROPPER</button>
         <button class="tool-btn" id="traceLinesBtn" title="Extract lines from the TRACE image — opens a window with the full set of controls, and drops the result in as real editable strokes">✎ EXTRACT LINES</button>
@@ -3257,6 +3276,26 @@ showLayerMenu(ev.clientX, ev.clientY, [
       if(k === 'v') { document.querySelector('[data-tool="select"]').click(); }
       if(k === 'e') { document.querySelector('[data-tool="eraser"]').click(); }
       if(k === 'l') { document.querySelector('[data-tool="lasso"]').click(); }
+      if(k === 'a') { document.querySelector('[data-tool="node"]').click(); }
+      if(k === 'p') { document.querySelector('[data-tool="pen"]').click(); }
+      if(currentTool === 'pen' && penDraft){
+        if(e.key === 'Enter'){ e.preventDefault(); penFinish(); return; }
+        if(e.key === 'Escape'){ e.preventDefault(); penCancel(); return; }
+      }
+      if(currentTool === 'node' && nodeSel){
+        if(e.key === 'Escape'){ clearNodeSelection(); return; }
+        if(e.key === 'Delete' || e.key === 'Backspace'){
+          const a = editedStroke();
+          if(a && nodeSel.sel.size){
+            e.preventDefault();
+            beginEdit(a);
+            if(deleteSelectedNodes(a)){ syncStrokeFromNodes(a); commitEdit(a, '앵커 지움'); }
+            else { editBefore = null; toast('앵커가 둘은 남아야 선입니다.'); }
+            drawNodeOverlay(); updateNodePanel();
+            return;
+          }
+        }
+      }
       if(e.key.toLowerCase() === 'x' && (e.ctrlKey || e.metaKey) && e.shiftKey && lassoSelection){
         e.preventDefault();
         lassoCutToNewLayer();
@@ -7310,6 +7349,449 @@ showLayerMenu(ev.clientX, ev.clientY, [
     return null;
   }
 
+
+  // ---- 앵커 · 핸들 ----
+  // node = { x, y, hi:{x,y}|null, ho:{x,y}|null }
+  //   hi = 들어오는 핸들, ho = 나가는 핸들. 둘 다 없으면 꺾인 점(코너).
+  //   핸들은 절대 좌표로 둔다 -- 끌 때 그 자리가 곧 핸들 자리라 계산이 없다.
+
+  function pathArcLengths(pts){
+    const acc = [0];
+    for(let i = 1; i < pts.length; i++)
+      acc.push(acc[i-1] + Math.hypot(pts[i].x - pts[i-1].x, pts[i].y - pts[i-1].y));
+    return acc;
+  }
+
+  // 필압을 길이 비율로 다시 잰다. 점 개수가 아니라 길이를 기준으로 삼아야
+  // 모양을 바꿔도 굵은 자리가 제자리에 남는다.
+  function pressureProfile(pts, n){
+    n = n || 32;
+    const has = pts.some(p => p.p != null);
+    if(!has) return null;
+    const acc = pathArcLengths(pts);
+    const total = acc[acc.length-1];
+    if(!(total > 0)) return null;
+    const out = new Array(n);
+    let j = 0;
+    for(let k = 0; k < n; k++){
+      const target = total * k / (n - 1);
+      while(j < acc.length - 2 && acc[j+1] < target) j++;
+      const seg = acc[j+1] - acc[j];
+      const t = seg > 0 ? (target - acc[j]) / seg : 0;
+      const a = pts[j].p != null ? pts[j].p : 1;
+      const b = pts[j+1].p != null ? pts[j+1].p : a;
+      out[k] = a + (b - a) * t;
+    }
+    return out;
+  }
+
+  function applyPressure(pts, pw){
+    if(!pw || !pw.length || pts.length < 2) return pts;
+    const acc = pathArcLengths(pts);
+    const total = acc[acc.length-1];
+    if(!(total > 0)) return pts;
+    for(let i = 0; i < pts.length; i++){
+      const f = acc[i] / total * (pw.length - 1);
+      const lo = Math.floor(f), hi = Math.min(pw.length - 1, lo + 1);
+      pts[i].p = pw[lo] + (pw[hi] - pw[lo]) * (f - lo);
+    }
+    return pts;
+  }
+
+  // 폴리라인 → 앵커. 먼저 더글러스-포이커로 모양을 지키는 점만 남기고,
+  // 남은 점마다 이웃을 보고 핸들을 단다(캐트멀-롬 → 베지어). 그래야 원래
+  // 곡선에 가깝게 시작하고, 손대기 전까지는 거의 같은 선으로 보인다.
+  function fitNodes(pts, tol){
+    if(!pts || pts.length < 2) return (pts || []).map(p => ({ x:p.x, y:p.y, hi:null, ho:null }));
+    const simp = simplifyPath(pts.map(p => [p.x, p.y]), tol == null ? 2 : tol);
+    const a = simp.map(q => ({ x:q[0], y:q[1] }));
+    if(a.length < 2) return a.map(p => ({ x:p.x, y:p.y, hi:null, ho:null }));
+    const nodes = a.map(p => ({ x:p.x, y:p.y, hi:null, ho:null }));
+    // 캐트멀-롬의 접선을 베지어 핸들 길이(1/3)로 옮긴다.
+    for(let i = 0; i < nodes.length; i++){
+      const prev = a[i-1] || a[i], next = a[i+1] || a[i];
+      const tx = (next.x - prev.x) / 6, ty = (next.y - prev.y) / 6;
+      if(i > 0)               nodes[i].hi = { x: nodes[i].x - tx, y: nodes[i].y - ty };
+      if(i < nodes.length-1)  nodes[i].ho = { x: nodes[i].x + tx, y: nodes[i].y + ty };
+    }
+    return nodes;
+  }
+
+  // 원래 점을 그대로 앵커로. 선이 1px도 안 변한다.
+  function nodesFromPointsExact(pts){
+    return pts.map(p => ({ x:p.x, y:p.y, hi:null, ho:null }));
+  }
+
+  function cubicAt(p0, c1, c2, p1, t){
+    const u = 1 - t, a = u*u*u, b = 3*u*u*t, c = 3*u*t*t, d = t*t*t;
+    return { x: a*p0.x + b*c1.x + c*c2.x + d*p1.x,
+             y: a*p0.y + b*c1.y + c*c2.y + d*p1.y };
+  }
+
+  // 앵커 → 점. 핸들이 없는 구간은 직선이라 점 둘이면 끝이고, 곡선 구간만
+  // 잘게 나눈다. 나누는 수는 길이에 맞춘다 -- 짧은 구간을 64등분하면
+  // 점만 늘고 그림은 같다.
+  function flattenNodes(nodes, closed){
+    if(!nodes || !nodes.length) return [];
+    if(nodes.length === 1) return [{ x:nodes[0].x, y:nodes[0].y }];
+    const out = [{ x:nodes[0].x, y:nodes[0].y }];
+    const n = nodes.length;
+    const last = closed ? n : n - 1;
+    for(let i = 0; i < last; i++){
+      const A = nodes[i], B = nodes[(i+1) % n];
+      const c1 = A.ho, c2 = B.hi;
+      if(!c1 && !c2){ out.push({ x:B.x, y:B.y }); continue; }
+      const p1 = c1 || { x:A.x, y:A.y };
+      const p2 = c2 || { x:B.x, y:B.y };
+      const rough = Math.hypot(p1.x-A.x, p1.y-A.y) + Math.hypot(p2.x-p1.x, p2.y-p1.y)
+                  + Math.hypot(B.x-p2.x, B.y-p2.y);
+      const steps = Math.max(4, Math.min(64, Math.ceil(rough / 3)));
+      for(let s = 1; s <= steps; s++) out.push(cubicAt(A, p1, p2, B, s/steps));
+    }
+    return out;
+  }
+
+  // 획을 앵커 기준으로 다시 세운다. points 는 아래쪽(그리기·SVG·플로터)이
+  // 전부 쓰는 것이라, 앵커를 고치면 여기서 한 번만 다시 만들어 주면 된다.
+  function syncStrokeFromNodes(a){
+    if(!a || !a.nodes) return a;
+    const pts = flattenNodes(a.nodes, !!a.closed);
+    a.points = a.pw ? applyPressure(pts, a.pw) : pts;
+    return a;
+  }
+
+  // 획을 편집 가능한 상태로. mode: 'bezier' | 'points'
+  function makeEditable(a, mode, tol){
+    if(!a || a.type !== 'stroke' || !a.points || !a.points.length) return a;
+    a.pw = a.pw || pressureProfile(a.points, 32);
+    a.nodes = mode === 'points' ? nodesFromPointsExact(a.points)
+                                : fitNodes(a.points, tol == null ? 2 : tol);
+    a.edit = mode === 'points' ? 'points' : 'bezier';
+    if(a.edit === 'bezier') syncStrokeFromNodes(a);
+    return a;
+  }
+
+  // 두 선(원래 것과 맞춘 것)이 얼마나 벌어졌나. 변환 품질을 눈이 아니라
+  // 숫자로 확인하려고 둔다.
+  function maxDeviation(ptsA, ptsB){
+    if(!ptsA.length || ptsB.length < 2) return Infinity;
+    let worst = 0;
+    for(const p of ptsA){
+      let d = Infinity;
+      for(let i = 0; i < ptsB.length - 1; i++)
+        d = Math.min(d, distToSegment(p, ptsB[i], ptsB[i+1]));
+      if(d > worst) worst = d;
+    }
+    return worst;
+  }
+
+
+  // ---- 앵커 편집 ----
+  let nodeSel = null;      // { id, sel:Set<number>, drag:null }
+  let nodeFitTol = 1;      // 맞춤 성김. 작을수록 앵커가 많고 원본에 가깝다
+  let nodeMode = 'bezier'; // 새로 고를 획의 기본 방식
+
+  const nodeHitR = () => 7 / (viewZoom || 1);
+
+  function editedStroke(){
+    return nodeSel ? actions.find(a => a.id === nodeSel.id) : null;
+  }
+
+  function snapshotStroke(a){
+    return { nodes: a.nodes ? a.nodes.map(n => ({ x:n.x, y:n.y,
+                                hi: n.hi ? {x:n.hi.x, y:n.hi.y} : null,
+                                ho: n.ho ? {x:n.ho.x, y:n.ho.y} : null })) : null,
+             points: a.points.map(p => ({ x:p.x, y:p.y, p:p.p })),
+             closed: !!a.closed, edit: a.edit || null,
+             pw: a.pw ? a.pw.slice() : null };
+  }
+  function restoreStroke(a, s){
+    a.nodes = s.nodes ? s.nodes.map(n => ({ x:n.x, y:n.y,
+                          hi: n.hi ? {x:n.hi.x, y:n.hi.y} : null,
+                          ho: n.ho ? {x:n.ho.x, y:n.ho.y} : null })) : null;
+    a.points = s.points.map(p => ({ x:p.x, y:p.y, p:p.p }));
+    a.closed = s.closed; a.edit = s.edit; a.pw = s.pw ? s.pw.slice() : null;
+  }
+
+  let editBefore = null;   // 한 번의 조작을 시작할 때의 상태
+  function beginEdit(a){ editBefore = snapshotStroke(a); }
+  function commitEdit(a, label){
+    if(!a || !editBefore) return;
+    const after = snapshotStroke(a);
+    // 아무것도 안 바뀌었으면 되돌리기 목록을 더럽히지 않는다.
+    if(JSON.stringify(after) === JSON.stringify(editBefore)){ editBefore = null; return; }
+    actions.push({ type:'strokeEdit', id:++actionCounter, targetId:a.id,
+                   before:editBefore, after, layer:a.layer, label: label || '앵커 편집' });
+    editBefore = null;
+    redoStack.length = 0;
+    renderSingleLayer(a.layer);
+    drawNodeOverlay();
+  }
+
+  // ---- 덧그림판: 앵커와 핸들 ----
+  function drawNodeOverlay(){
+    const oc = $('lassoOverlay');
+    if(!oc) return;
+    const c = oc.getContext('2d');
+    c.clearRect(0, 0, oc.width, oc.height);
+    const a = editedStroke();
+    if(!a || !a.nodes) return;
+    const z = viewZoom || 1;
+    const pts = flattenNodes(a.nodes, !!a.closed);
+
+    c.save();
+    // 패스 자체를 얇게 덧그려 어떤 획을 잡고 있는지 보이게 한다.
+    c.lineWidth = 1 / z; c.strokeStyle = 'rgba(228,68,45,0.85)';
+    c.beginPath(); c.moveTo(pts[0].x, pts[0].y);
+    for(let i = 1; i < pts.length; i++) c.lineTo(pts[i].x, pts[i].y);
+    if(a.closed) c.closePath();
+    c.stroke();
+
+    // 핸들은 고른 앵커의 것만 보여 준다. 전부 그리면 무슨 선인지 안 보인다.
+    c.lineWidth = 1 / z; c.strokeStyle = 'rgba(80,80,90,0.9)';
+    for(let i = 0; i < a.nodes.length; i++){
+      if(!nodeSel.sel.has(i)) continue;
+      const n = a.nodes[i];
+      for(const h of [n.hi, n.ho]){
+        if(!h) continue;
+        c.beginPath(); c.moveTo(n.x, n.y); c.lineTo(h.x, h.y); c.stroke();
+        c.beginPath(); c.arc(h.x, h.y, 3/z, 0, Math.PI*2);
+        c.fillStyle = '#fff'; c.fill(); c.stroke();
+      }
+    }
+    // 앵커. 고른 것은 채워서, 코너는 마름모로 -- 모양만 봐도 상태를 안다.
+    for(let i = 0; i < a.nodes.length; i++){
+      const n = a.nodes[i], on = nodeSel.sel.has(i);
+      const r = 4 / z, corner = !n.hi && !n.ho;
+      c.beginPath();
+      if(corner){
+        c.moveTo(n.x, n.y-r); c.lineTo(n.x+r, n.y); c.lineTo(n.x, n.y+r); c.lineTo(n.x-r, n.y);
+        c.closePath();
+      } else {
+        c.rect(n.x-r, n.y-r, r*2, r*2);
+      }
+      c.fillStyle = on ? '#e4442d' : '#fff';
+      c.strokeStyle = '#1d1d1f'; c.lineWidth = 1.2/z;
+      c.fill(); c.stroke();
+    }
+    c.restore();
+  }
+
+  function selectStrokeForEdit(a, mode){
+    if(!a) { nodeSel = null; drawNodeOverlay(); return; }
+    if(!a.nodes) makeEditable(a, mode || nodeMode, nodeFitTol);
+    nodeSel = { id: a.id, sel: new Set(), drag: null };
+    drawNodeOverlay();
+    updateNodePanel();
+  }
+
+  function clearNodeSelection(){
+    nodeSel = null;
+    const oc = $('lassoOverlay');
+    if(oc) oc.getContext('2d').clearRect(0, 0, oc.width, oc.height);
+    updateNodePanel();
+  }
+
+  // ---- 무엇을 잡았나 ----
+  function hitNode(pos, a){
+    const r = nodeHitR();
+    for(let i = a.nodes.length - 1; i >= 0; i--){
+      const n = a.nodes[i];
+      if(Math.hypot(pos.x-n.x, pos.y-n.y) <= r) return { kind:'node', i };
+    }
+    return null;
+  }
+  function hitHandle(pos, a){
+    if(!nodeSel) return null;
+    const r = nodeHitR();
+    for(const i of nodeSel.sel){
+      const n = a.nodes[i];
+      if(n.hi && Math.hypot(pos.x-n.hi.x, pos.y-n.hi.y) <= r) return { kind:'handle', i, which:'hi' };
+      if(n.ho && Math.hypot(pos.x-n.ho.x, pos.y-n.ho.y) <= r) return { kind:'handle', i, which:'ho' };
+    }
+    return null;
+  }
+  // 패스 위 어디를 짚었나 — 앵커를 끼워 넣을 자리를 찾는 데 쓴다.
+  function hitSegment(pos, a){
+    const r = Math.max(6 / (viewZoom || 1), a.width/2 + 4);
+    let best = null, bestD = r;
+    const n = a.nodes.length, last = a.closed ? n : n - 1;
+    for(let i = 0; i < last; i++){
+      const A = a.nodes[i], B = a.nodes[(i+1) % n];
+      const p1 = A.ho || A, p2 = B.hi || B;
+      for(let s = 0; s < 24; s++){
+        const t0 = s/24, t1 = (s+1)/24;
+        const q0 = cubicAt(A, p1, p2, B, t0), q1 = cubicAt(A, p1, p2, B, t1);
+        const d = distToSegment(pos, q0, q1);
+        if(d < bestD){ bestD = d; best = { kind:'segment', i, t:(t0+t1)/2 }; }
+      }
+    }
+    return best;
+  }
+
+  // 구간 한가운데에 앵커를 끼운다. 드 카스텔조로 쪼개면 모양이 그대로다 --
+  // 끼우는 순간 선이 튀면 그건 편집이 아니라 파괴다.
+  function insertNodeAt(a, i, t){
+    const n = a.nodes.length;
+    const A = a.nodes[i], B = a.nodes[(i+1) % n];
+    const p1 = A.ho ? {x:A.ho.x,y:A.ho.y} : {x:A.x,y:A.y};
+    const p2 = B.hi ? {x:B.hi.x,y:B.hi.y} : {x:B.x,y:B.y};
+    const lerp = (u,v)=>({ x:u.x+(v.x-u.x)*t, y:u.y+(v.y-u.y)*t });
+    const q0 = lerp(A,p1), q1 = lerp(p1,p2), q2 = lerp(p2,B);
+    const r0 = lerp(q0,q1), r1 = lerp(q1,q2);
+    const mid = lerp(r0,r1);
+    const straight = !A.ho && !B.hi;
+    if(!straight){ A.ho = q0; B.hi = q2; }
+    a.nodes.splice(i+1, 0, { x:mid.x, y:mid.y,
+                             hi: straight ? null : {x:r0.x,y:r0.y},
+                             ho: straight ? null : {x:r1.x,y:r1.y} });
+    return i+1;
+  }
+
+  function deleteSelectedNodes(a){
+    if(!nodeSel || !nodeSel.sel.size) return false;
+    const keep = a.nodes.filter((_, i) => !nodeSel.sel.has(i));
+    if(keep.length < 2) return false;      // 점 하나만 남기면 선이 아니다
+    a.nodes = keep;
+    nodeSel.sel.clear();
+    return true;
+  }
+
+  // 코너 ↔ 부드럽게. 부드럽게 만들 때는 이웃 방향으로 핸들을 세운다.
+  function toggleNodeCorner(a, i){
+    const n = a.nodes[i];
+    if(n.hi || n.ho){ n.hi = null; n.ho = null; return; }
+    const prev = a.nodes[i-1] || a.nodes[(a.closed ? a.nodes.length-1 : i)];
+    const next = a.nodes[i+1] || a.nodes[(a.closed ? 0 : i)];
+    const tx = (next.x - prev.x) / 6, ty = (next.y - prev.y) / 6;
+    n.hi = { x: n.x - tx, y: n.y - ty };
+    n.ho = { x: n.x + tx, y: n.y + ty };
+  }
+
+
+  function penFinishIfDrawing(){
+    if(penDraft && penDraft.nodes.length >= 2) penFinish();
+    else penCancel();
+  }
+
+  function updateNodePanel(){
+    const row = $('nodeRow');
+    if(!row) return;
+    row.style.display = (currentTool === 'node') ? 'flex' : 'none';
+    const info = $('nodeInfo');
+    const a = editedStroke();
+    if(!info) return;
+    if(!a){ info.textContent = '획을 누르세요'; return; }
+    info.textContent = '앵커 ' + a.nodes.length + '개 · ' +
+      (a.edit === 'points' ? '점 그대로' : '베지어') +
+      (nodeSel.sel.size ? ' · ' + nodeSel.sel.size + '개 고름' : '') +
+      (a.closed ? ' · 닫힘' : '');
+  }
+
+  {
+    const tol = $('nodeTol'), tolV = $('nodeTolVal');
+    if(tol) tol.addEventListener('input', () => {
+      nodeFitTol = (parseInt(tol.value, 10) || 10) / 10;
+      tolV.textContent = nodeFitTol.toFixed(1);
+      // 고른 획이 있으면 새 성김으로 다시 맞춘다 -- 슬라이더를 움직였는데
+      // 아무 일도 안 일어나면 무엇을 바꾸는 값인지 알 수가 없다.
+      const a = editedStroke();
+      if(a && a.edit === 'bezier'){
+        beginEdit(a);
+        makeEditable(a, 'bezier', nodeFitTol);
+        nodeSel.sel.clear();
+        commitEdit(a, '앵커 다시 맞춤');
+        updateNodePanel();
+      }
+    });
+    const setMode = m => {
+      const a = editedStroke();
+      nodeMode = m;
+      if(!a) return;
+      beginEdit(a);
+      makeEditable(a, m, nodeFitTol);
+      nodeSel.sel.clear();
+      commitEdit(a, m === 'points' ? '점 그대로로' : '베지어로');
+      updateNodePanel();
+    };
+    const mb = $('nodeModeBezier'), mp = $('nodeModePoints');
+    if(mb) mb.addEventListener('click', () => setMode('bezier'));
+    if(mp) mp.addEventListener('click', () => setMode('points'));
+  }
+
+
+  // ---- 펜툴 ----
+  let penDraft = null;   // { nodes:[], closed:false, drag:null }
+
+  function penPreview(hover){
+    const oc = $('lassoOverlay');
+    if(!oc) return;
+    const c = oc.getContext('2d');
+    c.clearRect(0, 0, oc.width, oc.height);
+    if(!penDraft || !penDraft.nodes.length) return;
+    const z = viewZoom || 1;
+    const shown = penDraft.nodes.slice();
+    // 아직 안 찍은 다음 점을 미리 이어 보여 준다. 어디로 갈지 보이지 않으면
+    // 곡선을 찍을 수가 없다.
+    if(hover && !penDraft.closed) shown.push({ x:hover.x, y:hover.y, hi:null, ho:null });
+    const pts = flattenNodes(shown, penDraft.closed);
+    c.save();
+    c.lineWidth = Math.max(1/z, brushSize);
+    c.strokeStyle = strokeColor;
+    c.globalAlpha = 0.55;
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    c.beginPath(); c.moveTo(pts[0].x, pts[0].y);
+    for(let i = 1; i < pts.length; i++) c.lineTo(pts[i].x, pts[i].y);
+    if(penDraft.closed) c.closePath();
+    c.stroke();
+    c.globalAlpha = 1;
+    // 앵커와, 지금 끌고 있는 핸들
+    c.lineWidth = 1/z;
+    for(let i = 0; i < penDraft.nodes.length; i++){
+      const n = penDraft.nodes[i], r = 4/z;
+      for(const h of [n.hi, n.ho]){
+        if(!h) continue;
+        c.strokeStyle = 'rgba(80,80,90,0.9)';
+        c.beginPath(); c.moveTo(n.x, n.y); c.lineTo(h.x, h.y); c.stroke();
+        c.beginPath(); c.arc(h.x, h.y, 3/z, 0, Math.PI*2);
+        c.fillStyle = '#fff'; c.fill(); c.stroke();
+      }
+      c.beginPath(); c.rect(n.x-r, n.y-r, r*2, r*2);
+      c.fillStyle = (i === 0) ? '#e4442d' : '#fff';
+      c.strokeStyle = '#1d1d1f';
+      c.fill(); c.stroke();
+    }
+    c.restore();
+  }
+
+  function penFinish(){
+    if(!penDraft){ return; }
+    const nodes = penDraft.nodes;
+    if(nodes.length < 2){ penCancel(); return; }
+    const act = { type:'stroke', id:++actionCounter, tool:'brush',
+                  color: strokeColor, width: brushSize,
+                  texture: currentTexture, grain: currentGrain,
+                  seed: (Math.random()*2147483647)|0,
+                  nodes, closed: penDraft.closed, edit:'bezier', pw:null,
+                  points: [], layer: activeLayer().id };
+    syncStrokeFromNodes(act);
+    penDraft = null;
+    renderStrokeFull(activeLayer().ctx, act);
+    compositeLayers();
+    actions.push(act);
+    renderLayersPanel();
+    redoStack.length = 0;
+    const oc = $('lassoOverlay');
+    if(oc) oc.getContext('2d').clearRect(0, 0, oc.width, oc.height);
+    toast('패스 그림 — A 키로 앵커를 손볼 수 있습니다.');
+  }
+
+  function penCancel(){
+    penDraft = null;
+    const oc = $('lassoOverlay');
+    if(oc) oc.getContext('2d').clearRect(0, 0, oc.width, oc.height);
+  }
+
   function clearStrokeSelection(){
     selectedStrokeId = null;
     renderAll();
@@ -7400,6 +7882,98 @@ showLayerMenu(ev.clientX, ev.clientY, [
         if(typeof syncLiveEdit === 'function') syncLiveEdit(true); // live link: fill → composition + gallery now
         toast(`Fill split to new layer: ${fl.name}.`);
       }, 10);
+      return;
+    }
+
+    if(currentTool === 'pen'){
+      let q = { x:p.x, y:p.y };
+      // 첫 앵커를 다시 누르면 닫는다.
+      if(penDraft && penDraft.nodes.length > 1){
+        const f = penDraft.nodes[0];
+        if(Math.hypot(q.x-f.x, q.y-f.y) <= nodeHitR() * 1.6){
+          penDraft.closed = true;
+          penFinish();
+          return;
+        }
+      }
+      // 이미 있는 획의 끝점에도 붙는다 -- 펜툴로 그린 선이야말로 플로터로 간다.
+      if(snapEnabled){
+        const t = nearestSnap(q, snapCandidates(null), snapRadiusCanvas());
+        if(t) q = { x:t.x, y:t.y };
+      }
+      if(!penDraft) penDraft = { nodes: [], closed: false, drag: null };
+      penDraft.nodes.push({ x:q.x, y:q.y, hi:null, ho:null });
+      penDraft.drag = { i: penDraft.nodes.length - 1, from: q, moved: false };
+      penPreview(null);
+      try { drawCanvas.setPointerCapture(e.pointerId); } catch(err){}
+      return;
+    }
+
+    if(currentTool === 'node'){
+      const cur = editedStroke();
+      // 이미 고른 획이 있으면 그 안쪽(핸들 → 앵커 → 패스)부터 본다.
+      // 바로 다른 획으로 넘어가면 겹친 자리에서 편집이 불가능해진다.
+      if(cur && cur.nodes){
+        const h = hitHandle(p, cur);
+        if(h){
+          beginEdit(cur);
+          nodeSel.drag = { kind:'handle', i:h.i, which:h.which };
+          try { drawCanvas.setPointerCapture(e.pointerId); } catch(err){}
+          return;
+        }
+        const nHit = hitNode(p, cur);
+        if(nHit){
+          if(e.altKey){
+            beginEdit(cur);
+            toggleNodeCorner(cur, nHit.i);
+            syncStrokeFromNodes(cur);
+            commitEdit(cur, '앵커 모양 바꿈');
+            nodeSel.sel = new Set([nHit.i]);
+            updateNodePanel();
+            return;
+          }
+          if(e.shiftKey){
+            if(nodeSel.sel.has(nHit.i)) nodeSel.sel.delete(nHit.i);
+            else nodeSel.sel.add(nHit.i);
+          } else if(!nodeSel.sel.has(nHit.i)){
+            nodeSel.sel = new Set([nHit.i]);
+          }
+          beginEdit(cur);
+          nodeSel.drag = { kind:'nodes', from:p,
+                           start:[...nodeSel.sel].map(i => ({ i, n: cur.nodes[i],
+                             x:cur.nodes[i].x, y:cur.nodes[i].y,
+                             hi: cur.nodes[i].hi ? {x:cur.nodes[i].hi.x, y:cur.nodes[i].hi.y} : null,
+                             ho: cur.nodes[i].ho ? {x:cur.nodes[i].ho.x, y:cur.nodes[i].ho.y} : null })) };
+          drawNodeOverlay(); updateNodePanel();
+          try { drawCanvas.setPointerCapture(e.pointerId); } catch(err){}
+          return;
+        }
+        const seg = hitSegment(p, cur);
+        if(seg && (e.ctrlKey || e.metaKey)){
+          beginEdit(cur);
+          const at = insertNodeAt(cur, seg.i, seg.t);
+          syncStrokeFromNodes(cur);
+          commitEdit(cur, '앵커 넣음');
+          nodeSel.sel = new Set([at]);
+          drawNodeOverlay(); updateNodePanel();
+          return;
+        }
+        if(seg){
+          // 패스 몸통을 끌면 획 전체가 움직인다.
+          beginEdit(cur);
+          nodeSel.sel.clear();
+          nodeSel.drag = { kind:'whole', from:p,
+                           start: cur.nodes.map(n => ({ x:n.x, y:n.y,
+                             hi: n.hi ? {x:n.hi.x, y:n.hi.y} : null,
+                             ho: n.ho ? {x:n.ho.x, y:n.ho.y} : null })) };
+          drawNodeOverlay(); updateNodePanel();
+          try { drawCanvas.setPointerCapture(e.pointerId); } catch(err){}
+          return;
+        }
+      }
+      const pick = hitTestStroke(p);
+      if(pick) selectStrokeForEdit(pick);
+      else clearNodeSelection();
       return;
     }
 
@@ -8113,6 +8687,59 @@ showLayerMenu(ev.clientX, ev.clientY, [
       if(xform.drag){ xformPointerMove(getPos(e), e.shiftKey); }
       return;
     }
+    if(penDraft){
+      const p = getPos(e);
+      if(penDraft.drag){
+        const n = penDraft.nodes[penDraft.drag.i];
+        const d = Math.hypot(p.x - penDraft.drag.from.x, p.y - penDraft.drag.from.y);
+        // 살짝 흔들린 것을 핸들로 보지 않는다. 톡 누른 것은 꺾인 점이어야 한다.
+        if(d > 3 / (viewZoom || 1)){
+          penDraft.drag.moved = true;
+          n.ho = { x:p.x, y:p.y };
+          n.hi = { x: n.x - (p.x - n.x), y: n.y - (p.y - n.y) };
+        }
+        penPreview(null);
+      } else {
+        penPreview(p);
+      }
+      return;
+    }
+    if(nodeSel && nodeSel.drag){
+      const a = editedStroke();
+      if(a){
+        const p = getPos(e);
+        const d = nodeSel.drag;
+        if(d.kind === 'handle'){
+          const n = a.nodes[d.i];
+          n[d.which] = { x:p.x, y:p.y };
+          // 코너가 아니면 반대쪽 핸들도 따라 돈다 -- 그게 '부드러운' 앵커의 뜻이다.
+          const other = d.which === 'hi' ? 'ho' : 'hi';
+          if(n[other] && !n.corner){
+            const len = Math.hypot(n[other].x-n.x, n[other].y-n.y);
+            const dx = n.x-p.x, dy = n.y-p.y;
+            const m = Math.hypot(dx, dy) || 1;
+            n[other] = { x: n.x + dx/m*len, y: n.y + dy/m*len };
+          }
+        } else if(d.kind === 'nodes'){
+          const dx = p.x - d.from.x, dy = p.y - d.from.y;
+          for(const s of d.start){
+            s.n.x = s.x + dx; s.n.y = s.y + dy;
+            if(s.hi) s.n.hi = { x:s.hi.x+dx, y:s.hi.y+dy };
+            if(s.ho) s.n.ho = { x:s.ho.x+dx, y:s.ho.y+dy };
+          }
+        } else if(d.kind === 'whole'){
+          const dx = p.x - d.from.x, dy = p.y - d.from.y;
+          a.nodes.forEach((n, i) => {
+            const s = d.start[i];
+            n.x = s.x + dx; n.y = s.y + dy;
+            if(s.hi) n.hi = { x:s.hi.x+dx, y:s.hi.y+dy };
+            if(s.ho) n.ho = { x:s.ho.x+dx, y:s.ho.y+dy };
+          });
+        }
+        drawNodeOverlay();
+      }
+      return;
+    }
     if(lassoDrawing){
       const p = getPos(e);
       const last = lassoDrawing[lassoDrawing.length-1];
@@ -8355,6 +8982,26 @@ showLayerMenu(ev.clientX, ev.clientY, [
       lastRawPos = null;
     }
   }
+  window.addEventListener('pointerup', () => {
+    if(penDraft && penDraft.drag){
+      if(!penDraft.drag.moved){
+        const n = penDraft.nodes[penDraft.drag.i];
+        n.hi = null; n.ho = null;          // 톡 누른 것은 꺾인 점
+      }
+      penDraft.drag = null;
+      penPreview(null);
+    }
+  });
+  window.addEventListener('pointerup', e => {
+    if(nodeSel && nodeSel.drag){
+      const a = editedStroke();
+      const label = nodeSel.drag.kind === 'whole' ? '획 옮김'
+                  : nodeSel.drag.kind === 'handle' ? '핸들 옮김' : '앵커 옮김';
+      nodeSel.drag = null;
+      if(a){ syncStrokeFromNodes(a); commitEdit(a, label); }
+      updateNodePanel();
+    }
+  });
   window.addEventListener('pointerup', endStroke);
   window.addEventListener('pointercancel', endStroke);
 
@@ -8365,6 +9012,14 @@ showLayerMenu(ev.clientX, ev.clientY, [
     }
     const undoneAction = actions.pop();
     redoStack.push(undoneAction);
+    // 획을 고친 표시 — 그림을 지우는 게 아니라 이전 모양으로 되돌린다.
+    if(undoneAction.type === 'strokeEdit'){
+      const t = actions.find(a => a.id === undoneAction.targetId);
+      if(t){ restoreStroke(t, undoneAction.before); renderSingleLayer(t.layer); }
+      if(nodeSel && nodeSel.id === undoneAction.targetId){ nodeSel.sel.clear(); drawNodeOverlay(); }
+      toast(undoneAction.label + ' 되돌림.');
+      return;
+    }
     // Layer merge → restore both layers from the marker's snapshot.
     if(undoneAction.type === 'mergeLayers'){
       undoMerge(undoneAction);
@@ -8473,6 +9128,14 @@ showLayerMenu(ev.clientX, ev.clientY, [
       return;
     }
     const redoneAction = redoStack.pop();
+    if(redoneAction.type === 'strokeEdit'){
+      const t = actions.find(a => a.id === redoneAction.targetId);
+      if(t){ restoreStroke(t, redoneAction.after); renderSingleLayer(t.layer); }
+      actions.push(redoneAction);
+      if(nodeSel && nodeSel.id === redoneAction.targetId){ nodeSel.sel.clear(); drawNodeOverlay(); }
+      toast(redoneAction.label + ' 다시 적용.');
+      return;
+    }
     if(redoneAction.type === 'lassoDelete'){
       actions.length = 0;
       actions.push(...redoneAction.nextOrder);
