@@ -903,7 +903,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b50</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b51</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -5699,8 +5699,12 @@ showLayerMenu(ev.clientX, ev.clientY, [
     // rendered on top of the fill anyway. This stops specks from blocking
     // the flood and leaving pinhole gaps.
     const seedIsEmpty = sa <= 24;
+    // 반쯤 덮인 자리를 찍었다 = 좁은 영역이라 빈 픽셀이 아예 없다는 뜻.
+    // 그럴 때는 '여기보다 더 덮이지 않은 곳'까지를 같은 영역으로 본다.
+    const seedPartial = !seedIsEmpty && sa < 250;
     function matches(i){
       if(seedIsEmpty && data[i+3] <= 24) return true;
+      if(seedPartial && data[i+3] <= sa) return true;
       const dr=data[i]-sr, dg=data[i+1]-sg, db=data[i+2]-sb, da=data[i+3]-sa;
       return (dr*dr+dg*dg+db*db+da*da) <= tol2;
     }
@@ -5827,8 +5831,12 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
     const tol2 = tol*tol*4 + 1;
     const seedIsEmpty = sa <= 24;
+    // 반쯤 덮인 자리를 찍었다 = 좁은 영역이라 빈 픽셀이 아예 없다는 뜻.
+    // 그럴 때는 '여기보다 더 덮이지 않은 곳'까지를 같은 영역으로 본다.
+    const seedPartial = !seedIsEmpty && sa < 250;
     function matches(i){
       if(seedIsEmpty && data[i+3] <= 24) return true;
+      if(seedPartial && data[i+3] <= sa) return true;
       const dr=data[i]-sr, dg=data[i+1]-sg, db=data[i+2]-sb, da=data[i+3]-sa;
       return (dr*dr+dg*dg+db*db+da*da) <= tol2;
     }
