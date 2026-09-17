@@ -903,7 +903,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b53</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b56</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -1020,8 +1020,8 @@
 
       <div class="tool-row" style="display:flex;gap:10px;flex-wrap:wrap;">
         <label class="chk-row" style="display:flex;align-items:center;gap:6px;font-size:10px;font-family:var(--font-mono);cursor:pointer;"
-          title="선을 그을 때 시작·끝점이 이미 있는 획의 끝에 딱 붙습니다. 한 바퀴 돌아 자기 시작점으로 오면 도형이 닫힙니다. 플로터는 1px 틈도 그대로 그리므로 이음매가 벌어지면 눈에 띕니다.">
-          <input type="checkbox" id="snapEnd" checked> 끝점 자석
+          title="선을 그을 때 시작·끝점이 이미 있는 획의 끝에 딱 붙습니다. 한 바퀴 돌아 자기 시작점으로 오면 도형이 닫힙니다. 플로터는 1px 틈도 그대로 그리므로 이음매가 벌어지면 눈에 띕니다. 그리는 중 Alt 를 누르고 있으면 이 설정이 잠깐 뒤집힙니다 — 켜 뒀으면 그 순간만 안 붙고, 꺼 뒀으면 그 순간만 붙습니다.">
+          <input type="checkbox" id="snapEnd" checked> 끝점 자석 <span style="opacity:.55">(Alt=잠깐 뒤집기)</span>
         </label>
         <div class="range-row">
           <span>SNAP</span>
@@ -3028,6 +3028,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // the drawing itself is shown. Optionally records the replay to a .webm
   // video for saving/sharing.
   let replaying = false;
+  let replayStop = false;      // 도는 중에 다시 누르면 선다
+  let replayStartedAt = 0;
 
   function setTraceVisibleForReplay(visible){
     traceImg.style.visibility = visible ? '' : 'hidden';
@@ -3063,13 +3065,20 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
   async function playReplay(opts){
     const record = !!(opts && opts.record);
-    if(replaying) { toast('Replay already running.'); return; }
-    if(actions.length === 0){ toast('No drawing history to replay.'); return; }
+    if(replaying){
+      // 도는 중에 다시 누른 것은 '그만'이라는 뜻이다.
+      replayStop = true;
+      toast('리플레이를 멈춥니다…');
+      return;
+    }
+    if(actions.length === 0){ toast('리플레이할 그림 기록이 없습니다.'); return; }
     replaying = true;
+    replayStop = false;
+    replayStartedAt = Date.now();
     clearStrokeSelection();
     setTraceVisibleForReplay(false);
     const replayBtnEl = $('replayBtn'), replaySaveBtnEl = $('replaySaveBtn');
-    if(replayBtnEl) replayBtnEl.disabled = true;
+    if(replayBtnEl){ replayBtnEl.disabled = false; replayBtnEl.textContent = '■ STOP'; }
     if(replaySaveBtnEl) replaySaveBtnEl.disabled = true;
 
     // "completed" canvases: one per layer, so replayed erasers/fills respect
@@ -3148,7 +3157,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
     toast(record ? 'Replaying & recording…' : 'Replaying…');
     blit(); await raf(); await raf();
 
+    try {
     for(const a of actions){
+      if(replayStop) break;
       const lid = doneL.has(a.layer) ? a.layer : layers[0].id;
       if(a.type === 'stroke'){
         const pts = a.points;
@@ -3199,7 +3210,14 @@ showLayerMenu(ev.clientX, ev.clientY, [
     }
 
     // hold the final frame briefly (nicer video ending)
-    for(let f=0, m=beat(30); f<m; f++) await raf();
+    for(let f=0, m=beat(30); f<m && !replayStop; f++) await raf();
+    } catch(err){
+      // 터져도 여기서 잡는다. 못 잡으면 replaying 이 true 로 굳어
+      // 그 뒤로는 버튼이 죽은 채로 남는다.
+      console.error('replay failed', err);
+      toast('리플레이 중 문제가 생겨 멈췄습니다: ' + (err && err.message ? err.message : err));
+    }
+    if(replayStop) toast('리플레이를 멈췄습니다.');
 
     renderAll(); // exact final state
     setTraceVisibleForReplay(true);
@@ -3218,13 +3236,36 @@ showLayerMenu(ev.clientX, ev.clientY, [
         toast(`Replay video saved (.${ext}${ext === 'mp4' ? ' · H.264' : ''})`);
       }
     }
-    if(replayBtnEl) replayBtnEl.disabled = false;
-    if(replaySaveBtnEl) replaySaveBtnEl.disabled = false;
-    replaying = false;
+    endReplay(replayBtnEl, replaySaveBtnEl);
   }
 
-  $('replayBtn').addEventListener('click', ()=> playReplay());
-  $('replaySaveBtn').addEventListener('click', ()=> playReplay({ record: true }));
+  // 어떻게 끝났든 -- 다 돌았든, 멈췄든, 터졌든 -- 되돌려 놓는다.
+  function endReplay(btn, saveBtn){
+    replaying = false;
+    replayStop = false;
+    const b = btn || $('replayBtn'), s = saveBtn || $('replaySaveBtn');
+    if(b){ b.disabled = false; b.textContent = '▶ REPLAY'; }
+    if(s) s.disabled = false;
+    try { setTraceVisibleForReplay(true); } catch(err){}
+    try { renderAll(); } catch(err){}
+  }
+
+  // 지난번 리플레이가 터져 깃발만 서 있는 채로 남았을 수 있다. 버튼이
+  // 눌렸다는 것은 화면상 활성이라는 뜻이므로, 그 둘이 어긋나면 잔해로 본다.
+  function unstickReplay(){
+    const b = $('replayBtn');
+    // 도는 중이면 버튼 글자가 STOP 이다. 깃발은 섰는데 글자가 REPLAY 라면
+    // 그건 지난번 사고의 잔해다 -- STOP 상태에서 풀어 버리면 리플레이가
+    // 둘 겹쳐 돈다.
+    if(replaying && b && !b.disabled && b.textContent !== '■ STOP'){
+      replaying = false;
+      replayStop = false;
+      return true;
+    }
+    return false;
+  }
+  $('replayBtn').addEventListener('click', ()=>{ unstickReplay(); playReplay(); });
+  $('replaySaveBtn').addEventListener('click', ()=>{ unstickReplay(); playReplay({ record: true }); });
   // Remember replay speed across sessions
   (function initReplaySpeed(){
     const KEY = 'nulayer_replay_speed';
@@ -3662,7 +3703,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
   }
   async function embedRecipeInPng(blob, recipe){
     const buf = new Uint8Array(await blob.arrayBuffer());
-    const json = recipeToJson(recipe);
+    // 글자를 1바이트로 자르면 한글 레이어 이름이 제어 문자가 되어 기록
+    // 전체가 못 읽히게 된다 -- 실제로 그랬다. ASCII 로 이스케이프해 넣는다.
+    const json = recipeToJson(recipe).replace(/[\u0080-\uffff]/g,
+      c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
     const kw = RECIPE_KEYWORD;
     const textBytes = new Uint8Array(kw.length + 1 + json.length);
     for(let i=0;i<kw.length;i++) textBytes[i] = kw.charCodeAt(i);
@@ -3741,6 +3785,22 @@ showLayerMenu(ev.clientX, ev.clientY, [
     } catch(e){ console.warn('composition parse failed', e); }
     return null;
   }
+  // 셋을 차례로 시도한다. 새 파일은 ①에서 끝나고, 옛 파일은 ②에서 끝나며,
+  // 이미 망가진 파일은 ③에서 이름만 잃고 획은 되찾는다.
+  function parseRecipeBytes(bytes){
+    try { return JSON.parse(new TextDecoder('utf-8', { fatal:true }).decode(bytes)); } catch(e){}
+    let raw = '';
+    for(let i=0;i<bytes.length;i++) raw += String.fromCharCode(bytes[i]);
+    try { return JSON.parse(raw); } catch(e){}
+    // 제어 문자와 0x7F 이상은 문자열 안에서만 나온다 -- 구조는 전부 ASCII 다.
+    const repaired = raw.replace(/[\x00-\x1f\x7f-\xff]/g, '?');
+    try {
+      const r = JSON.parse(repaired);
+      console.warn('recipe: 깨진 글자를 ? 로 치환해 읽었습니다 (옛 파일의 한글 이름).');
+      return r;
+    } catch(e){ return null; }
+  }
+
   function extractRecipeFromPng(arrayBuffer){
     try {
       const b = new Uint8Array(arrayBuffer);
@@ -3757,8 +3817,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
           if(z > 0){
             let kw=''; for(let i=0;i<z;i++) kw += String.fromCharCode(data[i]);
             if(kw === RECIPE_KEYWORD){
-              let txt=''; for(let i=z+1;i<data.length;i++) txt += String.fromCharCode(data[i]);
-              const recipe = JSON.parse(txt);
+              const body = data.subarray(z+1);
+              const recipe = parseRecipeBytes(body);
               return Array.isArray(recipe) && recipe.length ? recipe : null;
             }
           }
@@ -7226,6 +7286,16 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
   // 붙을 수 있는 끝점을 모은다. 보이는 레이어의 획만 -- 안 보이는 것에
   // 붙으면 왜 거기 붙었는지 알 길이 없다.
+  // 한 획을 그리는 동안에는 다른 획이 늘거나 줄지 않는다. 매 움직임마다
+  // 전부 다시 모으면 획이 쌓일수록 그리는 손이 무거워진다.
+  let snapCache = null;
+  function snapCandidatesCached(excludeId){
+    if(snapCache && snapCache.key === excludeId) return snapCache.list;
+    snapCache = { key: excludeId, list: snapCandidates(excludeId) };
+    return snapCache.list;
+  }
+  function invalidateSnapCache(){ snapCache = null; }
+
   function snapCandidates(excludeId){
     const out = [];
     const vis = new Set(layers.filter(l => l.visible !== false).map(l => l.id));
@@ -7260,13 +7330,48 @@ showLayerMenu(ev.clientX, ev.clientY, [
   function snapTargetFor(pos, act){
     if(!snapEnabled) return null;
     const r = snapRadiusCanvas();
-    const cands = snapCandidates(act ? act.id : null);
+    const cands = snapCandidatesCached(act ? act.id : null).slice();
     if(act && act.points && act.points.length > 3){
       // 자기 시작점 -- 막 그리기 시작한 몇 점에는 붙지 않는다.
       const s = act.points[0];
       cands.push({ x: s.x, y: s.y, id: act.id, end: 'self' });
     }
     return nearestSnap(pos, cands, r);
+  }
+
+
+  // 지금 이 순간 자석이 도는가. 이벤트가 있으면 그 이벤트의 Alt 를 보고,
+  // 없으면 마지막으로 본 키 상태를 쓴다 -- 키를 누른 채 손을 떼는 경우가
+  // 있어서 둘 다 필요하다.
+  let altHeld = false;
+  function snapActive(e){
+    const alt = e ? !!e.altKey : altHeld;
+    return alt ? !snapEnabled : snapEnabled;
+  }
+  window.addEventListener('keydown', e => {
+    if(e.key !== 'Alt' || altHeld) return;
+    altHeld = true;
+    refreshSnapHintNow();
+  });
+  window.addEventListener('keyup', e => {
+    if(e.key !== 'Alt') return;
+    altHeld = false;
+    refreshSnapHintNow();
+  });
+  window.addEventListener('blur', () => { altHeld = false; });
+
+  // 키를 누른 그 자리에서 표시가 바로 바뀌어야 한다. 한 번 더 움직여야
+  // 반응하면 무엇이 켜졌는지 알 수가 없다.
+  function refreshSnapHintNow(){
+    if(!currentAction || currentAction.tool === 'eraser'){
+      if(penDraft) penPreview(null);
+      return;
+    }
+    const t = snapActive(null)
+      ? snapTargetFor(currentAction.points[currentAction.points.length-1], currentAction)
+      : null;
+    snapHint = t;
+    drawSnapHint(t);
   }
 
   function drawSnapHint(t){
@@ -7779,6 +7884,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     renderStrokeFull(activeLayer().ctx, act);
     compositeLayers();
     actions.push(act);
+    invalidateSnapCache();
     renderLayersPanel();
     redoStack.length = 0;
     const oc = $('lassoOverlay');
@@ -7897,7 +8003,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         }
       }
       // 이미 있는 획의 끝점에도 붙는다 -- 펜툴로 그린 선이야말로 플로터로 간다.
-      if(snapEnabled){
+      if(snapActive(e)){
         const t = nearestSnap(q, snapCandidates(null), snapRadiusCanvas());
         if(t) q = { x:t.x, y:t.y };
       }
@@ -8014,10 +8120,11 @@ showLayerMenu(ev.clientX, ev.clientY, [
     // 이미 있는 획의 끝에서 시작하면 그 점에 딱 붙인다. 이어 그린 선의
     // 이음매가 벌어지면 플로터는 그 틈을 그대로 그린다.
     const first = penPoint(p, e);
-    if(currentTool !== 'eraser' && snapEnabled){
+    if(currentTool !== 'eraser' && snapActive(e)){
       const t = nearestSnap(p, snapCandidates(null), snapRadiusCanvas());
       if(t){ first.x = t.x; first.y = t.y; }
     }
+    invalidateSnapCache();
     currentAction = { type:'stroke', id:++actionCounter, tool:currentTool, color:strokeColor, width:brushSize,
                       texture: currentTexture, grain: currentGrain, seed: (Math.random()*2147483647)|0,
                       points:[first], layer: activeLayer().id };
@@ -8807,11 +8914,11 @@ showLayerMenu(ev.clientX, ev.clientY, [
       moved = true;
     }
     if(moved) repaintLiveStroke();
-    if(currentAction && currentAction.tool !== 'eraser' && snapEnabled){
+    if(currentAction && currentAction.tool !== 'eraser' && snapActive(e)){
       const t = snapTargetFor(currentAction.points[currentAction.points.length-1], currentAction);
       const same = (t && snapHint) ? (t.x === snapHint.x && t.y === snapHint.y) : (t === snapHint);
       if(!same){ snapHint = t; drawSnapHint(t); }
-    }
+    } else if(snapHint){ clearSnapHint(); }
   });
 
   drawCanvas.addEventListener('pointerenter', e => updateCursorState(e));
@@ -8951,7 +9058,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         }
         // 끝점을 붙인다. 자기 시작점이면 도형이 닫힌 것이다 -- 좌표를
         // 똑같이 맞춰야 플로터가 이음매를 안 남긴다.
-        if(currentAction.tool !== 'eraser' && snapEnabled){
+        if(currentAction.tool !== 'eraser' && snapActive(null)){
           const t = snapTargetFor(pts[pts.length-1], currentAction);
           if(t){
             const e2 = pts[pts.length-1];
@@ -8975,6 +9082,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         renderStrokeFull(activeLayer().ctx, currentAction);
         compositeLayers();
         actions.push(currentAction);
+        invalidateSnapCache();
         renderLayersPanel();
         redoStack.length = 0; 
       }
