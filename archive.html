@@ -177,6 +177,11 @@
   .loader-dot:nth-child(3) { animation-delay: 0.4s; }
   @keyframes pulse { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
 
+  .collage-item .trace-badge {
+    position:absolute; right:4px; top:4px; font-size:11px; line-height:1;
+    padding:2px 4px; border-radius:6px; background:rgba(43,125,233,.9); color:#fff;
+    pointer-events:none; font-family:monospace;
+  }
 </style>
 </head>
 <body>
@@ -202,7 +207,8 @@
     <button class="btn-fm-close" id="fmDown" title="Send this object one step back">▼ DOWN</button>
   </div>
   <div class="fm-btns">
-    <button class="btn-fm-del" id="fmDelete">Delete</button>
+    <button class="btn-fm-close" id="fmTrace" style="display:none;" title="이 작품을 그릴 때 밑에 깔았던 참고 이미지를 봅니다">⌾ 출처 이미지</button>
+    <button class="btn-fm-del" id="fmDelete" title="콜라주에서만 치웁니다 — 저장소의 파일은 그대로입니다">Delete</button>
     <button class="btn-fm-close" id="fmClose">Close</button>
   </div>
 </div>
@@ -416,6 +422,7 @@
   async function listAllImages(cfg){
     const rootPath = (cfg.path || 'gallery').replace(/^\/+|\/+$/g,'');
     const files = [];
+    const traces = new Map();   // 기본 이름 → 곁파일 주소
 
     async function walk(path){
       const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${encodeURI(path)}?ref=${encodeURIComponent(cfg.branch || 'main')}`;
@@ -427,12 +434,19 @@
       for(const it of items){
         if(it.type === 'dir'){
           await walk(it.path);
+        } else if(it.type === 'file' && /\.trace\.(webp|jpe?g|png)$/i.test(it.name)){
+          // 트레이스 곁파일: 작품이 아니라 그 PNG 의 참고 이미지
+          traces.set(it.name.replace(/\.trace\.(webp|jpe?g|png)$/i, ''), it.download_url);
         } else if(it.type === 'file' && /\.(png|jpe?g|webp|gif)$/i.test(it.name)){
           files.push({ name: it.name, downloadUrl: it.download_url });
         }
       }
     }
     await walk(rootPath);
+    for(const f of files){
+      const t = traces.get(f.name.replace(/\.(png|jpe?g|webp|gif)$/i, ''));
+      if(t) f.traceUrl = t;
+    }
     return files;
   }
 
@@ -482,6 +496,7 @@
         el: el,
         url: img.downloadUrl,   // for the in-place archive replay
         name: img.name,
+        traceUrl: img.traceUrl || null,
         imEl: null,
         x: rand(-size * 0.15, vw - size * 0.85),
         y: rand(-size * 0.15, vh - size * 0.85),
@@ -495,6 +510,13 @@
         _sizeMin: sizeMin,
         _sizeMax: sizeMax
       };
+      if(img.traceUrl){
+        const badge = document.createElement('span');
+        badge.className = 'trace-badge';
+        badge.textContent = '⌾';
+        badge.title = '트레이스 참고 이미지가 함께 저장돼 있습니다 — 메뉴의 출처 이미지';
+        el.appendChild(badge);
+      }
       itemsData.push(obj);
       el.style.zIndex = 5 + i; // distinct stacking per item (stable order)
       updateTransform(obj);
@@ -655,9 +677,31 @@
     $('fmScale').value = obj.scale;
     $('fmRotate').value = obj.rotate;
     
+    const tb = $('fmTrace');
+    if(tb) tb.style.display = obj.traceUrl ? '' : 'none';
     floatMenu.style.display = 'flex';
     positionMenu(obj);
   }
+
+  // 참고 이미지를 큰 창으로. 저장할 때 1080 으로 줄였으니 화면에 꽉 차게
+  // 띄워도 무겁지 않다.
+  function showTraceViewer(obj){
+    if(!obj || !obj.traceUrl) return;
+    let ov = document.getElementById('traceViewer');
+    if(!ov){
+      ov = document.createElement('div');
+      ov.id = 'traceViewer';
+      ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.86);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;cursor:zoom-out;';
+      ov.innerHTML = '<img style="max-width:92vw;max-height:84vh;box-shadow:0 8px 40px rgba(0,0,0,.6);background:#fff">' +
+                     '<div style="font-family:monospace;font-size:12px;color:#ddd;"></div>';
+      ov.addEventListener('click', () => { ov.style.display = 'none'; });
+      document.body.appendChild(ov);
+    }
+    ov.querySelector('img').src = withArchiveVer(obj.traceUrl);
+    ov.querySelector('div').textContent = obj.name.replace(/\.png$/i, '') + ' — 트레이스 참고 이미지 (클릭하면 닫힘)';
+    ov.style.display = 'flex';
+  }
+  $('fmTrace').addEventListener('click', () => showTraceViewer(activeItemObj));
 
   function positionMenu(obj) {
     // Menu sits centered above the item
