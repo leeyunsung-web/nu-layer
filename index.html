@@ -903,7 +903,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b62</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b64</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -1109,7 +1109,7 @@
         <input type="range" id="traceOpacity" min="0" max="100" value="30" title="Opacity" style="width:70px">
         <button class="btn btn-sm btn-ghost" id="btnAdjustTrace" title="Resize / rotate reference">ADJUST</button>
         <button class="btn btn-sm" id="btnTraceDoneTop" style="display:none;" title="Finish placing the reference image and return to drawing">✓ DONE PLACING</button>
-        <button class="btn btn-sm btn-ghost" id="btnClearTrace">CLEAR</button>
+
         <!-- 브러시 상태 점. 원래 SIZE 슬라이더 옆에 있었는데, 32px 정사각이
              슬라이더에서 폭을 그만큼 빼앗아 값 칸까지 밀려 있었다. 캔버스 바
              오른쪽 끝은 늘 비어 있고 그리는 손이 바로 보는 자리라 여기가 낫다. -->
@@ -1149,7 +1149,6 @@
         <button class="tool-btn" data-tool="select" title="Hotkey: V — drag on canvas to move the ACTIVE layer">SELECT</button>
         <button class="tool-btn" data-tool="eraser" title="Hotkey: E — erases on the ACTIVE layer only">ERASER</button>
         <button class="tool-btn" data-tool="pen" title="Hotkey: P — 톡 누르면 꺾인 점, 끌면 부드러운 점. 첫 앵커를 다시 누르면 닫힙니다. Enter 로 끝냅니다.">PEN</button>
-        <button class="tool-btn" data-tool="node" title="Hotkey: A — 그려 둔 획을 눌러 앵커를 끌거나, 넣거나, 지웁니다">NODE EDIT</button>
         <button class="tool-btn" data-tool="lasso" title="Hotkey: L — draw a selection, then Delete to remove it from the ACTIVE layer, T to free-transform it, or Ctrl+Shift+X to cut it onto a new layer">LASSO</button>
         <button class="tool-btn" id="eyedropperBtn" title="Hotkey: I — click the canvas once to pick a color">EYEDROPPER</button>
         <button class="tool-btn" id="traceLinesBtn" title="Extract lines from the TRACE image — opens a window with the full set of controls, and drops the result in as real editable strokes">✎ EXTRACT LINES</button>
@@ -1948,13 +1947,6 @@ showLayerMenu(ev.clientX, ev.clientY, [
       // ---- Drag a layer row onto another row \u2192 merge; onto a FOLDER row
       // \u2192 move it into that folder. Pointer Events: mouse, touch, pen.
       row.dataset.layerId = l.id;
-      if(l.isTrace){
-        const tb = document.createElement('span');
-        tb.textContent = '⌾';
-        tb.title = '트레이스 참고 이미지 — 아카이브 곁파일에서 복원됨. 톤 플롯·SVG·컴포지션·기록에는 나가지 않습니다. 화면에서만 내릴 수 있고, 아카이브 사본은 남습니다.';
-        tb.style.cssText = 'font-size:11px;margin-right:4px;color:#2b7de9;';
-        row.appendChild(tb);
-      }
       if(l.asFill){
         const fb = document.createElement('span');
         fb.textContent = '▣';
@@ -2941,8 +2933,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
           else floodFillApply(l.ctx, a.x, a.y, a.color, a.tolerance);
         }
         else if(a.type === 'layerRecolor') applyLayerRecolor(l.ctx, a.color);
-        else if(a.type === 'image' && a.img && a.w > 0 && a.h > 0){
+        else if(a.type === 'image' && a.img && a.w > 0 && a.h > 0 && (a.img.naturalWidth === undefined || a.img.naturalWidth > 0)){
+          l.ctx.save(); if(a.alpha != null) l.ctx.globalAlpha = a.alpha;
           l.ctx.drawImage(a.img, a.x, a.y, a.w, a.h);
+          l.ctx.restore();
         }
       } catch(err){ console.error('renderSingleLayer: skipped an action', err, a); }
     }
@@ -3012,16 +3006,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
     toast(`Line width set to ${changed[0].a.width}px (Ctrl+Z to undo).`);
   });
 
-  function confirmTraceRemoval(l){
-    if(!l || !l.isTrace) return true;
-    if(!confirm('트레이스 참고 레이어 "' + l.name + '"를 화면에서 내립니다.\n아카이브의 곁파일은 남습니다. 계속할까요?')) return false;
-    const typed = prompt('한 번 더 확인합니다. "내림" 이라고 입력하세요.');
-    return typed === '내림';
-  }
   $('layerDelBtn').addEventListener('click', ()=>{
     if(layers.length <= 1){ toast('At least one layer is required.'); return; }
     const al = activeLayer();
-    if(al && al.isTrace && !confirmTraceRemoval(al)) return;
+    if(al && al.isTrace) setTimeout(onTraceLayerGone, 0);
     const idx = layers.findIndex(x=>x.id===al.id);
     // UNDOABLE delete: snapshot the full action order + the layer object,
     // then remove. Ctrl+Z restores the layer with all its actions exactly.
@@ -3372,7 +3360,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       if(k === 'v') { document.querySelector('[data-tool="select"]').click(); }
       if(k === 'e') { document.querySelector('[data-tool="eraser"]').click(); }
       if(k === 'l') { document.querySelector('[data-tool="lasso"]').click(); }
-      if(k === 'a') { document.querySelector('[data-tool="node"]').click(); }
+      // (노드 편집은 뺐다 -- A 키는 비어 있다)
       if(k === 'p') { document.querySelector('[data-tool="pen"]').click(); }
       if(currentTool === 'pen' && penDraft){
         if(e.key === 'Enter'){ e.preventDefault(); penFinish(); return; }
@@ -3522,7 +3510,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
   let traceSelected = false;     // UI (controls + box) visible only when selected
 
   function applyTraceTransform(){
-    if(traceState.loaded && typeof scheduleTraceAutosave === 'function') scheduleTraceAutosave();
+    if(traceState.loaded && typeof scheduleTraceBake === 'function') scheduleTraceBake();
     const fw = traceFrameW();
     traceImg.style.transform = `translate(${traceState.x * fw}px, ${traceState.y * fw}px) rotate(${traceState.rotate}deg) scale(${traceState.scale})`;
     traceImg.style.opacity = traceState.opacity;
@@ -3575,7 +3563,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
       traceState.loaded = true;
       applyTraceTransform();
       syncTraceControls();
-      scheduleTraceAutosave();
+      bakeTraceLayer();
+      traceImg.style.visibility = 'hidden';   // 레이어가 보여 준다. 두 겹은 안 된다
+      toast('TRACE 레이어를 맨 아래에 만들었습니다. 눈을 끄거나 지우는 것은 레이어처럼 하세요.');
       setTraceAdjustMode(true);   // enter adjust mode right after loading
       setTraceSelected(true);
       toast('Reference image loaded — drag to position it, then press [✓ DONE PLACING].');
@@ -3643,19 +3633,15 @@ showLayerMenu(ev.clientX, ev.clientY, [
     if(traceAdjustMode) setTraceSelected(true);
   });
 
-  $('btnClearTrace').addEventListener('click', () => {
-    if(!traceState.loaded) return;
-    // 화면에서 내리는 것뿐이지만, 되살릴 사본(오토세이브)까지 함께 지우므로
-    // 두 번 묻는다. 아카이브에 올린 곁파일은 남는다.
-    if(!confirm('트레이스 이미지를 내립니다. 아카이브에 저장한 곁파일은 남지만, 되살리기 사본은 지워집니다. 계속할까요?')) return;
-    if(prompt('한 번 더 확인합니다. "내림" 이라고 입력하세요.') !== '내림') return;
-    traceDbDel('current').catch(()=>{});
-    traceImg.style.display = 'none';
-    traceImg.src = '';
+  // CLEAR 단추는 없다. 트레이스는 레이어라 지우면 된다. 레이어가 지워지면
+  // 조절 패널도 더는 뜻이 없으므로 접는다.
+  function onTraceLayerGone(){
+    traceLayerId = null;
     traceState.loaded = false;
+    traceImg.src = '';
     setTraceAdjustMode(false);
     setTraceSelected(false);
-  });
+  }
 
   // Drag the reference (only in adjust mode). Clicking it selects (shows UI).
   traceImg.addEventListener('pointerdown', e=>{
@@ -3731,11 +3717,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
       // structural meta (layer names + folder grouping) must survive the
       // save — it used to fall through to null and vanish from the PNG.
       if(a.type==='meta'){
-        const mo = { type:'meta', v: a.v || 1,
+        return { type:'meta', v: a.v || 1,
                  layers: (a.layers || []).map(x => x.af ? x : (x.asFill ? { ...x, af:1 } : x)),
                  folders: a.folders || [] };
-        if(a.trace) mo.trace = a.trace;
-        return mo;
       }
       if(a.type==='stroke'){
         const o = { type:'stroke', tool:a.tool, color:a.color, width:a.width, li,
@@ -3764,6 +3748,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
         }
         if(a.ox || a.oy){ o.ox = Math.round(a.ox||0); o.oy = Math.round(a.oy||0); }
         return o;
+      }
+      if(a.type==='image' && a.tr && a.src){
+        return { type:'image', x:a.x, y:a.y, w:a.w, h:a.h, li, src:a.src, tr:1, alpha:a.alpha };
       }
       if(a.type==='layerRecolor'){
         return { type:'layerRecolor', color:a.color, li };
@@ -4131,7 +4118,6 @@ showLayerMenu(ev.clientX, ev.clientY, [
     return await res.json();
   }
 
-  let pendingTraceName = '';   // 기록을 만들 때 메타에 적을 곁파일 이름
   async function savePatternToFolder(canvas, objId, recipe, reuse){
     const now = new Date();
     // reuse = {filename, dateFolder} → OVERWRITE that exact file instead of
@@ -4144,14 +4130,6 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const roleTag = userRole === 'master' ? 'MASTER' : 'GUEST';
     const filename = (reuse && reuse.filename)
       || `pattern_${dateFolder}_${timeStamp(now)}_${roleTag}_OBJ-${pad2(objId)}.png`;
-
-    // 트레이스가 있으면 기록 메타에 곁파일 이름을 적는다. 기록은 호출자가
-    // 이미 만들어 왔으므로 메타를 여기서 고쳐 넣는다.
-    if(traceState.loaded && recipe && recipe.length){
-      pendingTraceName = traceSidecarName(filename, 'webp');
-      const m = recipe.find(a => a && a.type === 'meta');
-      if(m) m.trace = { file: pendingTraceName };
-    }
 
     // Recipe (drawing history) is embedded into the PNG itself.
     const blob = await canvasToRecipeBlob(canvas, recipe);
@@ -4192,14 +4170,6 @@ showLayerMenu(ev.clientX, ev.clientY, [
     }
     // 결과가 비어 있다는 건 어디에도 기록되지 않았다는 뜻이다. 빈 토스트를
     // 띄우면 사용자는 저장됐다고 읽는다 -- 반드시 실패라고 말해야 한다.
-    // 트레이스가 있으면 같은 이름의 곁파일로. 기록에 적을 정보를 돌려준다.
-    let traceInfo = null;
-    try { traceInfo = await archiveTraceSidecar(filename, dateFolder, ghPath); }
-    catch(e){ console.warn('trace sidecar', e); }
-    if(traceInfo){
-      if(traceInfo.error) results.push('Trace failed: ' + traceInfo.error);
-      else results.push(traceInfo.skipped ? 'Trace: unchanged' : ('Trace: ' + traceInfo.file));
-    }
     if(!results.length) results.push('Save failed — nothing was written anywhere.');
     // 아카이브 패널이 열려 있으면 just now 올린 파일이 보이도록 다시 읽는다.
     // 목록은 패널을 열 때만 가져오므로 열어 둔 채로 저장하면 옛 목록이 남는다.
@@ -4215,7 +4185,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         : 'Overwriting the original is master-only — the archive original is unchanged.');
     toast(results.join(' · '));
     updateFolderChip();
-    return { filename, dateFolder, ghPath, overwrote, traceInfo };
+    return { filename, dateFolder, ghPath, overwrote };
   }
 
   async function loadImageFile(file, sourceUrl, ghPath){
@@ -5667,9 +5637,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
           }
         } else if(a.type === 'layerRecolor'){
           applyLayerRecolor(target, a.color);
-        } else if(a.type === 'image' && a.img && a.w > 0 && a.h > 0){
+        } else if(a.type === 'image' && a.img && a.w > 0 && a.h > 0 && (a.img.naturalWidth === undefined || a.img.naturalWidth > 0)){
           target.save(); target.imageSmoothingEnabled = true; target.imageSmoothingQuality = 'high';
-          if(a.isTrace) target.globalAlpha = 0.35;
+          if(a.alpha != null) target.globalAlpha = a.alpha;
           target.drawImage(a.img, a.x * k, a.y * k, a.w * k, a.h * k);
           target.restore();
         }
@@ -5702,8 +5672,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
   }
 
   // 잠깐 뒤에 그린다. 그리는 사이 또 바뀌면 끝나고 한 번 더.
+  let hiresSkipOnce = false;
   function scheduleHiRes(){
     if(preciseViewOn()) return;
+    if(hiresSkipOnce){ hiresSkipOnce = false; return; }   // 방금 획 하나를 얹었다
     if(hiResK() === 1){ renderHiResNow(); return; }
     hiresDirty = true;
     if(hiresTimer) return;
@@ -6045,11 +6017,29 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
   $('flipViewBtn').addEventListener('click', toggleViewFlip);
   $('navResetBtn').addEventListener('click', resetView);
-  // Ctrl/Cmd + wheel over the canvas = zoom
+  // 휠 = 확대·축소 (Ctrl 없이도). 커서 아래 지점이 그대로 남게 한다.
+  function zoomViewAt(clientX, clientY, next){
+    next = Math.max(0.2, Math.min(6, next));
+    if(Math.abs(next - viewZoom) < 1e-6) return;
+    const frame = drawCanvas.closest('.canvas-frame');
+    const r = frame.getBoundingClientRect();
+    // 프레임 중심 기준 커서 위치. transform-origin 이 중심이므로 여기서 잰다.
+    const cx = clientX - (r.left + r.width / 2);
+    const cy = clientY - (r.top + r.height / 2);
+    const ratio = next / viewZoom;
+    // 커서에서 (이동 뒤) 중심까지의 벡터가 ratio 배 커지므로, 그만큼 되돌린다.
+    viewPanX = cx - (cx - viewPanX) * ratio;
+    viewPanY = cy - (cy - viewPanY) * ratio;
+    viewZoom = next;
+    applyViewTransform();
+    if(typeof refreshPreciseRes === 'function') refreshPreciseRes();
+    if(typeof scheduleHiRes === 'function') scheduleHiRes();
+  }
   drawCanvas.closest('.canvas-frame').addEventListener('wheel', e=>{
-    if(!(e.ctrlKey || e.metaKey)) return;
     e.preventDefault();
-    setViewZoom(viewZoom * (e.deltaY < 0 ? 1.1 : 1/1.1));
+    // Ctrl+휠은 브라우저가 페이지 확대로 쓰는 몸짓이라 더 크게 움직인다.
+    const step = (e.ctrlKey || e.metaKey) ? 1.15 : 1.1;
+    zoomViewAt(e.clientX, e.clientY, viewZoom * (e.deltaY < 0 ? step : 1/step));
   }, { passive: false });
   // Release rotate/pan modifiers
   window.addEventListener('keyup', e=>{
@@ -6077,6 +6067,15 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // 다각형 채움. 구멍은 evenodd 로 뺀다.
   let vectorFillOn = true;
   let vfillCounter = 0;
+
+  // 마지막 채우기 레이어. 같은 색이면 여기에 이어 칠한다.
+  let lastFill = null;   // { id, color, kind }
+  function reusableFillLayer(color, kind){
+    if(!lastFill || lastFill.color !== color || lastFill.kind !== kind) return null;
+    const l = layers.find(x => x.id === lastFill.id);
+    if(!l || !l.visible) return null;        // 지웠거나 눈을 감았으면 새로
+    return l;
+  }
 
   // 이은 자리를 덧그림판에 보여 준다. 값을 돌릴 때 켜 두면 잘못 잇는 자리가
   // 바로 보인다 -- 숫자만 보고는 알 수 없다.
@@ -7625,8 +7624,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
           else floodFillApply(lc, a.x, a.y, a.color, a.tolerance);  // legacy action compat
         }
         else if(a.type==='layerRecolor') applyLayerRecolor(lc, a.color);
-        else if(a.type==='image' && a.img && a.w > 0 && a.h > 0){
+        else if(a.type==='image' && a.img && a.w > 0 && a.h > 0 && (a.img.naturalWidth === undefined || a.img.naturalWidth > 0)){
+          lc.save(); if(a.alpha != null) lc.globalAlpha = a.alpha;
           lc.drawImage(a.img, a.x, a.y, a.w, a.h);
+          lc.restore();
         }
       } catch(err){
         console.error('renderAll: skipped an action due to error', err, a);
@@ -8161,7 +8162,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     refreshPreciseView();
     const row = $('nodeRow');
     if(!row) return;
-    row.style.display = (currentTool === 'node') ? 'flex' : 'none';
+    row.style.display = 'none';        // 노드 편집을 뺐다
     const info = $('nodeInfo');
     const a = editedStroke();
     if(!info) return;
@@ -8679,197 +8680,66 @@ showLayerMenu(ev.clientX, ev.clientY, [
   }
 
 
-  // ---- 트레이스 아카이브 ----
-  const TRACE_MAX = 1080;
+  // ---- 트레이스 레이어 ----
+  let traceLayerId = null;
+  let traceBakeTimer = null;
 
-  // git 이 쓰는 blob SHA-1. GitHub contents API 가 돌려주는 sha 와 같아서,
-  // 이미 올라간 것과 같은지 로컬에서 견줄 수 있다.
-  async function gitBlobSha(bytes){
-    const head = new TextEncoder().encode('blob ' + bytes.length + '\0');
-    const buf = new Uint8Array(head.length + bytes.length);
-    buf.set(head, 0); buf.set(bytes, head.length);
-    const h = await crypto.subtle.digest('SHA-1', buf);
-    return [...new Uint8Array(h)].map(b => b.toString(16).padStart(2, '0')).join('');
-  }
-
-  // 지금 트레이스를 캔버스 좌표로 구워 가벼운 WebP 로. 배치(위치·배율·회전)가
-  // 이미 반영돼 있어서 복원할 때는 그냥 맨 아래에 깔면 된다.
-  async function traceToArchiveBlob(){
+  function traceToDataUrl(){
     const baked = bakeTraceToCanvas();
     if(!baked) return null;
     const W = baked.width, H = baked.height;
-    const sc = Math.min(1, TRACE_MAX / Math.max(W, H));
+    const sc = Math.min(1, 1080 / Math.max(W, H));
     const c = document.createElement('canvas');
-    c.width = Math.max(1, Math.round(W * sc)); c.height = Math.max(1, Math.round(H * sc));
+    c.width = Math.max(1, Math.round(W*sc)); c.height = Math.max(1, Math.round(H*sc));
     const g = c.getContext('2d');
     g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);   // 손실 압축에 알파는 없다
     g.drawImage(baked, 0, 0, c.width, c.height);
-    let blob = await new Promise(r => c.toBlob(r, 'image/webp', 0.8));
-    let ext = 'webp';
-    if(!blob || blob.type !== 'image/webp'){          // WebP 를 못 만드는 브라우저
-      blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.82));
-      ext = 'jpg';
-    }
-    return { blob, ext, w: c.width, h: c.height, sc };
+    let url = c.toDataURL('image/webp', 0.8);
+    if(!/^data:image\/webp/.test(url)) url = c.toDataURL('image/jpeg', 0.82);
+    return { url, w: W, h: H };
   }
 
-  function traceSidecarName(pngName, ext){
-    return pngName.replace(/\.png$/i, '') + '.trace.' + (ext || 'webp');
+  function traceLayer(){
+    const l = traceLayerId != null ? layers.find(x => x.id === traceLayerId) : null;
+    if(!l) traceLayerId = null;
+    return l || null;
   }
 
-  // 아카이브 저장 뒤에 부른다. 트레이스가 있으면 같은 폴더에 곁파일을 올리고
-  // 그 정보를 돌려준다(기록에 적으려고). 같은 해시면 올리지 않는다.
-  let lastTraceUpload = null;   // { path, sha }
-  async function archiveTraceSidecar(filename, dateFolder, ghPathOfPng){
+  // 맨 아래에 두거나, 있으면 그 레이어를 다시 굽는다.
+  function bakeTraceLayer(){
     if(!traceState.loaded) return null;
-    const made = await traceToArchiveBlob();
+    const made = traceToDataUrl();
     if(!made) return null;
-    const bytes = new Uint8Array(await made.blob.arrayBuffer());
-    const sha = await gitBlobSha(bytes);
-    const name = traceSidecarName(filename, made.ext);
-    const info = { file: name, sha, w: made.w, h: made.h };
-    let path = null;
-    if(ghPathOfPng) path = ghPathOfPng.replace(/[^\/]+$/, name);
-    if(ghConfig && ghConfig.token){
-      if(lastTraceUpload && lastTraceUpload.sha === sha && lastTraceUpload.path === (path || ('?/' + dateFolder + '/' + name))){
-        info.path = lastTraceUpload.path; info.skipped = true;
-      } else {
-        try {
-          const p = await commitToGitHub(made.blob, name, dateFolder, path);
-          info.path = p;
-          lastTraceUpload = { path: p, sha };
-        } catch(e){ info.error = e.message; }
-      }
-    } else if(baseDirHandle){
-      try {
-        const dirHandle = await baseDirHandle.getDirectoryHandle(dateFolder, { create: true });
-        const fh = await dirHandle.getFileHandle(name, { create: true });
-        const w = await fh.createWritable(); await w.write(made.blob); await w.close();
-        info.path = dateFolder + '/' + name;
-      } catch(e){ info.error = e.message; }
+    let l = traceLayer();
+    if(!l){
+      l = createLayer('TRACE');
+      l.isTrace = true;
+      layers.unshift(l);                              // 맨 아래
+      traceLayerId = l.id;
     }
-    return info;
-  }
-
-  // 곁파일 주소. 오브젝트가 아카이브에서 왔으면 그 폴더에서, 아니면 못 찾는다.
-  function traceSidecarUrl(obj, file){
-    if(!obj || !file) return null;
-    if(obj.sourceUrl){
-      const base = obj.sourceUrl.replace(/[^\/]+$/, '');
-      return withArchiveVer(base + encodeURIComponent(file));
-    }
-    if(obj.ghPath && ghConfig){
-      const { owner, repo, branch } = ghConfig;
-      const dir = obj.ghPath.replace(/[^\/]+$/, '');
-      return withArchiveVer(`https://raw.githubusercontent.com/${owner}/${repo}/${branch || 'main'}/${dir}${encodeURIComponent(file)}`);
-    }
-    return null;
-  }
-
-  // 곁파일을 받아 맨 아래 레이어로 깐다. 참고용이라 잠그고, 어디에도 안 나간다.
-  async function restoreTraceLayer(obj, meta){
-    const tr = meta && meta.trace;
-    if(!tr || !tr.file) return false;
-    const url = traceSidecarUrl(obj, tr.file);
-    if(!url) return false;
+    for(let i = actions.length - 1; i >= 0; i--) if(actions[i].layer === l.id) actions.splice(i, 1);
     const img = new Image();
-    img.crossOrigin = 'anonymous';
-    const okLoad = await new Promise(res => { img.onload = () => res(true); img.onerror = () => res(false); img.src = url; });
-    if(!okLoad){ toast('트레이스 곁파일을 못 받았습니다: ' + tr.file); return false; }
-    const l = createLayer('TRACE · ' + (obj.name || ('OBJ-' + obj.id)));
-    l.isTrace = true;
-    l.locked = true;
-    layers.unshift(l);                                    // 맨 아래
-    const W = drawCanvas.width, H = drawCanvas.height;
-    const act = { type:'image', id:++actionCounter, img, x:0, y:0, w:W, h:H, layer:l.id, isTrace:true };
-    l.ctx.globalAlpha = 0.35;                             // 참고용은 흐리게
-    l.ctx.drawImage(img, 0, 0, W, H);
-    l.ctx.globalAlpha = 1;
+    const act = { type:'image', id:++actionCounter, img, x:0, y:0, w: made.w, h: made.h,
+                  layer: l.id, isTrace:true, src: made.url, alpha: traceState.opacity };
     actions.push(act);
-    return true;
+    const paint = () => {
+      l.ctx.clearRect(0, 0, l.canvas.width, l.canvas.height);
+      l.ctx.save(); l.ctx.globalAlpha = traceState.opacity;
+      l.ctx.drawImage(img, 0, 0, made.w, made.h);
+      l.ctx.restore();
+      compositeLayers();
+    };
+    img.onload = paint;
+    img.src = made.url;
+    if(img.complete && img.naturalWidth) paint();
+    renderLayersPanel();
+    return l;
   }
 
-  function isTraceLayer(id){ const l = layerById(id); return !!(l && l.isTrace); }
-
-
-  // ---- 트레이스 오토세이브 (IndexedDB) ----
-  const TRACE_DB = 'nulayer_trace', TRACE_STORE = 'trace';
-  function traceDb(){
-    return new Promise((res, rej) => {
-      if(typeof indexedDB === 'undefined'){ rej(new Error('no idb')); return; }
-      const r = indexedDB.open(TRACE_DB, 1);
-      r.onupgradeneeded = () => { r.result.createObjectStore(TRACE_STORE); };
-      r.onsuccess = () => res(r.result);
-      r.onerror = () => rej(r.error);
-    });
-  }
-  async function traceDbPut(key, val){
-    const db = await traceDb();
-    await new Promise((res, rej) => {
-      const tx = db.transaction(TRACE_STORE, 'readwrite');
-      tx.objectStore(TRACE_STORE).put(val, key);
-      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
-    });
-    db.close();
-  }
-  async function traceDbGet(key){
-    const db = await traceDb();
-    const v = await new Promise((res, rej) => {
-      const r = db.transaction(TRACE_STORE).objectStore(TRACE_STORE).get(key);
-      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
-    });
-    db.close();
-    return v;
-  }
-  async function traceDbDel(key){
-    const db = await traceDb();
-    await new Promise((res, rej) => {
-      const tx = db.transaction(TRACE_STORE, 'readwrite');
-      tx.objectStore(TRACE_STORE).delete(key);
-      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
-    });
-    db.close();
-  }
-
-  // 원본 이미지를 긴 변 1600 WebP 로 줄여 둔다. 오토세이브는 화면에 다시
-  // 띄우는 용도라 아카이브(1080)보다 조금 넉넉하게.
-  let traceSaveTimer = null;
-  function scheduleTraceAutosave(){
-    if(traceSaveTimer) return;
-    traceSaveTimer = setTimeout(() => { traceSaveTimer = null; traceAutosaveNow(); }, 1200);
-  }
-  async function traceAutosaveNow(){
-    try {
-      if(!traceState.loaded || !traceImg.naturalWidth){ await traceDbDel('current'); return; }
-      const nw = traceImg.naturalWidth, nh = traceImg.naturalHeight;
-      const sc = Math.min(1, 1600 / Math.max(nw, nh));
-      const c = document.createElement('canvas');
-      c.width = Math.max(1, Math.round(nw*sc)); c.height = Math.max(1, Math.round(nh*sc));
-      c.getContext('2d').drawImage(traceImg, 0, 0, c.width, c.height);
-      let blob = await new Promise(r => c.toBlob(r, 'image/webp', 0.85));
-      if(!blob || blob.type !== 'image/webp') blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.88));
-      await traceDbPut('current', { blob, state: { scale: traceState.scale, rotate: traceState.rotate,
-        x: traceState.x, y: traceState.y, opacity: traceState.opacity }, at: Date.now() });
-    } catch(e){ /* 오토세이브는 최선일 뿐이다 */ }
-  }
-  async function traceAutosaveRestore(){
-    try {
-      const rec = await traceDbGet('current');
-      if(!rec || !rec.blob) return false;
-      const url = URL.createObjectURL(rec.blob);
-      await new Promise((res, rej) => {
-        traceImg.onload = () => { traceImg.onload = null; res(); };
-        traceImg.onerror = () => rej(new Error('trace decode'));
-        traceImg.src = url;
-      });
-      Object.assign(traceState, rec.state || {});
-      traceState.loaded = true;
-      traceImg.style.display = '';
-      applyTraceTransform();
-      syncTraceControls();
-      toast('트레이스 이미지를 되살렸습니다.');
-      return true;
-    } catch(e){ return false; }
+  // 슬라이더가 움직이는 동안 매번 굽지 않는다.
+  function scheduleTraceBake(){
+    if(traceBakeTimer) return;
+    traceBakeTimer = setTimeout(() => { traceBakeTimer = null; bakeTraceLayer(); }, 120);
   }
 
   function clearStrokeSelection(){
@@ -8943,9 +8813,16 @@ showLayerMenu(ev.clientX, ev.clientY, [
       let region = null;
       try { region = findClosedRegion(strokes, p.x, p.y, null, vfOpts); } catch(err){ console.error('vector fill', err); }
       if(region){
-        const fl = createLayer('VFILL ' + (++vfillCounter));
-        const idx = layers.findIndex(x => x.id === activeLayerId);
-        layers.splice(Math.max(0, idx), 0, fl);          // 활성 레이어 아래
+        let fl = reusableFillLayer(fillColor, 'v');
+        const reused = !!fl;
+        if(!fl){
+          fl = createLayer('VFILL ' + (++vfillCounter));
+          const idx = layers.findIndex(x => x.id === activeLayerId);
+          layers.splice(Math.max(0, idx), 0, fl);        // 활성 레이어 아래
+          const alv = activeLayer();
+          if(alv && alv.folderId != null) fl.folderId = alv.folderId;
+        }
+        lastFill = { id: fl.id, color: fillColor, kind: 'v' };
         const act = { type:'fill', id:++actionCounter, x:p.x, y:p.y, color:fillColor, tolerance:0,
                       layer: fl.id, poly: region.poly, holes: region.holes || [] };
         paintVectorFill(fl.ctx, act);
@@ -8954,7 +8831,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
         renderLayersPanel();
         redoStack.length = 0;
         if(typeof syncLiveEdit === 'function') syncLiveEdit(true);
-        toast('벡터 채움 → ' + fl.name + ' (면적 ' + Math.round(region.area) + 'px²' +
+        toast((reused ? '벡터 채움 → ' + fl.name + ' 에 이어서' : '벡터 채움 → ' + fl.name) +
+              ' (면적 ' + Math.round(region.area) + 'px²' +
               (region.holes && region.holes.length ? ', 구멍 ' + region.holes.length : '') + ')');
         return;
       }
@@ -8972,21 +8850,26 @@ showLayerMenu(ev.clientX, ev.clientY, [
         const mask = computeSplitFillMask(src.getContext('2d'), p.x, p.y, fillColor, tolerance, true);
         drawCanvas.style.cursor = 'copy';
         if(!mask){ toast('Already this color. Pick another color.'); return; }
-        const fl = createLayer('FILL ' + (++fillLayerCounter));
-        // Filling inside a folder keeps the fill IN that folder — folder
-        // register / select-move / dissolve then treat it as one drawing.
-        const alForFill = activeLayer();
-        if(alForFill && alForFill.folderId != null) fl.folderId = alForFill.folderId;
+        let fl = reusableFillLayer(fillColor, 'p');
+        const reusedFill = !!fl;
+        if(!fl){
+          fl = createLayer('FILL ' + (++fillLayerCounter));
+          // Filling inside a folder keeps the fill IN that folder — folder
+          // register / select-move / dissolve then treat it as one drawing.
+          const alForFill = activeLayer();
+          if(alForFill && alForFill.folderId != null) fl.folderId = alForFill.folderId;
+          const idx = layers.findIndex(x=>x.id===activeLayerId);
+          layers.splice(Math.max(0, idx), 0, fl); // below the active layer
+        }
+        lastFill = { id: fl.id, color: fillColor, kind: 'p' };
         paintSplitFill(fl.ctx, mask, fillColor, 0, 0);
-        const idx = layers.findIndex(x=>x.id===activeLayerId);
-        layers.splice(Math.max(0, idx), 0, fl); // below the active layer
         compositeLayers();
         actions.push({ type:'fill', id:++actionCounter, x:p.x, y:p.y, color:fillColor, tolerance,
                        layer: fl.id, src: srcIds, m: encodeMask(mask) });
         renderLayersPanel();
         redoStack.length = 0;
         if(typeof syncLiveEdit === 'function') syncLiveEdit(true); // live link: fill → composition + gallery now
-        toast(`Fill split to new layer: ${fl.name}.`);
+        toast(reusedFill ? `Fill added to ${fl.name}.` : `Fill split to new layer: ${fl.name}.`);
       }, 10);
       return;
     }
@@ -9114,10 +8997,6 @@ showLayerMenu(ev.clientX, ev.clientY, [
       return;
     }
 
-    if(activeLayer() && activeLayer().isTrace){
-      toast('트레이스 참고 레이어에는 그릴 수 없습니다. 다른 레이어를 고르세요.');
-      return;
-    }
     drawing = true;
     if(!preciseViewOn() && hiresShownK > 1) preciseCanvas.style.display = 'none';
     drawCanvas.setPointerCapture(e.pointerId);
@@ -9553,7 +9432,6 @@ showLayerMenu(ev.clientX, ev.clientY, [
           if(b.layer === a.layer && (b.type === 'stroke' || b.type === 'fill')) b.color = a.color;
         }
       } else if(a.type === 'stroke' || a.type === 'fill' || a.type === 'image'){
-        if(a.isTrace) continue;                       // 참고 이미지는 내보내지 않는다
         baked.push(a.type === 'stroke' ? { ...a, points: a.points.slice() } : { ...a });
       }
     }
@@ -10089,7 +9967,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         renderStrokeFull(activeLayer().ctx, currentAction);
         actions.push(currentAction);
         hiresAddStroke(currentAction);
-        if(!preciseViewOn() && hiresShownK > 1) preciseCanvas.style.display = '';
+        if(!preciseViewOn() && hiresShownK > 1){ preciseCanvas.style.display = ''; hiresSkipOnce = true; }
         compositeLayers();
         invalidateSnapCache();
         renderLayersPanel();
@@ -11176,7 +11054,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       if(a.type === 'fill' || a.type === 'image') bad.add(a.layer);
       else if(a.type === 'stroke' && a.tool !== 'eraser') seen.add(a.layer);
     }
-    for(const l of layers) if(l.asFill || l.isTrace) bad.add(l.id);   // 면 취급·참고 이미지는 선 레이어가 아니다
+    for(const l of layers) if(l.asFill) bad.add(l.id);   // 면 취급이면 선 레이어가 아니다
     return [...seen].filter(id => !bad.has(id));
   }
   // 레시피(오브젝트 안의 획 목록)에서도 같은 판정을 한다. 여기서는 li 가 레이어다.
@@ -11553,9 +11431,15 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const only = (onlyLayerIds && onlyLayerIds.size) ? onlyLayerIds : null;
     const layerIndexOf = a => Math.max(0, layers.findIndex(l=>l.id===a.layer));
     actions.forEach(a=>{
-      if(only && (a.type==='stroke' || a.type==='fill' || a.type==='layerRecolor')
+      if(only && (a.type==='stroke' || a.type==='fill' || a.type==='layerRecolor' || a.type==='image')
               && !only.has(a.layer)) return;
       const li = layerIndexOf(a);
+      if(a.type==='image' && a.isTrace && a.src){
+        // 이미 1080 WebP 로 줄여 둔 것을 그대로 싣는다
+        result.push({ type:'image', x:a.x-bbox.minX, y:a.y-bbox.minY, w:a.w, h:a.h, li, src:a.src, tr:1,
+                      alpha: a.alpha == null ? 1 : a.alpha });
+        return;
+      }
       if(a.type==='stroke'){
         // Erasers get a WIDER capture margin (their own paint radius):
         // trimming a stroke's fringe puts the eraser CENTER outside the
@@ -11618,15 +11502,14 @@ showLayerMenu(ev.clientX, ev.clientY, [
       const l = layers[li];
       const m = { li, name: l ? l.name : ('LAYER ' + (li + 1)), f: (l && l.folderId) ? l.folderId : 0 };
       if(l && l.asFill) m.af = 1;
+      if(l && l.visible === false) m.v = 0;
+      if(l && l.isTrace) m.tr = 1;
       return m;
     });
     const foldersMeta = folders
       .filter(f => layersMeta.some(m => m.f === f.id))
       .map(f => ({ id: f.id, name: f.name }));
-    const metaObj = { type: 'meta', v: 1, layers: layersMeta, folders: foldersMeta };
-    if(traceState.loaded && typeof pendingTraceName === 'string' && pendingTraceName)
-      metaObj.trace = { file: pendingTraceName };
-    result.unshift(metaObj);
+    result.unshift({ type: 'meta', v: 1, layers: layersMeta, folders: foldersMeta });
     return result;
   }
 
@@ -11917,6 +11800,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
           const m = meta && meta.layers ? meta.layers.find(x => x.li === li) : null;
           const nl = createLayer(m && m.name ? m.name : `${tag}${usedLis.length > 1 ? ' L' + (k+1) : ''}`);
           if(m && m.af) nl.asFill = true;
+          if(m && m.v === 0) nl.visible = false;
+          if(m && m.tr){ nl.isTrace = true; traceLayerId = nl.id; }
           layers.push(nl);
           fresh.push(nl);
           liMap.set(li, nl);
@@ -11944,13 +11829,6 @@ showLayerMenu(ev.clientX, ev.clientY, [
           activeFolderId = grpF.id;
         }
         activeLayerId = fresh[fresh.length - 1].id;
-        // 트레이스 곁파일이 있으면 맨 아래에 깐다. 비동기라 그림이 먼저
-        // 올라오고 잠시 뒤 참고 이미지가 밑에 나타난다.
-        if(meta && meta.trace && meta.trace.file){
-          restoreTraceLayer(obj, meta).then(done => {
-            if(done){ renderAll(); renderLayersPanel(); toast('트레이스 참고 이미지를 맨 아래에 깔았습니다.'); }
-          });
-        }
         const layerIdFor = a => (liMap.get(a.li || 0) || fresh[fresh.length - 1]).id;
         const loadStart = actions.length; // bake erasers after the whole batch lands
         obj.recipe.forEach(a=>{
@@ -11977,6 +11855,16 @@ showLayerMenu(ev.clientX, ev.clientY, [
             actions.push(act);
           } else if(a.type === 'layerRecolor'){
             actions.push({ type:'layerRecolor', id:++actionCounter, color:a.color, layer: layerIdFor(a) });
+          } else if(a.type === 'image' && a.src){
+            // 트레이스. 디코딩이 끝나면 그 레이어를 다시 그린다.
+            const lid2 = layerIdFor(a);
+            const img = new Image();
+            const act = { type:'image', id:++actionCounter, img, x:a.x + offX, y:a.y + offY, w:a.w, h:a.h,
+                          layer: lid2, isTrace: !!a.tr, src: a.src, alpha: a.alpha == null ? 1 : a.alpha };
+            actions.push(act);
+            img.onload = () => { renderSingleLayer(lid2); };
+            img.src = a.src;
+            if(a.tr) traceState.loaded = true;
           }
         });
         // FINAL-IMAGE geometry: fold the loaded erasers into the stroke
@@ -12031,10 +11919,13 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const members = layers.filter(l=>l.folderId === fid && l.visible);
     if(!members.length){ toast('Folder has no visible layers.'); return; }
     const memberIds = new Set(members.map(l=>l.id));
+    // 트레이스 레이어는 눈이 감겨 있어도 기록에 싣는다 -- 아카이브에서 다시
+    // 열 때 같은 자리에 같은 상태로 와야 한다. 그림(래스터)에는 안 들어간다.
+    for(const l of layers) if(l.isTrace) memberIds.add(l.id);
     const temp = document.createElement('canvas');
     temp.width = drawCanvas.width; temp.height = drawCanvas.height;
     const tc = temp.getContext('2d');
-    for(const l of layers){ if(memberIds.has(l.id)) tc.drawImage(l.canvas, 0, 0); }
+    for(const l of layers){ if(memberIds.has(l.id) && l.visible && !l.isTrace) tc.drawImage(l.canvas, 0, 0); }
     let bbox = getBBox(temp);
     if(!bbox){ toast('Folder layers are empty.'); return; }
     // The fill tool splits every fill onto its OWN layer, which (on older
@@ -14631,7 +14522,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
         acts.push(o);
       } else if(a.type === 'layerRecolor'){
         acts.push({ t:'r', color:a.color, layer:a.layer });
-      } else if(a.type === 'image' && a.img && !a.isTrace){
+      } else if(a.type === 'image' && a.src && a.isTrace){
+        acts.push({ t:'i', x:a.x, y:a.y, w:a.w, h:a.h, layer:a.layer, src:a.src, tr:1, alpha:a.alpha });
+      } else if(a.type === 'image' && a.img){
         try {
           const c = document.createElement('canvas');
           c.width = Math.max(1, Math.round(a.w));
@@ -14645,7 +14538,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     return JSON.stringify({
       v: 1, ts: Date.now(),
       layers: layers.map(l=>({ id:l.id, name:l.name, visible:l.visible, f: l.folderId || 0,
-                                 af: l.asFill ? 1 : 0 })),
+                                 af: l.asFill ? 1 : 0, tr: l.isTrace ? 1 : 0 })),
       folders: folders.map(f=>({ id:f.id, name:f.name, c: f.collapsed ? 1 : 0 })),
       active: activeLayerId,
       acts
@@ -14687,6 +14580,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         l.visible = ld.visible !== false;
         if(ld.f) l.folderId = ld.f;
         if(ld.af) l.asFill = true;
+        if(ld.tr){ l.isTrace = true; traceLayerId = l.id; }
         return l;
       });
       layerIdCounter = Math.max(layerIdCounter, ...st.layers.map(l=>l.id));
@@ -14720,7 +14614,11 @@ showLayerMenu(ev.clientX, ev.clientY, [
           pendingImgs++;
           img.onload = ()=>{ if(--pendingImgs === 0) renderAll(); };
           img.src = a.src;
-          actions.push({ type:'image', id:++actionCounter, x:a.x, y:a.y, w:a.w, h:a.h, layer:a.layer, img });
+          const o = { type:'image', id:++actionCounter, x:a.x, y:a.y, w:a.w, h:a.h, layer:a.layer, img };
+          if(a.tr){ o.isTrace = true; o.src = a.src; o.alpha = a.alpha == null ? 1 : a.alpha;
+                    const tl = layers.find(l => l.id === a.layer); if(tl){ tl.isTrace = true; traceLayerId = tl.id; }
+                    traceState.loaded = true; }
+          actions.push(o);
         }
       }
       renderAll();
@@ -15028,7 +14926,6 @@ showLayerMenu(ev.clientX, ev.clientY, [
       for(const l of layers){
         if(!l.visible) continue;
         if(l.isTone) continue;                     // 톤 레이어를 다시 톤 뜨지 않는다
-        if(l.isTrace) continue;                    // 참고 이미지는 그림이 아니다
         if(!getBBox(l.canvas)) continue;           // 빈 레이어는 보내지 않는다
         payload.push({ name: l.name, png: l.canvas.toDataURL('image/png'),
                        lines: l.asFill ? [] : (lineMap.get(l.id) || []),
@@ -15449,7 +15346,6 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // Installed here (end of script) so `layers`, `actions`, and `renderAll`
   // are all initialized before first use.
   restoreAutosave();
-  traceAutosaveRestore();
   updateDiscardBtn();
   renderLayersPanel();
   updateNavPreview();
