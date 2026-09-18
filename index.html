@@ -903,7 +903,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b68</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b72</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -1019,6 +1019,11 @@
 
 
       <div class="tool-row" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+        <button class="btn btn-sm" id="alignCenter"
+          title="Move the active layer (or the selected folder / layers) so its artwork sits dead centre on the canvas. Shift+click for horizontal only, Alt+click for vertical only. Undoable.">CENTRE</button>
+        <span style="font-size:9px;font-family:var(--font-mono);color:var(--ink-dim);">arrows = 1px · Shift = 10px</span>
+      </div>
+      <div class="tool-row" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
         <button class="btn btn-sm" id="snapEnd" aria-pressed="true"
           title="Snap stroke ends to nearby stroke ends. Come back around to your own start and the shape closes. A plotter draws even a 1px gap, so seams show. Hold Alt while drawing to invert this temporarily.">SNAP ENDS</button>
         <div class="range-row" title="Snap distance in screen pixels.">
@@ -1105,6 +1110,9 @@
         <button class="tool-btn" data-tool="select" title="Hotkey: V — drag on canvas to move the ACTIVE layer">SELECT</button>
         <button class="tool-btn" data-tool="eraser" title="Hotkey: E — erases on the ACTIVE layer only">ERASER</button>
         <button class="tool-btn" data-tool="lasso" title="Hotkey: L — draw a selection, then Delete to remove it from the ACTIVE layer, T to free-transform it, or Ctrl+Shift+X to cut it onto a new layer">LASSO</button>
+        <button class="tool-btn" id="shapeRect" title="Add a square at the centre of the canvas. Move it with SELECT, nudge with the arrow keys.">□</button>
+        <button class="tool-btn" id="shapeCircle" title="Add a circle at the centre of the canvas.">○</button>
+        <button class="tool-btn" id="shapeTri" title="Add a triangle at the centre of the canvas.">△</button>
         <button class="tool-btn" id="eyedropperBtn" title="Hotkey: I — click the canvas once to pick a color">EYEDROPPER</button>
         <button class="tool-btn" id="traceLinesBtn" title="Extract lines from the TRACE image — opens a window with the full set of controls, and drops the result in as real editable strokes">EXTRACT LINES</button>
       </div>
@@ -1217,6 +1225,17 @@
 
       <div class="comp-item-editor" id="compItemEditor" hidden>
         <h3>ADJUST ELEMENT</h3>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
+          <button class="btn btn-sm" id="compSnapBtn" aria-pressed="true"
+            title="Snap the element you drag to the canvas centre and edges, and to the centres and edges of other placed elements. Guides show what it locked onto. Hold Alt while dragging to suspend it.">SNAP</button>
+          <button class="btn btn-sm" id="compCentreBtn"
+            title="Put the selected element dead centre. Shift+click for horizontal only, Alt+click for vertical only.">CENTRE</button>
+          <div class="range-row" title="How close the element has to get before it snaps.">
+            <span>DIST</span>
+            <input type="range" id="compSnapDist" min="2" max="40" value="8">
+            <span class="val" id="compSnapDistVal">8</span>
+          </div>
+        </div>
         <div class="range-row">
           <span>SCALE</span>
           <input type="range" id="itemScale" min="10" max="400" value="100">
@@ -3332,6 +3351,16 @@ showLayerMenu(ev.clientX, ev.clientY, [
       if(k === 'b') { document.querySelector('[data-tool="brush"]').click(); }
       if(k === 'g') { document.querySelector('[data-tool="fill"]').click(); }
       if(k === 'v') { document.querySelector('[data-tool="select"]').click(); }
+      // 방향키로 한 칸씩. Shift 를 누르면 열 칸. SELECT 일 때만 듣는다 --
+      // 다른 도구에서 방향키는 그리기와 상관없는 몸짓이라 가로채면 곤란하다.
+      if(currentTool === 'select' && /^Arrow/.test(e.key)){
+        e.preventDefault();
+        const step = e.shiftKey ? 10 : 1;
+        const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+        const dy = e.key === 'ArrowUp'   ? -step : e.key === 'ArrowDown'  ? step : 0;
+        nudgeBy(dx, dy, null);
+        return;
+      }
       if(k === 'e') { document.querySelector('[data-tool="eraser"]').click(); }
       if(k === 'l') { document.querySelector('[data-tool="lasso"]').click(); }
       // (노드 편집은 뺐다 -- A 키는 비어 있다)
@@ -5230,6 +5259,39 @@ showLayerMenu(ev.clientX, ev.clientY, [
   }
   $('stitchPaintBtn').addEventListener('click', openStitchPaint);
 
+  let compSnapWired = false;
+  function wireCompSnap(){
+    if(compSnapWired) return;
+    compSnapWired = true;
+    const b = $('compSnapBtn'), c = $('compCentreBtn'), dd = $('compSnapDist');
+    const paint = () => { if(b){ b.setAttribute('aria-pressed', compSnapOn ? 'true' : 'false');
+                                 b.classList.toggle('btn-accent', compSnapOn); } };
+    try {
+      const sv = JSON.parse(localStorage.getItem('nulayer_compsnap') || 'null');
+      if(sv){ compSnapOn = sv.on !== false; compSnapPx = sv.d || 8;
+              if(dd){ dd.value = compSnapPx; $('compSnapDistVal').textContent = compSnapPx; } }
+    } catch(err){}
+    paint();
+    const save = () => { try { localStorage.setItem('nulayer_compsnap',
+      JSON.stringify({ on: compSnapOn, d: compSnapPx })); } catch(err){} };
+    if(b) b.addEventListener('click', () => { compSnapOn = !compSnapOn; paint(); save();
+      if(!compSnapOn && compGuides.length){ compGuides = []; renderComposition(); } });
+    if(c) c.addEventListener('click', e => centerCompItem(e.shiftKey ? 'h' : e.altKey ? 'v' : 'both'));
+    if(dd) dd.addEventListener('input', () => {
+      compSnapPx = parseInt(dd.value, 10) || 8;
+      $('compSnapDistVal').textContent = compSnapPx;
+      save();
+    });
+  }
+  // 변수들이 선언된 뒤에 배선한다 -- 위에서 바로 부르면 아직 없는 값을 읽는다.
+  setTimeout(wireCompSnap, 0);
+
+  $('shapeRect').addEventListener('click', () => addShape('rect'));
+  $('shapeCircle').addEventListener('click', () => addShape('circle'));
+  $('shapeTri').addEventListener('click', () => addShape('tri'));
+  $('alignCenter').addEventListener('click', e =>
+    centerSelection(e.shiftKey ? 'h' : e.altKey ? 'v' : 'both'));
+
   $('openMgrBtn').addEventListener('click', openMgr);
   $('mgrClose').addEventListener('click', closeMgr);
   $('mgrRefresh').addEventListener('click', refreshMgr);
@@ -5533,13 +5595,13 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const oc = $('lassoOverlay');
     if(oc && oc.parentElement) oc.parentElement.insertBefore(preciseCanvas, oc);
   }
-  const PRECISE_PX_BUDGET = 24e6;
+  const PRECISE_PX_BUDGET = 64e6;
   let preciseK = 1;
 
   // 배율×DPR 을 올림하되, 픽셀 예산 안에서. 4배를 넘기면 메모리가 무의미하게 든다.
   function hiResK(){
     const dpr = (typeof devicePixelRatio === 'number' && devicePixelRatio > 0) ? devicePixelRatio : 1;
-    let k = Math.min(4, Math.max(1, Math.ceil((viewZoom || 1) * dpr)));
+    let k = Math.min(8, Math.max(1, Math.ceil((viewZoom || 1) * dpr)));
     const W = drawCanvas.width, H = drawCanvas.height;
     while(k > 1 && W * H * k * k > PRECISE_PX_BUDGET) k--;
     return k;
@@ -5651,13 +5713,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const out = preciseCanvas.getContext('2d');
     out.setTransform(1, 0, 0, 1, 0, 0);
     out.clearRect(0, 0, W*k, H*k);
-    const sc = hiresScratch.getContext('2d', { willReadFrequently: true });
     for(const l of layers){
       if(!l.visible) continue;
-      sc.setTransform(1, 0, 0, 1, 0, 0);
-      sc.clearRect(0, 0, W*k, H*k);
-      renderLayerHiRes(l, k, sc);
-      out.drawImage(hiresScratch, 0, 0);
+      out.setTransform(1, 0, 0, 1, 0, 0);
+      renderLayerHiRes(l, k, out);
     }
     hiresShownK = k;
     preciseK = k;
@@ -5667,9 +5726,21 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
   // 잠깐 뒤에 그린다. 그리는 사이 또 바뀌면 끝나고 한 번 더.
   let hiresSkipOnce = false;
+  let hiresStamp = '';
+  let hiresRenders = 0;      // 실제로 다시 그린 횟수 (검사용)
+
+  // 그림이 바뀌었는지 싸게 알아본다. 액션 수·마지막 id·보이는 레이어·배율.
+  function hiresStampNow(){
+    let vis = '';
+    for(const l of layers) if(l.visible) vis += l.id + ',';
+    const last = actions.length ? actions[actions.length-1].id : 0;
+    return actions.length + '|' + last + '|' + vis + '|' + hiResK();
+  }
+
   function scheduleHiRes(){
     if(preciseViewOn()) return;
-    if(hiresSkipOnce){ hiresSkipOnce = false; return; }   // 방금 획 하나를 얹었다
+    if(hiresSkipOnce){ hiresSkipOnce = false; hiresStamp = hiresStampNow(); return; }
+    if(hiresStampNow() === hiresStamp) return;            // 바뀐 것이 없다
     if(hiResK() === 1){ renderHiResNow(); return; }
     hiresDirty = true;
     if(hiresTimer) return;
@@ -5677,7 +5748,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       hiresTimer = null;
       if(hiresBusy){ return; }
       hiresBusy = true; hiresDirty = false;
-      try { renderHiResNow(); } finally { hiresBusy = false; }
+      try { renderHiResNow(); hiresRenders++; hiresStamp = hiresStampNow(); } finally { hiresBusy = false; }
       if(hiresDirty) scheduleHiRes();
     }, 160);
   }
@@ -7671,7 +7742,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
     dctx.restore();
   }
 
+  function invalidateHiRes(){ hiresStamp = ''; }
+
   function renderAll(){
+    hiresStamp = '';
     // Rebuild every layer from its actions (chronological), then composite.
     layers.forEach(l => l.ctx.clearRect(0, 0, l.canvas.width, l.canvas.height));
     actions.forEach(a=>{
@@ -8828,6 +8902,120 @@ showLayerMenu(ev.clientX, ev.clientY, [
   function scheduleTraceBake(){
     if(traceBakeTimer) return;
     traceBakeTimer = setTimeout(() => { traceBakeTimer = null; bakeTraceLayer(); }, 120);
+  }
+
+
+  // ---- 도형 ----
+  // 캔버스 가운데에 캔버스 짧은 변의 절반 크기로 놓는다. 크기와 자리는
+  // 그린 뒤 SELECT 로 옮기고 방향키로 다듬으면 된다.
+  function shapePoints(kind, cx, cy, r){
+    const pts = [];
+    if(kind === 'rect'){
+      pts.push({x:cx-r, y:cy-r}, {x:cx+r, y:cy-r}, {x:cx+r, y:cy+r}, {x:cx-r, y:cy+r}, {x:cx-r, y:cy-r});
+    } else if(kind === 'tri'){
+      // 정삼각형. 무게중심이 아니라 테두리 가운데를 맞춘다 -- CENTRE 도구가
+      // 테두리로 재므로, 둘이 다르면 도형을 넣자마자 가운데 정렬이 움직인다.
+      const off = r/4;                    // 테두리 가운데 = 무게중심 - r/4
+      for(let i = 0; i < 3; i++){
+        const a = -Math.PI/2 + i * Math.PI*2/3;
+        pts.push({ x: cx + Math.cos(a)*r, y: cy + off + Math.sin(a)*r });
+      }
+      pts.push({ ...pts[0] });
+    } else {
+      // 동그라미: 둘레를 1px 남짓으로 나눈다. 확대해도 각이 안 보인다.
+      const n = Math.max(48, Math.min(720, Math.round(2*Math.PI*r)));
+      for(let i = 0; i <= n; i++){
+        const a = i / n * Math.PI*2 - Math.PI/2;
+        pts.push({ x: cx + Math.cos(a)*r, y: cy + Math.sin(a)*r });
+      }
+    }
+    return pts;
+  }
+
+  function addShape(kind){
+    if(activeLayer() && activeLayer().isTrace){
+      toast('트레이스 레이어에는 그릴 수 없습니다.'); return;
+    }
+    const W = drawCanvas.width, H = drawCanvas.height;
+    const r = Math.min(W, H) * 0.25;
+    const act = { type:'stroke', id:++actionCounter, tool:'brush', color:strokeColor, width:brushSize,
+                  texture: currentTexture, grain: currentGrain, seed: (Math.random()*2147483647)|0,
+                  points: shapePoints(kind, W/2, H/2, r), closed: true, layer: activeLayer().id };
+    renderStrokeFull(activeLayer().ctx, act);
+    actions.push(act);
+    invalidateSnapCache();
+    compositeLayers();
+    redoStack.length = 0;
+    if(typeof syncLiveEdit === 'function') syncLiveEdit(true);
+    toast({rect:'네모', circle:'동그라미', tri:'세모'}[kind] + ' — SELECT 로 옮기고 방향키로 다듬으세요.');
+  }
+
+  // ---- 옮기기: 중앙 정렬 · 방향키 ----
+  // 지금 무엇을 옮길 것인가. SELECT 의 규칙과 같다.
+  function moveTargets(){
+    if(selectedLayerIds.size > 1){
+      const sel = layers.filter(l => selectedLayerIds.has(l.id));
+      if(sel.length > 1) return { set: sel, label: sel.length + ' layers' };
+    }
+    if(activeFolderId != null){
+      const members = layers.filter(l => l.folderId === activeFolderId);
+      if(members.length) return { set: members,
+        label: (folders.find(f => f.id === activeFolderId) || {}).name || 'FOLDER' };
+    }
+    const al = activeLayer();
+    return al ? { set: [al], label: al.name } : null;
+  }
+
+  // 옮기기를 한 번의 되돌릴 수 있는 일로. 방향키와 중앙 정렬이 같이 쓴다.
+  function nudgeBy(dx, dy, label){
+    dx = Math.round(dx); dy = Math.round(dy);
+    if(!dx && !dy) return false;
+    const t = moveTargets();
+    if(!t) return false;
+    const ids = new Set(t.set.map(l => l.id));
+    const moved = actions.filter(a =>
+      ids.has(a.layer) && a.type !== 'moveLayer' && a.type !== 'mergeLayers' && a.type !== 'layerTexture');
+    if(!moved.length) return false;
+    moved.forEach(a => shiftActionBy(a, dx, dy));
+    actions.push({ type:'moveLayer', id:++actionCounter, layer: t.set[0].id, dx, dy, moved });
+    redoStack.length = 0;
+    renderAll();
+    if(label) toast(label);
+    return true;
+  }
+
+  // 그려진 것의 테두리를 재서 캔버스 가운데로. 여러 레이어면 그 전체를 하나로 본다.
+  function centerSelection(mode){
+    const t = moveTargets();
+    if(!t) return;
+    const tmp = document.createElement('canvas');
+    tmp.width = drawCanvas.width; tmp.height = drawCanvas.height;
+    const tc = tmp.getContext('2d');
+    for(const l of t.set) if(l.visible) tc.drawImage(l.canvas, 0, 0);
+    const bb = getBBox(tmp);
+    if(!bb){ toast('옮길 그림이 없습니다.'); return; }
+    const cx = bb.minX + bb.w/2, cy = bb.minY + bb.h/2;
+    let dx = 0, dy = 0;
+    if(mode !== 'v') dx = drawCanvas.width/2 - cx;
+    if(mode !== 'h') dy = drawCanvas.height/2 - cy;
+    if(!nudgeBy(dx, dy, t.label + ' → ' +
+        (mode === 'h' ? '가로 가운데' : mode === 'v' ? '세로 가운데' : '캔버스 가운데')))
+      toast('이미 가운데입니다.');
+  }
+
+
+  // 등록·저장을 마친 뒤 부른다. 트레이스는 제 몫을 다했으므로 접어 둔다.
+  function hideTraceAfterRegister(){
+    let n = 0;
+    for(const l of layers){
+      if(l.isTrace && l.visible !== false){ l.visible = false; n++; }
+    }
+    if(n){
+      renderLayersPanel();
+      compositeLayers();
+      toast('TRACE 레이어를 접었습니다 — 레이어 목록에서 다시 켤 수 있습니다.');
+    }
+    return n;
   }
 
   function clearStrokeSelection(){
@@ -10055,6 +10243,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         renderStrokeFull(activeLayer().ctx, currentAction);
         actions.push(currentAction);
         hiresAddStroke(currentAction);
+      if(hiresShownK > 1) hiresStamp = hiresStampNow();
         if(!preciseViewOn() && hiresShownK > 1){ preciseCanvas.style.display = ''; hiresSkipOnce = true; }
         compositeLayers();
         invalidateSnapCache();
@@ -12116,6 +12305,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const cropped = cropCanvas(temp, bbox);
     const recipe = buildRecipeForBBox(bbox, memberIds);
     const obj = addObject(cropped, recipe);
+    hideTraceAfterRegister();
     toast(`Folder registered as OBJ-${String(objCounter).padStart(2,'0')} (${cropped.width}×${cropped.height})`);
     try {
       await savePatternToFolder(cropped, obj.id, recipe);
@@ -12135,6 +12325,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const cropped = cropCanvas(drawCanvas, bbox);
     const recipe = buildRecipeForBBox(bbox);
     const obj = addObject(cropped, recipe);
+    hideTraceAfterRegister();
     toast(`Registered OBJ-${String(objCounter).padStart(2,'0')} (${cropped.width}×${cropped.height})`);
     liveEditTarget = null; // registering ends any live link before the canvas clears
     loadedSourceObj = obj; // ⤓ SAVE now overwrites the object just registered
@@ -12179,6 +12370,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     if(!bbox){ toast('Canvas is empty — nothing to save.'); return; }
     const cropped = cropCanvas(drawCanvas, bbox);
     const recipe = buildRecipeForBBox(bbox);
+    hideTraceAfterRegister();
     target.canvas = cropped;
     target.w = cropped.width;
     target.h = cropped.height;
@@ -12700,6 +12892,94 @@ showLayerMenu(ev.clientX, ev.clientY, [
     ctx.restore();
   }
 
+
+  // ---- 컴포지션 자석 ----
+  let compSnapOn = true;
+  let compSnapPx = 8;              // 화면이 아니라 컴포지션 좌표 기준
+  let compGuides = [];             // 지금 붙은 자리 (그려 주려고)
+
+  // 놓인 것 하나의 테두리. 회전은 테두리를 감싸는 사각형으로 친다 --
+  // 돌아간 그림에 축을 맞추는 일은 드물고, 감싸는 사각형이 눈에 맞는다.
+  function itemBox(it){
+    const w = it.obj.w * it.scale * (it.sx || 1);
+    const h = it.obj.h * it.scale * (it.sy || 1);
+    const a = it.angle || 0;
+    const cs = Math.abs(Math.cos(a)), sn = Math.abs(Math.sin(a));
+    const bw = w*cs + h*sn, bh = w*sn + h*cs;
+    return { cx: it.x, cy: it.y, w: bw, h: bh,
+             x0: it.x - bw/2, x1: it.x + bw/2, y0: it.y - bh/2, y1: it.y + bh/2 };
+  }
+
+  // 끌고 있는 것의 자리를 가까운 축으로 당긴다. 가로·세로를 따로 본다 --
+  // 한쪽만 맞추고 싶을 때가 많고, 둘을 묶으면 그게 안 된다.
+  function snapCompItem(it, x, y){
+    compGuides = [];
+    if(!compSnapOn) return { x, y };
+    const W = compCanvas.width, H = compCanvas.height;
+    const box = itemBox(it);
+    const hw = box.w/2, hh = box.h/2;
+
+    // 후보 축: [끌리는 값, 붙을 값, 안내선 자리]
+    const xs = [], ys = [];
+    const addX = (at, why) => { xs.push({ at, why }); };
+    const addY = (at, why) => { ys.push({ at, why }); };
+    addX(W/2, 'canvas'); addX(0, 'canvas'); addX(W, 'canvas');
+    addY(H/2, 'canvas'); addY(0, 'canvas'); addY(H, 'canvas');
+    for(const other of placedItems){
+      if(other === it) continue;
+      const b = itemBox(other);
+      addX(b.cx, 'item'); addX(b.x0, 'item'); addX(b.x1, 'item');
+      addY(b.cy, 'item'); addY(b.y0, 'item'); addY(b.y1, 'item');
+    }
+
+    // 이 그림의 어느 모서리를 그 축에 댈 것인가
+    const mine = [[0, 'centre'], [-hw, 'left'], [hw, 'right']];
+    const mineY = [[0, 'centre'], [-hh, 'top'], [hh, 'bottom']];
+
+    let bestX = null, bestY = null;
+    for(const c of xs) for(const [off] of mine){
+      const want = c.at - off;                       // 이 자리에 두면 딱 맞는다
+      const d = Math.abs(want - x);
+      if(d <= compSnapPx && (!bestX || d < bestX.d)) bestX = { d, want, at: c.at, why: c.why };
+    }
+    for(const c of ys) for(const [off] of mineY){
+      const want = c.at - off;
+      const d = Math.abs(want - y);
+      if(d <= compSnapPx && (!bestY || d < bestY.d)) bestY = { d, want, at: c.at, why: c.why };
+    }
+    if(bestX){ x = bestX.want; compGuides.push({ axis:'x', at: bestX.at, why: bestX.why }); }
+    if(bestY){ y = bestY.want; compGuides.push({ axis:'y', at: bestY.at, why: bestY.why }); }
+    return { x, y };
+  }
+
+  // 안내선. 붙은 동안만 보인다 -- 늘 떠 있으면 그림을 가린다.
+  function drawCompGuides(ctx){
+    if(!compGuides.length) return;
+    const W = compCanvas.width, H = compCanvas.height;
+    ctx.save();
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6, 4]);
+    for(const g of compGuides){
+      ctx.strokeStyle = g.why === 'canvas' ? 'rgba(228,68,45,0.9)' : 'rgba(43,125,233,0.9)';
+      ctx.beginPath();
+      if(g.axis === 'x'){ ctx.moveTo(g.at, 0); ctx.lineTo(g.at, H); }
+      else { ctx.moveTo(0, g.at); ctx.lineTo(W, g.at); }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // 고른 것을 캔버스 가운데로. 끌지 않고 한 번에.
+  function centerCompItem(mode){
+    if(selectedItemIdx == null || !placedItems[selectedItemIdx]){ toast('먼저 하나를 고르세요.'); return; }
+    const it = placedItems[selectedItemIdx];
+    if(mode !== 'v') it.x = compCanvas.width / 2;
+    if(mode !== 'h') it.y = compCanvas.height / 2;
+    compGuides = [];
+    renderComposition();
+    toast(mode === 'h' ? '가로 가운데' : mode === 'v' ? '세로 가운데' : '캔버스 가운데');
+  }
+
   function itemHitTest(item, mx, my){
     const dx = mx - item.x;
     const dy = my - item.y;
@@ -12780,6 +13060,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       cctx.strokeRect(fr.x, fr.y, fr.w, fr.h);
       cctx.restore();
     }
+    drawCompGuides(cctx);      // 안내선은 맨 위에
   }
 
   // 배치 한 개를 임의의 컨텍스트에 그린다. 컴포지션 렌더와 TONE PLOT 전송이
@@ -12904,8 +13185,12 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const dy = my - dragStartMouse.y;
 
     const item = placedItems[selectedItemIdx];
-    item.x = dragStartItemPos.x + dx;
-    item.y = dragStartItemPos.y + dy;
+    // Alt 를 누르고 있으면 자석을 잠깐 끈다 -- 끝점 자석과 같은 몸짓이다.
+    const want = e.altKey
+      ? (compGuides = [], { x: dragStartItemPos.x + dx, y: dragStartItemPos.y + dy })
+      : snapCompItem(item, dragStartItemPos.x + dx, dragStartItemPos.y + dy);
+    item.x = want.x;
+    item.y = want.y;
 
     renderComposition();
   });
@@ -12913,6 +13198,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
   let compDownPos = null;
   compCanvas.addEventListener('pointerdown', e => {
     compDownPos = { x: e.clientX, y: e.clientY };
+  });
+  compCanvas.addEventListener('pointerup', () => {
+    if(compGuides.length){ compGuides = []; renderComposition(); }
   });
   compCanvas.addEventListener('pointerup', e => {
     // A true CLICK (not a drag) on a selected element opens it in DRAWING
