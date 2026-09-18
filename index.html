@@ -903,7 +903,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b72</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b74</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -5326,9 +5326,20 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const mkc = (w,h)=>{ const c=document.createElement('canvas'); c.width=w; c.height=h; return c; };
     const doneL = new Map(); // li → canvas
     const liOf = a => a.li || 0;
+    const drawnLis = new Set();     // 실제로 무언가 그린 레이어
+    // 픽셀을 읽는 채움이 하나라도 있으면 그때만 CPU 그리기를 요청한다.
+    // 획만 있는 그림에 붙이면 1467번을 GPU 없이 긋게 된다.
+    const needsPixels = recipe.some(a => a.type === 'fill' && (a.m || a.sli || (!a.poly)));
+    // 컨텍스트를 획마다 다시 잡으면, 획 1467개짜리 그림에서 1467번이다.
+    const ctxOf = new Map();
     const ensure = li => {
+      let c = ctxOf.get(li);
+      if(c) return c;
       if(!doneL.has(li)) doneL.set(li, mkc(W,H));
-      return doneL.get(li).getContext('2d', { willReadFrequently:true });
+      c = needsPixels ? doneL.get(li).getContext('2d', { willReadFrequently:true })
+                      : doneL.get(li).getContext('2d');
+      ctxOf.set(li, c);
+      return c;
     };
     recipe.forEach(a => { if(a.type==='stroke'||a.type==='fill'||a.type==='layerRecolor') ensure(liOf(a)); });
     const lis = [...doneL.keys()].sort((a,b)=>a-b);
@@ -5844,7 +5855,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     for(let i=0; i<data.length; i+=4){
       if(data[i+3] > 0){ data[i]=fr; data[i+1]=fg; data[i+2]=fb; }
     }
-    ctx.putImageData(imgData,0,0);
+    if(imgData) ctx.putImageData(imgData,0,0);
   }
 
   let actionCounter = 0;
@@ -6236,12 +6247,28 @@ showLayerMenu(ev.clientX, ev.clientY, [
     ctx.restore();
   }
 
+
+  // 같은 캔버스에 여러 번 칠할 때 버퍼를 함께 쓴다. floodFillApply 를
+  // 그대로 부르되, 읽기·쓰기만 바깥으로 뺀다.
+  let floodShared = null;      // { data, w, h } — 있으면 그것을 쓴다
+  function floodBatch(ctx, fn){
+    const w = ctx.canvas.width, h = ctx.canvas.height;
+    const img = ctx.getImageData(0, 0, w, h);
+    const prev = floodShared;
+    floodShared = { data: img.data, w, h };
+    try { fn(); }
+    finally { floodShared = prev; }
+    ctx.putImageData(img, 0, 0);
+  }
+
   function floodFillApply(ctx, seedX, seedY, hexColor, tol){
     const w = ctx.canvas.width, h = ctx.canvas.height;
     seedX = Math.max(0, Math.min(w-1, Math.floor(seedX)));
     seedY = Math.max(0, Math.min(h-1, Math.floor(seedY)));
-    const imgData = ctx.getImageData(0,0,w,h);
-    const data = imgData.data;
+    // 묶음 안이면 그 버퍼를 쓴다 -- 읽고 쓰는 것은 묶음이 한 번씩만 한다.
+    const shared = floodShared && floodShared.w === w && floodShared.h === h ? floodShared : null;
+    const imgData = shared ? null : ctx.getImageData(0,0,w,h);
+    const data = shared ? shared.data : imgData.data;
     // Only ever called from replay/legacy paths: an empty layer means the
     // fill's boundary was lost (e.g. old variation recipes) — a flood here
     // would paint the entire canvas, so skip instead.
@@ -6343,7 +6370,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         data[i+3] = 255;
       }
     }
-    ctx.putImageData(imgData,0,0);
+    if(imgData) ctx.putImageData(imgData,0,0);
   }
 
   // ==================== SPLIT FILL (fill → its own layer) ====================
@@ -11656,24 +11683,109 @@ showLayerMenu(ev.clientX, ev.clientY, [
   //
   // 레시피 항목은 전부 li(레이어 인덱스)를 들고 있으므로, 아카이브에서 받은
   // PNG도 tEXt에 레시피가 실려 있으면 레이어가 그대로 복원된다.
+
+  // 오브젝트를 레이어 캔버스로 푼 결과를 붙들어 둔다. 레시피가 그대로면
+  // 결과도 그대로다 -- 톤 플롯 창을 여닫을 때마다 1초씩 다시 풀 이유가 없다.
+  const recipeCanvasCache = new Map();   // obj.id → { sig, out }
+  const recipeBakeCache = new Map();     // obj.id → { sig, rec }  지우개를 구운 레시피
+  function recipeSig(recipe){
+    let n = 0, last = 0;
+    for(const a of recipe){ n++; if(a.points) last += a.points.length; }
+    return n + ':' + last;
+  }
+  function recipeToLayerCanvasesCached(obj){
+    if(!obj || !obj.recipe) return null;
+    const sig = recipeSig(obj.recipe) + '@' + obj.canvas.width + 'x' + obj.canvas.height;
+    const hit = recipeCanvasCache.get(obj.id);
+    if(hit && hit.sig === sig) return hit.out;
+    const out = recipeToLayerCanvases(obj.recipe, obj.canvas.width, obj.canvas.height);
+    recipeCanvasCache.set(obj.id, { sig, out });
+    return out;
+  }
+  function invalidateRecipeCanvasCache(objId){
+    if(objId == null){ recipeCanvasCache.clear(); recipeBakeCache.clear(); }
+    else { recipeCanvasCache.delete(objId); recipeBakeCache.delete(objId); }
+  }
+
+  // 지우개를 구운 레시피. 오브젝트당 한 번이면 된다.
+  function bakedRecipeFor(obj, recipe){
+    const src0 = recipe || obj.recipe;
+    const sig = recipeSig(src0);
+    const hit = recipeBakeCache.get(obj.id);
+    if(hit && hit.sig === sig) return hit.rec;
+    const cp = src0.map(a => a.type === 'stroke'
+      ? { ...a, points: (a.points || []).slice() } : { ...a });
+    const rec = bakeErasers(cp, a => a.li || 0, { preserveTextured: true });
+    recipeBakeCache.set(obj.id, { sig, rec });
+    return rec;
+  }
+
   function recipeToLayerCanvases(recipe, W, H){
     if(!recipe || !recipe.length) return null;
     const mkc = (w,h)=>{ const c=document.createElement('canvas'); c.width=w; c.height=h; return c; };
     const doneL = new Map();
     const liOf = a => a.li || 0;
+    const drawnLis = new Set();     // 실제로 무언가 그린 레이어
+    // 픽셀을 읽는 채움이 하나라도 있으면 그때만 CPU 그리기를 요청한다.
+    // 획만 있는 그림에 붙이면 1467번을 GPU 없이 긋게 된다.
+    const needsPixels = recipe.some(a => a.type === 'fill' && (a.m || a.sli || (!a.poly)));
+    // 컨텍스트를 획마다 다시 잡으면, 획 1467개짜리 그림에서 1467번이다.
+    const ctxOf = new Map();
     const ensure = li => {
+      let c = ctxOf.get(li);
+      if(c) return c;
       if(!doneL.has(li)) doneL.set(li, mkc(W,H));
-      return doneL.get(li).getContext('2d', { willReadFrequently:true });
+      c = needsPixels ? doneL.get(li).getContext('2d', { willReadFrequently:true })
+                      : doneL.get(li).getContext('2d');
+      ctxOf.set(li, c);
+      return c;
     };
     recipe.forEach(a => { if(a.type==='stroke'||a.type==='fill'||a.type==='layerRecolor') ensure(liOf(a)); });
+
+    // 채움이 많은 그림은 레이어마다 묶어서 칠한다. 130번 칠하는 그림에서
+    // 캔버스를 오가는 횟수가 260번에서 레이어 수만큼으로 준다.
+    const floodByLi = new Map();
+    for(const a of recipe){
+      if(a.type === 'fill' && !a.m && !a.poly && !(a.sli && a.sli.length)){
+        const li = liOf(a);
+        if(!floodByLi.has(li)) floodByLi.set(li, 0);
+        floodByLi.set(li, floodByLi.get(li) + 1);
+      }
+    }
+    const batchLis = new Set([...floodByLi.entries()].filter(([, n]) => n > 2).map(([li]) => li));
+    const openBatch = new Map();      // li → { img, done }
+    const beginLi = li => {
+      if(!batchLis.has(li) || openBatch.has(li)) return;
+      const c = ensure(li);
+      const img = c.getImageData(0, 0, W, H);
+      openBatch.set(li, img);
+      floodShared = { data: img.data, w: W, h: H };
+    };
+    const endLi = li => {
+      const img = openBatch.get(li);
+      if(!img) return;
+      ensure(li).putImageData(img, 0, 0);
+      openBatch.delete(li);
+      floodShared = null;
+    };
+    const endAll = () => {
+      for(const li of [...openBatch.keys()]) endLi(li);
+      floodShared = null;
+    };
 
     for(const a of recipe){
       const li = liOf(a);
       try {
         if(a.type === 'stroke'){
+          if(a.tool !== 'eraser') drawnLis.add(li);
+          endLi(li);        // 이 레이어의 묶음만 닫는다 -- 다른 레이어의 획은
+                            // 이 버퍼를 건드리지 않으므로 끊을 이유가 없다
           strokeSmoothPath(ensure(li), a.points, a.width, a.color,
                            a.tool === 'eraser', a.tx || 'smooth', a.g, a.sd);
         } else if(a.type === 'fill'){
+          drawnLis.add(li);
+          if(!a.m && !a.poly && !(a.sli && a.sli.length)) beginLi(li);
+          else endLi(li);                        // 다른 방식은 캔버스를 직접 그린다
           const dc = ensure(li);
           if(a.m){
             // mw/mh가 없는 레시피는 1080 캔버스에서 기록된 것이다. 조각 크기로
@@ -11693,10 +11805,13 @@ showLayerMenu(ev.clientX, ev.clientY, [
       } catch(err){ console.warn('recipe layer replay skipped an action', err); }
     }
     // 잉크가 하나도 없는 레이어는 톤 창에서 빈 영역이 되므로 버린다.
+    endAll();
+    // 무엇이 그려졌는지는 이미 안다. getBBox 로 레이어마다 전체 픽셀을
+    // 다시 읽을 이유가 없다 -- 804×862 를 다섯 번이면 350만 화소다.
     const out = [];
     [...doneL.keys()].sort((x,y)=>x-y).forEach(li => {
-      const c = doneL.get(li);
-      if(getBBox(c)) out.push({ li, canvas: c });
+      if(!drawnLis.has(li)) return;
+      out.push({ li, canvas: doneL.get(li) });
     });
     return out.length ? out : null;
   }
@@ -15193,7 +15308,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         const cut = path.lastIndexOf('/');
         const file = cut > 0 ? path.slice(cut + 1) : path;
         if(!srcCache.has(obj.id))
-          srcCache.set(obj.id, recipeToLayerCanvases(obj.recipe, obj.canvas.width, obj.canvas.height));
+          srcCache.set(obj.id, recipeToLayerCanvasesCached(obj));
         // 같은 파일이 여러 번 나오면 폴더 이름이 똑같아져 구분이 안 된다.
         const seq = (nameSeq.get(path) || 0) + 1;
         nameSeq.set(path, seq);
@@ -15224,11 +15339,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       // 결과는 배치와 무관하므로 오브젝트당 한 번만 만들어 나눠 쓴다.
       let rec = obj.recipe;
       if(rec && rec.length){
-        if(!bakeCache.has(obj.id)){
-          const cp = rec.map(a => a.type === 'stroke'
-            ? { ...a, points: (a.points || []).slice() } : { ...a });
-          bakeCache.set(obj.id, bakeErasers(cp, a => a.li || 0, { preserveTextured: true }));
-        }
+        if(!bakeCache.has(obj.id)) bakeCache.set(obj.id, bakedRecipeFor(obj, rec));
         rec = bakeCache.get(obj.id);
         const cs = Math.cos(it.angle), sn = Math.sin(it.angle);
         const hw = obj.w/2, hh = obj.h/2;
