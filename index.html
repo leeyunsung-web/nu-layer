@@ -903,7 +903,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b74</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b76</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -2929,9 +2929,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         }
         else if(a.type === 'layerRecolor') applyLayerRecolor(l.ctx, a.color);
         else if(a.type === 'image' && a.img && a.w > 0 && a.h > 0 && (a.img.naturalWidth === undefined || a.img.naturalWidth > 0)){
-          l.ctx.save(); if(a.alpha != null) l.ctx.globalAlpha = a.alpha;
-          l.ctx.drawImage(a.img, a.x, a.y, a.w, a.h);
-          l.ctx.restore();
+          drawActionImage(l.ctx, a);
         }
       } catch(err){ console.error('renderSingleLayer: skipped an action', err, a); }
     }
@@ -3753,7 +3751,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         return o;
       }
       if(a.type==='image' && a.tr && a.src){
-        return { type:'image', x:a.x, y:a.y, w:a.w, h:a.h, li, src:a.src, tr:1, alpha:a.alpha };
+        return { type:'image', x:a.x, y:a.y, w:a.w, h:a.h, li, src:a.src, tr:1, alpha:a.alpha, fh:a.fh };
       }
       if(a.type==='layerRecolor'){
         return { type:'layerRecolor', color:a.color, li };
@@ -5606,13 +5604,13 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const oc = $('lassoOverlay');
     if(oc && oc.parentElement) oc.parentElement.insertBefore(preciseCanvas, oc);
   }
-  const PRECISE_PX_BUDGET = 64e6;
+  const PRECISE_PX_BUDGET = 32e6;
   let preciseK = 1;
 
   // 배율×DPR 을 올림하되, 픽셀 예산 안에서. 4배를 넘기면 메모리가 무의미하게 든다.
   function hiResK(){
     const dpr = (typeof devicePixelRatio === 'number' && devicePixelRatio > 0) ? devicePixelRatio : 1;
-    let k = Math.min(8, Math.max(1, Math.ceil((viewZoom || 1) * dpr)));
+    let k = Math.min(5, Math.max(1, Math.ceil((viewZoom || 1) * dpr)));
     const W = drawCanvas.width, H = drawCanvas.height;
     while(k > 1 && W * H * k * k > PRECISE_PX_BUDGET) k--;
     return k;
@@ -5646,7 +5644,6 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
 
   // ---- 모든 화면 고해상도 ----
-  const hiresScratch = document.createElement('canvas');
   let hiresTimer = null, hiresBusy = false, hiresDirty = false;
   let hiresShownK = 1;       // 지금 화면에 붙은 판의 배율
 
@@ -5706,8 +5703,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
           applyLayerRecolor(target, a.color);
         } else if(a.type === 'image' && a.img && a.w > 0 && a.h > 0 && (a.img.naturalWidth === undefined || a.img.naturalWidth > 0)){
           target.save(); target.imageSmoothingEnabled = true; target.imageSmoothingQuality = 'high';
-          if(a.alpha != null) target.globalAlpha = a.alpha;
-          target.drawImage(a.img, a.x * k, a.y * k, a.w * k, a.h * k);
+          drawActionImage(target, a, 0, 0, k);
           target.restore();
         }
       } catch(err){ console.error('hires: skipped an action', err, a); }
@@ -5720,7 +5716,6 @@ showLayerMenu(ev.clientX, ev.clientY, [
     if(k === 1){ hiresShownK = 1; preciseCanvas.style.display = 'none'; syncOverlayRes(1); return; }
     const W = drawCanvas.width, H = drawCanvas.height;
     if(preciseCanvas.width !== W*k || preciseCanvas.height !== H*k){ preciseCanvas.width = W*k; preciseCanvas.height = H*k; }
-    if(hiresScratch.width !== W*k || hiresScratch.height !== H*k){ hiresScratch.width = W*k; hiresScratch.height = H*k; }
     const out = preciseCanvas.getContext('2d');
     out.setTransform(1, 0, 0, 1, 0, 0);
     out.clearRect(0, 0, W*k, H*k);
@@ -7770,9 +7765,12 @@ showLayerMenu(ev.clientX, ev.clientY, [
   }
 
   function invalidateHiRes(){ hiresStamp = ''; }
+  // renderAll 은 되돌리기 안에서도 불린다. 그때는 사진을 버리면 안 된다.
+  let renderAllDropsSnaps = true;
 
   function renderAll(){
     hiresStamp = '';
+    if(typeof dropUndoSnaps === 'function' && renderAllDropsSnaps) dropUndoSnaps();
     // Rebuild every layer from its actions (chronological), then composite.
     layers.forEach(l => l.ctx.clearRect(0, 0, l.canvas.width, l.canvas.height));
     actions.forEach(a=>{
@@ -7791,9 +7789,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         }
         else if(a.type==='layerRecolor') applyLayerRecolor(lc, a.color);
         else if(a.type==='image' && a.img && a.w > 0 && a.h > 0 && (a.img.naturalWidth === undefined || a.img.naturalWidth > 0)){
-          lc.save(); if(a.alpha != null) lc.globalAlpha = a.alpha;
-          lc.drawImage(a.img, a.x, a.y, a.w, a.h);
-          lc.restore();
+          drawActionImage(lc, a);
         }
       } catch(err){
         console.error('renderAll: skipped an action due to error', err, a);
@@ -9045,6 +9041,51 @@ showLayerMenu(ev.clientX, ev.clientY, [
     return n;
   }
 
+
+  // ---- 되돌리기용 사진 ----
+  const UNDO_SNAPS = 12;
+  const undoSnaps = [];        // { id, layer, canvas } — 그 액션을 얹기 직전의 레이어
+  const snapPool = [];         // 다 쓴 캔버스는 돌려 써서 새로 만들지 않는다
+
+  function takeUndoSnap(actionId, layerId){
+    const l = layerById(layerId);
+    if(!l) return;
+    let c = snapPool.pop();
+    if(!c){ c = document.createElement('canvas'); }
+    if(c.width !== l.canvas.width || c.height !== l.canvas.height){
+      c.width = l.canvas.width; c.height = l.canvas.height;
+    }
+    const g = c.getContext('2d');
+    g.clearRect(0, 0, c.width, c.height);
+    g.drawImage(l.canvas, 0, 0);
+    undoSnaps.push({ id: actionId, layer: layerId, canvas: c });
+    while(undoSnaps.length > UNDO_SNAPS) snapPool.push(undoSnaps.shift().canvas);
+  }
+
+  // 이 액션을 되돌릴 사진이 있으면 붙이고 true. 없으면 false -- 부르는 쪽이
+  // 예전처럼 다시 그린다.
+  function restoreUndoSnap(action){
+    if(!action || !undoSnaps.length) return false;
+    const top = undoSnaps[undoSnaps.length - 1];
+    if(top.id !== action.id) return false;      // 사진과 순서가 어긋났다
+    const l = layerById(top.layer);
+    if(!l){ snapPool.push(undoSnaps.pop().canvas); return false; }
+    const g = l.ctx;
+    g.save(); g.setTransform(1,0,0,1,0,0);
+    g.clearRect(0, 0, l.canvas.width, l.canvas.height);
+    g.drawImage(top.canvas, 0, 0);
+    g.restore();
+    snapPool.push(undoSnaps.pop().canvas);
+    compositeLayers();
+    invalidateHiRes();
+    return true;
+  }
+
+  // 그림을 갈아엎는 일(불러오기·전체 지우기) 뒤에는 사진이 맞지 않는다.
+  function dropUndoSnaps(){
+    while(undoSnaps.length) snapPool.push(undoSnaps.pop().canvas);
+  }
+
   function clearStrokeSelection(){
     selectedStrokeId = null;
     renderAll();
@@ -9060,7 +9101,15 @@ showLayerMenu(ev.clientX, ev.clientY, [
     frameEl.addEventListener('pointerleave', ()=>{ pointerOverCanvas = false; });
   }
 
-  drawCanvas.addEventListener('contextmenu', e => e.preventDefault());
+  drawCanvas.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    const t = moveTargets();
+    if(!t) return;
+    showLayerMenu(e.clientX, e.clientY, [
+      { label: '⇋ FLIP HORIZONTAL — ' + t.label, fn: flipSelectionH },
+      { label: '◎ CENTRE — ' + t.label, fn: () => centerSelection('both') },
+    ]);
+  });
   traceImg.addEventListener('contextmenu', e => e.preventDefault());
 
   drawCanvas.addEventListener('pointerdown', e=>{
@@ -9417,6 +9466,100 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // frozen mask, so they just accumulate a paint offset; legacy fills shift
   // their seed (their own layer's content shifts with them, so the flood
   // stays consistent).
+
+  // 마스크를 좌우로 뒤집는다. 폭이 mw 인 격자에서 각 줄을 뒤집으면 된다.
+
+  // 이미지 한 장을 자리에 그린다. flipH 면 좌우를 뒤집는다.
+  function drawActionImage(ctx, a, sx, sy, k){
+    k = k || 1;
+    const x = (a.x + (sx || 0)) * k, y = (a.y + (sy || 0)) * k;
+    const w = a.w * k, h = a.h * k;
+    ctx.save();
+    if(a.alpha != null) ctx.globalAlpha = a.alpha;
+    if(a.flipH){
+      ctx.translate(x + w, y);
+      ctx.scale(-1, 1);
+      ctx.drawImage(a.img, 0, 0, w, h);
+    } else {
+      ctx.drawImage(a.img, x, y, w, h);
+    }
+    ctx.restore();
+  }
+
+  function flipMaskH(mask, mw, mh){
+    const out = new Uint8Array(mw*mh);
+    for(let y = 0; y < mh; y++){
+      const row = y*mw;
+      for(let x = 0; x < mw; x++) out[row + (mw-1-x)] = mask[row + x];
+    }
+    return out;
+  }
+
+  // 한 액션을 x = axis 를 거울삼아 뒤집는다.
+  function flipActionH(a, axis){
+    if(a.type === 'stroke'){
+      // 거울은 거울일 뿐이다. 순서까지 뒤집으면 시작점이 반대편 끝으로
+      // 옮겨가, 끝점 자석·이어 그리기·필압이 전부 어긋난다.
+      a.points.forEach(pt => { pt.x = 2*axis - pt.x; });
+      if(a.nodes){
+        a.nodes.forEach(n => {
+          n.x = 2*axis - n.x;
+          if(n.hi) n.hi.x = 2*axis - n.hi.x;
+          if(n.ho) n.ho.x = 2*axis - n.ho.x;
+        });
+      }
+    } else if(a.type === 'fill'){
+      a.x = 2*axis - a.x;
+      if(a.poly){
+        const ox = a.ox || 0;
+        a.poly = a.poly.map(p => [2*axis - (p[0] + ox) - ox, p[1]]);
+        if(a.holes) a.holes = a.holes.map(h => h.map(p => [2*axis - (p[0] + ox) - ox, p[1]]));
+      }
+      if(a.m){
+        const mw = a.mw || drawCanvas.width, mh = a.mh || drawCanvas.height;
+        a.m = encodeMask(flipMaskH(decodeMask(a.m, mw*mh), mw, mh));
+        // 마스크를 제자리에서 뒤집었으니, 그 판 자체의 자리도 거울로 옮긴다
+        a.ox = 2*axis - ((a.ox || 0) + mw);
+      }
+    } else if(a.type === 'image'){
+      a.x = 2*axis - (a.x + a.w);
+      a.flipH = !a.flipH;
+    }
+  }
+
+  // 고른 레이어(또는 폴더)를 좌우로 뒤집는다. 한 번의 되돌릴 수 있는 일이다.
+  function flipSelectionH(){
+    const t = moveTargets();
+    if(!t) return false;
+    const ids = new Set(t.set.map(l => l.id));
+    const acts = actions.filter(a =>
+      ids.has(a.layer) && (a.type === 'stroke' || a.type === 'fill' || a.type === 'image'));
+    if(!acts.length){ toast('뒤집을 그림이 없습니다.'); return false; }
+
+    // 축: 뒤집을 것들의 테두리 한가운데
+    const tmp = document.createElement('canvas');
+    tmp.width = drawCanvas.width; tmp.height = drawCanvas.height;
+    const tc = tmp.getContext('2d');
+    for(const l of t.set) if(l.visible) tc.drawImage(l.canvas, 0, 0);
+    const bb = getBBox(tmp);
+    if(!bb){ toast('뒤집을 그림이 없습니다.'); return false; }
+    const axis = bb.minX + bb.w/2;
+
+    const before = acts.map(a => JSON.parse(JSON.stringify(a, (k, v) => (k === 'img' ? undefined : v))));
+    acts.forEach(a => flipActionH(a, axis));
+    actions.push({ type:'flipLayer', id:++actionCounter, layer: t.set[0].id,
+                   axis, targets: acts, before, label: t.label });
+    redoStack.length = 0;
+    renderAll();
+    toast(t.label + ' 좌우 뒤집기');
+    return true;
+  }
+
+  // 되돌리기: 다시 뒤집으면 제자리다 (같은 축이므로).
+  function undoFlip(marker){
+    marker.targets.forEach(a => flipActionH(a, marker.axis));
+  }
+
   function shiftActionBy(a, dx, dy){
     if(a.type === 'stroke'){
       a.points.forEach(pt => { pt.x += dx; pt.y += dy; });
@@ -10267,6 +10410,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
           return;
         }
         // Commit the finished stroke into its layer, then recomposite.
+        takeUndoSnap(currentAction.id, currentAction.layer);
         renderStrokeFull(activeLayer().ctx, currentAction);
         actions.push(currentAction);
         hiresAddStroke(currentAction);
@@ -10312,6 +10456,12 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const undoneAction = actions.pop();
     redoStack.push(undoneAction);
     // 획을 고친 표시 — 그림을 지우는 게 아니라 이전 모양으로 되돌린다.
+    if(undoneAction.type === 'flipLayer'){
+      undoFlip(undoneAction);
+      renderAll();
+      toast(undoneAction.label + ' 뒤집기 되돌림.');
+      return;
+    }
     if(undoneAction.type === 'dupLayer'){
       undoDuplicate(undoneAction);
       clearStrokeSelection();
@@ -10424,8 +10574,25 @@ showLayerMenu(ev.clientX, ev.clientY, [
         renderLayersPanel();
       }
     }
+    // 사진이 있으면 그것을 붙이고 끝낸다. clearStrokeSelection 이 renderAll 을
+    // 부르므로 반드시 그 앞에서 본다 -- 그 안에서 사진이 버려진다.
+    if(restoreUndoSnap(undoneAction)){
+      selectedStrokeId = null;
+      toast('Undo successful.');
+      return;
+    }
     clearStrokeSelection();
-    renderAll();
+    // 바뀐 것이 한 레이어뿐이면 그 레이어만 다시 그린다. renderAll 은 레이어
+    // 전부를 액션 처음부터 다시 그리므로, 획 하나 빼자고 부를 일이 아니다.
+    const onlyLayer = (undoneAction.type === 'stroke' || undoneAction.type === 'fill' ||
+                       undoneAction.type === 'image' || undoneAction.type === 'layerRecolor')
+                      ? undoneAction.layer : null;
+    if(onlyLayer != null && layerById(onlyLayer)){
+      invalidateHiRes();
+      renderSingleLayer(onlyLayer);
+    } else {
+      renderAll();
+    }
     toast('Undo successful.');
   });
 
@@ -10435,6 +10602,13 @@ showLayerMenu(ev.clientX, ev.clientY, [
       return;
     }
     const redoneAction = redoStack.pop();
+    if(redoneAction.type === 'flipLayer'){
+      undoFlip(redoneAction);          // 다시 뒤집으면 원래대로
+      actions.push(redoneAction);
+      renderAll();
+      toast(redoneAction.label + ' 뒤집기 다시 적용.');
+      return;
+    }
     if(redoneAction.type === 'dupLayer'){
       // 다시 하려면 복사를 새로 하는 편이 정확하다 -- 이전 마커는 버린다.
       const src = redoneAction.prevOrder;
@@ -10544,8 +10718,21 @@ showLayerMenu(ev.clientX, ev.clientY, [
       renderLayersPanel();
     }
     actions.push(redoneAction);
-    clearStrokeSelection();
-    renderAll();
+    // clearStrokeSelection 은 renderAll 을 부른다. 한 획을 도로 얹을 때
+    // 그것까지 돌면 1467획을 다시 그리게 된다.
+    selectedStrokeId = null;
+    const onlyLayerR = (redoneAction.type === 'stroke' || redoneAction.type === 'fill' ||
+                        redoneAction.type === 'image' || redoneAction.type === 'layerRecolor')
+                       ? redoneAction.layer : null;
+    // 다시 하기는 그 레이어만 다시 그린다. 획 하나를 얹기만 하면 될 것
+    // 같지만, 되돌리기가 사진으로 되감은 상태와 액션 목록이 어긋날 수 있다 --
+    // 목록대로 다시 그리는 편이 언제나 맞다.
+    if(onlyLayerR != null && layerById(onlyLayerR)){
+      invalidateHiRes();
+      renderSingleLayer(onlyLayerR);
+    } else {
+      renderAll();
+    }
     toast('Redo successful.');
   });
 
@@ -11828,7 +12015,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       if(a.type==='image' && a.isTrace && a.src){
         // 이미 1080 WebP 로 줄여 둔 것을 그대로 싣는다
         result.push({ type:'image', x:a.x-bbox.minX, y:a.y-bbox.minY, w:a.w, h:a.h, li, src:a.src, tr:1,
-                      alpha: a.alpha == null ? 1 : a.alpha });
+                      alpha: a.alpha == null ? 1 : a.alpha, fh: a.flipH ? 1 : 0 });
         return;
       }
       if(a.type==='stroke'){
@@ -12277,7 +12464,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
             const lid2 = layerIdFor(a);
             const img = new Image();
             const act = { type:'image', id:++actionCounter, img, x:a.x + offX, y:a.y + offY, w:a.w, h:a.h,
-                          layer: lid2, isTrace: !!a.tr, src: a.src, alpha: a.alpha == null ? 1 : a.alpha };
+                          layer: lid2, isTrace: !!a.tr, src: a.src, alpha: a.alpha == null ? 1 : a.alpha,
+                          flipH: !!a.fh };
             actions.push(act);
             img.onload = () => { renderSingleLayer(lid2); };
             img.src = a.src;
@@ -15081,7 +15269,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
       } else if(a.type === 'layerRecolor'){
         acts.push({ t:'r', color:a.color, layer:a.layer });
       } else if(a.type === 'image' && a.src && a.isTrace){
-        acts.push({ t:'i', x:a.x, y:a.y, w:a.w, h:a.h, layer:a.layer, src:a.src, tr:1, alpha:a.alpha });
+        acts.push({ t:'i', x:a.x, y:a.y, w:a.w, h:a.h, layer:a.layer, src:a.src, tr:1, alpha:a.alpha,
+                    fh: a.flipH ? 1 : 0 });
       } else if(a.type === 'image' && a.img){
         try {
           const c = document.createElement('canvas');
@@ -15173,6 +15362,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
           img.onload = ()=>{ if(--pendingImgs === 0) renderAll(); };
           img.src = a.src;
           const o = { type:'image', id:++actionCounter, x:a.x, y:a.y, w:a.w, h:a.h, layer:a.layer, img };
+          if(a.fh) o.flipH = true;
           if(a.tr){ o.isTrace = true; o.src = a.src; o.alpha = a.alpha == null ? 1 : a.alpha;
                     const tl = layers.find(l => l.id === a.layer); if(tl){ tl.isTrace = true; traceLayerId = tl.id; }
                     traceState.loaded = true; }
