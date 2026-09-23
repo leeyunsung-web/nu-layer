@@ -876,23 +876,12 @@
   #shapePanel .sp-actions{ justify-content:flex-end; margin-top:8px; }
   #shapeBtn.on{ background:var(--ink); color:#fff; }
 
-  /* 04 LAYERS — 그리드 둘째 줄에 산다. 세 큰 패널은 첫째 줄. */
-  .layout { grid-template-rows: auto auto; }
-  .layout > .col-gutter { grid-row: 1 / span 2; }
-  .layout > .panel:not(.layers-panel) { grid-row: 1; }
-  .layers-panel { grid-row: 2; align-self: start; margin-top: 22px; }
-  .layers-panel[data-col="1"] { grid-column: 1; }
-  .layers-panel[data-col="2"] { grid-column: 3; }
-  .layers-panel[data-col="3"] { grid-column: 5; }
+  /* 04 LAYERS — 고른 열의 패널 안, 그 내용 바로 아래에 붙는다. */
+  .layers-panel { margin-top: 16px; }
   .layers-panel .layers-wrap { border: none; background: transparent; padding: 0; }
   .layers-panel .layer-list { max-height: 60vh; }
   .layers-panel.carrying { opacity: .6; }
-  .layout.layers-target-1 > .panel:not(.layers-panel):nth-of-type(1),
-  .layout.layers-target-2 > .panel:not(.layers-panel):nth-of-type(2),
-  .layout.layers-target-3 > .panel:not(.layers-panel):nth-of-type(3) { outline: 2px dashed var(--ink-dim); outline-offset: 4px; }
-  @media (max-width: 1100px) {
-    .layers-panel, .layers-panel[data-col] { grid-column: auto; grid-row: auto; margin-top: 0; }
-  }
+  .layout > .panel.layers-target { outline: 2px dashed var(--ink-dim); outline-offset: 4px; }
 </style>
 </head>
 <body>
@@ -1271,6 +1260,38 @@
           <button class="btn btn-accent" id="addAllVarBtn">ADD ALL TO SAMPLES</button>
         </div>
       </div>
+
+    <!-- 04 LAYERS -->
+    <section class="panel layers-panel" id="panelLayers" data-panel="layers" data-col="2">
+      <div class="panel-head">
+        <span class="panel-index" title="LAYERS — drag me to another column">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
+            <polygon points="12,3 21,8 12,13 3,8"/><polyline points="3,12 12,17 21,12"/><polyline points="3,16 12,21 21,16"/>
+          </svg>
+        </span>
+        <h2>LAYERS</h2>
+        <span class="panel-sub" style="font-size:10px;color:var(--ink-dim);">drag the title to move this panel</span>
+      </div>
+      <div class="layers-wrap">
+        <div class="layers-head">
+          <span>LAYERS <span style="opacity:0.4;font-size:9px;">v3</span></span>
+          <div class="layers-btns">
+            <button id="layerAddBtn" title="Add layer">＋</button>
+            <button id="layerUpBtn" title="Move active layer up">↑</button>
+            <button id="layerDownBtn" title="Move active layer down">↓</button>
+            <button id="layerDelBtn" title="Delete active layer (its strokes too)">✕</button>
+          </div>
+        </div>
+        <div class="layer-list" id="layerList"></div>
+        <button class="btn btn-sm" id="strokeToFillBtn" title="Trace the inked area into a COLOR layer and its outline into a vector LINE layer, then hide the original so TONE PLOT receives exactly two regions. Shift+click also fills enclosed holes.">▤ SPLIT COLOR + LINE</button>
+        <button class="btn btn-sm" id="layerRecolorBtn" title="Recolor everything on the active layer with the selected color">◉ RECOLOR LAYER</button>
+        <div class="range-row" id="layerWidthRow" title="Set the line thickness (px) of every stroke on the ACTIVE layer (live)">
+          <span>LINE WIDTH</span>
+          <input type="range" id="layerWidthSlider" min="1" max="60" value="8">
+          <span class="val" id="layerWidthVal">8</span>
+        </div>
+      </div>
+    </section>
     </section>
 
     <div class="col-gutter" data-gutter="2" role="separator" aria-orientation="vertical"
@@ -1380,38 +1401,6 @@
           <button class="btn btn-ghost" id="openCompGalleryBtn" hidden
                   title="Reopen a saved composition from the gallery for editing (master)">OPEN GALLERY</button>
           <button class="btn btn-ghost" id="downloadCompBtn">SAVE PNG</button>
-        </div>
-      </div>
-    </section>
-
-    <!-- 04 LAYERS -->
-    <section class="panel layers-panel" id="panelLayers" data-panel="layers" data-col="2">
-      <div class="panel-head">
-        <span class="panel-index" title="LAYERS — drag me to another column">
-          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
-            <polygon points="12,3 21,8 12,13 3,8"/><polyline points="3,12 12,17 21,12"/><polyline points="3,16 12,21 21,16"/>
-          </svg>
-        </span>
-        <h2>LAYERS</h2>
-        <span class="panel-sub" style="font-size:10px;color:var(--ink-dim);">drag the title to move this panel</span>
-      </div>
-      <div class="layers-wrap">
-        <div class="layers-head">
-          <span>LAYERS <span style="opacity:0.4;font-size:9px;">v3</span></span>
-          <div class="layers-btns">
-            <button id="layerAddBtn" title="Add layer">＋</button>
-            <button id="layerUpBtn" title="Move active layer up">↑</button>
-            <button id="layerDownBtn" title="Move active layer down">↓</button>
-            <button id="layerDelBtn" title="Delete active layer (its strokes too)">✕</button>
-          </div>
-        </div>
-        <div class="layer-list" id="layerList"></div>
-        <button class="btn btn-sm" id="strokeToFillBtn" title="Trace the inked area into a COLOR layer and its outline into a vector LINE layer, then hide the original so TONE PLOT receives exactly two regions. Shift+click also fills enclosed holes.">▤ SPLIT COLOR + LINE</button>
-        <button class="btn btn-sm" id="layerRecolorBtn" title="Recolor everything on the active layer with the selected color">◉ RECOLOR LAYER</button>
-        <div class="range-row" id="layerWidthRow" title="Set the line thickness (px) of every stroke on the ACTIVE layer (live)">
-          <span>LINE WIDTH</span>
-          <input type="range" id="layerWidthSlider" min="1" max="60" value="8">
-          <span class="val" id="layerWidthVal">8</span>
         </div>
       </div>
     </section>
@@ -5620,11 +5609,18 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const panel = $('panelLayers');
     const layout = document.querySelector('.layout');
     if(panel && layout){
+      const bigPanels = () => [...layout.querySelectorAll(':scope > .panel:not(.layers-panel)')];
+      // 그 열의 패널 안, 맨 끝에 붙인다 -- 그래야 그 패널 내용 바로 아래에 온다.
+      const placeIn = c => {
+        const host = bigPanels()[c - 1];
+        if(!host) return;
+        host.appendChild(panel);
+        panel.dataset.col = String(c);
+      };
       try {
         const saved = parseInt(localStorage.getItem('nulayer_layers_col') || '2', 10);
-        if(saved >= 1 && saved <= 3) panel.dataset.col = String(saved);
-      } catch(e){}
-      const bigPanels = () => [...layout.querySelectorAll(':scope > .panel:not(.layers-panel)')];
+        placeIn(saved >= 1 && saved <= 3 ? saved : 2);
+      } catch(e){ placeIn(2); }
       // 포인터가 어느 열 위에 있나 -- 큰 패널 셋의 가로 범위로 본다
       const colAt = x => {
         const ps = bigPanels();
@@ -5650,18 +5646,17 @@ showLayerMenu(ev.clientX, ev.clientY, [
         if(!drag.moved) return;
         panel.classList.add('carrying');
         const c = colAt(e.clientX);
-        layout.classList.remove('layers-target-1', 'layers-target-2', 'layers-target-3');
-        layout.classList.add('layers-target-' + c);
+        bigPanels().forEach((p, i) => p.classList.toggle('layers-target', i === c - 1));
       });
       const end = e => {
         if(!drag || (e && e.pointerId !== drag.id)) return;
         const moved = drag.moved, x = e ? e.clientX : drag.x0;
         drag = null;
         panel.classList.remove('carrying');
-        layout.classList.remove('layers-target-1', 'layers-target-2', 'layers-target-3');
+        bigPanels().forEach(p => p.classList.remove('layers-target'));
         if(!moved) return;
         const c = colAt(x);
-        panel.dataset.col = String(c);
+        placeIn(c);
         try { localStorage.setItem('nulayer_layers_col', String(c)); } catch(err){}
         toast('LAYERS → ' + ({1:'01 DRAWING',2:'02 SAMPLES',3:'03 COMPOSITION'})[c] + ' 아래');
       };
