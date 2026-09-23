@@ -875,6 +875,24 @@
   #shapePanel .sp-num input{ width:64px; }
   #shapePanel .sp-actions{ justify-content:flex-end; margin-top:8px; }
   #shapeBtn.on{ background:var(--ink); color:#fff; }
+
+  /* 04 LAYERS — 그리드 둘째 줄에 산다. 세 큰 패널은 첫째 줄. */
+  .layout { grid-template-rows: auto auto; }
+  .layout > .col-gutter { grid-row: 1 / span 2; }
+  .layout > .panel:not(.layers-panel) { grid-row: 1; }
+  .layers-panel { grid-row: 2; align-self: start; margin-top: 22px; }
+  .layers-panel[data-col="1"] { grid-column: 1; }
+  .layers-panel[data-col="2"] { grid-column: 3; }
+  .layers-panel[data-col="3"] { grid-column: 5; }
+  .layers-panel .layers-wrap { border: none; background: transparent; padding: 0; }
+  .layers-panel .layer-list { max-height: 60vh; }
+  .layers-panel.carrying { opacity: .6; }
+  .layout.layers-target-1 > .panel:not(.layers-panel):nth-of-type(1),
+  .layout.layers-target-2 > .panel:not(.layers-panel):nth-of-type(2),
+  .layout.layers-target-3 > .panel:not(.layers-panel):nth-of-type(3) { outline: 2px dashed var(--ink-dim); outline-offset: 4px; }
+  @media (max-width: 1100px) {
+    .layers-panel, .layers-panel[data-col] { grid-column: auto; grid-row: auto; margin-top: 0; }
+  }
 </style>
 </head>
 <body>
@@ -924,7 +942,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b93</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b97</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -1074,25 +1092,6 @@
       </div>
       <button class="btn btn-sm btn-ghost btn-full" id="resetPrefsBtn" style="padding:8px 6px;font-size:10px;"
         title="Resets SIZE / STABILIZER / TEXTURE / GRAIN / PRESSURE / TOLERANCE / colour and the COMPOSITION values to factory defaults. Your artwork is not touched.">↺ RESET SETTINGS</button>
-      <div class="layers-wrap">
-        <div class="layers-head">
-          <span>LAYERS <span style="opacity:0.4;font-size:9px;">v3</span></span>
-          <div class="layers-btns">
-            <button id="layerAddBtn" title="Add layer">＋</button>
-            <button id="layerUpBtn" title="Move active layer up">↑</button>
-            <button id="layerDownBtn" title="Move active layer down">↓</button>
-            <button id="layerDelBtn" title="Delete active layer (its strokes too)">✕</button>
-          </div>
-        </div>
-        <div class="layer-list" id="layerList"></div>
-        <button class="btn btn-sm" id="strokeToFillBtn" title="Trace the inked area into a COLOR layer and its outline into a vector LINE layer, then hide the original so TONE PLOT receives exactly two regions. Shift+click also fills enclosed holes.">▤ SPLIT COLOR + LINE</button>
-        <button class="btn btn-sm" id="layerRecolorBtn" title="Recolor everything on the active layer with the selected color">◉ RECOLOR LAYER</button>
-        <div class="range-row" id="layerWidthRow" title="Set the line thickness (px) of every stroke on the ACTIVE layer (live)">
-          <span>LINE WIDTH</span>
-          <input type="range" id="layerWidthSlider" min="1" max="60" value="8">
-          <span class="val" id="layerWidthVal">8</span>
-        </div>
-      </div>
         </aside>
 
         <div class="draw-main">
@@ -1218,8 +1217,6 @@
           <option value="10">10x</option>
         </select>
       </div>
-        </div>
-      </div>
       <div class="tool-row" id="vfillRow" style="display:none;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px;">
         <button class="btn btn-sm" id="vfillOn" aria-pressed="true"
           title="Compute the enclosed region from stroke geometry and fill it as a polygon — no leaking through gaps, no stair-stepping when zoomed, and it exports straight to SVG and the plotter. Falls back to the paint bucket when no closed region is found.">VECTOR FILL</button>
@@ -1240,6 +1237,8 @@
           <input type="range" id="vfAngle" min="10" max="90" value="60">
           <span class="val" id="vfAngleVal">60°</span>
         </div>
+        </div>
+      </div>
       </div>
     </section>
 
@@ -1381,6 +1380,38 @@
           <button class="btn btn-ghost" id="openCompGalleryBtn" hidden
                   title="Reopen a saved composition from the gallery for editing (master)">OPEN GALLERY</button>
           <button class="btn btn-ghost" id="downloadCompBtn">SAVE PNG</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 04 LAYERS -->
+    <section class="panel layers-panel" id="panelLayers" data-panel="layers" data-col="2">
+      <div class="panel-head">
+        <span class="panel-index" title="LAYERS — drag me to another column">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
+            <polygon points="12,3 21,8 12,13 3,8"/><polyline points="3,12 12,17 21,12"/><polyline points="3,16 12,21 21,16"/>
+          </svg>
+        </span>
+        <h2>LAYERS</h2>
+        <span class="panel-sub" style="font-size:10px;color:var(--ink-dim);">drag the title to move this panel</span>
+      </div>
+      <div class="layers-wrap">
+        <div class="layers-head">
+          <span>LAYERS <span style="opacity:0.4;font-size:9px;">v3</span></span>
+          <div class="layers-btns">
+            <button id="layerAddBtn" title="Add layer">＋</button>
+            <button id="layerUpBtn" title="Move active layer up">↑</button>
+            <button id="layerDownBtn" title="Move active layer down">↓</button>
+            <button id="layerDelBtn" title="Delete active layer (its strokes too)">✕</button>
+          </div>
+        </div>
+        <div class="layer-list" id="layerList"></div>
+        <button class="btn btn-sm" id="strokeToFillBtn" title="Trace the inked area into a COLOR layer and its outline into a vector LINE layer, then hide the original so TONE PLOT receives exactly two regions. Shift+click also fills enclosed holes.">▤ SPLIT COLOR + LINE</button>
+        <button class="btn btn-sm" id="layerRecolorBtn" title="Recolor everything on the active layer with the selected color">◉ RECOLOR LAYER</button>
+        <div class="range-row" id="layerWidthRow" title="Set the line thickness (px) of every stroke on the ACTIVE layer (live)">
+          <span>LINE WIDTH</span>
+          <input type="range" id="layerWidthSlider" min="1" max="60" value="8">
+          <span class="val" id="layerWidthVal">8</span>
         </div>
       </div>
     </section>
@@ -3606,8 +3637,28 @@ showLayerMenu(ev.clientX, ev.clientY, [
     updateTraceSelectBox();
   }
 
+  let traceLayerWasVisible = null;
   function setTraceAdjustMode(on){
+    if(on){ if(hiresShownK > 1) hiresSuspend(); }
+    const wasOn = traceAdjustMode;
     traceAdjustMode = on && traceState.loaded;
+    if(traceAdjustMode && !wasOn){
+      // 밑그림을 보이고 구운 레이어는 잠시 감춘다 -- 끌리는 것은 밑그림이다.
+      traceImg.style.visibility = '';
+      const tl = traceLayer();
+      if(tl){ traceLayerWasVisible = tl.visible; tl.visible = false; }
+      if(traceBakeTimer){ clearTimeout(traceBakeTimer); traceBakeTimer = null; }
+      compositeLayers(); renderLayersPanel();
+    } else if(!traceAdjustMode && wasOn){
+      // 끝: 그 자리로 한 번 굽고, 밑그림은 다시 감춘다.
+      if(traceBakeTimer){ clearTimeout(traceBakeTimer); traceBakeTimer = null; }
+      const tl = bakeTraceLayer();
+      if(tl && traceLayerWasVisible != null) tl.visible = traceLayerWasVisible;
+      traceLayerWasVisible = null;
+      traceImg.style.visibility = 'hidden';
+      compositeLayers(); renderLayersPanel();
+      hiresResume();
+    } else if(!on) hiresResume();
     traceImg.classList.toggle('interactive', traceAdjustMode);
     // Lift reference above the drawing canvas so it can be grabbed
     traceImg.style.zIndex = traceAdjustMode ? '8' : '';
@@ -3635,8 +3686,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
       traceState.loaded = true;
       applyTraceTransform();
       syncTraceControls();
-      bakeTraceLayer();
       traceImg.style.visibility = 'hidden';   // 레이어가 보여 준다. 두 겹은 안 된다
+      bakeTraceLayer();
       toast('TRACE 레이어를 맨 아래에 만들었습니다. 눈을 끄거나 지우는 것은 레이어처럼 하세요.');
       setTraceAdjustMode(true);   // enter adjust mode right after loading
       setTraceSelected(true);
@@ -5562,6 +5613,63 @@ showLayerMenu(ev.clientX, ev.clientY, [
     fh.addEventListener('input', () => { setDrawFrame(drawFrame.w, parseInt(fh.value, 10) / 100); paint(); });
     // 첫 안내선은 첫 합성(compositeLayers)이 그린다 -- 여기는 캔버스가 아직 없다.
   }
+
+  // ==================== 04 LAYERS 패널 자리 ====================
+  // 머리말을 잡고 좌우로 끌면, 놓은 자리의 열 아래로 간다. 자리는 남는다.
+  {
+    const panel = $('panelLayers');
+    const layout = document.querySelector('.layout');
+    if(panel && layout){
+      try {
+        const saved = parseInt(localStorage.getItem('nulayer_layers_col') || '2', 10);
+        if(saved >= 1 && saved <= 3) panel.dataset.col = String(saved);
+      } catch(e){}
+      const bigPanels = () => [...layout.querySelectorAll(':scope > .panel:not(.layers-panel)')];
+      // 포인터가 어느 열 위에 있나 -- 큰 패널 셋의 가로 범위로 본다
+      const colAt = x => {
+        const ps = bigPanels();
+        let best = 1, bd = Infinity;
+        ps.forEach((p, i) => {
+          const r = p.getBoundingClientRect();
+          const d = x < r.left ? r.left - x : x > r.right ? x - r.right : 0;
+          if(d < bd){ bd = d; best = i + 1; }
+        });
+        return best;
+      };
+      let drag = null;
+      panel.addEventListener('pointerdown', e => {
+        const handle = e.target.closest('.panel-head .panel-index, .panel-head h2');
+        if(!handle || e.button !== 0) return;
+        e.preventDefault();
+        drag = { id: e.pointerId, x0: e.clientX, moved: false };
+        try { panel.setPointerCapture(e.pointerId); } catch(err){}
+      });
+      panel.addEventListener('pointermove', e => {
+        if(!drag || e.pointerId !== drag.id) return;
+        if(Math.abs(e.clientX - drag.x0) > 6) drag.moved = true;
+        if(!drag.moved) return;
+        panel.classList.add('carrying');
+        const c = colAt(e.clientX);
+        layout.classList.remove('layers-target-1', 'layers-target-2', 'layers-target-3');
+        layout.classList.add('layers-target-' + c);
+      });
+      const end = e => {
+        if(!drag || (e && e.pointerId !== drag.id)) return;
+        const moved = drag.moved, x = e ? e.clientX : drag.x0;
+        drag = null;
+        panel.classList.remove('carrying');
+        layout.classList.remove('layers-target-1', 'layers-target-2', 'layers-target-3');
+        if(!moved) return;
+        const c = colAt(x);
+        panel.dataset.col = String(c);
+        try { localStorage.setItem('nulayer_layers_col', String(c)); } catch(err){}
+        toast('LAYERS → ' + ({1:'01 DRAWING',2:'02 SAMPLES',3:'03 COMPOSITION'})[c] + ' 아래');
+      };
+      panel.addEventListener('pointerup', end);
+      panel.addEventListener('pointercancel', end);
+    }
+  }
+
   {
     const btn = $('shapeBtn'), picker = $('shapePicker');
     const openPicker = on => {
@@ -5953,9 +6061,62 @@ showLayerMenu(ev.clientX, ev.clientY, [
   const preciseCanvas = document.createElement('canvas');
   preciseCanvas.id = 'preciseCanvas';
   preciseCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;display:none;';
+  // 지금 그리는 획만 올리는 판. 고해상도 판 바로 위, 올가미 판 아래.
+  const liveCanvas = document.createElement('canvas');
+  liveCanvas.id = 'liveCanvas';
+  // 고해상도 판의 스타일을 그대로 베끼면 display:none 까지 따라와 얇은 판이
+  // 영영 숨는다 -- 그리는 동안 선이 안 보이다 떼면 툭 나타나는 그 모습이다.
+  liveCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;';
   {
     const oc = $('lassoOverlay');
-    if(oc && oc.parentElement) oc.parentElement.insertBefore(preciseCanvas, oc);
+    if(oc && oc.parentElement){
+      oc.parentElement.insertBefore(preciseCanvas, oc);
+      oc.parentElement.insertBefore(liveCanvas, oc);
+    }
+  }
+
+  // 고해상도 판과 같은 크기·자리로 맞춘다. 배율·보이는 영역이 바뀔 때마다.
+  function syncLiveCanvas(){
+    if(liveCanvas.width !== preciseCanvas.width || liveCanvas.height !== preciseCanvas.height){
+      liveCanvas.width = preciseCanvas.width; liveCanvas.height = preciseCanvas.height;
+    }
+    const s = preciseCanvas.style, t = liveCanvas.style;
+    t.left = s.left; t.top = s.top; t.width = s.width; t.height = s.height;
+    t.display = s.display;                       // 판과 함께 보이고 함께 숨는다
+  }
+  function clearLiveCanvas(){
+    const c = liveCanvas.getContext('2d');
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, liveCanvas.width, liveCanvas.height);
+  }
+  // 지금 획을 배율대로 그린다. 텍스처 붓은 배율이 크면 픽셀 작업이 무거워
+  // 매 프레임 감당이 안 되므로 매끈한 선으로 보여 준다 -- 확정하면 정확해진다.
+  function paintLiveStrokeHiRes(a){
+    if(!a || hiresShownK <= 1 || preciseCanvas.style.display === 'none') return;
+    const k = hiresShownK;
+    const c = liveCanvas.getContext('2d');
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, liveCanvas.width, liveCanvas.height);
+    if(hiresRect) c.translate(-hiresRect.x * k, -hiresRect.y * k);
+    const heavy = (a.texture && a.texture !== 'smooth' && a.texture !== 'plotter') && k >= 3;
+    if(a.tool === 'eraser'){
+      const pts = a.points;
+      if(!pts || !pts.length) return;
+      c.save();
+      c.lineCap = 'round'; c.lineJoin = 'round';
+      c.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--paper').trim() || '#faf8f3';
+      c.lineWidth = Math.max(1, (a.width || brushSize) * k);
+      c.beginPath();
+      c.moveTo(pts[0].x * k, pts[0].y * k);
+      for(let i = 1; i < pts.length; i++) c.lineTo(pts[i].x * k, pts[i].y * k);
+      c.stroke();
+      c.restore();
+      return;
+    }
+    try {
+      renderStrokeFull(c, heavy ? { ...scaledStroke(a, k), texture:'plotter' } : scaledStroke(a, k));
+    } catch(err){}
+    c.setTransform(1, 0, 0, 1, 0, 0);
   }
   const PRECISE_PX_BUDGET = 32e6;
   let preciseK = 1;
@@ -6088,12 +6249,33 @@ showLayerMenu(ev.clientX, ev.clientY, [
     return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
   }
 
+  // 1080 판에 '구멍'을 낸다. 보이기만 가리고 포인터 판정은 그대로다.
+  function setDrawCanvasHole(x, y, w, h){
+    const st = drawCanvas.style;
+    if(x == null){
+      st.maskImage = ''; st.webkitMaskImage = '';
+      st.maskSize = ''; st.webkitMaskSize = '';
+      return;
+    }
+    const f = v => (v * 100).toFixed(3);
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none">'
+      + '<path fill="black" fill-rule="evenodd" d="M0 0H100V100H0Z'
+      + 'M' + f(x) + ' ' + f(y) + 'H' + f(x + w) + 'V' + f(y + h) + 'H' + f(x) + 'Z"/></svg>';
+    const url = 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")';
+    st.maskImage = url; st.webkitMaskImage = url;
+    st.maskSize = '100% 100%'; st.webkitMaskSize = '100% 100%';
+    st.maskRepeat = 'no-repeat'; st.webkitMaskRepeat = 'no-repeat';
+  }
+
   function renderHiResNow(){
     if(preciseViewOn()) return;          // 정확한 보기는 제 길로 그린다
     const k = hiResK();
     if(k === 1){
       hiresShownK = 1; hiresRect = null;
       preciseCanvas.style.display = 'none';
+      liveCanvas.style.display = 'none';
+      setDrawCanvasHole(null);                       // 판이 없으면 가릴 것도 없다
+      clearLiveCanvas();
       preciseCanvas.style.left = '0'; preciseCanvas.style.top = '0';
       preciseCanvas.style.width = '100%'; preciseCanvas.style.height = '100%';
       syncOverlayRes(1);
@@ -6113,6 +6295,11 @@ showLayerMenu(ev.clientX, ev.clientY, [
     preciseCanvas.style.top    = (vis.y / H * 100) + '%';
     preciseCanvas.style.width  = (vis.w / W * 100) + '%';
     preciseCanvas.style.height = (vis.h / H * 100) + '%';
+    // 판이 덮는 자리는 1080 판에서 가린다 -- 두 겹으로 비치면 선이 진해진다.
+    // clip-path 로 도려내면 포인터 판정까지 잘려 그 자리에서 펜이 캔버스에
+    // 안 닿는다(확대하면 안 그려지던 원인). CSS mask 는 보이는 것만 가리고
+    // 판정은 건드리지 않는다. 구멍은 evenodd 인 SVG 로 만든다.
+    setDrawCanvasHole(vis.x / W, vis.y / H, vis.w / W, vis.h / H);
     const out = preciseCanvas.getContext('2d');
     out.setTransform(1, 0, 0, 1, 0, 0);
     out.clearRect(0, 0, pw, ph);
@@ -6126,7 +6313,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
     hiresShownK = k;
     preciseK = k;
     syncOverlayRes(k);
-    if(!drawing) preciseCanvas.style.display = '';
+    preciseCanvas.style.display = '';           // 그리는 중에도 숨기지 않는다
+    syncLiveCanvas();                            // 판을 보인 뒤에 베껴야 얇은 판도 보인다
   }
 
   // 잠깐 뒤에 그린다. 그리는 사이 또 바뀌면 끝나고 한 번 더.
@@ -6136,6 +6324,22 @@ showLayerMenu(ev.clientX, ev.clientY, [
   let hiresRect = null;      // 지금 판이 덮고 있는 캔버스 영역
 
   // 그림이 바뀌었는지 싸게 알아본다. 액션 수·마지막 id·보이는 레이어·배율.
+  // 잠깐의 미리보기 동안 판을 접는다. 끝나면 hiresResume() 이 다시 그린다.
+  let hiresSuspended = false;
+  function hiresSuspend(){
+    if(hiresSuspended) return;
+    hiresSuspended = true;
+    preciseCanvas.style.display = 'none';
+    if(typeof liveCanvas !== 'undefined') liveCanvas.style.display = 'none';
+    setDrawCanvasHole(null);
+  }
+  function hiresResume(){
+    if(!hiresSuspended) return;
+    hiresSuspended = false;
+    hiresStamp = '';
+    scheduleHiRes();
+  }
+
   function hiresStampNow(){
     let vis = '';
     for(const l of layers) if(l.visible) vis += l.id + ',';
@@ -6147,6 +6351,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
   function scheduleHiRes(){
     if(preciseViewOn()) return;
+    if(hiresSuspended) return;
     if(hiresSkipOnce){ hiresSkipOnce = false; hiresStamp = hiresStampNow(); return; }
     if(hiresStampNow() === hiresStamp) return;            // 바뀐 것이 없다
     if(hiResK() === 1){ renderHiResNow(); return; }
@@ -6367,6 +6572,32 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // navigator + Rotate View tool. getPos() inverts the transform so every
   // tool keeps drawing exactly under the pointer at any zoom/angle.
   let viewZoom = 1, viewRot = 0, viewPanX = 0, viewPanY = 0;
+  // 지난 획이 끝난 자리. Shift+찍기로 여기서 직선을 잇는다.
+  let lastStrokeEnd = null;
+  // Shift 축 제한이 걸린 획의 시작점 (걸린 동안만 값이 있다)
+  let axisLockFrom = null;
+
+  // 0·90·180·270° 근처면 그 각으로 붙인다. 4° 안에서만.
+  function snapRotation(rad){
+    const step = Math.PI / 2, tol = 4 * Math.PI / 180;
+    const near = Math.round(rad / step) * step;
+    return Math.abs(rad - near) <= tol ? near : rad;
+  }
+
+  // 축 제한: 시작점에서 p 까지의 방향을 가로·세로·45° 중 가장 가까운 것으로.
+  // 축 위로 '투영'한다 -- 손 바로 아래(옆)에서 끝나야 자연스럽다. 길이를
+  // 지키면 손보다 조금 더 나가 어긋나 보인다.
+  function constrainToAxis(from, p){
+    const dx = p.x - from.x, dy = p.y - from.y;
+    const d = Math.hypot(dx, dy);
+    if(d < 1e-6) return { x: from.x, y: from.y };
+    const a = Math.atan2(dy, dx);
+    const step = Math.PI / 4;
+    const q = Math.round(a / step) * step;
+    const ux = Math.cos(q), uy = Math.sin(q);
+    const t = dx * ux + dy * uy;
+    return { x: from.x + ux * t, y: from.y + uy * t };
+  }
   // Mirror preview: -1 flips the view left/right. scaleX sits INNERMOST in the
   // transform chain, so it mirrors the artboard's own contents — #traceImage,
   // the lasso overlay and the paper texture all live inside #canvasView and
@@ -6542,8 +6773,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
   $('zoomSlider').addEventListener('input', e=> setViewZoom(parseInt(e.target.value, 10) / 100));
   $('zoomInBtn').addEventListener('click', ()=> setViewZoom(viewZoom * 1.25));
   $('zoomOutBtn').addEventListener('click', ()=> setViewZoom(viewZoom / 1.25));
-  $('rotLeftBtn').addEventListener('click', ()=>{ viewRot -= Math.PI/12; applyViewTransform(); });
-  $('rotRightBtn').addEventListener('click', ()=>{ viewRot += Math.PI/12; applyViewTransform(); });
+  $('rotLeftBtn').addEventListener('click', ()=>{ viewRot = snapRotation(viewRot - Math.PI/12); applyViewTransform(); });
+  $('rotRightBtn').addEventListener('click', ()=>{ viewRot = snapRotation(viewRot + Math.PI/12); applyViewTransform(); });
   ['frameW','frameH'].forEach(id=>{
     $(id).addEventListener('input', e=>{
       const v = Math.max(10, Math.min(100, parseInt(e.target.value,10) || 100));
@@ -9461,6 +9692,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
       l.ctx.save(); l.ctx.globalAlpha = traceState.opacity;
       l.ctx.drawImage(img, 0, 0, made.w, made.h);
       l.ctx.restore();
+      if(traceAdjustMode) l.visible = false;      // 조절 중엔 밑그림이 대신 보인다
+      invalidateHiRes();                          // 액션 수는 그대로라 도장이 안 바뀐다
       compositeLayers();
     };
     img.onload = paint;
@@ -9472,6 +9705,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
   // 슬라이더가 움직이는 동안 매번 굽지 않는다.
   function scheduleTraceBake(){
+    if(traceAdjustMode) return;                 // 조절이 끝날 때 한 번 굽는다
     if(traceBakeTimer) return;
     traceBakeTimer = setTimeout(() => { traceBakeTimer = null; bakeTraceLayer(); }, 120);
   }
@@ -10195,7 +10429,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     }
 
     drawing = true;
-    if(!preciseViewOn() && hiresShownK > 1) preciseCanvas.style.display = 'none';
+    clearLiveCanvas();                           // 판은 그대로 두고, 획은 그 위에 그린다
     drawCanvas.setPointerCapture(e.pointerId);
     lastRawPos = p;
     // 이미 있는 획의 끝에서 시작하면 그 점에 딱 붙인다. 이어 그린 선의
@@ -10206,9 +10440,15 @@ showLayerMenu(ev.clientX, ev.clientY, [
       if(t){ first.x = t.x; first.y = t.y; }
     }
     invalidateSnapCache();
+    // Shift 를 누른 채 찍으면 지난 획의 끝에서 여기까지 직선으로 잇는다.
+    const joinFrom = (e.shiftKey && lastStrokeEnd && currentTool !== 'eraser'
+                      && lastStrokeEnd.layer === activeLayer().id) ? lastStrokeEnd : null;
+    axisLockFrom = e.shiftKey ? { x: first.x, y: first.y } : null;
     currentAction = { type:'stroke', id:++actionCounter, tool:currentTool, color:strokeColor, width:brushSize,
                       texture: currentTexture, grain: currentGrain, seed: (Math.random()*2147483647)|0,
-                      points:[first], layer: activeLayer().id };
+                      points: joinFrom ? [{ x: joinFrom.x, y: joinFrom.y, p: first.p }, first] : [first],
+                      layer: activeLayer().id };
+    if(joinFrom) axisLockFrom = null;          // 이은 직선은 축에 묶지 않는다
     takeStrokeSnapshot();
     repaintLiveStrokeNow();   // 첫 점은 즉시 -- 톡 찍는 점이 한 프레임 늦으면 그게 더 답답하다
   });
@@ -10267,6 +10507,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     dctx.drawImage(liveTemp, 0, 0);
     dctx.drawImage(liveAbove, 0, 0);
     dctx.restore();
+    paintLiveStrokeHiRes(currentAction);
     updateNavPreviewThrottled();
     if(typeof scheduleLiveSync === 'function') scheduleLiveSync();
   }
@@ -10292,7 +10533,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
   let movingLayer = null;
 
   function compositeLayersMoving(){
-    if(!movingLayer){ compositeLayers(); return; }
+    if(!movingLayer){ hiresResume(); compositeLayers(); return; }
+    if(hiresShownK > 1) hiresSuspend();        // 끄는 동안은 1080 판이 보여야 한다
     dctx.save();
     dctx.globalCompositeOperation = 'source-over';
     dctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
@@ -10963,7 +11205,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     if(viewDrag){
       if(viewDrag.mode === 'rotate'){
         const a = Math.atan2(e.clientY - viewDrag.cy, e.clientX - viewDrag.cx);
-        viewRot = viewDrag.startRot + (a - viewDrag.startAngle);
+        viewRot = snapRotation(viewDrag.startRot + (a - viewDrag.startAngle));
       } else {
         viewPanX = viewDrag.startPanX + (e.clientX - viewDrag.startX);
         viewPanY = viewDrag.startPanY + (e.clientY - viewDrag.startY);
@@ -11061,6 +11303,18 @@ showLayerMenu(ev.clientX, ev.clientY, [
     for(const ev of batch){
       const p = getPos(ev);
       lastRawPos = p;
+      // Shift: 첫 점에서 가장 가까운 축으로 곧게. 점은 두 개면 되므로 끝점만
+      // 갈아 끼운다 -- 안정기·최소 간격은 직선에 뜻이 없다.
+      if(ev.shiftKey && currentAction.tool !== 'eraser'){
+        if(!axisLockFrom) axisLockFrom = { x: pts[0].x, y: pts[0].y };
+        const q = constrainToAxis(axisLockFrom, p);
+        const pr0 = penPressure(ev);
+        const endPt = pr0 != null ? { x: q.x, y: q.y, p: pr0 } : { x: q.x, y: q.y };
+        if(pts.length >= 2) pts[pts.length-1] = endPt; else pts.push(endPt);
+        moved = true;
+        continue;
+      }
+      axisLockFrom = null;
       const last = pts[pts.length-1];
       const dx = p.x - last.x, dy = p.y - last.y;
       const dist = Math.hypot(dx, dy);
@@ -11235,7 +11489,12 @@ showLayerMenu(ev.clientX, ev.clientY, [
         const pts = currentAction.points;
         const last = pts[pts.length-1];
         if(lastRawPos && Math.hypot(lastRawPos.x-last.x, lastRawPos.y-last.y) > 0.5){
-          pts.push({ x: lastRawPos.x, y: lastRawPos.y });
+          if(axisLockFrom){
+            // 축 제한 중: 끝점을 갈아 끼운다 -- 직선에 점이 셋이면 꺾일 수 있다
+            const q = constrainToAxis(axisLockFrom, lastRawPos);
+            if(pts.length >= 2) pts[pts.length-1] = { x: q.x, y: q.y, p: last.p };
+            else pts.push({ x: q.x, y: q.y });
+          } else pts.push({ x: lastRawPos.x, y: lastRawPos.y });
         }
         // 끝점을 붙인다. 자기 시작점이면 도형이 닫힌 것이다 -- 좌표를
         // 똑같이 맞춰야 플로터가 이음매를 안 남긴다.
@@ -11255,6 +11514,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         // 지우개는 먼저 잘라내기를 시도한다. 성공하면 액션 목록에 넣지 않는다 --
         // 넣으면 잘라낸 자리를 한 번 더 파내게 되고, 그게 바로 없애려던 자국이다.
         if(currentAction.tool === 'eraser' && eraseByCut(currentAction)){
+          clearLiveCanvas();
           currentAction = null;
           lastRawPos = null;
           return;
@@ -11265,9 +11525,16 @@ showLayerMenu(ev.clientX, ev.clientY, [
         if(navPending){ clearTimeout(navPending); navPending = 0; }
         navLast = 0;                 // 손을 떼면 다음 한 번은 바로 그린다
         actions.push(currentAction);
+        {
+          const lp = currentAction.points[currentAction.points.length-1];
+          lastStrokeEnd = currentAction.tool === 'eraser' ? lastStrokeEnd
+                        : { x: lp.x, y: lp.y, layer: currentAction.layer };
+        }
+        axisLockFrom = null;
         hiresAddStroke(currentAction);
+        clearLiveCanvas();
       if(hiresShownK > 1) hiresStamp = hiresStampNow();
-        if(!preciseViewOn() && hiresShownK > 1){ preciseCanvas.style.display = ''; hiresSkipOnce = true; }
+        if(!preciseViewOn() && hiresShownK > 1){ hiresSkipOnce = true; }
         compositeLayers();
         invalidateSnapCache();
         renderLayersPanel();
@@ -17035,7 +17302,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
   }
 
   function layoutColWidths(){
-    return [...layoutEl.querySelectorAll(':scope > .panel')]
+    return [...layoutEl.querySelectorAll(':scope > .panel:not(.layers-panel)')]
       .map(p => p.getBoundingClientRect().width);
   }
 
@@ -17141,12 +17408,12 @@ showLayerMenu(ev.clientX, ev.clientY, [
   let reorderDragEl = null;
 
   function panelOrder(){
-    return [...layoutEl.querySelectorAll(':scope > .panel')].map(p => p.dataset.panel);
+    return [...layoutEl.querySelectorAll(':scope > .panel:not(.layers-panel)')].map(p => p.dataset.panel);
   }
 
   function setPanelOrder(order, frs, animate){
     const byKey = {};
-    layoutEl.querySelectorAll(':scope > .panel').forEach(p => { byKey[p.dataset.panel] = p; });
+    layoutEl.querySelectorAll(':scope > .panel:not(.layers-panel)').forEach(p => { byKey[p.dataset.panel] = p; });
     const panels = order.map(k => byKey[k]).filter(Boolean);
     // Bail rather than render a layout that is missing a panel.
     if(panels.length !== 3) return false;
@@ -17203,7 +17470,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     let drag = null;
 
     function panelRects(){
-      return [...layoutEl.querySelectorAll(':scope > .panel')]
+      return [...layoutEl.querySelectorAll(':scope > .panel:not(.layers-panel)')]
         .map(p => ({ el: p, r: p.getBoundingClientRect() }));
     }
 
@@ -17226,7 +17493,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     }
 
     function clearMarks(){
-      layoutEl.querySelectorAll(':scope > .panel').forEach(p => {
+      layoutEl.querySelectorAll(':scope > .panel:not(.layers-panel)').forEach(p => {
         p.classList.remove('reordering', 'reorder-target');
       });
     }
@@ -17235,6 +17502,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       const handle = e.target.closest('.panel-head .panel-index, .panel-head h2');
       if(!handle || e.button !== 0) return;
       const panel = handle.closest('.panel');
+      if(panel && panel.classList.contains('layers-panel')) return;
       if(!panel || !panel.dataset.panel) return;
       // Stacked layout: there are no columns to swap, so leave the header alone.
       if(window.matchMedia('(max-width: 1240px)').matches) return;
@@ -17325,7 +17593,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       const carried = drag.panel;
       const hadOffset = Math.abs(drag.tx) > 0.5;
 
-      layoutEl.querySelectorAll(':scope > .panel').forEach(p => {
+      layoutEl.querySelectorAll(':scope > .panel:not(.layers-panel)').forEach(p => {
         if(p === carried) return;          // the carried panel settles, not snaps
         p.classList.remove('flipping');
         p.style.transform = '';
