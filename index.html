@@ -931,7 +931,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b103</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b104</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -16791,12 +16791,20 @@ showLayerMenu(ev.clientX, ev.clientY, [
         const cs = Math.cos(it.angle), sn = Math.sin(it.angle);
         const hw = obj.w/2, hh = obj.h/2;
         const kx = it.scale * (it.sx || 1), ky = it.scale * (it.sy || 1);
+        // AS FILL 레이어(af): 획은 면에 녹는다. 드로잉 전송과 같은 규칙.
+        const afLis = new Set();
+        {
+          const meta = rec.find(x => x && x.type === 'meta');
+          if(meta && Array.isArray(meta.layers))
+            for(const x of meta.layers) if(x && x.af) afLis.add(x.li || 0);
+        }
         for(const a of rec){
           const li = a.li || 0;
           const L = g.layers.get(li);
           if(!L) continue;
           if(a.type === 'fill' || a.type === 'image'){ L.hasFill = true; continue; }
           if(a.type !== 'stroke') continue;
+          if(afLis.has(li)){ L.hasFill = true; continue; }   // 선으로 보내지 않는다
           if(!a.points || !a.points.length) continue;
           // 살아남은 지우개도 같이 실어 보낸다 -- 톤 창이 굵은 획의 면에서
           // 파낸다. 이게 없으면 지운 자리가 플롯에서 되살아난다.
