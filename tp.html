@@ -2549,7 +2549,7 @@ async function archiveSaveSvg(){
   const rows = (svgPreview && svgPreview.length) ? svgPreview
              : (expRows && expRows.length) ? expRows : expBuildRows();
   const now = new Date();
-  const name = 'toneplot_' + ghDateFolder() + '_'
+  const name = exportBaseName(rows.map(r => r.w)) + '_'
              + String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0')
              + String(now.getSeconds()).padStart(2,'0') + '.svg';
   const path = 'toneplot/' + ghDateFolder() + '/' + name;
@@ -3298,11 +3298,31 @@ function svgOutRows(rows){
        + body + '</svg>\n';
 }
 
+
+// 내보내는 파일 이름: 날짜_펜굵기_가로x세로mm. 예) 2026-09-27_0.25mm_120x95mm
+// widths: 파일에 실리는 펜 굵기들(mm). 없으면 결과의 펜들, 그것도 없으면 지금 펜.
+function exportBaseName(widths){
+  const M = docMetrics();
+  const now = new Date();
+  const date = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0')
+             + '-' + String(now.getDate()).padStart(2,'0');
+  const pens = new Set();
+  const add = w => { const v = +(+w).toFixed(2); if(v > 0) pens.add(v); };
+  if(widths && widths.length) widths.forEach(add);
+  else if(S.result && S.result.byPen) for(const [,b] of S.result.byPen) add(b.pen && b.pen.widthMm);
+  if(!pens.size) add(S.pen.widthMm);
+  const pen = [...pens].sort((a,b) => a-b).map(String).join('+') + 'mm';
+  if(S.mode === 'cal') return 'calibration_' + date + '_' + pen;
+  const w = Math.round(M.drawW), h = Math.round(M.drawH);
+  const size = (w > 0 && h > 0) ? w + 'x' + h + 'mm' : Math.round(M.paperW) + 'x' + Math.round(M.paperH) + 'mm';
+  return date + '_' + pen + '_' + size;
+}
+
 function downloadRows(rows){
   const svg = svgOutRows(rows);
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([svg], { type:'image/svg+xml' }));
-  a.download = (S.mode === 'cal' ? 'calibration' : 'tone-plot') + '.svg';
+  a.download = exportBaseName(rows.map(r => r.w)) + '.svg';
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
@@ -3313,7 +3333,7 @@ function download(){
   const blob = new Blob([svg], {type:'image/svg+xml'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = (S.mode === 'cal' ? 'calibration' : 'tone-plot') + '.svg';
+  a.download = exportBaseName(null) + '.svg';
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
