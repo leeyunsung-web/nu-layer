@@ -931,7 +931,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b109</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b110</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -4504,9 +4504,11 @@ showLayerMenu(ev.clientX, ev.clientY, [
     // 덮어쓸 생각이었는데 권한이 없어 새 파일이 된 경우, 그 사실을 말한다.
     // 원본이 바뀐 줄 알고 있으면 나중에 아카이브를 열었을 때 당황한다.
     if(wantedOverwrite && !overwrote)
-      results.push(userRole === 'master'
-        ? 'No GitHub config, so the archive original is unchanged.'
-        : 'Overwriting the original is master-only — the archive original is unchanged.');
+      results.push(userRole !== 'master'
+        ? 'Overwriting the original is master-only — the archive original is unchanged.'
+        : (ghConfig && ghConfig.token)
+          ? '원본의 아카이브 경로를 찾지 못해 새 파일로 저장했습니다 — 다음 저장부터는 이 파일에 덮어씁니다.'
+          : 'No GitHub config, so the archive original is unchanged.');
     toast(results.join(' · '));
     updateFolderChip();
     return { filename, dateFolder, ghPath, overwrote };
@@ -14092,6 +14094,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
     tpLastSig = null;
     if(typeof toneplotDirty === 'function') toneplotDirty();
     try {
+      // 경로를 모르면(예전 컴포지션의 사본 등) 이름으로 아카이브에서 되찾는다.
+      if(!target.ghPath && target.filename){
+        try { await resolveArchivePath(target); } catch(e){}
+      }
       // 아카이브에서 온 오브젝트는 폴더를 따로 모른다 -- 경로에서 읽는다.
       // 파일 이름도 경로의 것이 정확하다. 그래야 로컬 폴더에도 같은 자리에 쓴다.
       let fname = target.filename, folder = target.saveFolder;
@@ -16077,6 +16083,49 @@ showLayerMenu(ev.clientX, ev.clientY, [
     return out;
   }
 
+  // 이름만 아는 오브젝트의 아카이브 경로를 색인에서 되찾는다. 찾으면 오브젝트에
+  // 적어 두고 그 경로를, 못 찾으면 null 을 돌려준다. 마스터(토큰) 전용.
+  // 파일 하나의 메타(경로·받을 주소). 없으면 null. (ghLoadList 는 폴더용이라
+  // 파일 응답을 빈 목록으로 돌려준다.)
+  async function ghStatFile(path){
+    const url = `https://api.github.com/repos/${ghConfig.owner}/${ghConfig.repo}/contents/${encodeURI(path)}?ref=${encodeURIComponent(ghConfig.branch || 'main')}&t=${Date.now()}`;
+    const res = await fetch(url, {
+      headers: { 'Accept': 'application/vnd.github+json', 'Authorization': `Bearer ${ghConfig.token}`, 'X-GitHub-Api-Version': '2022-11-28' },
+      cache: 'no-store'
+    });
+    if(res.status === 404) return null;
+    if(!res.ok) throw new Error('API ' + res.status);
+    const j = await res.json();
+    return (j && !Array.isArray(j) && j.path) ? j : null;
+  }
+  async function resolveArchivePath(obj){
+    if(!obj) return null;
+    if(obj.ghPath) return obj.ghPath;
+    if(!obj.filename || userRole !== 'master' || !ghConfig || !ghConfig.token) return null;
+    // 빠른 길: 저장할 때 붙인 이름(pattern_날짜_…)의 날짜 폴더에 그대로 있으면
+    // 요청 하나로 끝난다. 폴더에 제목이 붙었거나 옮겨졌으면 색인을 훑는다.
+    const m = String(obj.filename).match(/^pattern_(\d{4}-\d{2}-\d{2})_/);
+    if(m){
+      const prefix = (ghConfig.path || 'gallery').replace(/^\/+|\/+$/g, '');
+      try {
+        const r = await ghStatFile(prefix + '/' + m[1] + '/' + obj.filename);
+        if(r && r.path){
+          obj.ghPath = r.path;
+          if(!obj.downloadUrl && r.download_url) obj.downloadUrl = r.download_url;
+          return obj.ghPath;
+        }
+      } catch(e){ /* 없거나 못 읽음 -- 색인으로 */ }
+    }
+    let idx;
+    try { idx = await getArchiveIndex(false); } catch(e){ return null; }
+    if(!idx || !idx.length) return null;
+    const hit = idx.find(f => f && f.name === obj.filename);
+    if(!hit || !hit.path) return null;
+    obj.ghPath = hit.path;
+    if(!obj.downloadUrl && hit.downloadUrl) obj.downloadUrl = hit.downloadUrl;
+    return obj.ghPath;
+  }
+
   async function getArchiveIndex(force){
     const ver = archiveVer();
     if(!force && archiveIndex && archiveIndex.length && archiveIndexVer === ver)
@@ -16395,6 +16444,15 @@ showLayerMenu(ev.clientX, ev.clientY, [
         if(so.ghPath) obj.ghPath = so.ghPath;
       }
       objs.push(obj);
+    }
+    // 경로를 모르는 오브젝트(예전 빌드의 사본, 내장 그림)는 이름으로 아카이브에서
+    // 되찾는다. 여기서 해 두어야 톤 플롯의 폴더 이름이 처음부터 경로가 되고,
+    // 고쳐서 저장하면 그 파일에 덮어쓴다.
+    if(userRole === 'master' && ghConfig && ghConfig.token
+       && objs.some(o => o && !o.ghPath && o.filename)){
+      try {
+        for(const o of objs) if(o && !o.ghPath && o.filename) await resolveArchivePath(o);
+      } catch(e){ console.warn('archive path lookup failed', e); }
     }
     placedItems.length = 0;
     for(const it of man.items){
