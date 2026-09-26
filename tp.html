@@ -380,8 +380,8 @@
     </div>
     <div class="row">
       <label class="lb" for="pspread">번짐</label>
-      <input id="pspread" type="number" step="0.05" min="1" max="3" value="1"
-        title="펜을 종이에 찍으면 잉크가 번져 닙보다 굵게 남습니다. 0.5mm 펜이 0.9mm 로 남으면 1.8 입니다.&#10;두께 칸에는 펜에 적힌 값을 그대로 넣으세요 — 간격은 이 배율을 곱한 굵기로 잡습니다.&#10;선을 긋는 굵기(SVG)는 바뀌지 않습니다.">
+      <input id="pspread" type="number" step="0.05" min="1" max="3" value="1.6"
+        title="펜을 종이에 찍으면 잉크가 번져 닙보다 굵게 남습니다. 0.25mm 펜이 0.40mm 로 남으면 1.6 입니다 (기본값, 실제로 뽑아 잰 값).&#10;두께 칸에는 펜에 적힌 값을 그대로 넣으세요 — 화면의 선과 간격은 이 배율을 곱한 굵기로 잡습니다.&#10;다시 재려면 캘리브레이션 띠를 뽑아 선이 갈라지기 시작하는 칸의 간격 ÷ 닙 굵기.&#10;선을 긋는 굵기(SVG)는 바뀌지 않습니다.">
       <span class="unit">배</span>
     </div>
     <div class="row"><label class="chk"><input type="checkbox" id="pwet"> 젖은 매체 (포스카·물감 번짐)</label></div>
@@ -638,6 +638,10 @@ const regGradAmt = reg => {
 
 /* ============================================================ STATE */
 
+// 번짐 기본값. 닙 0.25mm 펜을 실제로 뽑아 잰 값(종이 0.40mm 안팎)이다.
+// 펜·종이마다 다르니 캘리브레이션 띠로 다시 재면 된다: 선이 갈라지기 시작하는
+// 칸의 간격 ÷ 닙 굵기.
+const SPREAD_DEFAULT = 1.6;
 const S = {
   drawScale: 100,                  // 체크된 레이어 전체(=그림)의 출력 크기 %
   mode:'hatch',
@@ -658,9 +662,10 @@ const S = {
   overlapAuto:true,      // 사용자가 손대기 전까지는 원본 종류를 따른다
   overlapGap:0,          // 펜 절반에 더할 여유 (mm)
   zoom:1, panX:0, panY:0,
-  spread:1.0,           // 번짐 배율 -- 닙 굵기 × 이 값이 종이에 남는 굵기다.
-                        // 펜·종이마다 달라 눈대중으로 정할 수 없다. 보정 없이
-                        // 시작해 실제로 뽑아 보며 올리는 편이 정확하다.
+  spread:SPREAD_DEFAULT, // 번짐 배율 -- 닙 굵기 × 이 값이 종이에 남는 굵기다.
+                        // 펜·종이마다 달라 눈대중으로 정할 수 없다. 실제로 뽑아
+                        // 잰 값으로 시작한다 (0.25mm 펜 → 0.40mm).
+  spreadCal:1,          // 번짐을 잰 값으로 맞춘 설정이라는 표시. 없으면 옛 1.0 이다.
   thickFill:false,      // 선은 펜 굵기 한 줄이 기본. 면으로 메우는 것은 선택이다.
   thickMode:'parallel',            // 'parallel' | 'tone' -- 굵은 획의 안을 무엇으로 메울지
   thickEdge:true,
@@ -1902,7 +1907,8 @@ function linePasses(reg, pen, M, opt, pitchPx, penPx, dens, budget, blocked){
   for(const L of lines){
     const pts = (L && L.p) ? L.p : L;
     const w   = (L && L.w) ? L.w : 0;
-    if(w > penPx * ratio) thick.push({ p: pts, w });
+    // 플로터 선(pl)은 화면의 곡선 그 자체 -- 절대 면으로 바꾸지 않는다
+    if(!(L && L.pl) && w > penPx * ratio) thick.push({ p: pts, w });
     else thin.push(pts.slice());
   }
 
@@ -2292,7 +2298,31 @@ function moveHint(){
   cv.addEventListener('pointercancel', end);
 })();
 
+
+// 실물 배율을 뉴레이어에 알린다. 드로잉의 PLOTTER 선이 이 값으로 펜 굵기를 px 로 바꾼다.
+let _lastMetricsMsg = '';
+function postPlotMetrics(force){
+  if(!window.opener || window.opener.closed) return;
+  const M = docMetrics();
+  let mmPerDocPx;
+  if(lastDoc && lastDoc.w > 0) mmPerDocPx = M.drawW / lastDoc.w;
+  else {
+    // 아직 그림이 없다: 1080 정사각을 넣으면 이렇게 된다
+    const avail = Math.min(M.paperW, M.paperH) - M.margin * 2;
+    mmPerDocPx = avail * (S.drawScale || 100) / 100 / 1080;
+  }
+  // PLOTTER 선은 인쇄될 선 그 자체다 -- 종이에 남는 굵기(닙 × 번짐)를 보낸다.
+  const msg = { type:'toneplot-metrics', mmPerDocPx, penMm: inkMm(), nibMm: S.pen.widthMm,
+                spread: (S.spread == null ? 1 : S.spread),
+                paper: S.paper, orient: S.orient, drawScale: S.drawScale };
+  const key = JSON.stringify(msg);
+  if(!force && key === _lastMetricsMsg) return;
+  _lastMetricsMsg = key;
+  try { window.opener.postMessage(msg, '*'); } catch(e){}
+}
+
 function draw(){
+  postPlotMetrics(false);
   const cv = $('view'), ctx = cv.getContext('2d');
   const M = docMetrics();
   const wrap = document.querySelector('.canvaswrap');
@@ -3352,11 +3382,12 @@ function syncPen(){
   const p = S.pen;
   $('pw').value = p.widthMm; $('ps').value = p.speed;
   $('pwet').checked = p.wet;
-  const solid = p.widthMm / maxDens(p);
+  const solid = inkMm(p) / maxDens(p);
   $('penNote').innerHTML = p.wet
     ? '젖은 매체입니다. 크로스 계열은 패스를 레이어로 나눠 내보내니 앞 패스가 마른 뒤 다음을 그리세요. '
       + '75% 이상 밀도는 마르기 전에 겹쳐 번질 수 있습니다.'
-    : '간격이 ' + solid.toFixed(2) + 'mm보다 촘촘하면 선이 붙어 면이 됩니다. 캘리브레이션 띠로 잰 실제 선폭을 넣으세요.';
+    : '닙 ' + p.widthMm + 'mm × 번짐 ' + (S.spread == null ? 1 : S.spread) + ' = 종이 ' + inkMm(p).toFixed(2) + 'mm. '
+      + '간격이 ' + solid.toFixed(2) + 'mm보다 촘촘하면 선이 붙어 면이 됩니다.';
 }
 
 function renderRegions(){
@@ -3763,6 +3794,7 @@ function tpUndoCheck(){
   tpRedo.length = 0;
   tpUndoLast = cur; tpUndoLastObj = obj;
   regMemSave();
+  tpSettingsSave();
 }
 function tpApplySnapshot(json){
   const obj = JSON.parse(json);
@@ -3781,8 +3813,30 @@ function tpApplySnapshot(json){
   tpUndoLastObj = tpSnapshotObj(); tpUndoLast = JSON.stringify(tpUndoLastObj);
   tpUndoPath = ''; tpUndoAt = 0;
   regMemSave();
+  tpSettingsSave();
   refresh();
 }
+
+// ---- 전역 설정 기억 ----
+const SET_MEM_KEY = 'nulayer_tp_settings';
+const SET_MEM_SKIP = { mode: 1, source: 1 };
+function tpSettingsSave(){
+  try {
+    const o = snapSettings();
+    for(const k of Object.keys(SET_MEM_SKIP)) delete o[k];
+    localStorage.setItem(SET_MEM_KEY, JSON.stringify(o));
+  } catch(e){}
+}
+function tpSettingsRestore(){
+  try {
+    const o = JSON.parse(localStorage.getItem(SET_MEM_KEY) || 'null');
+    if(!o || typeof o !== 'object') return false;
+    for(const k of Object.keys(SET_MEM_SKIP)) delete o[k];
+    applySettings(o);
+    return true;
+  } catch(e){ return false; }
+}
+
 function tpUndoBreak(){ tpUndoPath = ''; tpUndoAt = 0; }
 function tpUndoClear(){ tpUndo.length = 0; tpRedo.length = 0; tpUndoMark(); tpUndoPath = ''; }
 function tpUndoStep(){
@@ -4438,7 +4492,7 @@ function applyRegions(snap){
 }
 const SET_KEEP = ['drawScale','paper','orient','margin','join','keepLines',
                   'thickFill','thickMode','thickEdge','mode','source',
-                  'overlap','overlapAuto','overlapGap','svgGroup','spread'];
+                  'overlap','overlapAuto','overlapGap','svgGroup','spread','spreadCal'];
 function snapSettings(){
   const o = { pen: { ...S.pen } };
   for(const k of SET_KEEP) o[k] = S[k];
@@ -4447,6 +4501,10 @@ function snapSettings(){
 function applySettings(s){
   if(!s) return;
   for(const k of SET_KEEP) if(s[k] !== undefined) S[k] = s[k];
+  // 옛 저장·옛 창의 번짐 1.0 은 '손대지 않음' 이다. 잰 값으로 올린다.
+  // 사용자가 손댄 값(표시가 있는 설정)은 그대로.
+  if(!s.spreadCal && (s.spread == null || s.spread === 1)) S.spread = SPREAD_DEFAULT;
+  S.spreadCal = 1;
   if(s.pen) S.pen = { ...S.pen, ...s.pen };
   // 화면의 입력칸도 따라가야 한다. 값만 바꾸고 두면 화면과 상태가 어긋난다.
   $('paper').value = S.paper;
@@ -4624,6 +4682,7 @@ function receiveLayers(d, done){
         const pts = (L && L.p) ? L.p : L;
         const w   = (L && L.w) ? L.w : 1;
         const o = { p: pts.map(pt => [pt[0]*sc, pt[1]*sc]), w: w*sc };
+        if(L && L.pl) o.pl = 1;                    // 플로터 선 -- 면으로 바꾸지 않는다
         if(L && L.e) erasers.push(o); else lines.push(o);
       }
       prepErasers(erasers);
@@ -4726,6 +4785,7 @@ window.addEventListener('message', e => {
 if(window.opener){
   $('srcPick').classList.remove('hide');
   try{ window.opener.postMessage({ type:'toneplot-ready' }, '*'); }catch(_){ }
+  try{ postPlotMetrics(true); }catch(_){ }
   $('linkInfo').textContent = 'NU-LAYER 연결 대기 중…';
   $('linkInfo').classList.remove('hide');
 }
@@ -4837,6 +4897,7 @@ if(window.opener){
   });
 })();
 
+tpSettingsRestore();
 syncPen(); renderRegions(); syncTone();
 renderSaved();
 calNote();
