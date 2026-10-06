@@ -492,6 +492,15 @@
     width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.15);
     flex-shrink: 0; align-self: center;
   }
+  .cur-swatches { display: inline-flex; gap: 5px; align-items: center; }
+  .cur-sw { width: 18px; height: 18px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.2); cursor: pointer;
+            position: relative; flex-shrink: 0; }
+  .cur-sw#myPalFill { border-radius: 50%; }
+  .cur-sw.none { background: #fff linear-gradient(to top right, transparent calc(50% - 1px), #e4442d calc(50% - 1px),
+                 #e4442d calc(50% + 1px), transparent calc(50% + 1px)) !important; }
+  .cur-sw.armed { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .cur-sw.armed::after { content: '▾'; position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
+                 font-size: 9px; line-height: 1; color: var(--ink); pointer-events: none; }
   /* Each slot IS the colour picker. The native <input type=color> renders its
      own swatch that cannot be styled to match the primary grid, so it is
      stretched invisibly over a <label> that carries the real appearance;
@@ -943,7 +952,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b112</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b113</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -1003,7 +1012,12 @@
       <div class="palette-wrap">
         <div class="palette-label">
           <span>MY PALETTE</span>
-          <span class="my-pal-now" id="myPalNow" title="Current colour"></span>
+          <span class="cur-swatches">
+            <span class="my-pal-now cur-sw" id="myPalNow" data-target="line"
+              title="LINE colour — click to target it (then click a palette colour) · double-click = no line"></span>
+            <span class="cur-sw" id="myPalFill" data-target="fill"
+              title="FILL colour — closed pen paths and shapes are filled with this · click to target · double-click = no fill"></span>
+          </span>
         </div>
         <div class="palette-grid my-palette" id="myPaletteGrid"></div>
       </div>
@@ -3593,7 +3607,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       const t = sampleTraceColorAt(px, py);
       if(t){
         const hex = rgbToHex(t[0], t[1], t[2]);
-        applyColor(hex);
+        pickTargetColor(hex);
         document.querySelectorAll('.palette-cell.selected').forEach(c=>c.classList.remove('selected'));
         toast(`Picked ${hex.toUpperCase()} (trace)`);
         return;
@@ -3602,9 +3616,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
       return;
     }
     const hex = rgbToHex(d[0], d[1], d[2]);
-    applyColor(hex);
+    pickTargetColor(hex);
     document.querySelectorAll('.palette-cell.selected').forEach(c=>c.classList.remove('selected'));
-    toast(`Picked ${hex.toUpperCase()}`);
+    toast(`Picked ${hex.toUpperCase()}` + (swArmed === 'fill' ? ' → FILL' : ''));
   }
 
   // ==================== TRACING IMAGE (interactive resize / rotate) ====================
@@ -6667,6 +6681,15 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // (both variables stay in sync for compatibility with existing code)
   let strokeColor = '#1d1d1f';
   let fillColor = '#1d1d1f';
+  // 두 칸: 선 없음 표시와 펜·도형 채움 색 (null = 채움 없음). 고른 칸(armed)은
+  // 팔레트 클릭이 들어갈 곳. null 이면 예전처럼 선 색(+페인트통 색).
+  let lineNone = false;
+  let penFillColor = null;
+  let swArmed = null;     // null | 'line' | 'fill'
+  try {
+    const sv = JSON.parse(localStorage.getItem('nulayer_swatches') || 'null');
+    if(sv){ lineNone = !!sv.lineNone; penFillColor = (typeof sv.fill === 'string' && /^#[0-9a-f]{6}$/i.test(sv.fill)) ? sv.fill : null; }
+  } catch(e){}
   let brushSize = 5;
   const toolSizes = { brush: 5, eraser: 5 }; // independent sizes per tool
   let tolerance = 0; // Default 0 for crisp pixels
@@ -9618,16 +9641,11 @@ showLayerMenu(ev.clientX, ev.clientY, [
                   nodes: pd.nodes, closed: pd.closed, edit:'bezier', pw:null,
                   points: [], layer: al.id };
     syncStrokeFromNodes(act);
-    takeUndoSnap(act.id, act.layer);
-    renderStrokeFull(al.ctx, act);
-    actions.push(act);
-    { const lp = act.points[act.points.length - 1]; lastStrokeEnd = { x: lp.x, y: lp.y, layer: act.layer }; }
-    hiresAddStroke(act);
-    compositeLayers();
-    invalidateSnapCache();
-    renderLayersPanel();
-    redoStack.length = 0;
-    nodeSel = { id: act.id, sel: new Set(), drag:null };   // 그린 패스는 고른 채로 (앵커가 보인다)
+    const made = commitShapeWithFill(act, pd.closed);
+    if(made){
+      const lp = made.points[made.points.length - 1]; lastStrokeEnd = { x: lp.x, y: lp.y, layer: made.layer };
+      nodeSel = { id: made.id, sel: new Set(), drag:null };   // 그린 패스는 고른 채로 (앵커가 보인다)
+    } else nodeSel = null;
     pvOverlay();
   }
   function penCancel(){ penDraft = null; pvDrag = null; pvOverlay(); }
@@ -10054,8 +10072,14 @@ showLayerMenu(ev.clientX, ev.clientY, [
       const ns = penDraft.nodes;
       if(ns.length > 1){
         c.lineCap = 'round'; c.lineJoin = 'round';
-        c.strokeStyle = strokeColor; c.lineWidth = strokeWidthNow();
-        c.beginPath(); pvTrace(c, ns, penDraft.closed); c.stroke();
+        if(penFillColor && ns.length > 2){
+          c.globalAlpha = 0.35; c.fillStyle = penFillColor;
+          c.beginPath(); pvTrace(c, ns, true); c.fill(); c.globalAlpha = 1;
+        }
+        if(!lineNone){
+          c.strokeStyle = strokeColor; c.lineWidth = strokeWidthNow();
+          c.beginPath(); pvTrace(c, ns, penDraft.closed); c.stroke();
+        }
       }
       // 다음 선 미리보기 (마지막 앵커 → 커서)
       if(pvHover && !pvDrag){
@@ -10067,9 +10091,11 @@ showLayerMenu(ev.clientX, ev.clientY, [
         else if(pvShift) tgt = pvConstrain(last, pvHover);
         const c1 = last.ho || last;
         const c2 = (it.kind === 'close' && ns[0].hi) ? ns[0].hi : tgt;
-        c.globalAlpha = 0.45; c.strokeStyle = strokeColor; c.lineWidth = strokeWidthNow(); c.lineCap = 'round';
-        c.beginPath(); c.moveTo(last.x, last.y); c.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, tgt.x, tgt.y); c.stroke();
-        c.globalAlpha = 1;
+        if(!lineNone){
+          c.globalAlpha = 0.45; c.strokeStyle = strokeColor; c.lineWidth = strokeWidthNow(); c.lineCap = 'round';
+          c.beginPath(); c.moveTo(last.x, last.y); c.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, tgt.x, tgt.y); c.stroke();
+          c.globalAlpha = 1;
+        }
         c.strokeStyle = BLUE; c.lineWidth = 1 / k;
         c.beginPath(); c.moveTo(last.x, last.y); c.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, tgt.x, tgt.y); c.stroke();
       }
@@ -10934,17 +10960,15 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const act = { type:'stroke', id:++actionCounter, tool:'brush', color:strokeColor, width:strokeWidthNow(),
                   texture: currentTexture, grain: currentGrain, seed: (Math.random()*2147483647)|0,
                   points: pts, closed: true, layer: al.id };
-    renderStrokeFull(al.ctx, act);
-    actions.push(act);
+    if(lineNone && !penFillColor){
+      toast('선 색도 채움 색도 없습니다 — 두 칸 중 하나에 색을 넣으세요.');
+      return null;
+    }
     shapeDraft = null;
     clearShapeOverlay();
     syncShapePanel();
-    compositeLayers();
-    invalidateSnapCache();
-    renderLayersPanel();
-    redoStack.length = 0;
-    if(typeof syncLiveEdit === 'function') syncLiveEdit(true);
-    return act;
+    const made = commitShapeWithFill(act, true);
+    return made;
   }
 
   // 손잡이·안쪽을 끌 때. lock(또는 Shift)이면 처음 비율을 지킨다.
@@ -13398,6 +13422,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     updateColorPreviews();
     const now = $('myPalNow');
     if(now) now.style.background = hex;
+    if(typeof syncSwatches === 'function') syncSwatches();
   }
 
   const paletteGrid = $('paletteGrid');
@@ -13408,12 +13433,113 @@ showLayerMenu(ev.clientX, ev.clientY, [
     cell.title = hex;
     cell.dataset.hex = hex;
     cell.addEventListener('click', ()=>{
-      applyColor(hex);
+      pickTargetColor(hex);
       document.querySelectorAll('.palette-cell.selected').forEach(c=>c.classList.remove('selected'));
       cell.classList.add('selected');
     });
     paletteGrid.appendChild(cell);
   });
+
+
+  // ---- 두 칸 (LINE · FILL) ----
+  function saveSwatches(){
+    try { localStorage.setItem('nulayer_swatches', JSON.stringify({ lineNone, fill: penFillColor })); } catch(e){}
+  }
+  function syncSwatches(){
+    const L = $('myPalNow'), F = $('myPalFill');
+    if(L){ L.style.background = strokeColor; L.classList.toggle('none', lineNone); L.classList.toggle('armed', swArmed === 'line'); }
+    if(F){ F.style.background = penFillColor || '#fff'; F.classList.toggle('none', !penFillColor); F.classList.toggle('armed', swArmed === 'fill'); }
+  }
+  // 팔레트·스포이드가 고른 색을 고른 칸에 넣는다
+  function pickTargetColor(hex){
+    if(swArmed === 'fill'){
+      penFillColor = normHex(hex) || hex;
+      saveSwatches(); syncSwatches();
+      if(typeof pvOverlay === 'function') pvOverlay();
+      return;
+    }
+    lineNone = false;
+    applyColor(hex);
+    saveSwatches(); syncSwatches();
+  }
+  (function wireSwatches(){
+    for(const id of ['myPalNow', 'myPalFill']){
+      const el = $(id); if(!el) continue;
+      const tgt = el.dataset.target;
+      let clickTimer = 0;
+      el.addEventListener('click', () => {
+        // 두 번 누름과 겹치지 않게 아주 잠깐 기다린다
+        clearTimeout(clickTimer);
+        clickTimer = setTimeout(() => {
+          swArmed = (swArmed === tgt) ? null : tgt;
+          syncSwatches();
+          if(swArmed) toast((tgt === 'line' ? 'LINE' : 'FILL') + ' 칸을 골랐습니다 — 팔레트 색을 누르면 들어갑니다.');
+        }, 220);
+      });
+      el.addEventListener('dblclick', e => {
+        e.preventDefault();
+        clearTimeout(clickTimer);
+        if(tgt === 'line') lineNone = true; else penFillColor = null;
+        swArmed = tgt;
+        saveSwatches(); syncSwatches();
+        toast(tgt === 'line' ? '선 색 없음 — 펜·도형은 채움만 그립니다.' : '채움 색 없음 — 펜·도형은 선만 그립니다.');
+        if(typeof pvOverlay === 'function') pvOverlay();
+      });
+    }
+    syncSwatches();
+  })();
+
+  // 닫힌 패스를 채운다: 활성 레이어 아래 채움 레이어에 다각형 채움 (굳혀서)
+  function makeShapeFill(points, color){
+    const al = activeLayer();
+    let fl = reusableFillLayer(color, 'v');
+    if(!fl){
+      fl = createLayer('VFILL ' + (++vfillCounter));
+      const idx = layers.findIndex(x => x.id === al.id);
+      layers.splice(Math.max(0, idx), 0, fl);
+      if(al && al.folderId != null) fl.folderId = al.folderId;
+    }
+    lastFill = { id: fl.id, color, kind: 'v' };
+    let sx = 0, sy = 0; for(const p of points){ sx += p.x; sy += p.y; }
+    const act = { type:'fill', id:++actionCounter, x: sx / points.length, y: sy / points.length, color, tolerance:0,
+                  layer: fl.id, poly: points.map(p => [p.x, p.y]), holes: [] };
+    freezeVectorFillNow(act);
+    return act;
+  }
+  // 펜·도형이 만든 닫힌/열린 모양을 선·채움 칸대로 넣는다. 한 번에 되돌린다.
+  // 돌려주는 것: 만든 선 획 (없으면 null)
+  function commitShapeWithFill(strokeAct, closed){
+    const wantFill = closed && penFillColor && strokeAct.points.length > 2;
+    const wantLine = !lineNone;
+    if(!wantFill && !wantLine){
+      toast(closed ? '선 색도 채움 색도 없습니다 — 두 칸 중 하나에 색을 넣으세요.' : '선 색이 없어 열린 패스는 그릴 것이 없습니다.');
+      return null;
+    }
+    if(!wantFill){
+      // 예전 길 그대로 (빠름)
+      const al = layerById(strokeAct.layer);
+      takeUndoSnap(strokeAct.id, strokeAct.layer);
+      renderStrokeFull(al.ctx, strokeAct);
+      actions.push(strokeAct);
+      hiresAddStroke(strokeAct);
+      compositeLayers(); invalidateSnapCache(); renderLayersPanel();
+      redoStack.length = 0;
+      if(typeof syncLiveEdit === 'function') syncLiveEdit(true);
+      return strokeAct;
+    }
+    const fill = makeShapeFill(strokeAct.points, penFillColor);
+    const next = actions.slice();
+    next.push(fill);
+    if(wantLine) next.push(strokeAct);
+    const prevOrder = actions.slice();
+    actions.length = 0; actions.push(...next);
+    actions.push({ type:'pathOp', id: ++actionCounter, prevOrder, nextOrder: next.slice(),
+                   label: wantLine ? '선 + 채움' : '채움' });
+    redoStack.length = 0;
+    invalidateHiRes(); renderAll(); invalidateSnapCache(); renderLayersPanel();
+    if(typeof syncLiveEdit === 'function') syncLiveEdit(true);
+    return wantLine ? strokeAct : null;
+  }
 
   // ==================== MY PALETTE (12 user-assigned slots) ====================
   // Twelve slots that hold whatever the user puts there. The eyedropper (I)
@@ -13484,7 +13610,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         cell.classList.remove('empty');
         cell.style.background = v;
         cell.dataset.hex = v;
-        applyColor(v);
+        pickTargetColor(v);
         document.querySelectorAll('.palette-cell.selected').forEach(c=>c.classList.remove('selected'));
         cell.classList.add('selected');
         schedulePrefs();
@@ -13516,7 +13642,13 @@ showLayerMenu(ev.clientX, ev.clientY, [
       // The label forwards clicks to its input; blocking the label's click is
       // what stops a just-cleared slot from re-opening the picker.
       cell.addEventListener('click', e=>{
-        if(performance.now() < myPalSuppressClickUntil) e.preventDefault();
+        if(performance.now() < myPalSuppressClickUntil){ e.preventDefault(); return; }
+        if(swArmed && myPalette[i]){
+          e.preventDefault();
+          pickTargetColor(myPalette[i]);
+          document.querySelectorAll('.palette-cell.selected').forEach(c=>c.classList.remove('selected'));
+          cell.classList.add('selected');
+        }
       });
 
       cell.appendChild(input);
