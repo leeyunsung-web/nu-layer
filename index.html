@@ -309,7 +309,19 @@
   .trace-tools .brush-preview { width: 28px; height: 28px; }
 
   /* ---------- tool select ---------- */
-  .tool-select { display: flex; gap: 6px; align-items: center; }
+  .tool-select { display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap; }
+  .tool-group { display: flex; gap: 4px; align-items: center; flex: 1 1 auto; position: relative;
+                padding: 13px 6px 6px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel-alt); }
+  .tool-group .tg-label { position: absolute; left: 8px; top: 2px; font-family: var(--font-mono); font-size: 8.5px;
+                letter-spacing: .12em; color: var(--ink-dim); pointer-events: none; }
+  .tool-group[aria-label="Draw"] { flex: 3 1 0; } .tool-group[aria-label="Edit"] { flex: 4 1 0; } .tool-group[aria-label="Color"] { flex: 2 1 0; }
+  .tool-group .tool-btn { position: relative; padding: 8px 2px 12px; min-width: 0; font-size: 10px; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; }
+  .tool-btn kbd { position: absolute; left: 0; right: 0; bottom: 1px; text-align: center; font: 8px var(--font-mono); opacity: .45; background: none; border: 0; padding: 0; }
+  .pen-bar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 6px; padding: 6px 8px;
+             border: 1px dashed var(--border); border-radius: 8px; }
+  .pen-bar .pb-title { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; color: var(--ink-dim); }
+  .pen-bar .btn.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .pen-bar .pb-hint { font-family: var(--font-mono); font-size: 10px; color: var(--accent, #e4442d); margin-left: auto; }
   .tool-btn {
     flex: 1; padding: 10px 4px; font-family: var(--font-mono); font-size: 11px;
     border: 1px solid var(--border); background: var(--panel); color: var(--ink-dim);
@@ -931,7 +943,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b111</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b112</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -1091,6 +1103,7 @@
         <input type="range" id="traceOpacity" min="0" max="100" value="30" title="Opacity" style="width:70px">
         <button class="btn btn-sm btn-ghost" id="btnAdjustTrace" title="Resize / rotate reference">ADJUST</button>
         <button class="btn btn-sm" id="btnTraceDoneTop" style="display:none;" title="Finish placing the reference image and return to drawing">✓ DONE PLACING</button>
+        <button class="btn btn-sm" id="traceLinesBtn" title="Extract lines from the TRACE image — opens a window with the full set of controls, and drops the result in as real editable strokes">EXTRACT LINES</button>
 
         <!-- 브러시 상태 점. 원래 SIZE 슬라이더 옆에 있었는데, 32px 정사각이
              슬라이더에서 폭을 그만큼 빼앗아 값 칸까지 밀려 있었다. 캔버스 바
@@ -1128,18 +1141,35 @@
       </div>
 
       <div class="tool-select">
-        <button class="tool-btn active" data-tool="brush" title="Hotkey: B">STROKE</button>
-        <button class="tool-btn" data-tool="fill" title="Hotkey: G — fills a region and auto-splits it into a new layer">FILL</button>
-        <button class="tool-btn" data-tool="select" title="Hotkey: V — drag on canvas to move the ACTIVE layer">SELECT</button>
-        <button class="tool-btn" data-tool="eraser" title="Hotkey: E — erases on the ACTIVE layer only">ERASER</button>
-        <button class="tool-btn" data-tool="lasso" title="Hotkey: L — draw a selection, then Delete to remove it from the ACTIVE layer, T to free-transform it, or Ctrl+Shift+X to cut it onto a new layer">LASSO</button>
-        <button class="tool-btn" id="shapeBtn" aria-haspopup="true" aria-expanded="false"
-          title="Shapes — pick a rectangle, circle, triangle, star or cross star, place and size it on the canvas, then CONFIRM.">
-          <svg width="13" height="13" viewBox="0 0 13 13" aria-hidden="true" style="display:block;margin:auto">
-            <rect x="1.5" y="1.5" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
-        </button>
-        <button class="tool-btn" id="eyedropperBtn" title="Hotkey: I — click the canvas once to pick a color">EYEDROPPER</button>
-        <button class="tool-btn" id="traceLinesBtn" title="Extract lines from the TRACE image — opens a window with the full set of controls, and drops the result in as real editable strokes">EXTRACT LINES</button>
+        <div class="tool-group" aria-label="Draw">
+          <span class="tg-label">DRAW</span>
+          <button class="tool-btn active" data-tool="brush" title="Hotkey: B — freehand stroke">STROKE<kbd>B</kbd></button>
+          <button class="tool-btn" data-tool="pen" title="Hotkey: P — pen tool. Click = corner, drag = curve, click the first anchor to close, Enter to finish.">PEN<kbd>P</kbd></button>
+          <button class="tool-btn" id="shapeBtn" aria-haspopup="true" aria-expanded="false"
+            title="Shapes — pick a rectangle, circle, triangle, star or cross star, place and size it on the canvas, then CONFIRM.">
+            <svg width="13" height="13" viewBox="0 0 13 13" aria-hidden="true" style="display:block;margin:auto">
+              <rect x="1.5" y="1.5" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+          </button>
+        </div>
+        <div class="tool-group" aria-label="Edit">
+          <span class="tg-label">EDIT</span>
+          <button class="tool-btn" data-tool="node" title="Hotkey: A — direct selection: drag anchors, handles and segments of any stroke">DIRECT<kbd>A</kbd></button>
+          <button class="tool-btn" data-tool="select" title="Hotkey: V — drag on canvas to move the ACTIVE layer">MOVE<kbd>V</kbd></button>
+          <button class="tool-btn" data-tool="lasso" title="Hotkey: L — draw a selection, then Delete to remove it from the ACTIVE layer, T to free-transform it, or Ctrl+Shift+X to cut it onto a new layer">LASSO<kbd>L</kbd></button>
+          <button class="tool-btn" data-tool="eraser" title="Hotkey: E — erases on the ACTIVE layer only">ERASER<kbd>E</kbd></button>
+        </div>
+        <div class="tool-group" aria-label="Color">
+          <span class="tg-label">COLOR</span>
+          <button class="tool-btn" data-tool="fill" title="Hotkey: G — fills a region and auto-splits it into a new layer">FILL<kbd>G</kbd></button>
+          <button class="tool-btn" id="eyedropperBtn" title="Hotkey: I — click the canvas once to pick a color">PICK<kbd>I</kbd></button>
+        </div>
+      </div>
+      <div id="penBar" class="pen-bar" style="display:none;">
+        <span class="pb-title">PATH</span>
+        <button class="btn btn-sm" data-sub="add" title="+ — click a segment to add an anchor (shape stays the same)">+ ADD</button>
+        <button class="btn btn-sm" data-sub="del" title="− — click an anchor to delete it">− DELETE</button>
+        <button class="btn btn-sm" data-sub="convert" title="Shift+C — click an anchor: corner ↔ smooth · drag an anchor: new handles · drag a handle: move only that one">^ CONVERT</button>
+        <span class="pb-hint" id="penHint"></span>
       </div>
       <div id="shapePicker" role="menu" aria-label="Shapes">
           <button class="shape-pick" data-shape="rect" title="RECT"><svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3" y="4" width="16" height="14" rx="0"/></svg><span>RECT</span></button>
@@ -3470,24 +3500,6 @@ showLayerMenu(ev.clientX, ev.clientY, [
       if(k === 'l') { document.querySelector('[data-tool="lasso"]').click(); }
       // (노드 편집은 뺐다 -- A 키는 비어 있다)
       // (펜툴은 뺐다 -- P 키는 비어 있다)
-      if(currentTool === 'pen' && penDraft){
-        if(e.key === 'Enter'){ e.preventDefault(); penFinish(); return; }
-        if(e.key === 'Escape'){ e.preventDefault(); penCancel(); return; }
-      }
-      if(currentTool === 'node' && nodeSel){
-        if(e.key === 'Escape'){ clearNodeSelection(); return; }
-        if(e.key === 'Delete' || e.key === 'Backspace'){
-          const a = editedStroke();
-          if(a && nodeSel.sel.size){
-            e.preventDefault();
-            beginEdit(a);
-            if(deleteSelectedNodes(a)){ syncStrokeFromNodes(a); commitEdit(a, '앵커 지움'); }
-            else { editBefore = null; toast('앵커가 둘은 남아야 선입니다.'); }
-            drawNodeOverlay(); updateNodePanel();
-            return;
-          }
-        }
-      }
       if(e.key.toLowerCase() === 'x' && (e.ctrlKey || e.metaKey) && e.shiftKey && lassoSelection){
         e.preventDefault();
         lassoCutToNewLayer();
@@ -3916,6 +3928,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       if(a.type==='stroke'){
         const o = { type:'stroke', tool:a.tool, color:a.color, width:a.width, li,
                     pts: packPoints(a.points) };
+        if(a.nd){ o.nd = a.nd; if(a.cl) o.cl = 1; }
         // Recipes built by buildRecipeForBBox already use the compact keys
         // (tx/g/sd) — checking only a.texture DROPPED the texture here, which
         // is why spray strokes came back as smooth after a save+reload.
@@ -9028,17 +9041,32 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const out = [{ x:nodes[0].x, y:nodes[0].y }];
     const n = nodes.length;
     const last = closed ? n : n - 1;
+    // 앵커마다 아주 가까운 점(0.01px)을 양옆에 둘씩 둔다. 그리는 쪽의 매끈하기
+    // (이웃 둘까지 섞는다)가 앵커를 끌어당기지 못한다 -- 모서리가 정확하다.
+    const E = 0.01;
+    const unit = (dx, dy) => { const L = Math.hypot(dx, dy); return L > 1e-9 ? { x: dx/L, y: dy/L } : null; };
+    const segs = [];
     for(let i = 0; i < last; i++){
       const A = nodes[i], B = nodes[(i+1) % n];
-      const c1 = A.ho, c2 = B.hi;
-      if(!c1 && !c2){ out.push({ x:B.x, y:B.y }); continue; }
-      const p1 = c1 || { x:A.x, y:A.y };
-      const p2 = c2 || { x:B.x, y:B.y };
-      const rough = Math.hypot(p1.x-A.x, p1.y-A.y) + Math.hypot(p2.x-p1.x, p2.y-p1.y)
-                  + Math.hypot(B.x-p2.x, B.y-p2.y);
-      const steps = Math.max(4, Math.min(64, Math.ceil(rough / 3)));
-      for(let s = 1; s <= steps; s++) out.push(cubicAt(A, p1, p2, B, s/steps));
+      const p1 = A.ho || { x:A.x, y:A.y }, p2 = B.hi || { x:B.x, y:B.y };
+      const uo = unit(p1.x-A.x, p1.y-A.y) || unit(p2.x-A.x, p2.y-A.y) || unit(B.x-A.x, B.y-A.y) || { x:0, y:0 };
+      const ui = unit(B.x-p2.x, B.y-p2.y) || unit(B.x-p1.x, B.y-p1.y) || unit(B.x-A.x, B.y-A.y) || { x:0, y:0 };
+      segs.push({ A, B, p1, p2, uo, ui, curve: !!(A.ho || B.hi) });
     }
+    const side = (v, u, s) => { out.push({ x: v.x + u.x*E*s, y: v.y + u.y*E*s }); };
+    side(segs[0].A, segs[0].uo, 1); side(segs[0].A, segs[0].uo, 2);
+    segs.forEach((g, k) => {
+      if(g.curve){
+        const rough = Math.hypot(g.p1.x-g.A.x, g.p1.y-g.A.y) + Math.hypot(g.p2.x-g.p1.x, g.p2.y-g.p1.y)
+                    + Math.hypot(g.B.x-g.p2.x, g.B.y-g.p2.y);
+        const steps = Math.max(4, Math.min(160, Math.ceil(rough / 2)));
+        for(let s = 1; s < steps; s++) out.push(cubicAt(g.A, g.p1, g.p2, g.B, s/steps));
+      }
+      side(g.B, g.ui, -2); side(g.B, g.ui, -1);
+      out.push({ x:g.B.x, y:g.B.y });
+      const nx = segs[k+1];
+      if(nx){ side(g.B, nx.uo, 1); side(g.B, nx.uo, 2); }
+    });
     return out;
   }
 
@@ -9089,7 +9117,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
   }
 
   function snapshotStroke(a){
-    return { nodes: a.nodes ? a.nodes.map(n => ({ x:n.x, y:n.y,
+    return { nodes: a.nodes ? a.nodes.map(n => ({ x:n.x, y:n.y, sm: !!n.sm,
                                 hi: n.hi ? {x:n.hi.x, y:n.hi.y} : null,
                                 ho: n.ho ? {x:n.ho.x, y:n.ho.y} : null })) : null,
              points: a.points.map(p => ({ x:p.x, y:p.y, p:p.p })),
@@ -9097,9 +9125,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
              pw: a.pw ? a.pw.slice() : null };
   }
   function restoreStroke(a, s){
-    a.nodes = s.nodes ? s.nodes.map(n => ({ x:n.x, y:n.y,
+    a.nodes = s.nodes ? s.nodes.map(n => ({ x:n.x, y:n.y, sm: !!n.sm,
                           hi: n.hi ? {x:n.hi.x, y:n.hi.y} : null,
                           ho: n.ho ? {x:n.ho.x, y:n.ho.y} : null })) : null;
+    a._bb = null; a._bbFor = null;
     a.points = s.points.map(p => ({ x:p.x, y:p.y, p:p.p }));
     a.closed = s.closed; a.edit = s.edit; a.pw = s.pw ? s.pw.slice() : null;
   }
@@ -9121,6 +9150,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
   // ---- 덧그림판: 앵커와 핸들 ----
   function drawNodeOverlay(){
+    if(typeof pvOverlay === 'function'){ pvOverlay(); return; }
     const oc = $('lassoOverlay');
     if(!oc) return;
     const c = oc.getContext('2d');
@@ -9260,10 +9290,6 @@ showLayerMenu(ev.clientX, ev.clientY, [
   }
 
 
-  function penFinishIfDrawing(){
-    if(penDraft && penDraft.nodes.length >= 2) penFinish();
-    else penCancel();
-  }
 
   let _lastPrecise = false;
   function refreshPreciseView(){
@@ -9280,79 +9306,843 @@ showLayerMenu(ev.clientX, ev.clientY, [
     refreshPreciseView();
   }
 
-  // ---- 펜툴 ----
-  let penDraft = null;   // { nodes:[], closed:false, drag:null }
 
-  function penPreview(hover){
+  // ==================== PEN v2 (일러스트레이터식) ====================
+  let penDraft = null;     // 그리는 중인 패스 { nodes, closed, base }  base = 이어 그리는 원래 획
+  let penSub = null;       // null | 'add' | 'del' | 'convert'
+  let pvDrag = null;       // 지금 하는 끌기
+  let pvHover = null;      // 커서 (캔버스 좌표)
+  let pvAlt = false, pvShift = false;
+  const PV_DRAG_PX = 6;    // 이보다 덜 움직이면 클릭 (펜 손떨림)
+
+  // 화면 1px = 캔버스 몇 px
+  function pvK(){
+    const w = drawCanvas.offsetWidth || drawCanvas.width;
+    return (w / drawCanvas.width) * (viewZoom || 1);
+  }
+  const pvR = () => 7 / pvK();
+  const pvDist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const pvP = (x, y) => ({ x, y });
+  const pvMirror = (n, h) => ({ x: 2*n.x - h.x, y: 2*n.y - h.y });
+  const pvCloneNode = n => ({ x:n.x, y:n.y, sm:!!n.sm, hi: n.hi ? {x:n.hi.x, y:n.hi.y} : null, ho: n.ho ? {x:n.ho.x, y:n.ho.y} : null });
+  function pvConstrain(from, p){
+    const dx = p.x - from.x, dy = p.y - from.y;
+    if(!dx && !dy) return pvP(p.x, p.y);
+    const a = Math.round(Math.atan2(dy, dx) / (Math.PI/4)) * (Math.PI/4);
+    const pr = dx*Math.cos(a) + dy*Math.sin(a);
+    return pvP(from.x + Math.cos(a)*pr, from.y + Math.sin(a)*pr);
+  }
+  function pvReverse(nodes){
+    nodes.reverse();
+    for(const n of nodes){ const t = n.hi; n.hi = n.ho; n.ho = t; }
+    return nodes;
+  }
+  function pvSeg(nodes, closed, i){
+    const a = nodes[i], b = nodes[(i+1) % nodes.length];
+    return [a, a.ho || a, b.hi || b, b];
+  }
+  const pvSegCount = (nodes, closed) => closed ? nodes.length : nodes.length - 1;
+
+  // 획의 앵커. 기록에서 불러온 것(nd)은 points[0] 에 다시 앉힌다. 다른 도구가
+  // points 만 바꿔(늘이기·지우개 등) 앵커와 어긋났으면 앵커는 버린다 -- 그때는
+  // 자유 획처럼 다룬다. 어긋난 앵커로 손대면 선이 튄다.
+  function pvNodesOf(a){
+    if(!a || a.type !== 'stroke' || !a.points || !a.points.length) return null;
+    if(!a.nodes && a.nd){
+      a.nodes = a.nd.map(q => ({ x:q[0], y:q[1], hi: q[2] != null ? {x:q[2], y:q[3]} : null,
+                                 ho: q[4] != null ? {x:q[4], y:q[5]} : null, sm: !!q[6] }));
+      a.closed = !!a.cl; a.edit = 'bezier';
+    }
+    if(!a.nodes || a.edit !== 'bezier' || a.nodes.length < 2) return null;
+    const p0 = a.points[0], pN = a.points[a.points.length - 1];
+    const n0 = a.nodes[0], nN = a.closed ? a.nodes[0] : a.nodes[a.nodes.length - 1];
+    const dx = p0.x - n0.x, dy = p0.y - n0.y;
+    if(Math.abs(nN.x + dx - pN.x) > 0.6 || Math.abs(nN.y + dy - pN.y) > 0.6){
+      a.nodes = null; a.edit = null; return null;          // 어긋났다
+    }
+    if(Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01){
+      for(const n of a.nodes){
+        n.x += dx; n.y += dy;
+        if(n.hi){ n.hi.x += dx; n.hi.y += dy; }
+        if(n.ho){ n.ho.x += dx; n.ho.y += dy; }
+      }
+    }
+    return a.nodes;
+  }
+  // 편집할 앵커: 펜 획은 그 앵커, 자유 획은 맞춘 앵커를 '미리보기'로만 (끌기 전엔 안 바꾼다)
+  function pvEditNodes(a){
+    const own = pvNodesOf(a);
+    if(own) return own;
+    if(!nodeSel || nodeSel.id !== a.id) return null;
+    if(!nodeSel.tmp){
+      nodeSel.tmp = fitNodes(a.points, nodeFitTol);
+      for(const n of nodeSel.tmp) n.sm = !!(n.hi && n.ho);
+    }
+    return nodeSel.tmp;
+  }
+  // 실제로 손대는 순간: 되돌리기 사진을 찍고, 자유 획이면 그때 앵커로 바꾼다
+  function pvBegin(a){
+    beginEdit(a);
+    if(!pvNodesOf(a)){
+      a.pw = a.pw || pressureProfile(a.points, 32);
+      a.nodes = (nodeSel && nodeSel.id === a.id && nodeSel.tmp) ? nodeSel.tmp : fitNodes(a.points, nodeFitTol);
+      a.edit = 'bezier'; a.closed = !!a.closed;
+      if(nodeSel) nodeSel.tmp = null;
+    }
+  }
+  let pvRaf = 0, pvRafLayer = null;
+  function pvLive(a){
+    syncStrokeFromNodes(a);
+    a._bb = null; a._bbFor = null;
+    pvRafLayer = a.layer;
+    if(pvRaf) return;
+    pvRaf = requestAnimationFrame(() => {
+      pvRaf = 0;
+      if(pvRafLayer != null && layerById(pvRafLayer)){ invalidateHiRes(); renderSingleLayer(pvRafLayer); }
+      pvOverlay();
+    });
+  }
+  function pvCommit(a, label){
+    if(pvRaf){ cancelAnimationFrame(pvRaf); pvRaf = 0; }
+    syncStrokeFromNodes(a);
+    a._bb = null; a._bbFor = null;
+    invalidateHiRes();
+    commitEdit(a, label);
+    invalidateSnapCache();
+    pvOverlay();
+  }
+  // 획이 생기고 없어지는 조작 -- 목록 통째로 되돌린다
+  function pvPathOp(nextOrder, label){
+    const prevOrder = actions.slice();
+    actions.length = 0;
+    actions.push(...nextOrder);
+    actions.push({ type:'pathOp', id: ++actionCounter, prevOrder, nextOrder: nextOrder.slice(), label });
+    redoStack.length = 0;
+    invalidateHiRes(); renderAll(); invalidateSnapCache(); renderLayersPanel();
+  }
+  function pvCloneStroke(a, nodes, closed){
+    const o = Object.assign({}, a);
+    o.id = ++actionCounter;
+    o.nodes = nodes; o.closed = !!closed; o.edit = 'bezier'; o.pw = null;
+    delete o.nd; delete o.cl;
+    o.points = []; o._bb = null; o._bbFor = null;
+    syncStrokeFromNodes(o);
+    return o;
+  }
+
+  // 손댈 수 있는 획 (보이는 레이어, 지우개 아님)
+  function pvStrokes(onlyActive){
+    const al = activeLayer();
+    return actions.filter(a => a.type === 'stroke' && a.tool !== 'eraser' && a.points && a.points.length > 1
+      && (!onlyActive || a.layer === al.id)
+      && (() => { const l = layerById(a.layer); return l && l.visible; })());
+  }
+  // 이어 그릴 수 있는 끝점: 활성 레이어의 열린 펜 획
+  function pvHitEndpoint(q, exceptId){
+    let best = null;
+    for(const a of pvStrokes(true)){
+      if(a.id === exceptId) continue;
+      const ns = pvNodesOf(a);
+      if(!ns || a.closed) continue;
+      for(const i of [0, ns.length - 1]){
+        const d = pvDist(ns[i], q);
+        if(d <= pvR() && (!best || d < best.d)) best = { a, i, d, end: i === ns.length - 1 };
+      }
+    }
+    return best;
+  }
+  function pvHitAnchor(q, a, ns){
+    let best = null;
+    ns.forEach((n, i) => { const d = pvDist(n, q); if(d <= pvR() && (!best || d < best.d)) best = { i, d }; });
+    return best;
+  }
+  function pvNearest(ns, closed, q){
+    let best = null;
+    for(let i = 0; i < pvSegCount(ns, closed); i++){
+      const s = pvSeg(ns, closed, i);
+      let bt = 0, bd = Infinity;
+      for(let k = 0; k <= 40; k++){ const t = k/40, b = cubicAt(s[0], s[1], s[2], s[3], t), d = pvDist(b, q); if(d < bd){ bd = d; bt = t; } }
+      let st = 1/40;
+      for(let it = 0; it < 10; it++){
+        st /= 2;
+        for(const t of [bt - st, bt + st]){ if(t < 0 || t > 1) continue; const d = pvDist(cubicAt(s[0], s[1], s[2], s[3], t), q); if(d < bd){ bd = d; bt = t; } }
+      }
+      if(!best || bd < best.d) best = { i, t: bt, d: bd };
+    }
+    return best;
+  }
+  function pvHitSegment(q, a, ns){
+    const r = pvNearest(ns, !!a.closed, q);
+    const lim = Math.max(pvR(), (a.width || 1) / 2 + 2 / pvK());
+    return (r && r.d <= lim) ? r : null;
+  }
+  // 고른 앵커와 그 이웃의 핸들
+  function pvHandles(a, ns){
+    const out = [], L = ns.length, seen = new Set();
+    const add = (i, w) => { const n = ns[i]; const k = i + w; if(n && n[w] && !seen.has(k)){ seen.add(k); out.push({ i, which: w, h: n[w] }); } };
+    for(const i of (nodeSel ? nodeSel.sel : [])){
+      add(i, 'hi'); add(i, 'ho');
+      if(a.closed || i > 0) add((i - 1 + L) % L, 'ho');
+      if(a.closed || i < L - 1) add((i + 1) % L, 'hi');
+    }
+    return out;
+  }
+  function pvHitHandle(q, a, ns){
+    let best = null;
+    for(const h of pvHandles(a, ns)){ const d = pvDist(h.h, q); if(d <= pvR() && (!best || d < best.d)) best = { ...h, d }; }
+    return best;
+  }
+
+  // ---- 펜이 지금 무엇을 할지 (커서 표시와 클릭이 같은 판단을 쓴다) ----
+  function pvIntent(q, alt){
+    if(penDraft){
+      const ns = penDraft.nodes;
+      if(ns.length > 1 && pvDist(ns[0], q) <= pvR()) return { kind:'close' };
+      if(ns.length && pvDist(ns[ns.length - 1], q) <= pvR()) return { kind:'last' };
+      const ep = pvHitEndpoint(q, penDraft.base ? penDraft.base.id : null);
+      if(ep && ns.length) return { kind:'join', ep };
+      return { kind:'add' };
+    }
+    if(alt){
+      for(const a of pvStrokes(true).reverse()){
+        const ns = pvNodesOf(a); if(!ns) continue;
+        const h = pvHitAnchor(q, a, ns); if(h) return { kind:'convert', a, i: h.i };
+      }
+    }
+    const ep = pvHitEndpoint(q, null);
+    if(ep) return { kind:'continue', ep };
+    return { kind:'start' };
+  }
+  const PV_GLYPH = { close:['○','닫기 — 끌면 닫는 선만 곡선'], last:['⌃','마지막 앵커: 클릭 = 다음은 직선, 끌기 = 방향만'],
+                     join:['⊃','이 획과 잇기'], add:['',''], convert:['^','뾰족 ↔ 부드럽게'],
+                     continue:['/','이 획에서 이어 그리기'], start:['*','새 패스'] };
+
+  // ---- 펜 ----
+  function penDown(q, e){
+    const it = pvIntent(q, e.altKey);
+    if(it.kind === 'close'){
+      penDraft.closed = true;
+      pvDrag = { kind:'close', start:q, last:q, moved:false };
+      return;
+    }
+    if(it.kind === 'last'){
+      const n = penDraft.nodes[penDraft.nodes.length - 1];
+      n.ho = null; n.sm = false;
+      pvDrag = { kind:'out', i: penDraft.nodes.length - 1, start:q, last:q, moved:false };
+      return;
+    }
+    if(it.kind === 'join'){ penJoin(it.ep); return; }
+    if(it.kind === 'continue'){
+      const a = it.ep.a;
+      const ns = pvNodesOf(a).map(pvCloneNode);
+      if(it.ep.i === 0) pvReverse(ns);
+      penDraft = { nodes: ns, closed:false, base: a };
+      nodeSel = null;
+      pvDrag = { kind:'out', i: ns.length - 1, start:q, last:q, moved:false };
+      return;
+    }
+    if(it.kind === 'convert'){ nodeSel = { id: it.a.id, sel: new Set([it.i]), drag:null }; convertDown(it.a, it.i, q); return; }
+    // 새 앵커
+    if(!penDraft){ penDraft = { nodes: [], closed:false, base:null }; nodeSel = null; }
+    let pt = q;
+    const ns = penDraft.nodes;
+    if(e.shiftKey && ns.length) pt = pvConstrain(ns[ns.length - 1], q);
+    else if(snapActive(e)){
+      // 있는 획의 끝점에 붙는다 -- 플로터는 1px 틈도 그린다
+      const t = nearestSnap(q, snapCandidates(null), snapRadiusCanvas());
+      if(t) pt = { x:t.x, y:t.y };
+    }
+    ns.push({ x:pt.x, y:pt.y, hi:null, ho:null, sm:false });
+    pvDrag = { kind:'new', i: ns.length - 1, start:pt, last:q, moved:false };
+  }
+  function penMove(q, e){
+    const d = pvDrag, ns = penDraft ? penDraft.nodes : null;
+    if(!ns) return;
+    if(!d.moved && pvDist(q, d.start) * pvK() < PV_DRAG_PX){ d.last = q; return; }
+    d.moved = true;
+    if(d.kind === 'new'){
+      const n = ns[d.i];
+      if(spaceKeyHeld){                              // 찍고 있는 앵커 자체를 옮긴다
+        const dx = q.x - d.last.x, dy = q.y - d.last.y;
+        n.x += dx; n.y += dy;
+        if(n.hi){ n.hi.x += dx; n.hi.y += dy; }
+        if(n.ho){ n.ho.x += dx; n.ho.y += dy; }
+      } else {
+        const h = e.shiftKey ? pvConstrain(n, q) : q;
+        n.ho = pvP(h.x, h.y);
+        if(d.i === 0){ n.hi = null; n.sm = false; }          // 첫 앵커: 나가는 쪽만
+        else if(!e.altKey){ n.hi = pvMirror(n, n.ho); n.sm = true; }
+        else n.sm = false;                                      // Alt: 들어오는 쪽은 그대로
+      }
+    } else if(d.kind === 'out'){
+      const n = ns[d.i], h = e.shiftKey ? pvConstrain(n, q) : q;
+      n.ho = pvP(h.x, h.y); n.sm = false;
+    } else if(d.kind === 'close'){
+      const n = ns[0], h = e.shiftKey ? pvConstrain(n, q) : q;
+      n.hi = pvMirror(n, h); n.sm = false;                      // 닫는 선만. 첫 선(ho)은 그대로
+    }
+    d.last = q;
+  }
+  function penUp(){
+    const d = pvDrag;
+    if(d.kind === 'new' && !d.moved && penDraft){
+      const n = penDraft.nodes[d.i]; if(n){ n.hi = null; n.ho = null; n.sm = false; }
+    }
+    if(d.kind === 'close') penFinish();
+  }
+  function penFinish(){
+    if(!penDraft) return;
+    const pd = penDraft;
+    penDraft = null;
+    if(pd.nodes.length < 2){ pvOverlay(); return; }
+    if(pd.closed && pd.nodes.length < 3) pd.closed = false;
+    if(pd.base && !pd.closed && pd.nodes.length === pvNodesOf(pd.base).length){
+      // 이어 그리려다 아무것도 안 더했다 -- 그대로 둔다 (방향 핸들만 만졌어도 무시)
+      nodeSel = { id: pd.base.id, sel: new Set(), drag:null };
+      pvOverlay(); return;
+    }
+    if(pd.base){
+      // 이어 그린 획: 원래 획을 새 획으로 바꾼다 (되돌리면 원래대로)
+      const o = pvCloneStroke(pd.base, pd.nodes, pd.closed);
+      const next = actions.map(x => x === pd.base ? o : x);
+      pvPathOp(next, '이어 그리기');
+      nodeSel = { id: o.id, sel: new Set(), drag:null };
+      pvOverlay();
+      return;
+    }
+    const al = activeLayer();
+    const act = { type:'stroke', id:++actionCounter, tool:'brush',
+                  color: strokeColor, width: strokeWidthNow(),
+                  texture: currentTexture, grain: currentGrain,
+                  seed: (Math.random()*2147483647)|0,
+                  nodes: pd.nodes, closed: pd.closed, edit:'bezier', pw:null,
+                  points: [], layer: al.id };
+    syncStrokeFromNodes(act);
+    takeUndoSnap(act.id, act.layer);
+    renderStrokeFull(al.ctx, act);
+    actions.push(act);
+    { const lp = act.points[act.points.length - 1]; lastStrokeEnd = { x: lp.x, y: lp.y, layer: act.layer }; }
+    hiresAddStroke(act);
+    compositeLayers();
+    invalidateSnapCache();
+    renderLayersPanel();
+    redoStack.length = 0;
+    nodeSel = { id: act.id, sel: new Set(), drag:null };   // 그린 패스는 고른 채로 (앵커가 보인다)
+    pvOverlay();
+  }
+  function penCancel(){ penDraft = null; pvDrag = null; pvOverlay(); }
+  function penFinishIfDrawing(){ if(penDraft) penFinish(); }
+  function penPreview(){ pvOverlay(); }
+  // 그리다 다른 획의 끝점을 누르면 하나로 잇는다
+  function penJoin(ep){
+    const pd = penDraft; penDraft = null;
+    const other = ep.a;
+    const ons = pvNodesOf(other).map(pvCloneNode);
+    if(ep.end) pvReverse(ons);                      // 누른 끝점이 이어 붙는 쪽이 되게
+    const nodes = pd.nodes.concat(ons);
+    const style = pd.base || other;
+    const o = pvCloneStroke(style, nodes, false);
+    o.layer = other.layer;
+    const next = [];
+    for(const x of actions){
+      if(x === other) next.push(o);
+      else if(x !== pd.base) next.push(x);
+    }
+    pvPathOp(next, '패스 잇기');
+    nodeSel = { id: o.id, sel: new Set(), drag:null };
+    pvOverlay();
+  }
+
+  // ---- 변환 (Alt+앵커, ^ CONVERT) ----
+  function convertDown(a, i, q){
+    pvDrag = { kind:'convert', id: a.id, i, start:q, moved:false };
+  }
+  function convertMove(q, e){
+    const d = pvDrag, a = actions.find(x => x.id === d.id); if(!a) return;
+    if(!d.moved && pvDist(q, d.start) * pvK() < PV_DRAG_PX) return;
+    if(!d.moved){ pvBegin(a); d.moved = true; }
+    const n = a.nodes[d.i], h = e.shiftKey ? pvConstrain(n, q) : q;
+    n.ho = pvP(h.x, h.y); n.hi = pvMirror(n, n.ho); n.sm = true;
+    pvLive(a);
+  }
+  function convertUp(){
+    const d = pvDrag, a = actions.find(x => x.id === d.id); if(!a) return;
+    if(d.moved){ pvCommit(a, '앵커 변환'); return; }
+    pvBegin(a);
+    const ns = a.nodes, n = ns[d.i];
+    if(n.hi || n.ho){ n.hi = null; n.ho = null; n.sm = false; }
+    else {
+      const L = ns.length;
+      const p = (a.closed || d.i > 0) ? ns[(d.i - 1 + L) % L] : n;
+      const q = (a.closed || d.i < L - 1) ? ns[(d.i + 1) % L] : n;
+      const tx = (q.x - p.x) / 6, ty = (q.y - p.y) / 6;
+      if(tx || ty){ n.hi = pvP(n.x - tx, n.y - ty); n.ho = pvP(n.x + tx, n.y + ty); n.sm = true; }
+    }
+    pvCommit(a, '앵커 변환');
+  }
+
+  // ---- 직접 선택 ----
+  function pvPick(q){
+    // 위에 그려진 것부터. 잡기 범위는 선 굵기 + 화면 6px
+    const list = pvStrokes(false).reverse();
+    let best = null;
+    for(const a of list){
+      const ns = pvEditNodesPeek(a);
+      const r = ns ? pvNearest(ns, !!a.closed, q) : null;
+      let d = r ? r.d : Infinity;
+      if(!ns){ for(let i = 1; i < a.points.length; i++) d = Math.min(d, distToSegment(q, a.points[i-1], a.points[i])); }
+      const lim = (a.width || 1) / 2 + 6 / pvK();
+      if(d <= lim && (!best || d < best.d - 0.5)) best = { a, d };
+    }
+    return best ? best.a : null;
+  }
+  function pvEditNodesPeek(a){ return pvNodesOf(a); }
+  function pvSelect(a){
+    nodeSel = { id: a.id, sel: new Set(), drag:null, tmp: null };
+  }
+  function directDown(q, e){
+    let a = editedStroke();
+    let ns = a ? pvEditNodes(a) : null;
+    // 1. 핸들
+    if(a && ns){
+      const h = pvHitHandle(q, a, ns);
+      if(h){ pvDrag = { kind:'handle', id:a.id, i:h.i, which:h.which, start:q, moved:false,
+                        brk: e.altKey || penSub === 'convert' }; return; }
+    }
+    // 2. 앵커 · 3. 선분 -- 고른 획이 없거나 빗나가면 누른 자리의 획을 고른다
+    const tryOn = (a, ns) => {
+      const an = pvHitAnchor(q, a, ns);
+      if(an){
+        const i = an.i;
+        if(penSub === 'convert'){ convertDown(a, i, q); return true; }
+        if(e.shiftKey){ if(nodeSel.sel.has(i)) nodeSel.sel.delete(i); else nodeSel.sel.add(i); }
+        else if(!nodeSel.sel.has(i)) nodeSel.sel = new Set([i]);
+        pvDrag = { kind:'nodes', id:a.id, start:q, moved:false };
+        return true;
+      }
+      const sg = pvHitSegment(q, a, ns);
+      if(sg){
+        const L = ns.length;
+        if(!e.shiftKey) nodeSel.sel = new Set();
+        nodeSel.sel.add(sg.i); nodeSel.sel.add((sg.i + 1) % L);
+        pvDrag = { kind:'bend', id:a.id, i:sg.i, t: Math.min(0.85, Math.max(0.15, sg.t)), start:q, moved:false };
+        return true;
+      }
+      return false;
+    };
+    if(a && ns && tryOn(a, ns)) return;
+    const pick = pvPick(q);
+    if(pick && (!a || pick.id !== a.id)){
+      pvSelect(pick);
+      const pns = pvEditNodes(pick);
+      if(pns && tryOn(pick, pns)) return;
+      return;
+    }
+    if(!pick && !e.shiftKey && !(a && ns)){ nodeSel = null; }
+    if(a && ns) pvDrag = { kind:'marquee', id:a.id, start:q, cur:q, add:e.shiftKey };
+    else nodeSel = null;
+  }
+  function directMove(q, e){
+    const d = pvDrag;
+    if(d.kind === 'marquee'){ d.cur = q; return; }
+    const a = actions.find(x => x.id === d.id); if(!a) return;
+    if(!d.moved && pvDist(q, d.start) * pvK() < 2) return;
+    if(!d.moved){
+      pvBegin(a); d.moved = true;
+      const ns = a.nodes;
+      if(d.kind === 'nodes') d.orig = [...nodeSel.sel].map(i => ({ i, n: pvCloneNode(ns[i]) }));
+      if(d.kind === 'handle'){ const n = ns[d.i], opp = d.which === 'hi' ? 'ho' : 'hi'; d.oppLen = n[opp] ? pvDist(n, n[opp]) : 0; }
+      if(d.kind === 'bend'){ const L = ns.length; d.a0 = pvCloneNode(ns[d.i]); d.b0 = pvCloneNode(ns[(d.i + 1) % L]); }
+    }
+    const ns = a.nodes;
+    if(d.kind === 'nodes'){
+      let dx = q.x - d.start.x, dy = q.y - d.start.y;
+      if(e.shiftKey){ const c = pvConstrain(pvP(0,0), pvP(dx, dy)); dx = c.x; dy = c.y; }
+      for(const o of d.orig){
+        const n = ns[o.i];
+        n.x = o.n.x + dx; n.y = o.n.y + dy;
+        n.hi = o.n.hi ? pvP(o.n.hi.x + dx, o.n.hi.y + dy) : null;
+        n.ho = o.n.ho ? pvP(o.n.ho.x + dx, o.n.ho.y + dy) : null;
+      }
+    } else if(d.kind === 'handle'){
+      const n = ns[d.i], h = e.shiftKey ? pvConstrain(n, q) : q;
+      n[d.which] = pvP(h.x, h.y);
+      const opp = d.which === 'hi' ? 'ho' : 'hi';
+      if(d.brk || e.altKey){ n.sm = false; d.brk = true; }
+      else if(n.sm && n[opp] && d.oppLen){
+        // 부드러운 앵커: 반대쪽은 길이 그대로, 방향만 맞은편
+        const dx = n.x - h.x, dy = n.y - h.y, L = Math.hypot(dx, dy) || 1;
+        n[opp] = pvP(n.x + dx/L*d.oppLen, n.y + dy/L*d.oppLen);
+      }
+    } else if(d.kind === 'bend'){
+      const L = ns.length, A = ns[d.i], B = ns[(d.i + 1) % L];
+      const dx = q.x - d.start.x, dy = q.y - d.start.y;
+      const k = 1 / (3 * d.t * (1 - d.t));
+      const c1 = d.a0.ho || pvP(d.a0.x + (d.b0.x - d.a0.x)/3, d.a0.y + (d.b0.y - d.a0.y)/3);
+      const c2 = d.b0.hi || pvP(d.b0.x + (d.a0.x - d.b0.x)/3, d.b0.y + (d.a0.y - d.b0.y)/3);
+      A.ho = pvP(c1.x + dx*k, c1.y + dy*k);
+      B.hi = pvP(c2.x + dx*k, c2.y + dy*k);
+      A.sm = false; B.sm = false;                       // 옆 선분은 그대로
+    }
+    pvLive(a);
+  }
+  function directUp(){
+    const d = pvDrag;
+    if(d.kind === 'marquee'){
+      const a = actions.find(x => x.id === d.id);
+      const ns = a ? pvEditNodes(a) : null;
+      if(ns){
+        const x0 = Math.min(d.start.x, d.cur.x), x1 = Math.max(d.start.x, d.cur.x);
+        const y0 = Math.min(d.start.y, d.cur.y), y1 = Math.max(d.start.y, d.cur.y);
+        if((x1 - x0) * pvK() > 2 || (y1 - y0) * pvK() > 2){
+          if(!d.add) nodeSel.sel = new Set();
+          ns.forEach((n, i) => { if(n.x >= x0 && n.x <= x1 && n.y >= y0 && n.y <= y1) nodeSel.sel.add(i); });
+        } else if(!d.add){ nodeSel = null; }
+      }
+      return;
+    }
+    const a = actions.find(x => x.id === d.id);
+    if(a && d.moved) pvCommit(a, d.kind === 'handle' ? '핸들 옮김' : d.kind === 'bend' ? '선분 휘기' : '앵커 옮김');
+  }
+
+  // + / − (펜·직접 선택 둘 다에서)
+  function subDown(q){
+    const cur = editedStroke();
+    const cands = cur ? [cur].concat(pvStrokes(false).reverse().filter(x => x !== cur)) : pvStrokes(false).reverse();
+    for(const a of cands){
+      const ns = (nodeSel && nodeSel.id === a.id) ? pvEditNodes(a) : pvNodesOf(a);
+      if(!ns) continue;
+      if(penSub === 'add'){
+        const sg = pvHitSegment(q, a, ns);
+        if(!sg) continue;
+        if(!nodeSel || nodeSel.id !== a.id) pvSelect(a);
+        pvBegin(a);
+        const at = insertNodeAt(a, sg.i, sg.t);
+        const m = a.nodes[at]; m.sm = !!(m.hi && m.ho);
+        nodeSel.sel = new Set([at]);
+        pvCommit(a, '앵커 추가');
+        return;
+      }
+      if(penSub === 'del'){
+        const an = pvHitAnchor(q, a, ns);
+        if(!an) continue;
+        if(ns.length <= 2){
+          // 둘 남은 패스에서 하나를 지우면 선이 아니다 -- 획을 지운다
+          pvPathOp(actions.filter(x => x !== a), '패스 지움');
+          nodeSel = null; pvOverlay();
+          return;
+        }
+        if(!nodeSel || nodeSel.id !== a.id) pvSelect(a);
+        pvBegin(a);
+        a.nodes.splice(an.i, 1);
+        if(a.closed && a.nodes.length < 3) a.closed = false;
+        nodeSel.sel = new Set();
+        pvCommit(a, '앵커 삭제');
+        return;
+      }
+    }
+  }
+
+  // ---- 포인터 입구 ----
+  function pvDown(p, e){
+    pvHover = p; pvAlt = e.altKey; pvShift = e.shiftKey;
+    if(penSub === 'add' || penSub === 'del'){ if(!penDraft) subDown(p); pvOverlay(); return; }
+    try { drawCanvas.setPointerCapture(e.pointerId); } catch(err){}
+    if(currentTool === 'pen' && penSub !== 'convert') penDown(p, e);
+    else if(penSub === 'convert' && !penDraft){
+      // 변환: 핸들 → 그 핸들만, 앵커 → 뾰족/부드럽게·새 핸들
+      const a = editedStroke(), ns = a ? pvEditNodes(a) : null;
+      const h = (a && ns) ? pvHitHandle(q2(p), a, ns) : null;
+      if(h) pvDrag = { kind:'handle', id:a.id, i:h.i, which:h.which, start:p, moved:false, brk:true };
+      else {
+        let hit = null;
+        for(const s of (a ? [a] : []).concat(pvStrokes(false).reverse())){
+          const sn = pvNodesOf(s) || (nodeSel && nodeSel.id === s.id ? pvEditNodes(s) : null);
+          if(!sn) continue;
+          const an = pvHitAnchor(p, s, sn); if(an){ hit = { a:s, i:an.i }; break; }
+        }
+        if(hit){ if(!nodeSel || nodeSel.id !== hit.a.id) pvSelect(hit.a); nodeSel.sel = new Set([hit.i]); convertDown(hit.a, hit.i, p); }
+        else { const pick = pvPick(p); if(pick) pvSelect(pick); }
+      }
+    }
+    else directDown(p, e);
+    pvOverlay();
+  }
+  const q2 = p => p;
+  function pvMove(p, e){
+    pvHover = p; pvAlt = e.altKey; pvShift = e.shiftKey;
+    if(pvDrag){
+      if(pvDrag.kind === 'convert') convertMove(p, e);
+      else if(['new','out','close'].includes(pvDrag.kind)) penMove(p, e);
+      else directMove(p, e);
+    }
+    pvOverlay();
+  }
+  function pvUp(e){
+    const d = pvDrag;
+    pvDrag = null;
+    if(!d) return;
+    pvDrag = d;
+    if(d.kind === 'convert') convertUp();
+    else if(['new','out','close'].includes(d.kind)) penUp();
+    else directUp();
+    pvDrag = null;
+    pvOverlay();
+  }
+
+  // ---- 키 ----
+  function pvSetSub(s){
+    penSub = (penSub === s) ? null : s;
+    pvToolChanged();
+  }
+  function pvToolChanged(){
+    const on = currentTool === 'pen' || currentTool === 'node';
+    const bar = $('penBar');
+    if(bar){
+      bar.style.display = on ? 'flex' : 'none';
+      bar.querySelectorAll('[data-sub]').forEach(b => b.classList.toggle('on', b.dataset.sub === penSub));
+    }
+    if(!on){ penSub = null; if(penDraft) penFinish(); }
+    pvOverlay();
+  }
+  // 선택 앵커 지우기: 앵커와 붙은 선분이 사라지고 패스가 끊긴다
+  function pvDeleteSelected(){
+    const a = editedStroke();
+    if(!a || !nodeSel || !nodeSel.sel.size) return false;
+    const ns = pvNodesOf(a) || pvEditNodes(a);
+    if(!ns) return false;
+    const L = ns.length, del = nodeSel.sel;
+    let order = [...Array(L).keys()];
+    if(a.closed){
+      const f = order.findIndex(i => del.has(i));
+      order = order.slice(f).concat(order.slice(0, f));
+    }
+    const runs = []; let cur = [];
+    for(const i of order){ if(del.has(i)){ if(cur.length) runs.push(cur); cur = []; } else cur.push(pvCloneNode(ns[i])); }
+    if(cur.length) runs.push(cur);
+    const pieces = runs.filter(r => r.length > 1).map(r => {
+      r[0].hi = null; r[r.length - 1].ho = null;
+      const o = pvCloneStroke(a, r, false);
+      o.pw = null;
+      return o;
+    });
+    const next = [];
+    for(const x of actions){ if(x === a) next.push(...pieces); else next.push(x); }
+    pvPathOp(next, pieces.length ? '앵커 지움 (패스 끊김)' : '패스 지움');
+    nodeSel = pieces.length ? { id: pieces[0].id, sel: new Set(), drag:null } : null;
+    pvOverlay();
+    return true;
+  }
+  // Ctrl+J: 같은 획의 두 끝점 → 닫기, 다른 획 끝점(nodeSel.join) → 잇기
+  function pvJoin(){
+    const a = editedStroke();
+    if(!a || !nodeSel) return;
+    const ns = pvNodesOf(a) || pvEditNodes(a);
+    if(!ns || a.closed) { toast('열린 패스의 끝점을 고르세요.'); return; }
+    const L = ns.length, ends = [...nodeSel.sel].filter(i => i === 0 || i === L - 1);
+    if(nodeSel.join){
+      const b = actions.find(x => x.id === nodeSel.join.id);
+      const bn = b && pvNodesOf(b);
+      if(b && bn && ends.length === 1){
+        const A = ns.map(pvCloneNode), B = bn.map(pvCloneNode);
+        if(ends[0] === 0) pvReverse(A);
+        if(nodeSel.join.i !== 0) pvReverse(B);
+        const o = pvCloneStroke(a, A.concat(B), false);
+        const next = [];
+        for(const x of actions){ if(x === a) next.push(o); else if(x !== b) next.push(x); }
+        pvPathOp(next, '패스 잇기');
+        nodeSel = { id: o.id, sel: new Set(), drag:null };
+        pvOverlay(); return;
+      }
+    }
+    if(ends.length === 2 && L > 2){
+      pvBegin(a); a.closed = true; pvCommit(a, '패스 닫기'); return;
+    }
+    toast('끝점 두 개를 고르세요 — 다른 패스 끝점은 Shift+클릭.');
+  }
+  window.addEventListener('keydown', e => {
+    const tag = e.target && e.target.tagName;
+    if((tag === 'INPUT' && !['range','checkbox','radio','button','color'].includes(e.target.type)) || tag === 'TEXTAREA' || (e.target && e.target.isContentEditable)) return;
+    if(replaying) return;
+    const k = e.key, mod = e.ctrlKey || e.metaKey;
+    const eat = () => { e.preventDefault(); e.stopImmediatePropagation(); };
+    pvAlt = e.altKey; pvShift = e.shiftKey;
+    if(!mod && !e.altKey && (k === 'p' || k === 'P') && !e.shiftKey){ const b = document.querySelector('.tool-select [data-tool="pen"]'); if(b){ b.click(); eat(); } return; }
+    if(!mod && !e.altKey && (k === 'a' || k === 'A') && !e.shiftKey){ const b = document.querySelector('.tool-select [data-tool="node"]'); if(b){ b.click(); eat(); } return; }
+    const on = currentTool === 'pen' || currentTool === 'node';
+    if(!on) return;
+    if(k === 'Alt'){ pvOverlay(); return; }
+    if(mod && k.toLowerCase() === 'z' && penDraft){
+      // 그리는 중의 되돌리기 = 마지막 앵커 취소
+      eat();
+      if(!e.shiftKey){ penDraft.nodes.pop(); if(penDraft.nodes.length) penDraft.nodes[penDraft.nodes.length - 1].ho = null; else penDraft = null; }
+      pvOverlay(); return;
+    }
+    if(mod && k.toLowerCase() === 'j'){ eat(); pvJoin(); return; }
+    if(mod && k.toLowerCase() === 'a' && currentTool === 'node'){
+      const a = editedStroke(), ns = a && pvEditNodes(a);
+      if(ns){ eat(); nodeSel.sel = new Set(ns.map((_, i) => i)); pvOverlay(); }
+      return;
+    }
+    if(mod) return;
+    if(k === '+' || k === '='){ eat(); pvSetSub('add'); return; }
+    if(k === '-' || k === '_'){ eat(); pvSetSub('del'); return; }
+    if((k === 'C' || k === 'c') && e.shiftKey){ eat(); pvSetSub('convert'); return; }
+    if(k === 'Enter'){ if(penDraft){ eat(); penFinish(); } return; }
+    if(k === 'Escape'){
+      eat();
+      if(penDraft) penFinish();
+      else if(penSub) pvSetSub(penSub);
+      else { nodeSel = null; pvOverlay(); }
+      return;
+    }
+    if(k === 'Backspace' || k === 'Delete'){
+      if(penDraft){
+        eat();
+        penDraft.nodes.pop();
+        if(penDraft.nodes.length){ const n = penDraft.nodes[penDraft.nodes.length - 1]; n.ho = null; n.sm = false; }
+        else penDraft = null;
+        pvOverlay(); return;
+      }
+      if(nodeSel && nodeSel.sel.size){ eat(); pvDeleteSelected(); }
+      return;
+    }
+    if(/^Arrow/.test(k) && currentTool === 'node' && nodeSel && nodeSel.sel.size){
+      const a = editedStroke(); if(!a) return;
+      eat();
+      const st = e.shiftKey ? 10 : 1;
+      const dx = k === 'ArrowLeft' ? -st : k === 'ArrowRight' ? st : 0;
+      const dy = k === 'ArrowUp' ? -st : k === 'ArrowDown' ? st : 0;
+      pvBegin(a);
+      for(const i of nodeSel.sel){ const n = a.nodes[i]; if(!n) continue;
+        n.x += dx; n.y += dy; if(n.hi){ n.hi.x += dx; n.hi.y += dy; } if(n.ho){ n.ho.x += dx; n.ho.y += dy; } }
+      pvCommit(a, '앵커 옮김');
+      return;
+    }
+  }, true);
+  window.addEventListener('keyup', e => { if(e.key === 'Alt' || e.key === 'Shift'){ pvAlt = e.altKey; pvShift = e.shiftKey; pvOverlay(); } });
+  document.querySelectorAll('#penBar [data-sub]').forEach(b => b.addEventListener('click', () => pvSetSub(b.dataset.sub)));
+  // 직접 선택에서 Shift+클릭으로 다른 패스의 끝점을 '이을 짝'으로 고른다
+  drawCanvas.addEventListener('pointerdown', e => {
+    if(currentTool !== 'node' || !e.shiftKey || !nodeSel || penSub) return;
+    const p = getPos(e);
+    const ep = pvHitEndpoint(p, nodeSel.id);
+    if(ep){ nodeSel.join = { id: ep.a.id, i: ep.i }; }
+  }, true);
+
+  // ---- 덧그림판 ----
+  function pvTrace(c, ns, closed){
+    c.moveTo(ns[0].x, ns[0].y);
+    for(let i = 0; i < pvSegCount(ns, closed); i++){
+      const s = pvSeg(ns, closed, i);
+      c.bezierCurveTo(s[1].x, s[1].y, s[2].x, s[2].y, s[3].x, s[3].y);
+    }
+    if(closed) c.closePath();
+  }
+  function pvOverlay(){
     const oc = $('lassoOverlay');
     if(!oc) return;
     const c = oc.getContext('2d');
     c.clearRect(0, 0, oc.width, oc.height);
-    if(!penDraft || !penDraft.nodes.length) return;
-    const z = viewZoom || 1;
-    const shown = penDraft.nodes.slice();
-    // 아직 안 찍은 다음 점을 미리 이어 보여 준다. 어디로 갈지 보이지 않으면
-    // 곡선을 찍을 수가 없다.
-    if(hover && !penDraft.closed) shown.push({ x:hover.x, y:hover.y, hi:null, ho:null });
-    const pts = flattenNodes(shown, penDraft.closed);
+    const on = currentTool === 'pen' || currentTool === 'node';
+    const hint = $('penHint');
+    if(!on){ if(hint) hint.textContent = ''; return; }
+    const k = pvK(), BLUE = '#1f7bff';
     c.save();
-    c.lineWidth = Math.max(1/z, brushSize);
-    c.strokeStyle = strokeColor;
-    c.globalAlpha = 0.55;
-    c.lineCap = 'round'; c.lineJoin = 'round';
-    c.beginPath(); c.moveTo(pts[0].x, pts[0].y);
-    for(let i = 1; i < pts.length; i++) c.lineTo(pts[i].x, pts[i].y);
-    if(penDraft.closed) c.closePath();
-    c.stroke();
-    c.globalAlpha = 1;
-    // 앵커와, 지금 끌고 있는 핸들
-    c.lineWidth = 1/z;
-    for(let i = 0; i < penDraft.nodes.length; i++){
-      const n = penDraft.nodes[i], r = 4/z;
-      for(const h of [n.hi, n.ho]){
-        if(!h) continue;
-        c.strokeStyle = 'rgba(80,80,90,0.9)';
-        c.beginPath(); c.moveTo(n.x, n.y); c.lineTo(h.x, h.y); c.stroke();
-        c.beginPath(); c.arc(h.x, h.y, 3/z, 0, Math.PI*2);
-        c.fillStyle = '#fff'; c.fill(); c.stroke();
+    // 그리는 중인 패스: 실제 굵기·색으로
+    if(penDraft && penDraft.nodes.length){
+      const ns = penDraft.nodes;
+      if(ns.length > 1){
+        c.lineCap = 'round'; c.lineJoin = 'round';
+        c.strokeStyle = strokeColor; c.lineWidth = strokeWidthNow();
+        c.beginPath(); pvTrace(c, ns, penDraft.closed); c.stroke();
       }
-      c.beginPath(); c.rect(n.x-r, n.y-r, r*2, r*2);
-      c.fillStyle = (i === 0) ? '#e4442d' : '#fff';
-      c.strokeStyle = '#1d1d1f';
-      c.fill(); c.stroke();
+      // 다음 선 미리보기 (마지막 앵커 → 커서)
+      if(pvHover && !pvDrag){
+        const it = pvIntent(pvHover, pvAlt);
+        const last = ns[ns.length - 1];
+        let tgt = pvHover;
+        if(it.kind === 'close') tgt = ns[0];
+        else if(it.kind === 'join') tgt = pvNodesOf(it.ep.a)[it.ep.i];
+        else if(pvShift) tgt = pvConstrain(last, pvHover);
+        const c1 = last.ho || last;
+        const c2 = (it.kind === 'close' && ns[0].hi) ? ns[0].hi : tgt;
+        c.globalAlpha = 0.45; c.strokeStyle = strokeColor; c.lineWidth = strokeWidthNow(); c.lineCap = 'round';
+        c.beginPath(); c.moveTo(last.x, last.y); c.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, tgt.x, tgt.y); c.stroke();
+        c.globalAlpha = 1;
+        c.strokeStyle = BLUE; c.lineWidth = 1 / k;
+        c.beginPath(); c.moveTo(last.x, last.y); c.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, tgt.x, tgt.y); c.stroke();
+      }
+      c.strokeStyle = BLUE; c.lineWidth = 1 / k;
+      if(ns.length > 1){ c.beginPath(); pvTrace(c, ns, penDraft.closed); c.stroke(); }
+      const L = ns[ns.length - 1];
+      for(const h of [L.hi, L.ho]) if(h){
+        c.beginPath(); c.moveTo(L.x, L.y); c.lineTo(h.x, h.y); c.stroke();
+        c.fillStyle = BLUE; c.beginPath(); c.arc(h.x, h.y, 3.2 / k, 0, Math.PI*2); c.fill();
+      }
+      ns.forEach((n, i) => {
+        const r = 3.5 / k;
+        c.fillStyle = (i === ns.length - 1) ? BLUE : '#fff';
+        c.fillRect(n.x - r, n.y - r, r*2, r*2); c.strokeRect(n.x - r, n.y - r, r*2, r*2);
+      });
+    }
+    // 고른 획: 윤곽 · 앵커 · 핸들
+    const a = !penDraft ? editedStroke() : null;
+    const ns = a ? pvEditNodes(a) : null;
+    if(a && ns){
+      c.strokeStyle = BLUE; c.lineWidth = 1 / k;
+      c.beginPath(); pvTrace(c, ns, !!a.closed); c.stroke();
+      for(const h of pvHandles(a, ns)){
+        const n = ns[h.i];
+        c.beginPath(); c.moveTo(n.x, n.y); c.lineTo(h.h.x, h.h.y); c.stroke();
+        c.fillStyle = BLUE; c.beginPath(); c.arc(h.h.x, h.h.y, 3.2 / k, 0, Math.PI*2); c.fill();
+      }
+      ns.forEach((n, i) => {
+        const r = 3.5 / k, sel = nodeSel.sel.has(i);
+        c.fillStyle = sel ? BLUE : '#fff'; c.strokeStyle = BLUE;
+        if(n.sm && !sel){ c.beginPath(); c.arc(n.x, n.y, r, 0, Math.PI*2); c.fill(); c.stroke(); }
+        else { c.fillRect(n.x - r, n.y - r, r*2, r*2); c.strokeRect(n.x - r, n.y - r, r*2, r*2); }
+      });
+      if(nodeSel.join){
+        const b = actions.find(x => x.id === nodeSel.join.id), bn = b && pvNodesOf(b);
+        if(bn){ const n = bn[nodeSel.join.i], r = 5 / k; c.strokeStyle = '#e4442d'; c.strokeRect(n.x - r, n.y - r, r*2, r*2); }
+      }
+    }
+    // 펜: 이어 그릴 수 있는 끝점을 흐리게
+    if(currentTool === 'pen' && !penSub){
+      c.strokeStyle = 'rgba(31,123,255,.45)'; c.lineWidth = 1 / k;
+      for(const s of pvStrokes(true)){
+        if(s.closed || (a && s.id === a.id) || (penDraft && penDraft.base === s)) continue;
+        const sn = pvNodesOf(s); if(!sn) continue;
+        for(const n of [sn[0], sn[sn.length - 1]]){ const r = 3 / k; c.strokeRect(n.x - r, n.y - r, r*2, r*2); }
+      }
+    }
+    // 사각형 선택
+    if(pvDrag && pvDrag.kind === 'marquee'){
+      c.setLineDash([4 / k, 3 / k]); c.strokeStyle = BLUE; c.lineWidth = 1 / k;
+      c.strokeRect(pvDrag.start.x, pvDrag.start.y, pvDrag.cur.x - pvDrag.start.x, pvDrag.cur.y - pvDrag.start.y);
+      c.setLineDash([]);
+    }
+    // 커서 옆 표시
+    let tip = '';
+    if(pvHover && !pvDrag){
+      if(penSub === 'add') tip = '+ 선분을 눌러 앵커 추가';
+      else if(penSub === 'del') tip = '− 앵커를 눌러 삭제';
+      else if(penSub === 'convert') tip = '^ 앵커 클릭 = 뾰족↔부드럽게 · 끌기 = 새 핸들 · 핸들 = 그것만';
+      else if(currentTool === 'pen'){
+        const it = pvIntent(pvHover, pvAlt), g = PV_GLYPH[it.kind] || ['',''];
+        tip = g[1];
+        if(g[0]){
+          c.font = 'bold ' + (13 / k) + 'px monospace'; c.fillStyle = '#1d1d1f';
+          c.fillText(g[0], pvHover.x + 9 / k, pvHover.y + 16 / k);
+        }
+      } else if(currentTool === 'node'){
+        tip = 'A — 앵커·핸들·선분 끌기 · Alt+핸들 = 한쪽만 · Delete = 앵커 삭제 · Ctrl+J = 잇기/닫기';
+      }
     }
     c.restore();
+    if(hint) hint.textContent = tip;
   }
-
-  function penFinish(){
-    if(!penDraft){ return; }
-    const nodes = penDraft.nodes;
-    if(nodes.length < 2){ penCancel(); return; }
-    const act = { type:'stroke', id:++actionCounter, tool:'brush',
-                  color: strokeColor, width: brushSize,
-                  texture: currentTexture, grain: currentGrain,
-                  seed: (Math.random()*2147483647)|0,
-                  nodes, closed: penDraft.closed, edit:'bezier', pw:null,
-                  points: [], layer: activeLayer().id };
-    syncStrokeFromNodes(act);
-    penDraft = null;
-    renderStrokeFull(activeLayer().ctx, act);
-    compositeLayers();
-    actions.push(act);
-    invalidateSnapCache();
-    renderLayersPanel();
-    redoStack.length = 0;
-    const oc = $('lassoOverlay');
-    if(oc) oc.getContext('2d').clearRect(0, 0, oc.width, oc.height);
-    toast('패스 그림 — A 키로 앵커를 손볼 수 있습니다.');
-  }
-
-  function penCancel(){
-    penDraft = null;
-    const oc = $('lassoOverlay');
-    if(oc) oc.getContext('2d').clearRect(0, 0, oc.width, oc.height);
-  }
-
 
   // ---- 레이어 복사 ----
   function cloneActionForLayer(a, newLayerId){
@@ -9381,7 +10171,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const copied = [];
     for(const a of prevOrder){
       if(a.layer !== src.id) continue;
-      if(a.type === 'strokeEdit' || a.type === 'lassoDelete' || a.type === 'mergeLayers' ||
+      if(a.type === 'strokeEdit' || a.type === 'pathOp' || a.type === 'lassoDelete' || a.type === 'mergeLayers' ||
          a.type === 'dupLayer') continue;
       copied.push(cloneActionForLayer(a, nl.id));
     }
@@ -9419,7 +10209,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       newIds.push(nl.id);
       for(const a of prevOrder){
         if(a.layer !== m.id) continue;
-        if(a.type === 'strokeEdit' || a.type === 'lassoDelete' || a.type === 'mergeLayers' ||
+        if(a.type === 'strokeEdit' || a.type === 'pathOp' || a.type === 'lassoDelete' || a.type === 'mergeLayers' ||
            a.type === 'dupLayer') continue;
         actions.push(cloneActionForLayer(a, nl.id));
       }
@@ -10471,95 +11261,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
       return;
     }
 
-    if(currentTool === 'pen'){
-      let q = { x:p.x, y:p.y };
-      // 첫 앵커를 다시 누르면 닫는다.
-      if(penDraft && penDraft.nodes.length > 1){
-        const f = penDraft.nodes[0];
-        if(Math.hypot(q.x-f.x, q.y-f.y) <= nodeHitR() * 1.6){
-          penDraft.closed = true;
-          penFinish();
-          return;
-        }
-      }
-      // 이미 있는 획의 끝점에도 붙는다 -- 펜툴로 그린 선이야말로 플로터로 간다.
-      if(snapActive(e)){
-        const t = nearestSnap(q, snapCandidates(null), snapRadiusCanvas());
-        if(t) q = { x:t.x, y:t.y };
-      }
-      if(!penDraft) penDraft = { nodes: [], closed: false, drag: null };
-      penDraft.nodes.push({ x:q.x, y:q.y, hi:null, ho:null });
-      penDraft.drag = { i: penDraft.nodes.length - 1, from: q, moved: false };
-      penPreview(null);
-      try { drawCanvas.setPointerCapture(e.pointerId); } catch(err){}
-      return;
-    }
-
-    if(currentTool === 'node'){
-      const cur = editedStroke();
-      // 이미 고른 획이 있으면 그 안쪽(핸들 → 앵커 → 패스)부터 본다.
-      // 바로 다른 획으로 넘어가면 겹친 자리에서 편집이 불가능해진다.
-      if(cur && cur.nodes){
-        const h = hitHandle(p, cur);
-        if(h){
-          beginEdit(cur);
-          nodeSel.drag = { kind:'handle', i:h.i, which:h.which };
-          try { drawCanvas.setPointerCapture(e.pointerId); } catch(err){}
-          return;
-        }
-        const nHit = hitNode(p, cur);
-        if(nHit){
-          if(e.altKey){
-            beginEdit(cur);
-            toggleNodeCorner(cur, nHit.i);
-            syncStrokeFromNodes(cur);
-            commitEdit(cur, '앵커 모양 바꿈');
-            nodeSel.sel = new Set([nHit.i]);
-            updateNodePanel();
-            return;
-          }
-          if(e.shiftKey){
-            if(nodeSel.sel.has(nHit.i)) nodeSel.sel.delete(nHit.i);
-            else nodeSel.sel.add(nHit.i);
-          } else if(!nodeSel.sel.has(nHit.i)){
-            nodeSel.sel = new Set([nHit.i]);
-          }
-          beginEdit(cur);
-          nodeSel.drag = { kind:'nodes', from:p,
-                           start:[...nodeSel.sel].map(i => ({ i, n: cur.nodes[i],
-                             x:cur.nodes[i].x, y:cur.nodes[i].y,
-                             hi: cur.nodes[i].hi ? {x:cur.nodes[i].hi.x, y:cur.nodes[i].hi.y} : null,
-                             ho: cur.nodes[i].ho ? {x:cur.nodes[i].ho.x, y:cur.nodes[i].ho.y} : null })) };
-          drawNodeOverlay(); updateNodePanel();
-          try { drawCanvas.setPointerCapture(e.pointerId); } catch(err){}
-          return;
-        }
-        const seg = hitSegment(p, cur);
-        if(seg && (e.ctrlKey || e.metaKey)){
-          beginEdit(cur);
-          const at = insertNodeAt(cur, seg.i, seg.t);
-          syncStrokeFromNodes(cur);
-          commitEdit(cur, '앵커 넣음');
-          nodeSel.sel = new Set([at]);
-          drawNodeOverlay(); updateNodePanel();
-          return;
-        }
-        if(seg){
-          // 패스 몸통을 끌면 획 전체가 움직인다.
-          beginEdit(cur);
-          nodeSel.sel.clear();
-          nodeSel.drag = { kind:'whole', from:p,
-                           start: cur.nodes.map(n => ({ x:n.x, y:n.y,
-                             hi: n.hi ? {x:n.hi.x, y:n.hi.y} : null,
-                             ho: n.ho ? {x:n.ho.x, y:n.ho.y} : null })) };
-          drawNodeOverlay(); updateNodePanel();
-          try { drawCanvas.setPointerCapture(e.pointerId); } catch(err){}
-          return;
-        }
-      }
-      const pick = hitTestStroke(p);
-      if(pick) selectStrokeForEdit(pick);
-      else clearNodeSelection();
+    if(currentTool === 'pen' || currentTool === 'node'){
+      pvDown(p, e);
       return;
     }
 
@@ -10822,6 +11525,11 @@ showLayerMenu(ev.clientX, ev.clientY, [
     if(a.type === 'stroke'){
       a.points.forEach(pt => { pt.x += dx; pt.y += dy; });
       a._bb = null; a._bbFor = null;
+      if(a.nodes) a.nodes.forEach(n => {
+        n.x += dx; n.y += dy;
+        if(n.hi){ n.hi.x += dx; n.hi.y += dy; }
+        if(n.ho){ n.ho.x += dx; n.ho.y += dy; }
+      });
     } else if(a.type === 'fill'){
       // The seed (x, y) must ALWAYS follow the move — recipes test it
       // against the register bbox, so a stale seed made moved fills vanish
@@ -11386,24 +12094,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
       if(xform.drag){ xformPointerMove(getPos(e), e.shiftKey); }
       return;
     }
-    if(penDraft){
-      const p = getPos(e);
-      if(penDraft.drag){
-        const n = penDraft.nodes[penDraft.drag.i];
-        const d = Math.hypot(p.x - penDraft.drag.from.x, p.y - penDraft.drag.from.y);
-        // 살짝 흔들린 것을 핸들로 보지 않는다. 톡 누른 것은 꺾인 점이어야 한다.
-        if(d > 3 / (viewZoom || 1)){
-          penDraft.drag.moved = true;
-          n.ho = { x:p.x, y:p.y };
-          n.hi = { x: n.x - (p.x - n.x), y: n.y - (p.y - n.y) };
-        }
-        penPreview(null);
-      } else {
-        penPreview(p);
-      }
-      return;
-    }
-    if(nodeSel && nodeSel.drag){
+    if(currentTool === 'pen' || currentTool === 'node'){ pvMove(getPos(e), e); return; }
+    if(false){
       const a = editedStroke();
       if(a){
         const p = getPos(e);
@@ -11754,26 +12446,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       lastRawPos = null;
     }
   }
-  window.addEventListener('pointerup', () => {
-    if(penDraft && penDraft.drag){
-      if(!penDraft.drag.moved){
-        const n = penDraft.nodes[penDraft.drag.i];
-        n.hi = null; n.ho = null;          // 톡 누른 것은 꺾인 점
-      }
-      penDraft.drag = null;
-      penPreview(null);
-    }
-  });
-  window.addEventListener('pointerup', e => {
-    if(nodeSel && nodeSel.drag){
-      const a = editedStroke();
-      const label = nodeSel.drag.kind === 'whole' ? '획 옮김'
-                  : nodeSel.drag.kind === 'handle' ? '핸들 옮김' : '앵커 옮김';
-      nodeSel.drag = null;
-      if(a){ syncStrokeFromNodes(a); commitEdit(a, label); }
-      updateNodePanel();
-    }
-  });
+  window.addEventListener('pointerup', e => { if(pvDrag) pvUp(e); });
   window.addEventListener('pointerup', endStroke);
   window.addEventListener('pointercancel', endStroke);
 
@@ -11796,6 +12469,14 @@ showLayerMenu(ev.clientX, ev.clientY, [
       clearStrokeSelection();
       renderAll();
       renderLayersPanel();
+      toast(undoneAction.label + ' 되돌림.');
+      return;
+    }
+    if(undoneAction.type === 'pathOp'){
+      actions.length = 0;
+      actions.push(...undoneAction.prevOrder);
+      if(nodeSel && !actions.some(a => a.id === nodeSel.id)) nodeSel = null;
+      invalidateHiRes(); renderAll(); invalidateSnapCache(); pvOverlay();
       toast(undoneAction.label + ' 되돌림.');
       return;
     }
@@ -11944,6 +12625,15 @@ showLayerMenu(ev.clientX, ev.clientY, [
       toast('복사는 되돌린 뒤 다시 실행할 수 없습니다. 메뉴에서 다시 복사해 주세요.');
       return;
     }
+    if(redoneAction.type === 'pathOp'){
+      actions.length = 0;
+      actions.push(...redoneAction.nextOrder);
+      actions.push(redoneAction);
+      if(nodeSel && !actions.some(a => a.id === nodeSel.id)) nodeSel = null;
+      invalidateHiRes(); renderAll(); invalidateSnapCache(); pvOverlay();
+      toast(redoneAction.label + ' 다시 적용.');
+      return;
+    }
     if(redoneAction.type === 'strokeEdit'){
       const t = actions.find(a => a.id === redoneAction.targetId);
       if(t){ restoreStroke(t, redoneAction.after); renderSingleLayer(t.layer); }
@@ -12075,6 +12765,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       if(prevTool === 'pen' && currentTool !== 'pen' && typeof penFinishIfDrawing === 'function') penFinishIfDrawing();
       if(prevTool === 'node' && currentTool !== 'node' && typeof clearNodeSelection === 'function') clearNodeSelection();
       if(typeof updateNodePanel === 'function') updateNodePanel();
+      if(typeof pvToolChanged === 'function') pvToolChanged();
       // STROKE and ERASER keep independent sizes — swap on tool change.
       brushSize = toolSizes[currentTool === 'eraser' ? 'eraser' : 'brush'];
       $('brushSize').value = brushSize;
@@ -13376,6 +14067,13 @@ showLayerMenu(ev.clientX, ev.clientY, [
             points:a.points.map(p=>({x:p.x-bbox.minX, y:p.y-bbox.minY, p:p.p}))
           };
           if(a.texture && a.texture !== 'smooth'){ so.tx = a.texture; so.g = a.grain; so.sd = a.seed; }
+          if(a.nodes && a.edit === 'bezier' && a.nodes.length > 1){
+            const r2 = v => Math.round(v * 100) / 100;
+            so.nd = a.nodes.map(n => [r2(n.x - bbox.minX), r2(n.y - bbox.minY),
+              n.hi ? r2(n.hi.x - bbox.minX) : null, n.hi ? r2(n.hi.y - bbox.minY) : null,
+              n.ho ? r2(n.ho.x - bbox.minX) : null, n.ho ? r2(n.ho.y - bbox.minY) : null, n.sm ? 1 : 0]);
+            if(a.closed) so.cl = 1;
+          }
           result.push(so);
         }
       } else if(a.type==='fill'){
@@ -13812,7 +14510,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
               grain: (a.grain != null ? a.grain : (a.g != null ? a.g : 50)),
               seed: (a.seed != null ? a.seed : (a.sd != null ? a.sd : ((Math.random()*2147483647)|0))),
               points: a.points.map(p=>({ x:p.x + offX, y:p.y + offY, p:p.p })),
-              layer: layerIdFor(a)
+              layer: layerIdFor(a),
+              ...(a.nd ? { nd: a.nd, cl: a.cl ? 1 : 0 } : {})
             });
           } else if(a.type === 'fill'){
             const act = {
