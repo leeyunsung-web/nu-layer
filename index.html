@@ -1697,7 +1697,9 @@
   }
 
   function setRole(role){
-    localStorage.setItem(ROLE_KEY, role);
+    localStorage.setItem(ROLE_KEY, role);   // 다른 페이지(갤러리)가 읽는 값
+    // 이 탭의 기억. 새로고침해도 남고, 탭을 닫으면 사라진다.
+    try { sessionStorage.setItem(ROLE_KEY, role); } catch(e){}
     applyRole(role);
     if(typeof applyPaper === 'function') applyPaper();
   }
@@ -1737,11 +1739,15 @@
     }
   });
 
-  // Initialize: ALWAYS enter as guest — no login popup. Master is one
-  // SWITCH-button + password away.
+  // 시작할 때: 이 탭에서 이미 마스터로 들어와 있었다면 그대로 둔다.
+  // sessionStorage 라서 새로고침이나 같은 탭 안에서의 이동에는 풀리지 않고,
+  // 창(탭)을 완전히 닫아야 사라진다. 처음 여는 탭은 늘 게스트이고
+  // 로그인 팝업도 뜨지 않는다 — SWITCH 와 암호 한 번이면 마스터다.
   (function initRole(){
-    localStorage.setItem(ROLE_KEY, 'guest'); // other pages (gallery) read this
-    applyRole('guest');
+    let kept = 'guest';
+    try { if(sessionStorage.getItem(ROLE_KEY) === 'master') kept = 'master'; } catch(e){}
+    localStorage.setItem(ROLE_KEY, kept);   // 갤러리 등 다른 페이지가 읽는다
+    applyRole(kept);
   })();
 
   // ==================== LAYER PANEL ====================
