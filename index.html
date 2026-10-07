@@ -1145,6 +1145,8 @@
                        mix-blend-mode:multiply; display:none;"></canvas>
         <canvas id="frameOverlay" width="1080" height="1080"
                 style="position:absolute; inset:0; width:100%; height:100%; pointer-events:none;"></canvas>
+        <canvas id="pixelOverlay" width="1080" height="1080"
+                style="position:absolute; inset:0; width:100%; height:100%; pointer-events:none; display:none;"></canvas>
         <canvas id="lassoOverlay" width="1080" height="1080"
                 style="position:absolute; inset:0; width:100%; height:100%; pointer-events:none;"></canvas>
         </div>
@@ -1181,9 +1183,17 @@
         </div>
         <div class="tool-group" aria-label="Color">
           <span class="tg-label">COLOR</span>
+          <button class="tool-btn" data-tool="pixel" title="Hotkey: X — 픽셀 모드. 칸 단위로만 찍힙니다. 끌면 연속으로, Alt 를 누른 채 끌면 지워집니다. 찍은 픽셀은 색면으로 들어가고, 레이어를 우클릭하면 외곽 라인만 따낼 수 있습니다">PIXEL<kbd>X</kbd></button>
           <button class="tool-btn" data-tool="fill" title="Hotkey: G — fills a region and auto-splits it into a new layer">FILL<kbd>G</kbd></button>
           <button class="tool-btn" id="eyedropperBtn" title="Hotkey: I — click the canvas once to pick a color">PICK<kbd>I</kbd></button>
         </div>
+      </div>
+      <div id="pixelBar" class="pen-bar" style="display:none;">
+        <span class="pb-title">PIXEL</span>
+        <label for="pixelN" style="font-size:11px;" title="칸 수. 1080 을 나누어떨어지는 수만 둡니다 — 한 칸이 정수 픽셀이라 외곽선이 소수점 없이 떨어지고 플로터 출력이 깔끔합니다">GRID</label>
+        <select id="pixelN" style="font-family:inherit; font-size:11px; padding:3px 7px; border:1px solid var(--border); border-radius:6px; background:var(--panel); color:var(--ink);"></select>
+        <span id="pixelCell" style="font-size:11px; color:var(--ink-dim);"></span>
+        <span style="font-size:11px; color:var(--ink-dim);">끌면 연속 · Alt+끌기로 지우기 · 레이어 우클릭 → 외곽 라인만 따내기</span>
       </div>
       <div id="penBar" class="pen-bar" style="display:none;">
         <span class="pb-title">PATH</span>
@@ -2103,6 +2113,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
               ')', fn: ()=> purgeErasers(l.id) },
           { label: '⌫ ERASED PIXELS → NEW LAYER',
             fn: ()=> restoreErasedToLayer(l.id) },
+          { label: '⬡ 외곽 라인만 따내기 → 새 선 레이어',
+            fn: ()=> outlineFillLayer(l.id) },
           { label: selectedLayerIds.size > 1 ? ('📁 NEW FOLDER WITH ' + selectedLayerIds.size + ' SELECTED LAYERS') : '📁 NEW FOLDER WITH THIS LAYER',
             fn: ()=> createFolderWithLayers(selectedLayerIds.size > 1 ? layers.filter(x=>selectedLayerIds.has(x.id)) : [l]) }
         ];
@@ -3536,6 +3548,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         return;
       }
       if(k === 'e') { document.querySelector('[data-tool="eraser"]').click(); }
+      if(k === 'x') { const b = document.querySelector('[data-tool="pixel"]'); if(b) b.click(); }
       if(k === 'l') { document.querySelector('[data-tool="lasso"]').click(); }
       // (노드 편집은 뺐다 -- A 키는 비어 있다)
       // (펜툴은 뺐다 -- P 키는 비어 있다)
@@ -11331,6 +11344,257 @@ showLayerMenu(ev.clientX, ev.clientY, [
   });
   traceImg.addEventListener('contextmenu', e => e.preventDefault());
 
+
+  /* ==================== PIXEL MODE ====================
+     칸 단위로만 찍는다. 찍은 것은 'fill' 액션(언 마스크)으로 들어가므로
+     그리기·레이어·내보내기·올가미가 전부 기존 길을 그대로 탄다.
+     칸 수는 1080 의 약수만 둔다 — 칸이 정수 픽셀이라야 외곽선이
+     소수점 없이 떨어지고 플로터 출력이 깔끔하다. */
+
+  // 1080 의 약수 중 픽셀아트에 쓸 만한 것들
+  const PIXEL_NS = [24, 27, 30, 36, 40, 45, 54, 60, 72, 90, 108, 120];
+  let pixelN = 36;
+  let pixelDraw = null;   // 끄는 동안의 상태 { cells, n, lid, erase, seen }
+
+  function pixelCellSize(){ return drawCanvas.width / pixelN; }
+
+  function initPixelUI(){
+    const sel = $('pixelN');
+    if(!sel || sel.options.length) return;
+    for(const n of PIXEL_NS){
+      const o = document.createElement('option');
+      o.value = String(n);
+      o.textContent = n + ' × ' + n;
+      if(n === pixelN) o.selected = true;
+      sel.appendChild(o);
+    }
+    sel.addEventListener('change', ()=>{
+      pixelN = parseInt(sel.value, 10) || 36;
+      drawPixelGrid();
+      syncPixelBar();
+    });
+  }
+
+  function syncPixelBar(){
+    const bar = $('pixelBar'), on = currentTool === 'pixel';
+    if(bar) bar.style.display = on ? 'flex' : 'none';
+    const lbl = $('pixelCell');
+    if(lbl) lbl.textContent = on ? ('한 칸 ' + pixelCellSize() + 'px') : '';
+    const ov = $('pixelOverlay');
+    if(ov) ov.style.display = on ? '' : 'none';
+    if(on) drawPixelGrid();
+  }
+
+  function drawPixelGrid(){
+    const ov = $('pixelOverlay');
+    if(!ov || currentTool !== 'pixel') return;
+    const x = ov.getContext('2d'), W = ov.width, H = ov.height, cs = pixelCellSize();
+    x.clearRect(0, 0, W, H);
+    x.strokeStyle = 'rgba(0,0,0,0.16)';
+    x.lineWidth = 1;
+    x.beginPath();
+    for(let i = 1; i < pixelN; i++){
+      const v = Math.round(i * cs) + 0.5;
+      x.moveTo(v, 0); x.lineTo(v, H);
+      x.moveTo(0, v); x.lineTo(W, v);
+    }
+    x.stroke();
+    // 테두리는 조금 진하게 — 격자가 어디서 끝나는지 보이게
+    x.strokeStyle = 'rgba(0,0,0,0.32)';
+    x.strokeRect(0.5, 0.5, W - 1, H - 1);
+  }
+
+  // 칸 격자 → 캔버스 크기의 마스크
+  function pixelMaskFromCells(cells, n){
+    const W = drawCanvas.width, H = drawCanvas.height, cs = W / n;
+    const mask = new Uint8Array(W * H);
+    for(let gy = 0; gy < n; gy++){
+      for(let gx = 0; gx < n; gx++){
+        if(!cells[gy * n + gx]) continue;
+        const x0 = gx * cs, y0 = gy * cs;
+        for(let y = y0; y < y0 + cs; y++) mask.fill(1, y * W + x0, y * W + x0 + cs);
+      }
+    }
+    return mask;
+  }
+
+  function maskBounds(mask, W, H){
+    let mnX = W, mnY = H, mxX = -1, mxY = -1;
+    for(let i = 0; i < mask.length; i++){
+      if(!mask[i]) continue;
+      const x = i % W, y = (i - x) / W;
+      if(x < mnX) mnX = x; if(x > mxX) mxX = x;
+      if(y < mnY) mnY = y; if(y > mxY) mxY = y;
+    }
+    return { mnX, mnY, mxX, mxY };
+  }
+
+  // 지금 레이어에 이미 찍혀 있는 픽셀 면을 하나로 모은다 (이어 찍기·지우기용)
+  function pixelCellsOfLayer(lid, n){
+    const cells = new Uint8Array(n * n);
+    const W = drawCanvas.width, cs = W / n;
+    for(const a of actions){
+      if(a.type !== 'fill' || a.layer !== lid || !a.m || a.pixN !== n) continue;
+      const m = maskOf(a, a.mw || W, a.mh || drawCanvas.height);
+      for(let gy = 0; gy < n; gy++){
+        for(let gx = 0; gx < n; gx++){
+          // 칸 한가운데만 찍어 보면 충분하다
+          const px = Math.floor(gx * cs + cs / 2), py = Math.floor(gy * cs + cs / 2);
+          if(m[py * (a.mw || W) + px]) cells[gy * n + gx] = 1;
+        }
+      }
+    }
+    return cells;
+  }
+
+  function pixelCellAt(p){
+    const cs = pixelCellSize();
+    const gx = Math.floor(p.x / cs), gy = Math.floor(p.y / cs);
+    if(gx < 0 || gy < 0 || gx >= pixelN || gy >= pixelN) return -1;
+    return gy * pixelN + gx;
+  }
+
+  // 끄는 동안 보여 주는 미리보기 (오버레이에 — 진짜 레이어는 손 뗄 때 한 번만 건드린다)
+  function pixelPreview(){
+    if(!pixelDraw) return;
+    drawPixelGrid();
+    const ov = $('pixelOverlay'), x = ov.getContext('2d'), cs = pixelCellSize();
+    x.fillStyle = pixelDraw.erase ? 'rgba(210,210,215,0.85)' : strokeColor;
+    x.globalAlpha = pixelDraw.erase ? 1 : 0.75;
+    for(const i of pixelDraw.seen){
+      const gx = i % pixelN, gy = (i - gx) / pixelN;
+      x.fillRect(gx * cs, gy * cs, cs, cs);
+    }
+    x.globalAlpha = 1;
+  }
+
+  function pixelDown(p, e){
+    const al = activeLayer();
+    if(!al){ toast('레이어가 없습니다.'); return; }
+    pixelDraw = { n: pixelN, lid: al.id, erase: !!e.altKey, seen: new Set() };
+    pixelMove(p);
+  }
+  function pixelMove(p){
+    if(!pixelDraw) return;
+    const i = pixelCellAt(p);
+    if(i < 0 || pixelDraw.seen.has(i)) return;
+    pixelDraw.seen.add(i);
+    pixelPreview();
+  }
+  function pixelUp(){
+    const d = pixelDraw;
+    pixelDraw = null;
+    drawPixelGrid();
+    if(!d || !d.seen.size) return;
+
+    const W = drawCanvas.width, H = drawCanvas.height;
+    const lay = layers.find(l => l.id === d.lid);
+    if(!lay) return;
+
+    // 이 레이어에 이미 있던 칸 + 이번에 찍은 칸 (지우개면 뺀다)
+    const cells = pixelCellsOfLayer(d.lid, d.n);
+    for(const i of d.seen) cells[i] = d.erase ? 0 : 1;
+
+    // 이 레이어의 옛 픽셀 액션은 걷어내고 하나로 다시 쓴다 — 칸이 겹쳐 쌓이지 않게
+    for(let k = actions.length - 1; k >= 0; k--){
+      const a = actions[k];
+      if(a.type === 'fill' && a.layer === d.lid && a.pixN === d.n) actions.splice(k, 1);
+    }
+    lay.ctx.clearRect(0, 0, W, H);
+
+    let any = false;
+    for(let i = 0; i < cells.length; i++) if(cells[i]){ any = true; break; }
+    if(any){
+      const mask = pixelMaskFromCells(cells, d.n);
+      const bb = maskBounds(mask, W, H);
+      const act = { type:'fill', id: ++actionCounter, layer: d.lid, color: strokeColor,
+                    tolerance: 0, x: (bb.mnX + bb.mxX) / 2, y: (bb.mnY + bb.mxY) / 2,
+                    mw: W, mh: H, ox: 0, oy: 0, pixN: d.n, m: encodeMask(mask) };
+      act._mask = mask; act._maskFor = act.m; act._mb = bb;
+      paintSplitFill(lay.ctx, mask, act.color, 0, 0, W, H, null, bb);
+      actions.push(act);
+    }
+    compositeLayers();
+    renderLayersPanel();
+    redoStack.length = 0;
+    if(typeof syncLiveEdit === 'function') syncLiveEdit(true);
+  }
+
+  /* ---------- 레이어 우클릭 → 외곽 라인만 따내기 ----------
+     칠해진 칸들의 테두리를 격자선을 따라 폐곡선으로 뽑아 선 레이어를
+     새로 만든다. 원래 색면은 그대로 둔다 (겹쳐 보인다). */
+  function outlineFillLayer(lid){
+    const W = drawCanvas.width, H = drawCanvas.height;
+    const fills = actions.filter(a => a.type === 'fill' && a.layer === lid && a.m);
+    if(!fills.length){ toast('이 레이어에는 따낼 면이 없습니다.'); return; }
+
+    const solid = new Uint8Array(W * H);
+    for(const a of fills){
+      const mw = a.mw || W, mh = a.mh || H;
+      const m = maskOf(a, mw, mh);
+      const ox = Math.round(a.ox || 0), oy = Math.round(a.oy || 0);
+      for(let y = 0; y < mh; y++){
+        const ty = y + oy; if(ty < 0 || ty >= H) continue;
+        for(let x = 0; x < mw; x++){
+          if(!m[y * mw + x]) continue;
+          const tx = x + ox; if(tx < 0 || tx >= W) continue;
+          solid[ty * W + tx] = 1;
+        }
+      }
+    }
+
+    let loops;
+    try { loops = traceMaskContours(solid, W, H) || []; }
+    catch(err){ console.error('outline failed', err); toast('외곽선을 따지 못했습니다.'); return; }
+    if(!loops.length){ toast('따낼 테두리가 없습니다.'); return; }
+
+    const srcLayer = layers.find(l => l.id === lid);
+    const nl = createLayer((srcLayer ? srcLayer.name : 'LAYER') + ' OUTLINE');
+    const idx = layers.findIndex(x => x.id === lid);
+    layers.splice(Math.max(0, idx), 0, nl);          // 원본 바로 위
+    if(srcLayer && srcLayer.folderId != null) nl.folderId = srcLayer.folderId;
+
+    let made = 0;
+    for(const loop of loops){
+      const pts = dropCollinearPts(loop);
+      if(pts.length < 3) continue;
+      const act = { type:'stroke', id: ++actionCounter, tool:'brush',
+                    color: strokeColor, width: strokeWidthNow(),
+                    texture: currentTexture, grain: currentGrain,
+                    seed: (Math.random() * 2147483647) | 0,
+                    nodes: pts.map(q => ({ x:q.x, y:q.y, sm:false, hi:null, ho:null })),
+                    closed: true, edit:'bezier', pw:null, cr:0, join:null,
+                    points: [], layer: nl.id };
+      syncStrokeFromNodes(act);
+      if(!act.points.length) continue;
+      strokeSmoothPath(nl.ctx, act.points, act.width, act.color, false,
+                       act.texture, act.grain, act.seed);
+      actions.push(act);
+      made++;
+    }
+    compositeLayers();
+    renderLayersPanel();
+    redoStack.length = 0;
+    toast(made ? ('외곽선 ' + made + '개를 ' + nl.name + ' 로 따냈습니다.')
+               : '따낼 테두리가 없습니다.');
+  }
+
+  // 격자를 따라온 점들은 한 줄에 여러 개가 늘어서 있다 — 꺾이는 자리만 남긴다
+  function dropCollinearPts(loop){
+    const pts = loop.map(q => (q && q.x != null) ? { x:q.x, y:q.y } : { x:q[0], y:q[1] });
+    const n = pts.length;
+    if(n < 3) return pts;
+    const out = [];
+    for(let i = 0; i < n; i++){
+      const a = pts[(i - 1 + n) % n], b = pts[i], c = pts[(i + 1) % n];
+      if((b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x) !== 0) out.push(b);
+    }
+    return out.length >= 3 ? out : pts;
+  }
+
+  // 정의가 모두 끝난 뒤에 부른다 — PIXEL_NS 는 const 라 선언 위에서 못 쓴다
+  try { initPixelUI(); } catch(e){ console.error('pixel ui', e); }
+
   drawCanvas.addEventListener('pointerdown', e=>{
     // Ignore any non-primary input: right mouse button, middle button, or a pen with the
     // barrel/secondary button pressed. buttons bitmask: 1=tip/left, 2=barrel/right, 4=middle.
@@ -11375,6 +11639,13 @@ showLayerMenu(ev.clientX, ev.clientY, [
       eyedropperActive = false;
       const b = $('eyedropperBtn'); if(b) b.classList.remove('active');
       updateCursorState(e);
+      return;
+    }
+
+    if(currentTool === 'pixel'){
+      e.preventDefault();
+      try { drawCanvas.setPointerCapture(e.pointerId); } catch(err){}
+      pixelDown(p, e);
       return;
     }
 
@@ -12269,6 +12540,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
   drawCanvas.addEventListener('pointermove', e=>{
     updateCursorState(e);
+    if(pixelDraw){ pixelMove(getPos(e)); return; }
     if(viewDrag){
       if(viewDrag.mode === 'rotate'){
         const a = Math.atan2(e.clientY - viewDrag.cy, e.clientX - viewDrag.cx);
@@ -12544,6 +12816,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
   }
 
   function endStroke(){
+    if(pixelDraw){ pixelUp(); return; }
     if(viewDrag){ viewDrag = null; updateCursorState(); return; }
     if(xform){ xformPointerUp(); return; }
     if(lassoDrawing){
@@ -12980,6 +13253,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
       }
       updateBrushPreview();
       clearStrokeSelection();
+      if(typeof syncPixelBar === 'function') syncPixelBar();
+      if(prevTool === 'pixel' && currentTool !== 'pixel' && pixelDraw) pixelUp();
     });
   });
 
