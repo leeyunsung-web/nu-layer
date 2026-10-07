@@ -325,6 +325,8 @@
   .pen-bar .pb-r { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 10px; color: var(--ink-dim); }
   .pen-bar .pb-r input[type=range] { width: 80px; }
   .pen-bar .pb-r input[type=number] { width: 46px; font: 11px var(--font-mono); padding: 1px 3px; border: 1px solid var(--border); border-radius: 4px; }
+  .pen-bar .pb-sel { display: inline-flex; align-items: center; gap: 3px; }
+  .pen-bar .pb-sel .btn { min-width: 26px; padding-left: 6px; padding-right: 6px; }
   .pen-bar .pb-hint { font-family: var(--font-mono); font-size: 10px; color: var(--accent, #e4442d); margin-left: auto; }
   .tool-btn {
     flex: 1; padding: 10px 4px; font-family: var(--font-mono); font-size: 11px;
@@ -956,7 +958,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b114</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b115</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -1194,6 +1196,11 @@
         <label class="pb-r" title="Corner radius for corner anchors (no handles). Applies to new pen paths and to the selected path. 0 = none.">R
           <input type="range" id="penR" min="0" max="100" step="1" value="0">
           <input type="number" id="penRn" min="0" max="500" step="1" value="0"></label>
+        <span class="pb-sel" title="Round only the SELECTED anchors (DIRECT A: click / Shift-click / drag a box). 5px per press, Shift = 1px. Corner anchors (no handles) only.">
+          <span class="pb-title">SEL R</span>
+          <button class="btn btn-sm" id="selRMinus">−</button>
+          <button class="btn btn-sm" id="selRPlus">+</button>
+        </span>
         <span class="pb-hint" id="penHint"></span>
       </div>
       <div id="shapePicker" role="menu" aria-label="Shapes">
@@ -9095,7 +9102,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // 점만 늘고 그림은 같다.
   // 핸들 없는 꺾인 앵커를 반지름 cr 의 호로 깎은 앵커 목록. 원래 앵커는 그대로 둔다.
   function expandCorners(nodes, closed, cr){
-    if(!(cr > 0) || !nodes || nodes.length < 3) return nodes;
+    if(!nodes || nodes.length < 3) return nodes;
+    if(!(cr > 0) && !nodes.some(q => q.r > 0)) return nodes;
     const n = nodes.length, out = [];
     for(let i = 0; i < n; i++){
       const N = nodes[i];
@@ -9108,7 +9116,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
       const ux = ax/la, uy = ay/la, vx = bx/lb, vy = by/lb;
       const th = Math.acos(Math.max(-1, Math.min(1, ux*vx + uy*vy)));   // 안쪽 각
       if(th > Math.PI - 0.01 || th < 1e-3){ out.push(N); continue; }
-      let t = cr / Math.tan(th / 2);
+      const rr = (N.r != null) ? N.r : cr;
+      if(!(rr > 0)){ out.push(N); continue; }
+      let t = rr / Math.tan(th / 2);
       t = Math.min(t, la * 0.5, lb * 0.5);                                // 이웃 모서리와 나눠 쓴다
       const r = t * Math.tan(th / 2);
       const h = (4/3) * Math.tan((Math.PI - th) / 4) * r;                 // 원호 ≈ 3차 곡선
@@ -9119,7 +9129,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     return out;
   }
   function flattenNodes(nodes, closed, cr){
-    if(cr > 0 && nodes && nodes.length > 2) nodes = expandCorners(nodes, closed, cr);
+    if(nodes && nodes.length > 2) nodes = expandCorners(nodes, closed, cr || 0);
     if(!nodes || !nodes.length) return [];
     if(nodes.length === 1) return [{ x:nodes[0].x, y:nodes[0].y }];
     const out = [{ x:nodes[0].x, y:nodes[0].y }];
@@ -9201,7 +9211,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
   }
 
   function snapshotStroke(a){
-    return { nodes: a.nodes ? a.nodes.map(n => ({ x:n.x, y:n.y, sm: !!n.sm,
+    return { nodes: a.nodes ? a.nodes.map(n => ({ x:n.x, y:n.y, sm: !!n.sm, r: (n.r != null ? n.r : null),
                                 hi: n.hi ? {x:n.hi.x, y:n.hi.y} : null,
                                 ho: n.ho ? {x:n.ho.x, y:n.ho.y} : null })) : null,
              points: a.points.map(p => ({ x:p.x, y:p.y, p:p.p })),
@@ -9209,9 +9219,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
              pw: a.pw ? a.pw.slice() : null };
   }
   function restoreStroke(a, s){
-    a.nodes = s.nodes ? s.nodes.map(n => ({ x:n.x, y:n.y, sm: !!n.sm,
+    a.nodes = s.nodes ? s.nodes.map(n => { const o = { x:n.x, y:n.y, sm: !!n.sm,
                           hi: n.hi ? {x:n.hi.x, y:n.hi.y} : null,
-                          ho: n.ho ? {x:n.ho.x, y:n.ho.y} : null })) : null;
+                          ho: n.ho ? {x:n.ho.x, y:n.ho.y} : null }; if(n.r != null) o.r = n.r; return o; }) : null;
     a._bb = null; a._bbFor = null;
     a.points = s.points.map(p => ({ x:p.x, y:p.y, p:p.p }));
     a.closed = s.closed; a.edit = s.edit; a.pw = s.pw ? s.pw.slice() : null;
@@ -9409,7 +9419,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
   const pvDist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const pvP = (x, y) => ({ x, y });
   const pvMirror = (n, h) => ({ x: 2*n.x - h.x, y: 2*n.y - h.y });
-  const pvCloneNode = n => ({ x:n.x, y:n.y, sm:!!n.sm, hi: n.hi ? {x:n.hi.x, y:n.hi.y} : null, ho: n.ho ? {x:n.ho.x, y:n.ho.y} : null });
+  const pvCloneNode = n => { const o = { x:n.x, y:n.y, sm:!!n.sm, hi: n.hi ? {x:n.hi.x, y:n.hi.y} : null, ho: n.ho ? {x:n.ho.x, y:n.ho.y} : null };
+                              if(n.r != null) o.r = n.r; return o; };
   function pvConstrain(from, p){
     const dx = p.x - from.x, dy = p.y - from.y;
     if(!dx && !dy) return pvP(p.x, p.y);
@@ -9435,12 +9446,13 @@ showLayerMenu(ev.clientX, ev.clientY, [
     if(!a || a.type !== 'stroke' || !a.points || !a.points.length) return null;
     if(!a.nodes && a.nd){
       a.nodes = a.nd.map(q => ({ x:q[0], y:q[1], hi: q[2] != null ? {x:q[2], y:q[3]} : null,
-                                 ho: q[4] != null ? {x:q[4], y:q[5]} : null, sm: !!q[6] }));
+                                 ho: q[4] != null ? {x:q[4], y:q[5]} : null, sm: !!q[6],
+                                 ...(q[7] != null ? { r: q[7] } : {}) }));
       a.closed = !!a.cl; a.edit = 'bezier';
     }
     if(!a.nodes || a.edit !== 'bezier' || a.nodes.length < 2) return null;
     const p0 = a.points[0], pN = a.points[a.points.length - 1];
-    const E = (a.cr > 0) ? expandCorners(a.nodes, !!a.closed, a.cr) : a.nodes;
+    const E = expandCorners(a.nodes, !!a.closed, a.cr || 0);
     const n0 = E[0], nN = a.closed ? E[0] : E[E.length - 1];
     const dx = p0.x - n0.x, dy = p0.y - n0.y;
     if(Math.abs(nN.x + dx - pN.x) > 0.6 || Math.abs(nN.y + dy - pN.y) > 0.6){
@@ -10154,9 +10166,46 @@ showLayerMenu(ev.clientX, ev.clientY, [
   }
   syncPenCornerUI();
 
+
+  // ---- 고른 앵커만 둥글게 ----
+  function selRadiusStep(dir, fine){
+    const a = (typeof editedStroke === 'function') ? editedStroke() : null;
+    if(!a || !nodeSel || !nodeSel.sel || !nodeSel.sel.size){
+      toast('직접 선택(A)으로 둥글게 할 앵커를 먼저 고르세요 — 클릭, Shift+클릭, 사각형으로.');
+      return;
+    }
+    const ns0 = pvNodesOf(a) || pvEditNodes(a);
+    if(!ns0) return;
+    const L = ns0.length, closed = !!a.closed;
+    // 핸들 없는 꺾인 앵커(양옆 선분도 직선)만
+    const isCorner = i => {
+      const n = ns0[i], P = ns0[(i - 1 + L) % L], Q = ns0[(i + 1) % L];
+      if(!closed && (i === 0 || i === L - 1)) return false;
+      return !n.hi && !n.ho && !P.ho && !Q.hi;
+    };
+    const idx = [...nodeSel.sel].filter(i => i < L && isCorner(i));
+    if(!idx.length){ toast('고른 앵커 중 꺾인 앵커(핸들 없음)가 없습니다 — 끝점·곡선 앵커는 둥글게 할 수 없습니다.'); return; }
+    pvBegin(a);
+    const step = (fine ? 1 : 5) * dir;
+    let shown = 0;
+    for(const i of idx){
+      const n = a.nodes[i];
+      const cur = (n.r != null) ? n.r : (a.cr || 0);
+      n.r = Math.max(0, Math.min(500, cur + step));
+      shown = n.r;
+    }
+    pvCommit(a, dir > 0 ? '고른 앵커 둥글게' : '고른 앵커 덜 둥글게');
+    const hint = $('penHint');
+    if(hint) hint.textContent = '고른 앵커 ' + idx.length + '개 · R ' + shown;
+  }
+  if($('selRPlus')){
+    $('selRPlus').addEventListener('click', e => selRadiusStep(+1, e.shiftKey));
+    $('selRMinus').addEventListener('click', e => selRadiusStep(-1, e.shiftKey));
+  }
+
   // ---- 덧그림판 ----
   function pvTrace(c, ns, closed, cr){
-    if(cr > 0) ns = expandCorners(ns, closed, cr);
+    ns = expandCorners(ns, closed, cr || 0);
     c.moveTo(ns[0].x, ns[0].y);
     for(let i = 0; i < pvSegCount(ns, closed); i++){
       const s = pvSeg(ns, closed, i);
@@ -12617,7 +12666,11 @@ showLayerMenu(ev.clientX, ev.clientY, [
     if(undoneAction.type === 'strokeEdit'){
       const t = actions.find(a => a.id === undoneAction.targetId);
       if(t){ restoreStroke(t, undoneAction.before); renderSingleLayer(t.layer); }
-      if(nodeSel && nodeSel.id === undoneAction.targetId){ nodeSel.sel.clear(); drawNodeOverlay(); }
+      if(nodeSel && nodeSel.id === undoneAction.targetId){
+        const tt = actions.find(x => x.id === undoneAction.targetId);
+        if(!tt || !tt.nodes || [...nodeSel.sel].some(i => i >= tt.nodes.length)) nodeSel.sel.clear();
+        drawNodeOverlay();
+      }
       toast(undoneAction.label + ' 되돌림.');
       return;
     }
@@ -12772,7 +12825,11 @@ showLayerMenu(ev.clientX, ev.clientY, [
       const t = actions.find(a => a.id === redoneAction.targetId);
       if(t){ restoreStroke(t, redoneAction.after); renderSingleLayer(t.layer); }
       actions.push(redoneAction);
-      if(nodeSel && nodeSel.id === redoneAction.targetId){ nodeSel.sel.clear(); drawNodeOverlay(); }
+      if(nodeSel && nodeSel.id === redoneAction.targetId){
+        const tt = actions.find(x => x.id === redoneAction.targetId);
+        if(!tt || !tt.nodes || [...nodeSel.sel].some(i => i >= tt.nodes.length)) nodeSel.sel.clear();
+        drawNodeOverlay();
+      }
       toast(redoneAction.label + ' 다시 적용.');
       return;
     }
@@ -14316,7 +14373,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
             const r2 = v => Math.round(v * 100) / 100;
             so.nd = a.nodes.map(n => [r2(n.x - bbox.minX), r2(n.y - bbox.minY),
               n.hi ? r2(n.hi.x - bbox.minX) : null, n.hi ? r2(n.hi.y - bbox.minY) : null,
-              n.ho ? r2(n.ho.x - bbox.minX) : null, n.ho ? r2(n.ho.y - bbox.minY) : null, n.sm ? 1 : 0]);
+              n.ho ? r2(n.ho.x - bbox.minX) : null, n.ho ? r2(n.ho.y - bbox.minY) : null, n.sm ? 1 : 0,
+              n.r != null ? r2(n.r) : null]);
             if(a.closed) so.cl = 1;
             if(a.cr) so.cr = a.cr;
           }
