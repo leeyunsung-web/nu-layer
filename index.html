@@ -321,6 +321,10 @@
              border: 1px dashed var(--border); border-radius: 8px; }
   .pen-bar .pb-title { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; color: var(--ink-dim); }
   .pen-bar .btn.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .pen-bar .pb-sep { width: 1px; align-self: stretch; background: var(--border); margin: 0 2px; }
+  .pen-bar .pb-r { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 10px; color: var(--ink-dim); }
+  .pen-bar .pb-r input[type=range] { width: 80px; }
+  .pen-bar .pb-r input[type=number] { width: 46px; font: 11px var(--font-mono); padding: 1px 3px; border: 1px solid var(--border); border-radius: 4px; }
   .pen-bar .pb-hint { font-family: var(--font-mono); font-size: 10px; color: var(--accent, #e4442d); margin-left: auto; }
   .tool-btn {
     flex: 1; padding: 10px 4px; font-family: var(--font-mono); font-size: 11px;
@@ -952,7 +956,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b113</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b114</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -1183,6 +1187,13 @@
         <button class="btn btn-sm" data-sub="add" title="+ — click a segment to add an anchor (shape stays the same)">+ ADD</button>
         <button class="btn btn-sm" data-sub="del" title="− — click an anchor to delete it">− DELETE</button>
         <button class="btn btn-sm" data-sub="convert" title="Shift+C — click an anchor: corner ↔ smooth · drag an anchor: new handles · drag a handle: move only that one">^ CONVERT</button>
+        <span class="pb-sep"></span>
+        <span class="pb-title">CORNER</span>
+        <button class="btn btn-sm" data-join="miter" title="Sharp corners. (A plotter pen still rounds the outside of a corner by half its nib — that is the nib, not the path.)">SHARP</button>
+        <button class="btn btn-sm" data-join="round" title="Round joins — the way a round pen nib draws">ROUND</button>
+        <label class="pb-r" title="Corner radius for corner anchors (no handles). Applies to new pen paths and to the selected path. 0 = none.">R
+          <input type="range" id="penR" min="0" max="100" step="1" value="0">
+          <input type="number" id="penRn" min="0" max="500" step="1" value="0"></label>
         <span class="pb-hint" id="penHint"></span>
       </div>
       <div id="shapePicker" role="menu" aria-label="Shapes">
@@ -3942,7 +3953,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
       if(a.type==='stroke'){
         const o = { type:'stroke', tool:a.tool, color:a.color, width:a.width, li,
                     pts: packPoints(a.points) };
-        if(a.nd){ o.nd = a.nd; if(a.cl) o.cl = 1; }
+        if(a.nd){ o.nd = a.nd; if(a.cl) o.cl = 1; if(a.cr) o.cr = a.cr; }
+        if(a.jn) o.jn = a.jn;
         // Recipes built by buildRecipeForBBox already use the compact keys
         // (tx/g/sd) — checking only a.texture DROPPED the texture here, which
         // is why spray strokes came back as smooth after a save+reload.
@@ -6378,7 +6390,16 @@ showLayerMenu(ev.clientX, ev.clientY, [
     // clip-path 로 도려내면 포인터 판정까지 잘려 그 자리에서 펜이 캔버스에
     // 안 닿는다(확대하면 안 그려지던 원인). CSS mask 는 보이는 것만 가리고
     // 판정은 건드리지 않는다. 구멍은 evenodd 인 SVG 로 만든다.
-    setDrawCanvasHole(vis.x / W, vis.y / H, vis.w / W, vis.h / H);
+    {
+      // 구멍은 판보다 화면 2px 만큼 작게 -- 경계에서 두 판이 겹쳐 틈이 없다.
+      // (같은 자리에서 끝나면 양쪽 경계 픽셀이 다 반투명이라 종이가 비친다)
+      const scr = ((drawCanvas.offsetWidth || W) / W) * (viewZoom || 1);
+      const e = 2 / Math.max(0.01, scr);
+      const l = vis.x > 0 ? e : 0, t = vis.y > 0 ? e : 0;
+      const r = vis.x + vis.w < W ? e : 0, b = vis.y + vis.h < H ? e : 0;
+      const hw = Math.max(0, vis.w - l - r), hh = Math.max(0, vis.h - t - b);
+      setDrawCanvasHole((vis.x + l) / W, (vis.y + t) / H, hw / W, hh / H);
+    }
     const out = preciseCanvas.getContext('2d');
     out.setTransform(1, 0, 0, 1, 0, 0);
     out.clearRect(0, 0, pw, ph);
@@ -6629,6 +6650,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // smoothPoints 두 번 → 가운데점을 잇는 2차 곡선(plotterPathD) 을 1px 간격으로.
   function plotterFlatPoints(raw){
     if(!raw || !raw.length) return [];
+    if(strokeJoinNow) return raw.map(p => [Math.round(p.x*10)/10, Math.round(p.y*10)/10]);   // 펜 획은 점 그대로
     const pts = smoothPoints(raw);
     if(pts.length === 1) return [[pts[0].x, pts[0].y]];
     if(pts.length === 2) return [[pts[0].x, pts[0].y], [pts[1].x, pts[1].y]];
@@ -7598,8 +7620,14 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // Weighted moving-average smoothing (2 passes, endpoints preserved).
   // Applied at render time, so live drawing, undo/redo replay, and
   // variation recolor all produce the identical smooth result.
+  function withJoin(a, fn){
+    const o = strokeJoinNow;
+    strokeJoinNow = (a && (a.join || a.jn)) || null;
+    try { return fn(); } finally { strokeJoinNow = o; }
+  }
   function smoothPoints(pts){
     if(pts.length < 3) return pts;
+    if(strokeJoinNow) return pts;                 // 펜 획: 이미 정확한 점
     let cur = pts;
     for(let pass=0; pass<2; pass++){
       const out = [cur[0]];
@@ -7646,7 +7674,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     ctx.fillStyle = color;
     ctx.lineWidth = width;
     ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    ctx.lineJoin = strokeJoinNow || 'round';
     if(pts.length === 1){
       ctx.beginPath();
       ctx.arc(pts[0].x, pts[0].y, width/2, 0, Math.PI*2);
@@ -7660,7 +7688,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         for(let i=1; i<pts.length-1; i++){
           const mx = (pts[i].x + pts[i+1].x) / 2;
           const my = (pts[i].y + pts[i+1].y) / 2;
-          ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+          if(strokeJoinNow) ctx.lineTo(pts[i].x, pts[i].y); else ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
         }
         ctx.lineTo(pts[pts.length-1].x, pts[pts.length-1].y);
       }
@@ -7737,6 +7765,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const f = fmt || (v => Math.round(v * 100) / 100);
     if(!pts.length) return '';
     if(pts.length === 1) return null;                 // 점 하나는 원으로
+    if(strokeJoinNow) return 'M' + pts.map(p => f(p.x) + ' ' + f(p.y)).join('L');   // 펜 획: 곧은 꺾은선
     let d = `M${f(pts[0].x)} ${f(pts[0].y)}`;
     if(pts.length === 2){
       d += `L${f(pts[1].x)} ${f(pts[1].y)}`;
@@ -7768,7 +7797,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     ctx.strokeStyle = isEraser ? 'rgba(0,0,0,1)' : color;
     ctx.lineWidth = width;          // 균일 -- 플로터 펜에는 필압이 없다
     ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    ctx.lineJoin = strokeJoinNow || 'round';
     ctx.stroke(new Path2D(plotterPathD(pts)));
     ctx.restore();
   }
@@ -7794,7 +7823,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     ctx.fillStyle = ctx.strokeStyle;
     ctx.lineWidth = width;
     ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    ctx.lineJoin = strokeJoinNow || 'round';
     if(pts.length === 1){
       ctx.beginPath();
       ctx.arc(pts[0].x, pts[0].y, width/2, 0, Math.PI*2);
@@ -7810,7 +7839,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         for(let i=1; i<pts.length-1; i++){
           const mx = (pts[i].x + pts[i+1].x) / 2;
           const my = (pts[i].y + pts[i+1].y) / 2;
-          ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+          if(strokeJoinNow) ctx.lineTo(pts[i].x, pts[i].y); else ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
         }
         ctx.lineTo(pts[pts.length-1].x, pts[pts.length-1].y);
       }
@@ -8725,7 +8754,13 @@ showLayerMenu(ev.clientX, ev.clientY, [
     ctx.globalCompositeOperation = 'source-over';
   }
 
+  // 지금 그리는 획의 이음. 펜 획(join:'miter')만 뾰족하고 나머지는 언제나 둥글다.
+  var strokeJoinNow = null;   // var: 초기화 전에 불려도 안전하게
   function renderStrokeFull(ctx, action){
+    strokeJoinNow = (action && (action.join || action.jn)) || null;
+    try { return renderStrokeFull0(ctx, action); } finally { strokeJoinNow = null; }
+  }
+  function renderStrokeFull0(ctx, action){
     strokeSmoothPath(ctx, action.points, action.width, action.color, action.tool === 'eraser',
                      action.texture, action.grain, action.seed, action._k || 1);
   }
@@ -9058,7 +9093,33 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // 앵커 → 점. 핸들이 없는 구간은 직선이라 점 둘이면 끝이고, 곡선 구간만
   // 잘게 나눈다. 나누는 수는 길이에 맞춘다 -- 짧은 구간을 64등분하면
   // 점만 늘고 그림은 같다.
-  function flattenNodes(nodes, closed){
+  // 핸들 없는 꺾인 앵커를 반지름 cr 의 호로 깎은 앵커 목록. 원래 앵커는 그대로 둔다.
+  function expandCorners(nodes, closed, cr){
+    if(!(cr > 0) || !nodes || nodes.length < 3) return nodes;
+    const n = nodes.length, out = [];
+    for(let i = 0; i < n; i++){
+      const N = nodes[i];
+      const hasPrev = closed || i > 0, hasNext = closed || i < n - 1;
+      const P = nodes[(i - 1 + n) % n], Q = nodes[(i + 1) % n];
+      if(!hasPrev || !hasNext || N.hi || N.ho || P.ho || Q.hi){ out.push(N); continue; }
+      const ax = P.x - N.x, ay = P.y - N.y, bx = Q.x - N.x, by = Q.y - N.y;
+      const la = Math.hypot(ax, ay), lb = Math.hypot(bx, by);
+      if(la < 1e-6 || lb < 1e-6){ out.push(N); continue; }
+      const ux = ax/la, uy = ay/la, vx = bx/lb, vy = by/lb;
+      const th = Math.acos(Math.max(-1, Math.min(1, ux*vx + uy*vy)));   // 안쪽 각
+      if(th > Math.PI - 0.01 || th < 1e-3){ out.push(N); continue; }
+      let t = cr / Math.tan(th / 2);
+      t = Math.min(t, la * 0.5, lb * 0.5);                                // 이웃 모서리와 나눠 쓴다
+      const r = t * Math.tan(th / 2);
+      const h = (4/3) * Math.tan((Math.PI - th) / 4) * r;                 // 원호 ≈ 3차 곡선
+      const A = { x: N.x + ux*t, y: N.y + uy*t }, B = { x: N.x + vx*t, y: N.y + vy*t };
+      out.push({ x:A.x, y:A.y, hi:null, ho:{ x: A.x - ux*h, y: A.y - uy*h }, sm:false });
+      out.push({ x:B.x, y:B.y, hi:{ x: B.x - vx*h, y: B.y - vy*h }, ho:null, sm:false });
+    }
+    return out;
+  }
+  function flattenNodes(nodes, closed, cr){
+    if(cr > 0 && nodes && nodes.length > 2) nodes = expandCorners(nodes, closed, cr);
     if(!nodes || !nodes.length) return [];
     if(nodes.length === 1) return [{ x:nodes[0].x, y:nodes[0].y }];
     const out = [{ x:nodes[0].x, y:nodes[0].y }];
@@ -9097,7 +9158,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // 전부 쓰는 것이라, 앵커를 고치면 여기서 한 번만 다시 만들어 주면 된다.
   function syncStrokeFromNodes(a){
     if(!a || !a.nodes) return a;
-    const pts = flattenNodes(a.nodes, !!a.closed);
+    const pts = flattenNodes(a.nodes, !!a.closed, a.cr || 0);
     a.points = a.pw ? applyPressure(pts, a.pw) : pts;
     return a;
   }
@@ -9144,7 +9205,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
                                 hi: n.hi ? {x:n.hi.x, y:n.hi.y} : null,
                                 ho: n.ho ? {x:n.ho.x, y:n.ho.y} : null })) : null,
              points: a.points.map(p => ({ x:p.x, y:p.y, p:p.p })),
-             closed: !!a.closed, edit: a.edit || null,
+             closed: !!a.closed, edit: a.edit || null, cr: a.cr || 0, join: a.join || null,
              pw: a.pw ? a.pw.slice() : null };
   }
   function restoreStroke(a, s){
@@ -9154,6 +9215,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     a._bb = null; a._bbFor = null;
     a.points = s.points.map(p => ({ x:p.x, y:p.y, p:p.p }));
     a.closed = s.closed; a.edit = s.edit; a.pw = s.pw ? s.pw.slice() : null;
+    if('cr' in s){ a.cr = s.cr || 0; a.join = s.join || null; }
   }
 
   let editBefore = null;   // 한 번의 조작을 시작할 때의 상태
@@ -9378,7 +9440,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
     }
     if(!a.nodes || a.edit !== 'bezier' || a.nodes.length < 2) return null;
     const p0 = a.points[0], pN = a.points[a.points.length - 1];
-    const n0 = a.nodes[0], nN = a.closed ? a.nodes[0] : a.nodes[a.nodes.length - 1];
+    const E = (a.cr > 0) ? expandCorners(a.nodes, !!a.closed, a.cr) : a.nodes;
+    const n0 = E[0], nN = a.closed ? E[0] : E[E.length - 1];
     const dx = p0.x - n0.x, dy = p0.y - n0.y;
     if(Math.abs(nN.x + dx - pN.x) > 0.6 || Math.abs(nN.y + dy - pN.y) > 0.6){
       a.nodes = null; a.edit = null; return null;          // 어긋났다
@@ -9639,6 +9702,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
                   texture: currentTexture, grain: currentGrain,
                   seed: (Math.random()*2147483647)|0,
                   nodes: pd.nodes, closed: pd.closed, edit:'bezier', pw:null,
+                  cr: penR, join: penJoinMode,
                   points: [], layer: al.id };
     syncStrokeFromNodes(act);
     const made = commitShapeWithFill(act, pd.closed);
@@ -9717,6 +9781,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
   function pvEditNodesPeek(a){ return pvNodesOf(a); }
   function pvSelect(a){
     nodeSel = { id: a.id, sel: new Set(), drag:null, tmp: null };
+    if(a.nodes && a.edit === 'bezier'){ penR = a.cr || 0; penJoinMode = a.join || 'round'; syncPenCornerUI(); }
   }
   function directDown(q, e){
     let a = editedStroke();
@@ -10048,8 +10113,50 @@ showLayerMenu(ev.clientX, ev.clientY, [
     if(ep){ nodeSel.join = { id: ep.a.id, i: ep.i }; }
   }, true);
 
+
+  // ---- 펜 모서리: 이음·R ----
+  let penJoinMode = 'miter', penR = 0;
+  try {
+    const sv = JSON.parse(localStorage.getItem('nulayer_pen_corner') || 'null');
+    if(sv){ if(sv.join === 'round' || sv.join === 'miter') penJoinMode = sv.join; if(sv.r >= 0) penR = Math.min(500, +sv.r || 0); }
+  } catch(e){}
+  function savePenCorner(){ try { localStorage.setItem('nulayer_pen_corner', JSON.stringify({ join: penJoinMode, r: penR })); } catch(e){} }
+  function syncPenCornerUI(){
+    document.querySelectorAll('#penBar [data-join]').forEach(b => b.classList.toggle('on', b.dataset.join === penJoinMode));
+    const r = $('penR'), rn = $('penRn');
+    if(r) r.value = Math.min(100, penR);
+    if(rn && document.activeElement !== rn) rn.value = penR;
+  }
+  // 고른 펜 획에 바로 (한 번의 되돌리기로)
+  let pjEdit = null;
+  function penCornerTarget(){
+    const a = (typeof editedStroke === 'function') ? editedStroke() : null;
+    return (a && a.nodes && a.edit === 'bezier') ? a : null;
+  }
+  function applyPenCorner(live){
+    const a = penCornerTarget();
+    if(!a){ pvOverlay(); return; }
+    if(!pjEdit || pjEdit !== a){ beginEdit(a); pjEdit = a; }
+    a.cr = penR; a.join = penJoinMode;
+    if(live) pvLive(a);
+    else { pvCommit(a, '모서리'); pjEdit = null; }
+  }
+  document.querySelectorAll('#penBar [data-join]').forEach(b => b.addEventListener('click', () => {
+    penJoinMode = b.dataset.join; savePenCorner(); syncPenCornerUI(); applyPenCorner(false);
+  }));
+  if($('penR')){
+    $('penR').addEventListener('input', e => { penR = +e.target.value || 0; savePenCorner(); syncPenCornerUI(); applyPenCorner(true); });
+    $('penR').addEventListener('change', () => applyPenCorner(false));
+    $('penRn').addEventListener('change', e => {
+      penR = Math.max(0, Math.min(500, Math.round(+e.target.value || 0))); e.target.value = penR;
+      savePenCorner(); syncPenCornerUI(); applyPenCorner(false);
+    });
+  }
+  syncPenCornerUI();
+
   // ---- 덧그림판 ----
-  function pvTrace(c, ns, closed){
+  function pvTrace(c, ns, closed, cr){
+    if(cr > 0) ns = expandCorners(ns, closed, cr);
     c.moveTo(ns[0].x, ns[0].y);
     for(let i = 0; i < pvSegCount(ns, closed); i++){
       const s = pvSeg(ns, closed, i);
@@ -10074,11 +10181,13 @@ showLayerMenu(ev.clientX, ev.clientY, [
         c.lineCap = 'round'; c.lineJoin = 'round';
         if(penFillColor && ns.length > 2){
           c.globalAlpha = 0.35; c.fillStyle = penFillColor;
-          c.beginPath(); pvTrace(c, ns, true); c.fill(); c.globalAlpha = 1;
+          c.beginPath(); pvTrace(c, ns, true, penR); c.fill(); c.globalAlpha = 1;
         }
         if(!lineNone){
           c.strokeStyle = strokeColor; c.lineWidth = strokeWidthNow();
-          c.beginPath(); pvTrace(c, ns, penDraft.closed); c.stroke();
+          c.lineJoin = penJoinMode;
+          c.beginPath(); pvTrace(c, ns, penDraft.closed, penR); c.stroke();
+          c.lineJoin = 'round';
         }
       }
       // 다음 선 미리보기 (마지막 앵커 → 커서)
@@ -10100,7 +10209,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         c.beginPath(); c.moveTo(last.x, last.y); c.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, tgt.x, tgt.y); c.stroke();
       }
       c.strokeStyle = BLUE; c.lineWidth = 1 / k;
-      if(ns.length > 1){ c.beginPath(); pvTrace(c, ns, penDraft.closed); c.stroke(); }
+      if(ns.length > 1){ c.beginPath(); pvTrace(c, ns, penDraft.closed, penR); c.stroke(); }
       const L = ns[ns.length - 1];
       for(const h of [L.hi, L.ho]) if(h){
         c.beginPath(); c.moveTo(L.x, L.y); c.lineTo(h.x, h.y); c.stroke();
@@ -10117,7 +10226,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const ns = a ? pvEditNodes(a) : null;
     if(a && ns){
       c.strokeStyle = BLUE; c.lineWidth = 1 / k;
-      c.beginPath(); pvTrace(c, ns, !!a.closed); c.stroke();
+      c.beginPath(); pvTrace(c, ns, !!a.closed, a.cr || 0); c.stroke();
       for(const h of pvHandles(a, ns)){
         const n = ns[h.i];
         c.beginPath(); c.moveTo(n.x, n.y); c.lineTo(h.h.x, h.h.y); c.stroke();
@@ -11763,7 +11872,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
     return parts;
   }
 
-  function strokeToSvgEl(a, env){
+  function strokeToSvgEl(a, env){ return withJoin(a, () => strokeToSvgEl0(a, env)); }
+  function strokeToSvgEl0(a, env){
     const f = n => Math.round(n*100)/100;
     const pts = a.points;
     // 지우개는 기하로 베이크되지 못하고 여기까지 살아 온 것들이다 -- 스프레이
@@ -11821,7 +11931,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       const base = sm.length === 1
         ? `<circle cx="${f(sm[0].x)}" cy="${f(sm[0].y)}" r="${f(svgW/2)}" fill="${a.color}"/>`
         : `<path d="${plotterPathD(sm, f)}" fill="none" stroke="${a.color}" stroke-width="${f(svgW)}"`
-          + ` stroke-linecap="round" stroke-linejoin="round"/>`;
+          + ` stroke-linecap="round" stroke-linejoin="${(a.join || a.jn) === 'miter' ? 'miter' : 'round'}"/>`;
       return wrap(base, parts || []);
     }
 
@@ -11842,7 +11952,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       ? 'M' + out.map(p => f(p.x) + ' ' + f(p.y)).join('L')
       : plotterPathD(out, f);
     return wrap(`<path d="${d}" fill="none" stroke="${a.color}" stroke-width="${f(a.width)}"` +
-           ` stroke-linecap="round" stroke-linejoin="round"/>`);
+           ` stroke-linecap="round" stroke-linejoin="${(a.join || a.jn) === 'miter' ? 'miter' : 'round'}"/>`);
   }
 
   // Carve leftover eraser strokes (legacy fill layers) out of a fill mask.
@@ -14132,8 +14242,11 @@ showLayerMenu(ev.clientX, ev.clientY, [
           if(a.tool !== 'eraser') drawnLis.add(li);
           endLi(li);        // 이 레이어의 묶음만 닫는다 -- 다른 레이어의 획은
                             // 이 버퍼를 건드리지 않으므로 끊을 이유가 없다
-          strokeSmoothPath(ensure(li), a.points, a.width, a.color,
-                           a.tool === 'eraser', a.tx || 'smooth', a.g, a.sd);
+          strokeJoinNow = a.jn || null;
+          try {
+            strokeSmoothPath(ensure(li), a.points, a.width, a.color,
+                             a.tool === 'eraser', a.tx || 'smooth', a.g, a.sd);
+          } finally { strokeJoinNow = null; }
         } else if(a.type === 'fill'){
           drawnLis.add(li);
           if(!a.m && !a.poly && !(a.sli && a.sli.length)) beginLi(li);
@@ -14205,7 +14318,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
               n.hi ? r2(n.hi.x - bbox.minX) : null, n.hi ? r2(n.hi.y - bbox.minY) : null,
               n.ho ? r2(n.ho.x - bbox.minX) : null, n.ho ? r2(n.ho.y - bbox.minY) : null, n.sm ? 1 : 0]);
             if(a.closed) so.cl = 1;
+            if(a.cr) so.cr = a.cr;
           }
+          if(a.join) so.jn = a.join;
           result.push(so);
         }
       } else if(a.type==='fill'){
@@ -14643,7 +14758,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
               seed: (a.seed != null ? a.seed : (a.sd != null ? a.sd : ((Math.random()*2147483647)|0))),
               points: a.points.map(p=>({ x:p.x + offX, y:p.y + offY, p:p.p })),
               layer: layerIdFor(a),
-              ...(a.nd ? { nd: a.nd, cl: a.cl ? 1 : 0 } : {})
+              ...(a.nd ? { nd: a.nd, cl: a.cl ? 1 : 0, cr: a.cr || 0 } : {}),
+              ...(a.jn ? { join: a.jn } : {})
             });
           } else if(a.type === 'fill'){
             const act = {
@@ -17894,7 +18010,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
           const isEr = a.tool === 'eraser';
           const isPl = !isEr && (a.tx || a.texture) === 'plotter';
           // 플로터 선은 화면의 곡선 그대로 펴서 보낸다 -- 굵기는 펜(pl 표시)
-          const srcPts = isPl ? plotterFlatPoints(a.points).map(q => ({ x: q[0], y: q[1] })) : a.points;
+          const srcPts = isPl ? withJoin(a, () => plotterFlatPoints(a.points)).map(q => ({ x: q[0], y: q[1] })) : a.points;
           const poly = [];
           for(const pt of srcPts){
             const lx = (pt.x - hw) * kx, ly = (pt.y - hh) * ky;
@@ -18016,7 +18132,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
           // 찍어 돌려주므로 화면과 어긋난다 -- 잘리지 않은 획은 원본에서 편다.
           const orig = isPlotterStroke(a) && plPieces.get(a.id) === 1 ? plOrig.get(a.id) : null;
           const o = isPlotterStroke(a)
-            ? { p: plotterFlatPoints(orig ? orig.points : a.points), w: a.width || 1, pl: 1 }
+            ? { p: withJoin(orig || a, () => plotterFlatPoints(orig ? orig.points : a.points)), w: a.width || 1, pl: 1 }
             : { p: a.points.map(p => [Math.round(p.x*10)/10, Math.round(p.y*10)/10]),
                 w: a.width || 1 };
           if(a.tool === 'eraser') o.e = 1;
