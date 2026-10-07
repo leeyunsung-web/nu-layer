@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NU VARY — 패턴 변주</title>
+<style>
+  :root{
+    --bg:#f5f5f7; --panel:#fff; --panel-alt:#f5f5f7;
+    --border:#d2d2d7; --border-soft:#e5e5ea;
+    --ink:#1d1d1f; --ink-dim:#6e6e73;
+    --accent:#1d1d1f; --accent-dim:#424245;
+    --font-sans:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Helvetica,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+            font-family:var(--font-sans);-webkit-font-smoothing:antialiased}
+  body{padding:20px 20px 60px}
+  .wrap{max-width:1280px;margin:0 auto}
+
+  header{border-bottom:1px solid var(--border);padding-bottom:16px;margin-bottom:22px;
+         display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  h1{font-size:19px;margin:0;letter-spacing:2px;font-weight:600}
+  .sub{font-size:12px;color:var(--ink-dim);letter-spacing:.3px}
+
+  .cols{display:grid;grid-template-columns:minmax(0,520px) minmax(0,1fr);gap:20px;align-items:start}
+  @media (max-width:900px){ .cols{grid-template-columns:1fr} }
+
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;
+         padding:14px;margin-bottom:16px}
+  .panel h3{font-size:11px;letter-spacing:1.4px;margin:0 0 10px;color:var(--ink-dim);font-weight:600}
+
+  canvas{display:block;width:100%;aspect-ratio:1/1;border:1px solid var(--border-soft);
+         border-radius:10px;background:#fff;touch-action:none;cursor:crosshair}
+
+  .row{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+  button{font-family:inherit;font-size:11.5px;letter-spacing:.6px;padding:7px 12px;
+         border:1px solid var(--border);border-radius:8px;background:var(--panel);
+         color:var(--ink);cursor:pointer;transition:background .12s,border-color .12s}
+  button:hover{background:var(--panel-alt)}
+  button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  button.go{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+  button:disabled{opacity:.4;cursor:default}
+
+  .sl{display:grid;grid-template-columns:92px 1fr 46px;align-items:center;gap:9px;margin:7px 0}
+  .sl label{font-size:11.5px;color:var(--ink-dim)}
+  .sl output{font-size:11px;text-align:right;font-variant-numeric:tabular-nums;color:var(--accent)}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  .chk{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-dim);margin:8px 0}
+
+  .samples{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:8px}
+  .samp{border:1px solid var(--border-soft);border-radius:9px;padding:4px;background:#fff;
+        cursor:pointer;position:relative;transition:border-color .12s}
+  .samp:hover{border-color:var(--accent-dim)}
+  .samp.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+  .samp canvas{aspect-ratio:1/1;border:0;border-radius:6px}
+  .samp .x{position:absolute;top:2px;right:4px;font-size:13px;color:var(--ink-dim);
+           line-height:1;padding:2px;display:none}
+  .samp:hover .x{display:block}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px}
+  .cell{border:1px solid var(--border-soft);border-radius:10px;padding:5px;background:#fff;
+        cursor:pointer;transition:border-color .12s}
+  .cell:hover{border-color:var(--accent-dim)}
+  .cell canvas{aspect-ratio:1/1;border:0}
+
+  .note{font-size:11.5px;color:var(--ink-dim);line-height:1.65;margin:6px 0 0}
+  .read{font-size:11.5px;line-height:1.75;font-variant-numeric:tabular-nums}
+  .read b{font-weight:600}
+  .read .dim{color:var(--ink-dim)}
+  .seq{font-size:10.5px;color:var(--ink-dim);word-break:break-all;margin-top:5px;line-height:1.5}
+  .empty{font-size:11.5px;color:var(--ink-dim);padding:16px 0;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>NU VARY</h1>
+  <span class="sub">펜으로 그린 패턴을 읽어, 비슷하지만 다른 것을 계속 만듭니다</span>
+</header>
+
+<div class="cols">
+
+  <!-- ── 왼쪽: 그리기 ── -->
+  <div>
+    <div class="panel">
+      <h3>DRAW</h3>
+      <canvas id="cv" width="1040" height="1040"></canvas>
+      <p class="note">클릭 = 코너 · 끌기 = 곡선 · 첫 점을 다시 누르면 닫힘 · Enter로 마침</p>
+      <div class="row">
+        <button id="bClose" class="on">닫힌 패스</button>
+        <button id="bUndo">실행취소</button>
+        <button id="bClear">지우기</button>
+        <button id="bAdd" class="go">샘플로 등록 →</button>
+      </div>
+      <div class="row">
+        <span class="sub" style="align-self:center">프리셋</span>
+        <button data-pre="s4">4갈래</button>
+        <button data-pre="s6">6갈래</button>
+        <button data-pre="bloom">꽃</button>
+        <button data-pre="flash">섬광</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>SAMPLES</h3>
+      <div class="samples" id="samples"></div>
+      <div class="empty" id="sampEmpty">아직 등록한 패턴이 없습니다.</div>
+    </div>
+
+    <div class="panel">
+      <h3>READING</h3>
+      <div class="read" id="reading"><span class="dim">샘플을 고르면 구조를 읽습니다.</span></div>
+    </div>
+  </div>
+
+  <!-- ── 오른쪽: 변주 ── -->
+  <div>
+    <div class="panel">
+      <h3>VARY</h3>
+      <div class="sl"><label>반지름 흔들기</label><input type="range" id="rJit" min="0" max="60" value="18"><output>0.18</output></div>
+      <div class="sl"><label>각도 흔들기</label><input type="range" id="aJit" min="0" max="60" value="10"><output>0.10</output></div>
+      <div class="sl"><label>뾰족함</label><input type="range" id="hScale" min="10" max="260" value="100"><output>1.00</output></div>
+      <div class="sl"><label>갈래 수 ±</label><input type="range" id="armD" min="0" max="4" value="1"><output>1</output></div>
+      <div class="sl"><label>만들 개수</label><input type="range" id="count" min="4" max="36" value="12"><output>12</output></div>
+      <label class="chk"><input type="checkbox" id="sym" checked> 대칭 유지 (끄면 갈래마다 제각각)</label>
+      <div class="row">
+        <button id="bGen" class="go">생성</button>
+        <button id="bMix">두 샘플 섞기</button>
+        <button id="bSvgAll">SVG로 전부 내보내기</button>
+      </div>
+      <p class="note" id="mixNote"></p>
+    </div>
+
+    <div class="panel">
+      <h3>DERIVE — 꼭지점과 선을 발판으로</h3>
+      <div class="sl"><label>꼭지점마다</label><input type="range" id="dVert" min="0" max="100" value="0"><output>0.00</output></div>
+      <div class="sl"><label>선 위에</label><input type="range" id="dEdge" min="0" max="100" value="0"><output>0.00</output></div>
+      <div class="sl"><label>자식 크기</label><input type="range" id="dSize" min="5" max="60" value="22"><output>0.22</output></div>
+      <p class="note">0이면 안 붙습니다. 올리면 별 하나가 성운이 됩니다.</p>
+    </div>
+
+    <div class="panel">
+      <h3>RESULTS</h3>
+      <div class="grid" id="grid"></div>
+      <div class="empty" id="gridEmpty">샘플을 등록하고 생성을 누르세요.</div>
+      <p class="note">결과를 누르면 왼쪽 캔버스로 불러옵니다. 거기서 더 그리거나 다시 등록할 수 있어요.</p>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ══════════════════════════════════════════════════════════
+   NU VARY — 펜 패스를 극좌표 시그니처로 읽고 변주를 만든다.
+
+   노드 구조는 NU-LAYER 와 같다:
+     node = { x, y, sm, hi:{x,y}|null, ho:{x,y}|null }
+   그대로 옮겨 붙일 수 있도록 일부러 맞춰 두었다.
+   ══════════════════════════════════════════════════════════ */
+
+var TAU = Math.PI*2;
+var $ = function(id){ return document.getElementById(id); };
+function norm(a){ a = a % TAU; if(a < 0) a += TAU; return a; }
+function lerp(a,b,t){ return a + (b-a)*t; }
+// 각도 보간 — 짧은 쪽으로 돈다
+function lerpAng(a,b,t){ var d = norm(b-a); if(d > Math.PI) d -= TAU; return a + d*t; }
+
+/* ── 씨앗 있는 난수: 같은 씨앗이면 같은 결과가 나와 다시 찾아갈 수 있다 ── */
+function rng(seed){
+  var s = seed >>> 0 || 1;
+  return function(){ s ^= s<<13; s>>>=0; s ^= s>>17; s ^= s<<5; s>>>=0; return s/4294967296; };
+}
+
+/* ══════════════════ 노드 ↔ 시그니처 ══════════════════ */
+
+function centroid(nodes){
+  var sx=0, sy=0;
+  for(var i=0;i<nodes.length;i++){ sx += nodes[i].x; sy += nodes[i].y; }
+  return { x: sx/nodes.length, y: sy/nodes.length };
+}
+
+// 패스를 중심 기준 극좌표로 읽는다. 크기·회전과 무관한 '구조'만 남는다.
+function toSig(nodes, closed){
+  if(!nodes || nodes.length < 3) return null;
+  var c = centroid(nodes), i, maxR = 0, pol = [];
+  for(i=0;i<nodes.length;i++){
+    var dx = nodes[i].x - c.x, dy = nodes[i].y - c.y;
+    var r = Math.hypot(dx,dy);
+    if(r > maxR) maxR = r;
+    pol.push({ th: Math.atan2(dy,dx), r: r });
+  }
+  if(maxR <= 0) return null;
+  var th0 = pol[0].th, items = [];
+  for(i=0;i<nodes.length;i++){
+    var nd = nodes[i], p = pol[i];
+    // 핸들은 '그 노드의 반지름 방향' 기준으로 적는다 → 회전해도 그대로
+    var rel = function(h){
+      if(!h) return null;
+      var vx = h.x - nd.x, vy = h.y - nd.y;
+      return { len: Math.hypot(vx,vy)/maxR, ang: norm(Math.atan2(vy,vx) - p.th) };
+    };
+    items.push({ th: norm(p.th - th0), r: p.r/maxR, sm: !!nd.sm,
+                 hi: rel(nd.hi), ho: rel(nd.ho) });
+  }
+  return { n: nodes.length, closed: !!closed, items: items };
+}
+
+// 시그니처를 다시 노드로. cx,cy = 놓을 자리, scale = 바깥 반지름, rot = 돌릴 각도
+function toNodes(sig, cx, cy, scale, rot){
+  rot = rot || 0;
+  return sig.items.map(function(it){
+    var th = it.th + rot, r = it.r * scale;
+    var x = cx + Math.cos(th)*r, y = cy + Math.sin(th)*r;
+    var abs = function(h){
+      if(!h) return null;
+      var a = h.ang + th, L = h.len * scale;
+      return { x: x + Math.cos(a)*L, y: y + Math.sin(a)*L };
+    };
+    return { x:x, y:y, sm: it.sm, hi: abs(it.hi), ho: abs(it.ho) };
+  });
+}
+
+/* ══════════════════ 주기(갈래 수) 읽기 ══════════════════
+
+   4갈래 별을 8개 노드로 그리면 반지름 수열이
+     1.0 · 0.25 · 1.0 · 0.25 · 1.0 · 0.25 · 1.0 · 0.25
+   즉 길이 2짜리 단위가 4번. 그 2와 4를 찾아낸다.         */
+
+function detectPeriod(sig){
+  var n = sig.n, rs = sig.items.map(function(i){ return i.r; });
+  var best = null;
+  for(var p=1; p<n; p++){
+    if(n % p !== 0) continue;
+    var err = 0;
+    for(var i=0;i<n;i++) err += Math.abs(rs[i] - rs[(i+p)%n]);
+    err /= n;
+    if(err < 0.09){ best = { p:p, k:n/p, err:err }; break; }  // 가장 작은 주기
+  }
+  return best;
+}
+
+/* ══════════════════ 변주 ══════════════════ */
+
+function cloneItem(it){
+  return { th: it.th, r: it.r, sm: it.sm,
+           hi: it.hi ? { len:it.hi.len, ang:it.hi.ang } : null,
+           ho: it.ho ? { len:it.ho.len, ang:it.ho.ang } : null };
+}
+
+function vary(sig, cfg, seed){
+  var rnd = rng(seed), per = detectPeriod(sig);
+  var items = sig.items.map(cloneItem), i;
+
+  // ① 갈래 수 바꾸기 — 주기를 찾았을 때만. 한 단위를 k'번 되풀이하고 각도를 고르게 다시 깐다.
+  if(per && cfg.armD > 0){
+    var delta = Math.round((rnd()*2-1) * cfg.armD);
+    var k2 = Math.max(2, per.k + delta);
+    if(k2 !== per.k){
+      var unit = sig.items.slice(0, per.p).map(cloneItem), out = [];
+      for(var j=0;j<k2;j++) for(var u=0;u<unit.length;u++) out.push(cloneItem(unit[u]));
+      for(i=0;i<out.length;i++) out[i].th = i * TAU / out.length;
+      items = out;
+      per = { p: per.p, k: k2, err: per.err };
+    }
+  }
+
+  var n = items.length;
+
+  // ② 흔들기. 대칭을 지키면 '단위 안의 같은 자리'는 같은 값으로 흔든다 → 별이 별로 남는다.
+  var slotR = [], slotA = [], slots = (cfg.sym && per) ? per.p : n;
+  for(i=0;i<slots;i++){ slotR.push(rnd()*2-1); slotA.push(rnd()*2-1); }
+
+  for(i=0;i<n;i++){
+    var it = items[i], s = i % slots;
+    it.r *= 1 + slotR[s] * cfg.rJit;
+    if(it.r < 0.04) it.r = 0.04;
+    it.th = norm(it.th + slotA[s] * cfg.aJit * (TAU/n));
+    if(it.hi) it.hi.len *= cfg.hScale;
+    if(it.ho) it.ho.len *= cfg.hScale;
+  }
+
+  // 바깥 반지름을 1로 다시 맞춘다 — 결과들이 같은 크기로 보이게
+  var mx = 0;
+  for(i=0;i<n;i++) if(items[i].r > mx) mx = items[i].r;
+  if(mx > 0) for(i=0;i<n;i++){
+    items[i].r /= mx;
+    if(items[i].hi) items[i].hi.len /= mx;
+    if(items[i].ho) items[i].ho.len /= mx;
+  }
+
+  return { n:n, closed: sig.closed, items: items };
+}
+
+/* ══════════════════ 두 시그니처 섞기 ══════════════════
+
+   노드 수가 달라도 되게, 둘 다 '고른 각도'에서 다시 읽은 뒤 섞는다. */
+
+function sampleAt(sig, th){
+  var n = sig.n, i, a = null, b = null, best = -1;
+  th = norm(th);
+  // th 를 사이에 둔 두 항목 찾기 (th 는 0부터 커지는 순서라고 본다)
+  for(i=0;i<n;i++){
+    var t0 = sig.items[i].th, t1 = (i+1 < n) ? sig.items[i+1].th : TAU;
+    if(th >= t0 && th <= t1){ a = sig.items[i]; b = sig.items[(i+1)%n]; best = (t1>t0) ? (th-t0)/(t1-t0) : 0; break; }
+  }
+  if(!a){ a = sig.items[n-1]; b = sig.items[0]; best = 0.5; }
+  var mixH = function(ha, hb){
+    if(!ha && !hb) return null;
+    if(!ha) return { len: hb.len*best, ang: hb.ang };
+    if(!hb) return { len: ha.len*(1-best), ang: ha.ang };
+    return { len: lerp(ha.len, hb.len, best), ang: lerpAng(ha.ang, hb.ang, best) };
+  };
+  return { th: th, r: lerp(a.r, b.r, best), sm: best < 0.5 ? a.sm : b.sm,
+           hi: mixH(a.hi, b.hi), ho: mixH(a.ho, b.ho) };
+}
+
+function mixSig(s1, s2, t, n){
+  n = n || Math.max(s1.n, s2.n);
+  var items = [];
+  for(var i=0;i<n;i++){
+    var th = i*TAU/n, p = sampleAt(s1, th), q = sampleAt(s2, th);
+    var mh = function(a,b){
+      if(!a && !b) return null;
+      if(!a) return { len: b.len*t, ang: b.ang };
+      if(!b) return { len: a.len*(1-t), ang: a.ang };
+      return { len: lerp(a.len,b.len,t), ang: lerpAng(a.ang,b.ang,t) };
+    };
+    items.push({ th: th, r: lerp(p.r,q.r,t), sm: t<0.5 ? p.sm : q.sm,
+                 hi: mh(p.hi,q.hi), ho: mh(p.ho,q.ho) });
+  }
+  return { n:n, closed: s1.closed || s2.closed, items: items };
+}
+
+/* ══════════════════ 파생 — 꼭지점과 선을 발판으로 ══════════════════ */
+
+function bez(p0,c1,c2,p1,t){
+  var u = 1-t, a = u*u*u, b = 3*u*u*t, c = 3*u*t*t, d = t*t*t;
+  return { x: a*p0.x + b*c1.x + c*c2.x + d*p1.x,
+           y: a*p0.y + b*c1.y + c*c2.y + d*p1.y };
+}
+
+// 하나의 패스에서 '자식들이 놓일 자리' 목록을 뽑는다
+function scaffold(nodes, closed, cfg){
+  var spots = [], i;
+  if(cfg.vert > 0){
+    for(i=0;i<nodes.length;i++) spots.push({ x:nodes[i].x, y:nodes[i].y, w: cfg.vert });
+  }
+  if(cfg.edge > 0){
+    var last = closed ? nodes.length : nodes.length-1;
+    for(i=0;i<last;i++){
+      var a = nodes[i], b = nodes[(i+1)%nodes.length];
+      var c1 = a.ho || a, c2 = b.hi || b;
+      for(var t=0.25; t<0.99; t+=0.25){
+        var p = bez(a,c1,c2,b,t);
+        spots.push({ x:p.x, y:p.y, w: cfg.edge });
+      }
+    }
+  }
+  return spots;
+}
+
+// 파생된 자식에게 주는 약한 변주 — 부모를 알아볼 만큼만 흔든다
+var CHILD_VARY = { rJit: 0.16, aJit: 0.07, hScale: 1, armD: 0, sym: true };
+
+/* ══════════════════ 그리기 ══════════════════ */
+
+function tracePath(ctx, nodes, closed){
+  if(!nodes || nodes.length < 2) return;
+  ctx.beginPath();
+  ctx.moveTo(nodes[0].x, nodes[0].y);
+  var last = closed ? nodes.length : nodes.length-1;
+  for(var i=0;i<last;i++){
+    var a = nodes[i], b = nodes[(i+1)%nodes.length];
+    var c1 = a.ho || a, c2 = b.hi || b;
+    ctx.bezierCurveTo(c1.x,c1.y,c2.x,c2.y,b.x,b.y);
+  }
+  if(closed) ctx.closePath();
+}
+
+// 시그니처 하나를 캔버스에 (파생까지 포함해서) 그린다
+function drawSig(ctx, sig, cx, cy, scale, opt){
+  opt = opt || {};
+  var lw = opt.lw != null ? opt.lw : 2;
+  var nodes = toNodes(sig, cx, cy, scale, opt.rot || 0);
+  ctx.strokeStyle = opt.color || '#1d1d1f';
+  ctx.lineWidth = lw;
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  tracePath(ctx, nodes, sig.closed);
+  ctx.stroke();
+
+  var d = opt.derive;
+  if(d && (d.vert > 0 || d.edge > 0) && scale > 6){
+    var spots = scaffold(nodes, sig.closed, d), rnd = rng(opt.seed || 7);
+    for(var i=0;i<spots.length;i++){
+      var s = spots[i];
+      if(rnd() > s.w) continue;                      // 확률만큼만 붙인다
+      var cs = scale * d.size * (0.7 + rnd()*0.6);
+      if(cs < 3) continue;
+      // 자식도 조금씩 달라야 뭉쳐 보이지 않는다 (같은 모양의 복사본은 금세 티가 난다)
+      var kid = vary(sig, CHILD_VARY, (rnd()*2147483647)|0);
+      var sub = toNodes(kid, s.x, s.y, cs, rnd()*TAU);
+      ctx.lineWidth = Math.max(0.6, lw * 0.6);
+      tracePath(ctx, sub, kid.closed);
+      ctx.stroke();
+    }
+  }
+}
+
+/* ══════════════════ SVG ══════════════════ */
+
+function pathD(nodes, closed){
+  if(!nodes || nodes.length < 2) return '';
+  var f = function(v){ return Math.round(v*100)/100; };
+  var d = 'M ' + f(nodes[0].x) + ' ' + f(nodes[0].y);
+  var last = closed ? nodes.length : nodes.length-1;
+  for(var i=0;i<last;i++){
+    var a = nodes[i], b = nodes[(i+1)%nodes.length];
+    var c1 = a.ho || a, c2 = b.hi || b;
+    d += ' C ' + f(c1.x)+' '+f(c1.y)+', '+f(c2.x)+' '+f(c2.y)+', '+f(b.x)+' '+f(b.y);
+  }
+  if(closed) d += ' Z';
+  return d;
+}
+
+function sigToSvgPaths(sig, cx, cy, scale, derive, seed){
+  var out = [], nodes = toNodes(sig, cx, cy, scale, 0);
+  out.push(pathD(nodes, sig.closed));
+  if(derive && (derive.vert > 0 || derive.edge > 0)){
+    var spots = scaffold(nodes, sig.closed, derive), rnd = rng(seed || 7);
+    for(var i=0;i<spots.length;i++){
+      var s = spots[i];
+      if(rnd() > s.w) continue;
+      var cs = scale * derive.size * (0.7 + rnd()*0.6);
+      if(cs < 3) continue;
+      var kid = vary(sig, CHILD_VARY, (rnd()*2147483647)|0);   // 화면과 같은 규칙
+      out.push(pathD(toNodes(kid, s.x, s.y, cs, rnd()*TAU), kid.closed));
+    }
+  }
+  return out;
+}
+
+/* ══════════════════ 프리셋 ══════════════════ */
+
+// 뾰족한 별: 긴 꼭지점과 짧은 골이 번갈아. hz = 핸들 길이(0이면 직선 = 날카로움)
+function presetStar(k, inner, hz){
+  var nodes = [], n = k*2, R = 380, cx = 520, cy = 520;
+  for(var i=0;i<n;i++){
+    var th = i*TAU/n - Math.PI/2, r = (i%2===0) ? R : R*inner;
+    var x = cx + Math.cos(th)*r, y = cy + Math.sin(th)*r;
+    var nd = { x:x, y:y, sm: hz > 0 && i%2===1, hi:null, ho:null };
+    if(hz > 0 && i%2===1){
+      var t = th + Math.PI/2, L = R*hz;
+      nd.hi = { x: x - Math.cos(t)*L, y: y - Math.sin(t)*L };
+      nd.ho = { x: x + Math.cos(t)*L, y: y + Math.sin(t)*L };
+    }
+    nodes.push(nd);
+  }
+  return nodes;
+}
+
+var PRESETS = {
+  s4:    function(){ return presetStar(4, 0.20, 0); },
+  s6:    function(){ return presetStar(6, 0.30, 0); },
+  bloom: function(){ return presetStar(5, 0.46, 0.26); },
+  flash: function(){ return presetStar(4, 0.09, 0); }
+};
+
+/* ══════════════════ 상태 ══════════════════ */
+
+var cv = $('cv'), ctx = cv.getContext('2d');
+var W = cv.width, H = cv.height;
+
+var draft = { nodes: [], closed: true, done: false };
+var drag = null;
+var samples = [];        // { sig, nodes, closed, thumb }
+var selected = [];       // 고른 샘플 인덱스 (최대 2 — 섞기용)
+var results = [];        // { sig, seed }
+var closedMode = true;
+
+/* ══════════════════ 캔버스 입력 ══════════════════ */
+
+function pt(e){
+  var r = cv.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * (W / r.width),
+           y: (e.clientY - r.top)  * (H / r.height) };
+}
+function hitFirst(p){
+  if(!draft.nodes.length) return false;
+  var a = draft.nodes[0];
+  return Math.hypot(p.x-a.x, p.y-a.y) < 18;
+}
+
+cv.addEventListener('pointerdown', function(e){
+  if(draft.done) newDraft();
+  var p = pt(e);
+  if(draft.nodes.length >= 3 && hitFirst(p)){ finishDraft(true); return; }
+  cv.setPointerCapture(e.pointerId);
+  var nd = { x:p.x, y:p.y, sm:false, hi:null, ho:null };
+  draft.nodes.push(nd);
+  drag = { nd: nd, x0: p.x, y0: p.y, moved: false };
+  paint();
+});
+cv.addEventListener('pointermove', function(e){
+  if(!drag) return;
+  var p = pt(e), dx = p.x - drag.x0, dy = p.y - drag.y0;
+  if(!drag.moved && Math.hypot(dx,dy) < 4) return;
+  drag.moved = true;
+  drag.nd.sm = true;                                  // 끌면 부드러운 노드
+  drag.nd.ho = { x: drag.x0 + dx, y: drag.y0 + dy };
+  drag.nd.hi = { x: drag.x0 - dx, y: drag.y0 - dy };  // 반대쪽 대칭 핸들
+  paint();
+});
+cv.addEventListener('pointerup', function(){ drag = null; paint(); });
+
+window.addEventListener('keydown', function(e){
+  if(e.key === 'Enter'){ if(draft.nodes.length >= 3) finishDraft(closedMode); }
+  else if(e.key === 'Escape') newDraft();
+});
+
+function newDraft(){ draft = { nodes: [], closed: closedMode, done:false }; paint(); }
+function finishDraft(closed){ draft.closed = closed; draft.done = true; paint(); readOut(); }
+
+/* ══════════════════ 캔버스 그리기 ══════════════════ */
+
+function paint(){
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#fff'; ctx.fillRect(0,0,W,H);
+
+  var ns = draft.nodes;
+  if(ns.length >= 2){
+    ctx.strokeStyle = '#1d1d1f'; ctx.lineWidth = 3;
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    tracePath(ctx, ns, draft.done && draft.closed);
+    ctx.stroke();
+  }
+
+  // 앵커와 핸들
+  for(var i=0;i<ns.length;i++){
+    var nd = ns[i];
+    if(nd.hi || nd.ho){
+      ctx.strokeStyle = '#c7c7cc'; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      if(nd.hi){ ctx.moveTo(nd.x,nd.y); ctx.lineTo(nd.hi.x,nd.hi.y); }
+      if(nd.ho){ ctx.moveTo(nd.x,nd.y); ctx.lineTo(nd.ho.x,nd.ho.y); }
+      ctx.stroke();
+      ctx.fillStyle = '#c7c7cc';
+      [nd.hi,nd.ho].forEach(function(h){
+        if(!h) return;
+        ctx.beginPath(); ctx.arc(h.x,h.y,5,0,TAU); ctx.fill();
+      });
+    }
+    ctx.fillStyle = (i===0 && ns.length>=3 && !draft.done) ? '#1d1d1f' : '#fff';
+    ctx.strokeStyle = '#1d1d1f'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(nd.x,nd.y, i===0?8:6, 0,TAU); ctx.fill(); ctx.stroke();
+  }
+}
+
+/* ══════════════════ 읽기(분석) 표시 ══════════════════ */
+
+function currentSig(){
+  if(selected.length) return samples[selected[0]].sig;
+  if(draft.nodes.length >= 3) return toSig(draft.nodes, draft.closed);
+  return null;
+}
+
+function readOut(){
+  var sig = currentSig(), box = $('reading');
+  if(!sig){ box.innerHTML = '<span class="dim">샘플을 고르면 구조를 읽습니다.</span>'; return; }
+  var per = detectPeriod(sig);
+  var rs = sig.items.map(function(i){ return i.r.toFixed(2); });
+  var html = '노드 <b>' + sig.n + '개</b> · ' + (sig.closed ? '닫힘' : '열림');
+  html += per
+    ? ' · 단위 <b>' + per.p + '</b>개가 <b>' + per.k + '번</b> 되풀이 — <b>' + per.k + '갈래</b>로 읽힙니다'
+    : ' · <span class="dim">되풀이되는 주기를 못 찾았습니다 (갈래 수는 못 바꿉니다)</span>';
+  var smooth = sig.items.filter(function(i){ return i.hi || i.ho; }).length;
+  html += '<br>곡선 노드 ' + smooth + ' / ' + sig.n + '개';
+  html += '<div class="seq">반지름 ' + rs.join(' · ') + '</div>';
+  box.innerHTML = html;
+}
+
+/* ══════════════════ 샘플 ══════════════════ */
+
+function thumbOf(sig, size){
+  var c = document.createElement('canvas');
+  c.width = c.height = size;
+  var x = c.getContext('2d');
+  x.fillStyle = '#fff'; x.fillRect(0,0,size,size);
+  drawSig(x, sig, size/2, size/2, size*0.38, { lw: Math.max(1, size/70) });
+  return c;
+}
+
+function addSample(){
+  if(draft.nodes.length < 3) return;
+  var sig = toSig(draft.nodes, draft.closed);
+  if(!sig) return;
+  samples.push({ sig: sig });
+  selected = [samples.length-1];
+  renderSamples(); readOut();
+}
+
+function renderSamples(){
+  var box = $('samples');
+  box.innerHTML = '';
+  $('sampEmpty').style.display = samples.length ? 'none' : '';
+  samples.forEach(function(s, i){
+    var d = document.createElement('div');
+    d.className = 'samp' + (selected.indexOf(i) >= 0 ? ' sel' : '');
+    var c = thumbOf(s.sig, 150);
+    c.style.width = '100%'; c.style.height = 'auto';
+    d.appendChild(c);
+    var x = document.createElement('span');
+    x.className = 'x'; x.textContent = '×';
+    x.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      samples.splice(i,1);
+      selected = selected.filter(function(k){ return k !== i; })
+                         .map(function(k){ return k > i ? k-1 : k; });
+      renderSamples(); readOut(); updateMixNote();
+    });
+    d.appendChild(x);
+    d.addEventListener('click', function(){
+      var at = selected.indexOf(i);
+      if(at >= 0) selected.splice(at,1);
+      else { selected.push(i); if(selected.length > 2) selected.shift(); }
+      renderSamples(); readOut(); updateMixNote();
+    });
+    box.appendChild(d);
+  });
+}
+
+function updateMixNote(){
+  $('mixNote').textContent = selected.length === 2
+    ? '샘플 두 개를 골랐습니다 — 섞기를 누르면 그 사이를 단계별로 만듭니다.'
+    : (samples.length >= 2 ? '섞으려면 샘플을 두 개 고르세요.' : '');
+  $('bMix').disabled = selected.length !== 2;
+}
+
+/* ══════════════════ 생성 ══════════════════ */
+
+function cfg(){
+  return {
+    rJit:   +$('rJit').value / 100,
+    aJit:   +$('aJit').value / 100,
+    hScale: +$('hScale').value / 100,
+    armD:   +$('armD').value,
+    sym:    $('sym').checked
+  };
+}
+function deriveCfg(){
+  return { vert: +$('dVert').value/100, edge: +$('dEdge').value/100, size: +$('dSize').value/100 };
+}
+
+function generate(){
+  var sig = currentSig();
+  if(!sig) return;
+  var c = cfg(), n = +$('count').value;
+  results = [];
+  for(var i=0;i<n;i++){
+    var seed = (Math.random()*2147483647)|0;
+    results.push({ sig: vary(sig, c, seed), seed: seed });
+  }
+  renderGrid();
+}
+
+function mix(){
+  if(selected.length !== 2) return;
+  var a = samples[selected[0]].sig, b = samples[selected[1]].sig;
+  var n = +$('count').value;
+  results = [];
+  for(var i=0;i<n;i++){
+    var t = n > 1 ? i/(n-1) : 0.5;
+    results.push({ sig: mixSig(a,b,t), seed: 1000+i, t: t });
+  }
+  renderGrid();
+}
+
+function renderGrid(){
+  var box = $('grid');
+  box.innerHTML = '';
+  $('gridEmpty').style.display = results.length ? 'none' : '';
+  var d = deriveCfg();
+  results.forEach(function(r, i){
+    var cell = document.createElement('div');
+    cell.className = 'cell';
+    var c = document.createElement('canvas');
+    c.width = c.height = 300;
+    var x = c.getContext('2d');
+    x.fillStyle = '#fff'; x.fillRect(0,0,300,300);
+    drawSig(x, r.sig, 150, 150, 102, { lw: 2.2, derive: d, seed: r.seed });
+    c.style.width = '100%'; c.style.height = 'auto';
+    cell.appendChild(c);
+    cell.title = r.t != null ? ('섞기 ' + Math.round(r.t*100) + '%') : ('씨앗 ' + r.seed);
+    cell.addEventListener('click', function(){ loadToCanvas(r.sig); });
+    box.appendChild(cell);
+  });
+}
+
+function loadToCanvas(sig){
+  draft = { nodes: toNodes(sig, W/2, H/2, Math.min(W,H)*0.38, 0),
+            closed: sig.closed, done: true };
+  paint(); readOut();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ══════════════════ SVG 내보내기 ══════════════════ */
+
+function exportSvg(){
+  if(!results.length) return;
+  var cols = Math.ceil(Math.sqrt(results.length));
+  var cell = 300, pad = 20, d = deriveCfg();
+  var rows = Math.ceil(results.length/cols);
+  var w = cols*cell + pad*2, h = rows*cell + pad*2;
+  var out = ['<?xml version="1.0" encoding="UTF-8"?>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">',
+    '<g fill="none" stroke="#000" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">'];
+  results.forEach(function(r,i){
+    var cx = pad + (i%cols)*cell + cell/2, cy = pad + Math.floor(i/cols)*cell + cell/2;
+    sigToSvgPaths(r.sig, cx, cy, cell*0.36, d, r.seed).forEach(function(p){
+      if(p) out.push('  <path d="' + p + '"/>');
+    });
+  });
+  out.push('</g>','</svg>');
+  var blob = new Blob([out.join('\n')], { type:'image/svg+xml' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'nu-vary-' + Date.now() + '.svg';
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+}
+
+/* ══════════════════ 배선 ══════════════════ */
+
+[['rJit',100],['aJit',100],['hScale',100],['armD',1],['count',1],
+ ['dVert',100],['dEdge',100],['dSize',100]].forEach(function(pair){
+  var el = $(pair[0]), div = pair[1];
+  var out = el.parentNode.querySelector('output');
+  var show = function(){ out.textContent = div === 1 ? el.value : (+el.value/div).toFixed(2); };
+  show();
+  el.addEventListener('input', function(){
+    show();
+    if(pair[0].charAt(0) === 'd' && results.length) renderGrid();   // 파생은 바로 다시 그림
+  });
+});
+
+$('bClose').addEventListener('click', function(){
+  closedMode = !closedMode;
+  this.classList.toggle('on', closedMode);
+  this.textContent = closedMode ? '닫힌 패스' : '열린 패스';
+  draft.closed = closedMode; paint();
+});
+$('bUndo').addEventListener('click', function(){ draft.nodes.pop(); draft.done = false; paint(); readOut(); });
+$('bClear').addEventListener('click', newDraft);
+$('bAdd').addEventListener('click', addSample);
+$('bGen').addEventListener('click', generate);
+$('bMix').addEventListener('click', mix);
+$('bSvgAll').addEventListener('click', exportSvg);
+
+Array.prototype.forEach.call(document.querySelectorAll('[data-pre]'), function(b){
+  b.addEventListener('click', function(){
+    draft = { nodes: PRESETS[b.dataset.pre](), closed: true, done: true };
+    paint(); readOut();
+  });
+});
+
+// 처음 화면: 4갈래 별을 띄워 두고 바로 만져 볼 수 있게
+draft = { nodes: PRESETS.s4(), closed: true, done: true };
+paint(); readOut(); renderSamples(); updateMixNote();
+
+// 테스트에서 들여다볼 수 있게 내부를 열어 둔다
+window.NUVARY = { toSig:toSig, toNodes:toNodes, detectPeriod:detectPeriod,
+                  vary:vary, mixSig:mixSig, pathD:pathD, presetStar:presetStar,
+                  scaffold:scaffold, rng:rng };
+})();
+</script>
+</body>
+</html>
