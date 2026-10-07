@@ -131,6 +131,11 @@
       <div class="sl"><label>갈래 수 ±</label><input type="range" id="armD" min="0" max="4" value="1"><output>1</output></div>
       <div class="sl"><label>만들 개수</label><input type="range" id="count" min="4" max="36" value="12"><output>12</output></div>
       <label class="chk"><input type="checkbox" id="sym" checked> 대칭 유지 (끄면 갈래마다 제각각)</label>
+      <div id="sceneRow" hidden style="border-top:1px solid var(--border-soft);margin-top:10px;padding-top:9px">
+        <label class="chk"><input type="checkbox" id="sceneOn" checked> <b>그림 전체를 한 덩어리로</b> — 획들의 자리를 지킨 채 전부 같이 변주</label>
+        <div class="sl"><label>자리 흔들기</label><input type="range" id="posJit" min="0" max="30" value="6"><output>0.06</output></div>
+        <div class="sl"><label>크기 흔들기</label><input type="range" id="sizeJit" min="0" max="60" value="14"><output>0.14</output></div>
+      </div>
       <div class="row">
         <button id="bGen" class="go">생성</button>
         <button id="bMix">두 샘플 섞기</button>
@@ -350,6 +355,70 @@ function mixSig(s1, s2, t, n){
   return { n:n, closed: s1.closed || s2.closed, items: items };
 }
 
+/* ══════════════════ 그림 전체를 한 덩어리로 ══════════════════
+
+   획이 여러 개인 그림은 '획마다의 시그니처 + 그 획이 전체 안에서 놓인 자리'
+   로 적는다. 자리와 크기는 전체를 둘러싼 네모 기준 0~1 이라, 변주를 해도
+   서로의 위치 관계가 유지된다.                                        */
+
+function toScene(paths){
+  var items = [], i, k;
+  for(i=0;i<paths.length;i++){
+    var p = paths[i];
+    if(!p || !p.nodes || p.nodes.length < 3) continue;
+    var sig = toSig(p.nodes, p.closed);
+    if(!sig) continue;
+    var c = centroid(p.nodes), maxR = 0;
+    for(k=0;k<p.nodes.length;k++){
+      var d = Math.hypot(p.nodes[k].x - c.x, p.nodes[k].y - c.y);
+      if(d > maxR) maxR = d;
+    }
+    if(maxR <= 0) continue;
+    items.push({ sig: sig, ax: c.x, ay: c.y, ar: maxR });
+  }
+  if(!items.length) return null;
+
+  var mnX=1e9, mnY=1e9, mxX=-1e9, mxY=-1e9;
+  for(i=0;i<items.length;i++){
+    var t = items[i];
+    if(t.ax-t.ar < mnX) mnX = t.ax-t.ar;
+    if(t.ax+t.ar > mxX) mxX = t.ax+t.ar;
+    if(t.ay-t.ar < mnY) mnY = t.ay-t.ar;
+    if(t.ay+t.ar > mxY) mxY = t.ay+t.ar;
+  }
+  var S = Math.max(mxX-mnX, mxY-mnY) || 1;
+  var ox = (mnX+mxX)/2, oy = (mnY+mxY)/2;
+  for(i=0;i<items.length;i++){
+    var q = items[i];
+    items[i] = { sig: q.sig, cx: (q.ax-ox)/S, cy: (q.ay-oy)/S, rr: q.ar/S };
+  }
+  return { items: items };
+}
+
+function varyScene(sc, cfg, seed){
+  var rnd = rng(seed), out = { items: [] };
+  for(var i=0;i<sc.items.length;i++){
+    var it = sc.items[i];
+    out.items.push({
+      sig: vary(it.sig, cfg, (rnd()*2147483647)|0),
+      cx: it.cx + (rnd()*2-1) * cfg.posJit,
+      cy: it.cy + (rnd()*2-1) * cfg.posJit,
+      rr: Math.max(0.01, it.rr * (1 + (rnd()*2-1) * cfg.sizeJit))
+    });
+  }
+  return out;
+}
+
+function drawScene(ctx, sc, cx, cy, size, opt){
+  opt = opt || {};
+  for(var i=0;i<sc.items.length;i++){
+    var it = sc.items[i];
+    drawSig(ctx, it.sig, cx + it.cx*size, cy + it.cy*size, it.rr*size,
+            { lw: opt.lw, derive: opt.derive, color: opt.color,
+              seed: ((opt.seed || 7) + i*7919) >>> 0 });
+  }
+}
+
 /* ══════════════════ 파생 — 꼭지점과 선을 발판으로 ══════════════════ */
 
 function bez(p0,c1,c2,p1,t){
@@ -499,6 +568,7 @@ var selected = [];       // 고른 샘플 인덱스 (최대 2 — 섞기용)
 var results = [];        // { sig, seed }
 var picked = new Set();  // 고른 결과 인덱스 — NU-LAYER 로 보낼 것들
 var closedMode = true;
+var scene = null;        // NU-LAYER 에서 받은 그림 전체 (획 여러 개)
 
 /* ══════════════════ 캔버스 입력 ══════════════════ */
 
@@ -540,7 +610,7 @@ window.addEventListener('keydown', function(e){
   else if(e.key === 'Escape') newDraft();
 });
 
-function newDraft(){ draft = { nodes: [], closed: closedMode, done:false }; paint(); }
+function newDraft(){ draft = { nodes: [], closed: closedMode, done:false, extra:null }; paint(); }
 function finishDraft(closed){ draft.closed = closed; draft.done = true; paint(); readOut(); }
 
 /* ══════════════════ 캔버스 그리기 ══════════════════ */
@@ -556,10 +626,20 @@ function paintSoon(){
 function paint(){
   ctx.fillStyle = '#fff'; ctx.fillRect(0,0,W,H);   // 덮어 칠하므로 clearRect 는 군더더기
 
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+
+  // 같이 받은 나머지 획들 — 보여만 주고 고치지는 않으므로 옅게
+  if(draft.extra && draft.extra.length){
+    ctx.strokeStyle = '#86868b'; ctx.lineWidth = 2.5;
+    for(var e2=0;e2<draft.extra.length;e2++){
+      var ex = draft.extra[e2];
+      if(ex.nodes.length >= 2){ tracePath(ctx, ex.nodes, ex.closed); ctx.stroke(); }
+    }
+  }
+
   var ns = draft.nodes;
   if(ns.length >= 2){
     ctx.strokeStyle = '#1d1d1f'; ctx.lineWidth = 3;
-    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     tracePath(ctx, ns, draft.done && draft.closed);
     ctx.stroke();
   }
@@ -669,27 +749,46 @@ function updateMixNote(){
 
 function cfg(){
   return {
-    rJit:   +$('rJit').value / 100,
-    aJit:   +$('aJit').value / 100,
-    hScale: +$('hScale').value / 100,
-    armD:   +$('armD').value,
-    sym:    $('sym').checked
+    rJit:    +$('rJit').value / 100,
+    aJit:    +$('aJit').value / 100,
+    hScale:  +$('hScale').value / 100,
+    armD:    +$('armD').value,
+    sym:     $('sym').checked,
+    posJit:  +$('posJit').value / 100,
+    sizeJit: +$('sizeJit').value / 100
   };
+}
+// 그림 전체를 한 덩어리로 다룰 것인가 (획이 둘 이상일 때만 뜻이 있다)
+function sceneMode(){
+  return !!(scene && scene.items.length > 1 && $('sceneOn') && $('sceneOn').checked);
 }
 function deriveCfg(){
   return { vert: +$('dVert').value/100, edge: +$('dEdge').value/100, size: +$('dSize').value/100 };
 }
 
 function generate(){
-  var sig = currentSig();
-  if(!sig) return;
-  var c = cfg(), n = +$('count').value;
+  var c = cfg(), n = +$('count').value, i, seed;
   results = []; picked.clear();
-  for(var i=0;i<n;i++){
-    var seed = (Math.random()*2147483647)|0;
-    results.push({ sig: vary(sig, c, seed), seed: seed });
+  if(sceneMode()){
+    for(i=0;i<n;i++){
+      seed = (Math.random()*2147483647)|0;
+      results.push({ scene: varyScene(scene, c, seed), seed: seed });
+    }
+  } else {
+    var sig = currentSig();
+    if(!sig) return;
+    for(i=0;i<n;i++){
+      seed = (Math.random()*2147483647)|0;
+      results.push({ sig: vary(sig, c, seed), seed: seed });
+    }
   }
   renderGrid();
+}
+
+// 결과 하나를 캔버스에 — 획 하나든 그림 전체든 같은 입구로
+function paintResult(ctx, r, cx, cy, size, opt){
+  if(r.scene) drawScene(ctx, r.scene, cx, cy, size, opt);
+  else drawSig(ctx, r.sig, cx, cy, size, opt);
 }
 
 function mix(){
@@ -729,7 +828,7 @@ function buildGrid(){
     });
     var ed = document.createElement('button');
     ed.className = 'edit'; ed.textContent = '✎'; ed.title = '왼쪽 캔버스로 불러오기';
-    ed.addEventListener('click', function(ev){ ev.stopPropagation(); loadToCanvas(r.sig); });
+    ed.addEventListener('click', function(ev){ ev.stopPropagation(); loadToCanvas(r); });
     cell.appendChild(ed);
     box.appendChild(cell);
     gridCells.push({ cell: cell, cv: c, ctx: c.getContext('2d') });
@@ -752,8 +851,8 @@ function paintGrid(){
   for(var i=0;i<gridCells.length;i++){
     var g = gridCells[i], r = results[i], px = g.cv.width;
     g.ctx.fillStyle = '#fff'; g.ctx.fillRect(0,0,px,px);
-    drawSig(g.ctx, r.sig, px/2, px/2, px*0.34,
-            { lw: Math.max(1.2, px/136), derive: d, seed: r.seed });
+    paintResult(g.ctx, r, px/2, px/2, px*(r.scene ? 0.44 : 0.34),
+                { lw: Math.max(1.2, px/136), derive: d, seed: r.seed });
     g.cell.classList.toggle('pick', picked.has(i));
   }
 }
@@ -768,9 +867,21 @@ function paintGridSoon(){
 
 function renderGrid(){ buildGrid(); }
 
-function loadToCanvas(sig){
-  draft = { nodes: toNodes(sig, W/2, H/2, Math.min(W,H)*0.38, 0),
-            closed: sig.closed, done: true };
+function loadToCanvas(r){
+  if(r && r.scene){
+    // 그림 전체 — 첫 획을 고칠 수 있는 자리에 두고 나머지는 같이 보여 준다
+    var size = Math.min(W,H) * 0.44, ps = [];
+    for(var i=0;i<r.scene.items.length;i++){
+      var it = r.scene.items[i];
+      ps.push({ nodes: toNodes(it.sig, W/2 + it.cx*size, H/2 + it.cy*size, it.rr*size, 0),
+                closed: it.sig.closed });
+    }
+    draft = { nodes: ps[0].nodes, closed: ps[0].closed, done: true, extra: ps.slice(1) };
+  } else {
+    var sig = r && r.sig ? r.sig : r;
+    draft = { nodes: toNodes(sig, W/2, H/2, Math.min(W,H)*0.38, 0),
+              closed: sig.closed, done: true, extra: null };
+  }
   paint(); readOut();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -794,24 +905,52 @@ function syncSendBar(){
   $('bToArchive').disabled = !n;
 }
 
+// 받은 그림을 캔버스에 '그려져 있던 배치 그대로' 올린다 (가운데로 모으거나 펴지 않는다)
+function showPathsAsDrawn(list){
+  var mnX=1e9, mnY=1e9, mxX=-1e9, mxY=-1e9, i, k;
+  for(i=0;i<list.length;i++) for(k=0;k<list[i].nodes.length;k++){
+    var n = list[i].nodes[k];
+    if(n.x<mnX) mnX=n.x; if(n.x>mxX) mxX=n.x;
+    if(n.y<mnY) mnY=n.y; if(n.y>mxY) mxY=n.y;
+  }
+  if(mxX < mnX) return;
+  var bw = Math.max(1, mxX-mnX), bh = Math.max(1, mxY-mnY);
+  var s = Math.min(W,H) * 0.86 / Math.max(bw, bh);
+  var ox = W/2 - (mnX+mxX)/2*s, oy = H/2 - (mnY+mxY)/2*s;
+  var T = function(p){ return p ? { x: p.x*s+ox, y: p.y*s+oy } : null; };
+  var ps = list.map(function(p){
+    return { closed: p.closed,
+             nodes: p.nodes.map(function(n){
+               var q = T(n); q.sm = !!n.sm; q.hi = T(n.hi); q.ho = T(n.ho); return q;
+             }) };
+  });
+  draft = { nodes: ps[0].nodes, closed: ps[0].closed, done: true, extra: ps.slice(1) };
+  paint();
+}
+
 window.addEventListener('message', function(e){
   var d = e.data;
   if(!d || d.type !== 'nulayer-vary-in') return;
   linked = true;
-  var list = d.paths || [], added = 0, last = null;
+  var list = (d.paths || []).filter(function(p){ return p && p.nodes && p.nodes.length >= 3; });
+  if(!list.length){ syncSendBar(); return; }
+
+  // ① 획마다 샘플로 (하나만 골라 변주하고 싶을 때)
   for(var i=0;i<list.length;i++){
-    var p = list[i];
-    if(!p || !p.nodes) continue;
-    var sig = toSig(p.nodes, p.closed);
-    if(!sig) continue;
-    samples.push({ sig: sig }); last = sig; added++;
+    var sig = toSig(list[i].nodes, list[i].closed);
+    if(sig) samples.push({ sig: sig });
   }
-  if(added){
-    selected = [samples.length-1];
-    draft = { nodes: toNodes(last, W/2, H/2, Math.min(W,H)*0.38, 0), closed: last.closed, done: true };
-    paint(); renderSamples(); readOut(); updateMixNote();
-    generate();                       // 받자마자 한 판 보여 준다
-  }
+  selected = samples.length ? [samples.length-1] : [];
+
+  // ② 그림 전체를 한 덩어리로
+  scene = toScene(list);
+  var multi = !!(scene && scene.items.length > 1);
+  $('sceneRow').hidden = !multi;
+  if($('sceneOn')) $('sceneOn').checked = multi;
+
+  showPathsAsDrawn(list);             // 그려져 있던 그대로 보여 준다
+  renderSamples(); readOut(); updateMixNote();
+  generate();                          // 받자마자 한 판 보여 준다
   syncSendBar();
 });
 
@@ -839,20 +978,30 @@ function trimCanvas(c){
 // 결과 하나를 '그림 + 그 그림과 같은 좌표의 노드'로 만든다.
 // 노드를 같이 넘겨야 NU-LAYER 가 나중에 다시 열어 고칠 수 있다.
 function bakeResult(r, withDerive){
-  var px = 760, half = px/2, scale = px*0.33;
+  var px = 760, half = px/2, scale = px * (r.scene ? 0.44 : 0.33);
   var c = document.createElement('canvas');
   c.width = c.height = px;                      // 배경 없이 — 투명 PNG
   var x = c.getContext('2d');
-  drawSig(x, r.sig, half, half, scale, {
+  paintResult(x, r, half, half, scale, {
     lw: 3, derive: withDerive ? deriveCfg() : null, seed: r.seed
   });
   var t = trimCanvas(c);
   if(!t) return null;
+  var out = { png: t.canvas.toDataURL('image/png'), w: t.canvas.width, h: t.canvas.height };
   // 잘라낸 만큼 노드도 옮긴다 → 그림과 노드가 같은 좌표계에 있게 된다
-  var nodes = toNodes(r.sig, half - t.dx, half - t.dy, scale, 0);
-  return { png: t.canvas.toDataURL('image/png'),
-           w: t.canvas.width, h: t.canvas.height,
-           nodes: nodes, closed: r.sig.closed };
+  if(r.scene){
+    out.paths = r.scene.items.map(function(it){
+      return { nodes: toNodes(it.sig, half + it.cx*scale - t.dx, half + it.cy*scale - t.dy,
+                              it.rr*scale, 0),
+               closed: it.sig.closed };
+    });
+    out.nodes = out.paths[0].nodes;   // 옛 방식으로 읽는 쪽을 위해
+    out.closed = out.paths[0].closed;
+  } else {
+    out.nodes = toNodes(r.sig, half - t.dx, half - t.dy, scale, 0);
+    out.closed = r.sig.closed;
+  }
+  return out;
 }
 
 function sendPicked(mode){
@@ -904,6 +1053,7 @@ function exportSvg(){
 /* ══════════════════ 배선 ══════════════════ */
 
 [['rJit',100],['aJit',100],['hScale',100],['armD',1],['count',1],
+ ['posJit',100],['sizeJit',100],
  ['dVert',100],['dEdge',100],['dSize',100]].forEach(function(pair){
   var el = $(pair[0]), div = pair[1];
   var out = el.parentNode.querySelector('output');
@@ -926,6 +1076,7 @@ $('bUndo').addEventListener('click', function(){ draft.nodes.pop(); draft.done =
 $('bClear').addEventListener('click', newDraft);
 $('bAdd').addEventListener('click', addSample);
 $('bGen').addEventListener('click', generate);
+$('sceneOn').addEventListener('change', function(){ if(results.length) generate(); });
 $('bMix').addEventListener('click', mix);
 $('bSvgAll').addEventListener('click', exportSvg);
 $('bToCanvas').addEventListener('click', function(){ sendPicked('canvas'); });
@@ -956,9 +1107,10 @@ paint(); readOut(); renderSamples(); updateMixNote();
 window.NUVARY = { toSig:toSig, toNodes:toNodes, detectPeriod:detectPeriod,
                   vary:vary, mixSig:mixSig, pathD:pathD, presetStar:presetStar,
                   scaffold:scaffold, rng:rng, bakeResult:bakeResult,
+                  toScene:toScene, varyScene:varyScene,
                   trimCanvas:trimCanvas,
                   _state: function(){ return { samples:samples, results:results,
-                                               picked:picked, linked:linked }; } };
+                                               picked:picked, linked:linked, scene:scene, draft:draft }; } };
 })();
 </script>
 </body>

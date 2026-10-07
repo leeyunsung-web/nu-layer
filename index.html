@@ -18938,18 +18938,31 @@ showLayerMenu(ev.clientX, ev.clientY, [
              PNG 를 그대로 쓰므로 지금 작업 중인 캔버스를 건드리지 않는다. */
   let nvWin = null;
 
-  // 넘길 패스 고르기 — 고른 획이 앵커를 가지고 있으면 그것, 아니면 캔버스의 펜 패스 전부
+  // 넘길 패스 고르기. 고른 획이 있으면 그것 하나, 없으면 지금 캔버스에 보이는 획 전부.
+  // 브러시로 그은 획은 앵커가 없으므로 fitNodes 로 떠낸다 — 사본이라 원본은 그대로다.
   function nuVaryPaths(){
-    const pick = (a) => ({
-      nodes: a.nodes.map(n => ({ x:n.x, y:n.y, sm: !!n.sm,
-                                 hi: n.hi ? { x:n.hi.x, y:n.hi.y } : null,
-                                 ho: n.ho ? { x:n.ho.x, y:n.ho.y } : null })),
-      closed: !!a.closed
+    const take = (nodes, closed) => ({
+      nodes: nodes.map(n => ({ x:n.x, y:n.y, sm: !!n.sm,
+                               hi: n.hi ? { x:n.hi.x, y:n.hi.y } : null,
+                               ho: n.ho ? { x:n.ho.x, y:n.ho.y } : null })),
+      closed: !!closed
     });
     const sel = (typeof editedStroke === 'function') ? editedStroke() : null;
-    if(sel && sel.nodes && sel.nodes.length >= 3) return [pick(sel)];
-    const all = actions.filter(a => a && a.type === 'stroke' && a.nodes && a.nodes.length >= 3);
-    return all.slice(-8).map(pick);     // 너무 많으면 마지막 것들만
+    if(sel && sel.nodes && sel.nodes.length >= 3) return [take(sel.nodes, sel.closed)];
+
+    const vis = new Set(layers.filter(l => l.visible).map(l => l.id));
+    const out = [];
+    for(const a of actions){
+      if(!a || a.type !== 'stroke' || a.tool === 'eraser' || !vis.has(a.layer)) continue;
+      let nodes = a.nodes;
+      if(!nodes || nodes.length < 3){
+        if(!a.points || a.points.length < 4) continue;
+        try { nodes = fitNodes(a.points, 2); } catch(err){ continue; }
+      }
+      if(!nodes || nodes.length < 3) continue;
+      out.push(take(nodes, a.closed));
+    }
+    return out.slice(-24);
   }
 
   function openNuVary(){
@@ -18994,7 +19007,15 @@ showLayerMenu(ev.clientX, ev.clientY, [
   function nuVaryToCanvas(items){
     const al = activeLayer();
     let put = 0;
+    // 한 결과가 여러 획으로 이루어져 있으면(그림 전체 변주) 낱낱이 펴서 올린다
+    const flat = [];
     for(const it of items){
+      if(!it) continue;
+      if(Array.isArray(it.paths) && it.paths.length){
+        for(const q of it.paths) if(q && q.nodes) flat.push(q);
+      } else if(it.nodes) flat.push(it);
+    }
+    for(const it of flat){
       if(!it || !it.nodes || it.nodes.length < 3) continue;
       // 캔버스 가운데 쪽으로 옮겨 놓는다 (보내온 좌표는 잘라낸 PNG 기준이라 0,0 근처)
       const bb = it.nodes.reduce((a,n)=>({ x0:Math.min(a.x0,n.x), y0:Math.min(a.y0,n.y),
