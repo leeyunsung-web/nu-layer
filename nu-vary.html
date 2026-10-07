@@ -409,17 +409,20 @@ function drawSig(ctx, sig, cx, cy, scale, opt){
 
   var d = opt.derive;
   if(d && (d.vert > 0 || d.edge > 0) && scale > 6){
-    var spots = scaffold(nodes, sig.closed, d), rnd = rng(opt.seed || 7);
+    var spots = scaffold(nodes, sig.closed, d);
+    var base = opt.seed || 7;
+    ctx.lineWidth = Math.max(0.6, lw * 0.6);
     for(var i=0;i<spots.length;i++){
       var s = spots[i];
+      // 자리마다 제 난수를 쓴다 — 하나의 흐름을 나눠 쓰면 슬라이더를 조금
+      // 움직일 때마다 '어떤 자식이 나올지'가 통째로 바뀌어 화면이 튄다.
+      var rnd = rng((base ^ (i * 2654435761)) >>> 0);
       if(rnd() > s.w) continue;                      // 확률만큼만 붙인다
       var cs = scale * d.size * (0.7 + rnd()*0.6);
       if(cs < 3) continue;
       // 자식도 조금씩 달라야 뭉쳐 보이지 않는다 (같은 모양의 복사본은 금세 티가 난다)
       var kid = vary(sig, CHILD_VARY, (rnd()*2147483647)|0);
-      var sub = toNodes(kid, s.x, s.y, cs, rnd()*TAU);
-      ctx.lineWidth = Math.max(0.6, lw * 0.6);
-      tracePath(ctx, sub, kid.closed);
+      tracePath(ctx, toNodes(kid, s.x, s.y, cs, rnd()*TAU), kid.closed);
       ctx.stroke();
     }
   }
@@ -528,7 +531,7 @@ cv.addEventListener('pointermove', function(e){
   drag.nd.sm = true;                                  // 끌면 부드러운 노드
   drag.nd.ho = { x: drag.x0 + dx, y: drag.y0 + dy };
   drag.nd.hi = { x: drag.x0 - dx, y: drag.y0 - dy };  // 반대쪽 대칭 핸들
-  paint();
+  paintSoon();   // 포인터는 프레임보다 자주 온다 — 프레임당 한 번만 그린다
 });
 cv.addEventListener('pointerup', function(){ drag = null; paint(); });
 
@@ -542,9 +545,16 @@ function finishDraft(closed){ draft.closed = closed; draft.done = true; paint();
 
 /* ══════════════════ 캔버스 그리기 ══════════════════ */
 
+// 끌고 있는 동안에는 프레임마다 한 번만 그린다
+var painting = false;
+function paintSoon(){
+  if(painting) return;
+  painting = true;
+  requestAnimationFrame(function(){ painting = false; paint(); });
+}
+
 function paint(){
-  ctx.clearRect(0,0,W,H);
-  ctx.fillStyle = '#fff'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = '#fff'; ctx.fillRect(0,0,W,H);   // 덮어 칠하므로 clearRect 는 군더더기
 
   var ns = draft.nodes;
   if(ns.length >= 2){
@@ -694,34 +704,69 @@ function mix(){
   renderGrid();
 }
 
-function renderGrid(){
+/* 결과 칸은 한 번만 만들고 다시 쓴다.
+   슬라이더를 끌 때마다 36개를 지웠다 새로 만들면 레이아웃이 매번 다시 잡혀
+   느려진다. 칸은 그대로 두고 그림만 다시 그린다. */
+var gridCells = [];      // { cell, cv, ctx }
+
+function buildGrid(){
   var box = $('grid');
-  box.innerHTML = '';
+  box.innerHTML = ''; gridCells = [];
   $('gridEmpty').style.display = results.length ? 'none' : '';
-  var d = deriveCfg();
+  var px = gridPx();
   results.forEach(function(r, i){
     var cell = document.createElement('div');
-    cell.className = 'cell' + (picked.has(i) ? ' pick' : '');
+    cell.className = 'cell';
     var c = document.createElement('canvas');
-    c.width = c.height = 300;
-    var x = c.getContext('2d');
-    x.fillStyle = '#fff'; x.fillRect(0,0,300,300);
-    drawSig(x, r.sig, 150, 150, 102, { lw: 2.2, derive: d, seed: r.seed });
+    c.width = c.height = px;
     c.style.width = '100%'; c.style.height = 'auto';
     cell.appendChild(c);
     cell.title = r.t != null ? ('섞기 ' + Math.round(r.t*100) + '%') : ('씨앗 ' + r.seed);
     cell.addEventListener('click', function(){
       if(picked.has(i)) picked.delete(i); else picked.add(i);
-      renderGrid(); syncSendBar();
+      cell.classList.toggle('pick', picked.has(i));    // 그 칸만 고친다
+      syncSendBar();
     });
     var ed = document.createElement('button');
     ed.className = 'edit'; ed.textContent = '✎'; ed.title = '왼쪽 캔버스로 불러오기';
     ed.addEventListener('click', function(ev){ ev.stopPropagation(); loadToCanvas(r.sig); });
     cell.appendChild(ed);
     box.appendChild(cell);
+    gridCells.push({ cell: cell, cv: c, ctx: c.getContext('2d') });
   });
+  paintGrid();
   syncSendBar();
 }
+
+// 칸 하나의 실제 화면 크기에 맞춰 그린다 — 보이는 것보다 크게 그려 봐야 느리기만 하다
+function gridPx(){
+  var box = $('grid'), w = box ? box.clientWidth : 600;
+  var cols = Math.max(1, Math.floor(w / 142));
+  var side = Math.max(90, Math.floor(w / cols) - 12);
+  var dpr = Math.min(2, window.devicePixelRatio || 1);
+  return Math.min(300, Math.round(side * dpr));
+}
+
+function paintGrid(){
+  var d = deriveCfg();
+  for(var i=0;i<gridCells.length;i++){
+    var g = gridCells[i], r = results[i], px = g.cv.width;
+    g.ctx.fillStyle = '#fff'; g.ctx.fillRect(0,0,px,px);
+    drawSig(g.ctx, r.sig, px/2, px/2, px*0.34,
+            { lw: Math.max(1.2, px/136), derive: d, seed: r.seed });
+    g.cell.classList.toggle('pick', picked.has(i));
+  }
+}
+
+// 슬라이더는 한 번 끄는 동안 수십 번 불린다. 프레임마다 한 번만 그린다.
+var paintQueued = false;
+function paintGridSoon(){
+  if(paintQueued) return;
+  paintQueued = true;
+  requestAnimationFrame(function(){ paintQueued = false; paintGrid(); });
+}
+
+function renderGrid(){ buildGrid(); }
 
 function loadToCanvas(sig){
   draft = { nodes: toNodes(sig, W/2, H/2, Math.min(W,H)*0.38, 0),
@@ -822,7 +867,9 @@ function sendPicked(mode){
   try{
     window.opener.postMessage({ type:'nuvary-out', mode: mode, items: items }, '*');
     $('pickCount').textContent = items.length + '개 보냈습니다';
-    picked.clear(); renderGrid();
+    picked.clear();
+    for(var k=0;k<gridCells.length;k++) gridCells[k].cell.classList.remove('pick');
+    $('bToCanvas').disabled = true; $('bToArchive').disabled = true;
   }catch(err){
     $('pickCount').textContent = 'NU-LAYER 창을 찾지 못했습니다';
   }
@@ -864,7 +911,8 @@ function exportSvg(){
   show();
   el.addEventListener('input', function(){
     show();
-    if(pair[0].charAt(0) === 'd' && results.length) renderGrid();   // 파생은 바로 다시 그림
+    // 파생 슬라이더는 그림만 바뀐다 — 칸을 다시 만들 필요 없이 프레임당 한 번만 그린다
+    if(pair[0].charAt(0) === 'd' && results.length) paintGridSoon();
   });
 });
 
@@ -882,6 +930,16 @@ $('bMix').addEventListener('click', mix);
 $('bSvgAll').addEventListener('click', exportSvg);
 $('bToCanvas').addEventListener('click', function(){ sendPicked('canvas'); });
 $('bToArchive').addEventListener('click', function(){ sendPicked('archive'); });
+
+// 창 크기가 바뀌면 칸 크기도 달라진다 — 멈춘 뒤 한 번만 다시 만든다
+var resizeT = null;
+window.addEventListener('resize', function(){
+  clearTimeout(resizeT);
+  resizeT = setTimeout(function(){
+    if(!results.length || !gridCells.length) return;
+    if(Math.abs(gridCells[0].cv.width - gridPx()) > 24) buildGrid();
+  }, 200);
+});
 
 Array.prototype.forEach.call(document.querySelectorAll('[data-pre]'), function(b){
   b.addEventListener('click', function(){
