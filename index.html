@@ -976,6 +976,7 @@
       <a class="archive-link" id="galleryLink" href="gallery.html" target="_blank">GALLERY →</a>
       <button class="link-btn accent" id="openMgrBtn" style="display:none; font-family:var(--font-mono); font-size:11px; padding:8px 12px; border-radius:8px; border:1px solid var(--ink); background:var(--ink); color:#fff; cursor:pointer; font-weight:600;">ARCHIVE MANAGER</button>
       <button class="link-btn accent" id="tonePlotBtn" style="display:none; font-family:var(--font-mono); font-size:11px; padding:8px 12px; border-radius:8px; border:1px solid var(--ink); background:var(--ink); color:#fff; cursor:pointer; font-weight:600;" title="TONE PLOT 을 새 창으로 열고 지금 그림을 보냅니다 — 색 영역마다 해칭이나 스크린톤을 골라 플로터 SVG 로 바꿉니다" data-tp="v9.2">◫ TONE PLOT</button>
+      <button class="link-btn accent" id="nuVaryBtn" style="display:none; font-family:var(--font-mono); font-size:11px; padding:8px 12px; border-radius:8px; border:1px solid var(--ink); background:var(--ink); color:#fff; cursor:pointer; font-weight:600;" title="NU VARY 를 새 창으로 열고 고른 패스를 보냅니다 — 꼭지점과 선을 읽어 비슷하지만 다른 패턴을 계속 만듭니다. 고른 결과는 캔버스로 받거나 바로 아카이브에 등록할 수 있습니다">✦ NU VARY</button>
       <button class="link-btn accent" id="stitchPaintBtn" style="display:none; font-family:var(--font-mono); font-size:11px; padding:8px 12px; border-radius:8px; border:1px solid var(--ink); background:var(--ink); color:#fff; cursor:pointer; font-weight:600;" title="STITCH PAINT 를 새 창으로 엽니다 — Brother NV180D 용 자수 그림판 (stitch-paint.html 이 같은 폴더에 있어야 합니다)">✂ STITCH PAINT</button>
       <div class="role-chip" id="roleChip">
         <span class="role-badge" id="roleBadge">GUEST</span>
@@ -1676,7 +1677,7 @@
     if(sw) sw.textContent = isMaster ? '⇄ GUEST' : '⇄ MASTER';
     $('openMgrBtn').style.display = isMaster ? 'inline-flex' : 'none';
     // 창을 여는 도구들. 아카이브 매니저와 같은 성격이라 나란히 두고 함께 여닫는다.
-    for(const id of ['tonePlotBtn', 'stitchPaintBtn']){
+    for(const id of ['tonePlotBtn', 'stitchPaintBtn', 'nuVaryBtn']){
       const b = $(id);
       if(b) b.style.display = isMaster ? 'inline-flex' : 'none';
     }
@@ -18648,6 +18649,128 @@ showLayerMenu(ev.clientX, ev.clientY, [
       setTimeout(send, 300);
     }
   }
+
+  /* ============== NU VARY 연동 ==============
+     보내기: 지금 고른 펜 패스(없으면 캔버스의 펜 패스들)를 새 창으로 넘긴다.
+     받기  : 고른 결과를 되돌려 받는다. 'canvas' 는 캔버스에 편집 가능한 획으로
+             얹고, 'archive' 는 오브젝트로 등록한다. 등록은 NU VARY 가 보내 준
+             PNG 를 그대로 쓰므로 지금 작업 중인 캔버스를 건드리지 않는다. */
+  let nvWin = null;
+
+  // 넘길 패스 고르기 — 고른 획이 앵커를 가지고 있으면 그것, 아니면 캔버스의 펜 패스 전부
+  function nuVaryPaths(){
+    const pick = (a) => ({
+      nodes: a.nodes.map(n => ({ x:n.x, y:n.y, sm: !!n.sm,
+                                 hi: n.hi ? { x:n.hi.x, y:n.hi.y } : null,
+                                 ho: n.ho ? { x:n.ho.x, y:n.ho.y } : null })),
+      closed: !!a.closed
+    });
+    const sel = (typeof editedStroke === 'function') ? editedStroke() : null;
+    if(sel && sel.nodes && sel.nodes.length >= 3) return [pick(sel)];
+    const all = actions.filter(a => a && a.type === 'stroke' && a.nodes && a.nodes.length >= 3);
+    return all.slice(-8).map(pick);     // 너무 많으면 마지막 것들만
+  }
+
+  function openNuVary(){
+    const paths = nuVaryPaths();
+    if(nvWin && !nvWin.closed){ nvWin.focus(); }
+    else {
+      nvWin = window.open('nu-vary.html', 'nuvary');
+      if(!nvWin){ toast('팝업이 막혔습니다 — 이 사이트의 팝업을 허용해 주세요.'); return; }
+    }
+    if(!paths.length){
+      toast('펜(P)으로 패스를 그린 뒤 누르면 그 패스를 보냅니다. 지금은 빈 창만 엽니다.');
+      return;
+    }
+    // 창이 다 뜬 뒤에 받도록 몇 번 나눠 보낸다 — 한 번만 보내면 아직 안 읽힌 창이 놓친다.
+    let tries = 0;
+    const send = () => {
+      if(!nvWin || nvWin.closed || tries++ > 12) return;
+      try { nvWin.postMessage({ type:'nulayer-vary-in', paths }, '*'); } catch(e){}
+      setTimeout(send, 400);
+    };
+    setTimeout(send, 300);
+    toast('NU VARY 로 패스 ' + paths.length + '개를 보냈습니다.');
+  }
+  $('nuVaryBtn').addEventListener('click', openNuVary);
+
+  // 받은 노드로 진짜 획을 만든다 — 펜 툴이 커밋할 때와 같은 모양이어야
+  // 나중에 DIRECT(A) 로 앵커를 집어 고칠 수 있다.
+  function nuVaryStrokeAct(item, layerId){
+    const act = { type:'stroke', id:++actionCounter, tool:'brush',
+                  color: strokeColor, width: strokeWidthNow(),
+                  texture: currentTexture, grain: currentGrain,
+                  seed: (Math.random()*2147483647)|0,
+                  nodes: item.nodes.map(n => ({ x:n.x, y:n.y, sm: !!n.sm,
+                                                hi: n.hi ? { x:n.hi.x, y:n.hi.y } : null,
+                                                ho: n.ho ? { x:n.ho.x, y:n.ho.y } : null })),
+                  closed: !!item.closed, edit:'bezier', pw:null,
+                  cr: 0, join: null, points: [], layer: layerId };
+    syncStrokeFromNodes(act);
+    return act;
+  }
+
+  function nuVaryToCanvas(items){
+    const al = activeLayer();
+    let put = 0;
+    for(const it of items){
+      if(!it || !it.nodes || it.nodes.length < 3) continue;
+      // 캔버스 가운데 쪽으로 옮겨 놓는다 (보내온 좌표는 잘라낸 PNG 기준이라 0,0 근처)
+      const bb = it.nodes.reduce((a,n)=>({ x0:Math.min(a.x0,n.x), y0:Math.min(a.y0,n.y),
+                                           x1:Math.max(a.x1,n.x), y1:Math.max(a.y1,n.y) }),
+                                 { x0:1e9, y0:1e9, x1:-1e9, y1:-1e9 });
+      const ox = (drawCanvas.width  - (bb.x1-bb.x0))/2 - bb.x0;
+      const oy = (drawCanvas.height - (bb.y1-bb.y0))/2 - bb.y0;
+      const moved = { closed: it.closed,
+        nodes: it.nodes.map(n => ({ x:n.x+ox, y:n.y+oy, sm:n.sm,
+                                    hi: n.hi ? { x:n.hi.x+ox, y:n.hi.y+oy } : null,
+                                    ho: n.ho ? { x:n.ho.x+ox, y:n.ho.y+oy } : null })) };
+      const act = nuVaryStrokeAct(moved, al.id);
+      const made = commitShapeWithFill(act, !!moved.closed);
+      if(made) put++;
+    }
+    toast(put ? ('NU VARY 에서 ' + put + '개를 캔버스에 올렸습니다.')
+              : 'NU VARY 에서 받은 것이 없습니다.');
+  }
+
+  async function nuVaryToArchive(items){
+    let done = 0;
+    for(const it of items){
+      if(!it || !it.png) continue;
+      try {
+        const img = await new Promise((res, rej) => {
+          const im = new Image();
+          im.onload = () => res(im);
+          im.onerror = () => rej(new Error('image decode failed'));
+          im.src = it.png;
+        });
+        const c = document.createElement('canvas');
+        c.width = img.naturalWidth || it.w; c.height = img.naturalHeight || it.h;
+        c.getContext('2d').drawImage(img, 0, 0);
+        // 레시피에 획을 담아 두면 나중에 아카이브에서 열어 앵커째 고칠 수 있다
+        const recipe = (it.nodes && it.nodes.length >= 3)
+          ? [nuVaryStrokeAct(it, (activeLayer() || { id:0 }).id)] : null;
+        const obj = addObject(c, recipe);
+        const saved = await savePatternToFolder(c, obj.id, recipe);
+        if(saved){ obj.filename = saved.filename; obj.saveFolder = saved.dateFolder;
+                   if(saved.ghPath) obj.ghPath = saved.ghPath;
+                   loadedFilenames.add(saved.filename); }
+        done++;
+      } catch(err){
+        console.error('NU VARY archive failed', err);
+      }
+    }
+    toast(done ? ('NU VARY 에서 ' + done + '개를 아카이브에 등록했습니다.')
+               : '등록하지 못했습니다 — 콘솔을 확인해 주세요.');
+  }
+
+  window.addEventListener('message', (e) => {
+    const d = e.data;
+    if(!d || d.type !== 'nuvary-out' || !Array.isArray(d.items)) return;
+    if(d.mode === 'archive') nuVaryToArchive(d.items);
+    else nuVaryToCanvas(d.items);
+  });
+
   $('tonePlotBtn').addEventListener('click', openTonePlot);
 
   // ---- TONE PLOT v4 전체 소스 (base64 / UTF-8) ----

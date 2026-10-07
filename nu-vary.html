@@ -60,9 +60,15 @@
 
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px}
   .cell{border:1px solid var(--border-soft);border-radius:10px;padding:5px;background:#fff;
-        cursor:pointer;transition:border-color .12s}
+        cursor:pointer;transition:border-color .12s;position:relative}
   .cell:hover{border-color:var(--accent-dim)}
+  .cell.pick{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
   .cell canvas{aspect-ratio:1/1;border:0}
+  .cell .edit{position:absolute;top:4px;right:6px;font-size:12px;color:var(--ink-dim);
+              background:#fff;border:1px solid var(--border);border-radius:6px;
+              padding:1px 5px;line-height:1.4;display:none}
+  .cell:hover .edit{display:block}
+  .cell .edit:hover{color:var(--ink);border-color:var(--accent-dim)}
 
   .note{font-size:11.5px;color:var(--ink-dim);line-height:1.65;margin:6px 0 0}
   .read{font-size:11.5px;line-height:1.75;font-variant-numeric:tabular-nums}
@@ -145,7 +151,14 @@
       <h3>RESULTS</h3>
       <div class="grid" id="grid"></div>
       <div class="empty" id="gridEmpty">샘플을 등록하고 생성을 누르세요.</div>
-      <p class="note">결과를 누르면 왼쪽 캔버스로 불러옵니다. 거기서 더 그리거나 다시 등록할 수 있어요.</p>
+      <p class="note">결과를 누르면 <b>고릅니다</b>. 오른쪽 위 ✎ 를 누르면 왼쪽 캔버스로 불러옵니다.</p>
+      <div id="sendBar" hidden>
+        <div class="row" style="border-top:1px solid var(--border-soft);padding-top:11px;margin-top:11px">
+          <span class="sub" id="pickCount" style="align-self:center"></span>
+          <button id="bToCanvas">NU-LAYER 캔버스로</button>
+          <button id="bToArchive" class="go">아카이브에 등록</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -481,6 +494,7 @@ var drag = null;
 var samples = [];        // { sig, nodes, closed, thumb }
 var selected = [];       // 고른 샘플 인덱스 (최대 2 — 섞기용)
 var results = [];        // { sig, seed }
+var picked = new Set();  // 고른 결과 인덱스 — NU-LAYER 로 보낼 것들
 var closedMode = true;
 
 /* ══════════════════ 캔버스 입력 ══════════════════ */
@@ -660,7 +674,7 @@ function generate(){
   var sig = currentSig();
   if(!sig) return;
   var c = cfg(), n = +$('count').value;
-  results = [];
+  results = []; picked.clear();
   for(var i=0;i<n;i++){
     var seed = (Math.random()*2147483647)|0;
     results.push({ sig: vary(sig, c, seed), seed: seed });
@@ -672,7 +686,7 @@ function mix(){
   if(selected.length !== 2) return;
   var a = samples[selected[0]].sig, b = samples[selected[1]].sig;
   var n = +$('count').value;
-  results = [];
+  results = []; picked.clear();
   for(var i=0;i<n;i++){
     var t = n > 1 ? i/(n-1) : 0.5;
     results.push({ sig: mixSig(a,b,t), seed: 1000+i, t: t });
@@ -687,7 +701,7 @@ function renderGrid(){
   var d = deriveCfg();
   results.forEach(function(r, i){
     var cell = document.createElement('div');
-    cell.className = 'cell';
+    cell.className = 'cell' + (picked.has(i) ? ' pick' : '');
     var c = document.createElement('canvas');
     c.width = c.height = 300;
     var x = c.getContext('2d');
@@ -696,9 +710,17 @@ function renderGrid(){
     c.style.width = '100%'; c.style.height = 'auto';
     cell.appendChild(c);
     cell.title = r.t != null ? ('섞기 ' + Math.round(r.t*100) + '%') : ('씨앗 ' + r.seed);
-    cell.addEventListener('click', function(){ loadToCanvas(r.sig); });
+    cell.addEventListener('click', function(){
+      if(picked.has(i)) picked.delete(i); else picked.add(i);
+      renderGrid(); syncSendBar();
+    });
+    var ed = document.createElement('button');
+    ed.className = 'edit'; ed.textContent = '✎'; ed.title = '왼쪽 캔버스로 불러오기';
+    ed.addEventListener('click', function(ev){ ev.stopPropagation(); loadToCanvas(r.sig); });
+    cell.appendChild(ed);
     box.appendChild(cell);
   });
+  syncSendBar();
 }
 
 function loadToCanvas(sig){
@@ -706,6 +728,104 @@ function loadToCanvas(sig){
             closed: sig.closed, done: true };
   paint(); readOut();
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ══════════════════ NU-LAYER 연동 ══════════════════
+
+   받기: NU-LAYER 가 보낸 패스를 샘플로 등록하고 바로 한 판 만들어 보여 준다.
+   보내기: 고른 결과를 되돌려 준다. 등록은 NU-LAYER 가 한다 —
+           토큰이 한 곳에만 있고, 기존 등록 코드를 그대로 쓰고,
+           NU-LAYER 의 작업 중인 캔버스를 건드리지 않는다.          */
+
+var linked = false;   // NU-LAYER 가 열어 준 창인가
+
+function syncSendBar(){
+  var bar = $('sendBar');
+  if(!bar) return;
+  bar.hidden = !(linked && results.length);
+  var n = picked.size;
+  $('pickCount').textContent = n ? (n + '개 고름') : '보낼 것을 고르세요';
+  $('bToCanvas').disabled = !n;
+  $('bToArchive').disabled = !n;
+}
+
+window.addEventListener('message', function(e){
+  var d = e.data;
+  if(!d || d.type !== 'nulayer-vary-in') return;
+  linked = true;
+  var list = d.paths || [], added = 0, last = null;
+  for(var i=0;i<list.length;i++){
+    var p = list[i];
+    if(!p || !p.nodes) continue;
+    var sig = toSig(p.nodes, p.closed);
+    if(!sig) continue;
+    samples.push({ sig: sig }); last = sig; added++;
+  }
+  if(added){
+    selected = [samples.length-1];
+    draft = { nodes: toNodes(last, W/2, H/2, Math.min(W,H)*0.38, 0), closed: last.closed, done: true };
+    paint(); renderSamples(); readOut(); updateMixNote();
+    generate();                       // 받자마자 한 판 보여 준다
+  }
+  syncSendBar();
+});
+
+// 투명 가장자리를 잘라낸다 — 아카이브의 다른 오브젝트들과 같은 모양으로 들어가게
+function trimCanvas(c){
+  var x = c.getContext('2d'), w = c.width, h = c.height;
+  var dat = x.getImageData(0,0,w,h).data;
+  var x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for(var y=0;y<h;y++) for(var px=0;px<w;px++){
+    if(dat[(y*w+px)*4+3] > 8){
+      if(px < x0) x0 = px; if(px > x1) x1 = px;
+      if(y < y0) y0 = y;   if(y > y1) y1 = y;
+    }
+  }
+  if(x1 < 0) return null;
+  var pad = 6;
+  x0 = Math.max(0, x0-pad); y0 = Math.max(0, y0-pad);
+  x1 = Math.min(w-1, x1+pad); y1 = Math.min(h-1, y1+pad);
+  var o = document.createElement('canvas');
+  o.width = x1-x0+1; o.height = y1-y0+1;
+  o.getContext('2d').drawImage(c, x0, y0, o.width, o.height, 0, 0, o.width, o.height);
+  return { canvas: o, dx: x0, dy: y0 };
+}
+
+// 결과 하나를 '그림 + 그 그림과 같은 좌표의 노드'로 만든다.
+// 노드를 같이 넘겨야 NU-LAYER 가 나중에 다시 열어 고칠 수 있다.
+function bakeResult(r, withDerive){
+  var px = 760, half = px/2, scale = px*0.33;
+  var c = document.createElement('canvas');
+  c.width = c.height = px;                      // 배경 없이 — 투명 PNG
+  var x = c.getContext('2d');
+  drawSig(x, r.sig, half, half, scale, {
+    lw: 3, derive: withDerive ? deriveCfg() : null, seed: r.seed
+  });
+  var t = trimCanvas(c);
+  if(!t) return null;
+  // 잘라낸 만큼 노드도 옮긴다 → 그림과 노드가 같은 좌표계에 있게 된다
+  var nodes = toNodes(r.sig, half - t.dx, half - t.dy, scale, 0);
+  return { png: t.canvas.toDataURL('image/png'),
+           w: t.canvas.width, h: t.canvas.height,
+           nodes: nodes, closed: r.sig.closed };
+}
+
+function sendPicked(mode){
+  if(!linked || !picked.size) return;
+  var idx = Array.from(picked).sort(function(a,b){ return a-b; });
+  var items = [], i;
+  for(i=0;i<idx.length;i++){
+    var baked = bakeResult(results[idx[i]], true);
+    if(baked) items.push(baked);
+  }
+  if(!items.length) return;
+  try{
+    window.opener.postMessage({ type:'nuvary-out', mode: mode, items: items }, '*');
+    $('pickCount').textContent = items.length + '개 보냈습니다';
+    picked.clear(); renderGrid();
+  }catch(err){
+    $('pickCount').textContent = 'NU-LAYER 창을 찾지 못했습니다';
+  }
 }
 
 /* ══════════════════ SVG 내보내기 ══════════════════ */
@@ -760,6 +880,8 @@ $('bAdd').addEventListener('click', addSample);
 $('bGen').addEventListener('click', generate);
 $('bMix').addEventListener('click', mix);
 $('bSvgAll').addEventListener('click', exportSvg);
+$('bToCanvas').addEventListener('click', function(){ sendPicked('canvas'); });
+$('bToArchive').addEventListener('click', function(){ sendPicked('archive'); });
 
 Array.prototype.forEach.call(document.querySelectorAll('[data-pre]'), function(b){
   b.addEventListener('click', function(){
@@ -775,7 +897,10 @@ paint(); readOut(); renderSamples(); updateMixNote();
 // 테스트에서 들여다볼 수 있게 내부를 열어 둔다
 window.NUVARY = { toSig:toSig, toNodes:toNodes, detectPeriod:detectPeriod,
                   vary:vary, mixSig:mixSig, pathD:pathD, presetStar:presetStar,
-                  scaffold:scaffold, rng:rng };
+                  scaffold:scaffold, rng:rng, bakeResult:bakeResult,
+                  trimCanvas:trimCanvas,
+                  _state: function(){ return { samples:samples, results:results,
+                                               picked:picked, linked:linked }; } };
 })();
 </script>
 </body>
