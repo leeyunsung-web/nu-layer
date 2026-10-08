@@ -223,6 +223,8 @@
       linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px);
     background-size: 30px 30px;
   }
+  /* 픽셀 모드에서는 종이 모눈(30px)을 끈다 — 픽셀 격자와 겹쳐 지저분해 보인다 */
+  body.pixel-mode .paper-bg { background-image: none; }
   #traceImage {
     position: absolute; inset: 0; width: 100%; height: 100%; 
     object-fit: contain; pointer-events: none; display: none; opacity: 0.3;
@@ -6845,6 +6847,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     $('zoomSlider').value = Math.max(20, Math.min(600, Math.round(viewZoom*100)));
     updateNavPreview();
     if($('canvasCursor').style.display === 'block') updateCursorState(); // ring size tracks zoom
+    if(typeof drawPixelGridSoon === 'function') drawPixelGridSoon();
   }
   function setViewZoom(z){
     viewZoom = Math.max(0.2, Math.min(6, z));
@@ -11382,26 +11385,48 @@ showLayerMenu(ev.clientX, ev.clientY, [
     if(lbl) lbl.textContent = on ? ('한 칸 ' + pixelCellSize() + 'px') : '';
     const ov = $('pixelOverlay');
     if(ov) ov.style.display = on ? '' : 'none';
+    document.body.classList.toggle('pixel-mode', on);
     if(on) drawPixelGrid();
   }
 
+  // 격자는 화면에 실제로 찍히는 점 수에 맞춰 그린다.
+  // 1080 짜리 버퍼에 그려 놓고 화면 크기로 줄이면 선이 점 사이에 걸쳐
+  // 어떤 줄은 진하고 어떤 줄은 흐려진다 — 그래서 격자가 지저분해 보인다.
   function drawPixelGrid(){
     const ov = $('pixelOverlay');
     if(!ov || currentTool !== 'pixel') return;
-    const x = ov.getContext('2d'), W = ov.width, H = ov.height, cs = pixelCellSize();
+    const r = ov.getBoundingClientRect();
+    if(!r.width || !r.height) return;
+    const dpr = window.devicePixelRatio || 1;
+    // r 은 확대·회전이 이미 반영된 화면 크기다. 여기에 dpr 을 곱하면 실제 점 수.
+    const W = Math.max(1, Math.min(4096, Math.round(r.width  * dpr)));
+    const H = Math.max(1, Math.min(4096, Math.round(r.height * dpr)));
+    if(ov.width !== W || ov.height !== H){ ov.width = W; ov.height = H; }
+    const x = ov.getContext('2d');
     x.clearRect(0, 0, W, H);
-    x.strokeStyle = 'rgba(0,0,0,0.16)';
+
+    // 선을 점 한가운데(.5)에 놓아야 1점 굵기로 또렷하게 찍힌다
+    x.strokeStyle = 'rgba(0,0,0,0.18)';
     x.lineWidth = 1;
     x.beginPath();
     for(let i = 1; i < pixelN; i++){
-      const v = Math.round(i * cs) + 0.5;
-      x.moveTo(v, 0); x.lineTo(v, H);
-      x.moveTo(0, v); x.lineTo(W, v);
+      const vx = Math.round(i * W / pixelN) + 0.5;
+      const vy = Math.round(i * H / pixelN) + 0.5;
+      x.moveTo(vx, 0); x.lineTo(vx, H);
+      x.moveTo(0, vy); x.lineTo(W, vy);
     }
     x.stroke();
     // 테두리는 조금 진하게 — 격자가 어디서 끝나는지 보이게
-    x.strokeStyle = 'rgba(0,0,0,0.32)';
+    x.strokeStyle = 'rgba(0,0,0,0.34)';
     x.strokeRect(0.5, 0.5, W - 1, H - 1);
+  }
+
+  // 확대·창 크기가 바뀌면 점 수가 달라진다 — 프레임당 한 번만 다시 그린다
+  let pixelGridQueued = false;
+  function drawPixelGridSoon(){
+    if(pixelGridQueued || currentTool !== 'pixel') return;
+    pixelGridQueued = true;
+    requestAnimationFrame(()=>{ pixelGridQueued = false; drawPixelGrid(); if(pixelDraw) pixelPreview(); });
   }
 
   // 칸 격자 → 캔버스 크기의 마스크
@@ -11458,12 +11483,16 @@ showLayerMenu(ev.clientX, ev.clientY, [
   function pixelPreview(){
     if(!pixelDraw) return;
     drawPixelGrid();
-    const ov = $('pixelOverlay'), x = ov.getContext('2d'), cs = pixelCellSize();
+    // 오버레이는 1080 이 아니라 '화면 점 수' 좌표계다 — 칸 크기도 거기서 잰다
+    const ov = $('pixelOverlay'), x = ov.getContext('2d');
+    const cw = ov.width / pixelN, ch = ov.height / pixelN;
     x.fillStyle = pixelDraw.erase ? 'rgba(210,210,215,0.85)' : strokeColor;
     x.globalAlpha = pixelDraw.erase ? 1 : 0.75;
     for(const i of pixelDraw.seen){
       const gx = i % pixelN, gy = (i - gx) / pixelN;
-      x.fillRect(gx * cs, gy * cs, cs, cs);
+      x.fillRect(Math.round(gx * cw), Math.round(gy * ch),
+                 Math.round((gx+1) * cw) - Math.round(gx * cw),
+                 Math.round((gy+1) * ch) - Math.round(gy * ch));
     }
     x.globalAlpha = 1;
   }
