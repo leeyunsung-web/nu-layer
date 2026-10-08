@@ -1029,6 +1029,8 @@
           </span>
         </div>
         <div class="palette-grid my-palette" id="myPaletteGrid"></div>
+        <button class="btn btn-sm master-only" id="nuColorBtn" style="margin-top:6px; width:100%;"
+          title="NU COLOR — 윤성의 작품에서 뽑은 팔레트가 새 창으로 열립니다. 색을 누르면 지금 고른 칸(LINE 또는 FILL)으로 들어갑니다">NU COLOR ↗</button>
       </div>
       <div class="tool-row" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
         <div class="range-row">
@@ -1185,7 +1187,7 @@
         </div>
         <div class="tool-group" aria-label="Color">
           <span class="tg-label">COLOR</span>
-          <button class="tool-btn" data-tool="pixel" title="Hotkey: X — 픽셀 모드. 칸 단위로만 찍힙니다. 끌면 연속으로, Alt 를 누른 채 끌면 지워집니다. 찍은 픽셀은 색면으로 들어가고, 레이어를 우클릭하면 외곽 라인만 따낼 수 있습니다">PIXEL<kbd>X</kbd></button>
+          <button class="tool-btn" data-tool="pixel" title="Hotkey: X — 픽셀 모드 켜기/끄기. 켜져 있으면 붓은 칸을 찍고 지우개는 칸을 지웁니다. 한 칸은 한 색 -- 다른 칸으로 번지지 않습니다. 페인트통은 그대로 번집니다. 레이어를 우클릭하면 외곽 라인만 따낼 수 있습니다">PIXEL<kbd>X</kbd></button>
           <button class="tool-btn" data-tool="fill" title="Hotkey: G — fills a region and auto-splits it into a new layer">FILL<kbd>G</kbd></button>
           <button class="tool-btn" id="eyedropperBtn" title="Hotkey: I — click the canvas once to pick a color">PICK<kbd>I</kbd></button>
         </div>
@@ -1701,6 +1703,7 @@
     const so = $('saveObjBtn');
     if(so) so.style.display = isMaster ? '' : 'none';
     document.body.classList.toggle('role-master', isMaster);
+    const ncb = $('nuColorBtn'); if(ncb) ncb.style.display = isMaster ? '' : 'none';
     document.body.classList.toggle('role-guest', !isMaster);
     if(typeof updateCompSaveBtn === 'function') updateCompSaveBtn();
     if(typeof syncRegisterBtn === 'function') syncRegisterBtn();
@@ -1728,6 +1731,7 @@
   function tryMasterPass(){
     if($('masterPass').value === MASTER_PASSWORD){
       setRole('master');
+      if(typeof _openNuOnMaster === 'function') setTimeout(_openNuOnMaster, 0);
       hideLogin();
       toast('Switched to Master.');
     } else {
@@ -11357,7 +11361,15 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // 1080 의 약수 중 픽셀아트에 쓸 만한 것들
   const PIXEL_NS = [24, 27, 30, 36, 40, 45, 54, 60, 72, 90, 108, 120];
   let pixelN = 36;
+  let pixelMode = false;  // 켜져 있으면 붓은 칸을 찍고 지우개는 칸을 지운다
   let pixelDraw = null;   // 끄는 동안의 상태 { cells, n, lid, erase, seen }
+  function setPixelMode(on){
+    pixelMode = !!on;
+    const b = document.querySelector('.tool-select .tool-btn[data-tool="pixel"]');
+    if(b) b.classList.toggle('active', pixelMode);
+    syncPixelBar();
+    if(typeof updateBrushPreview === 'function') updateBrushPreview();
+  }
 
   function pixelCellSize(){ return drawCanvas.width / pixelN; }
 
@@ -11379,7 +11391,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
   }
 
   function syncPixelBar(){
-    const bar = $('pixelBar'), on = currentTool === 'pixel';
+    const bar = $('pixelBar'), on = pixelMode;
     if(bar) bar.style.display = on ? 'flex' : 'none';
     const lbl = $('pixelCell');
     if(lbl) lbl.textContent = on ? ('한 칸 ' + pixelCellSize() + 'px') : '';
@@ -11394,7 +11406,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // 어떤 줄은 진하고 어떤 줄은 흐려진다 — 그래서 격자가 지저분해 보인다.
   function drawPixelGrid(){
     const ov = $('pixelOverlay');
-    if(!ov || currentTool !== 'pixel') return;
+    if(!ov || !pixelMode) return;
     const r = ov.getBoundingClientRect();
     if(!r.width || !r.height) return;
     const dpr = window.devicePixelRatio || 1;
@@ -11424,7 +11436,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // 확대·창 크기가 바뀌면 점 수가 달라진다 — 프레임당 한 번만 다시 그린다
   let pixelGridQueued = false;
   function drawPixelGridSoon(){
-    if(pixelGridQueued || currentTool !== 'pixel') return;
+    if(pixelGridQueued || !pixelMode) return;
     pixelGridQueued = true;
     requestAnimationFrame(()=>{ pixelGridQueued = false; drawPixelGrid(); if(pixelDraw) pixelPreview(); });
   }
@@ -11454,22 +11466,26 @@ showLayerMenu(ev.clientX, ev.clientY, [
     return { mnX, mnY, mxX, mxY };
   }
 
-  // 지금 레이어에 이미 찍혀 있는 픽셀 면을 하나로 모은다 (이어 찍기·지우기용)
-  function pixelCellsOfLayer(lid, n){
-    const cells = new Uint8Array(n * n);
-    const W = drawCanvas.width, cs = W / n;
+  // 지금 레이어의 픽셀 면들을 색마다 따로 모은다 -- [{ color, cells }]
+  // 한 칸은 한 색만 가진다. 다른 색으로 찍으면 그 칸만 새 색으로 옮겨 간다.
+  function pixelLayersOfLayer(lid, n){
+    const W = drawCanvas.width, cs = W / n, out = [];
     for(const a of actions){
       if(a.type !== 'fill' || a.layer !== lid || !a.m || a.pixN !== n) continue;
-      const m = maskOf(a, a.mw || W, a.mh || drawCanvas.height);
+      const mw = a.mw || W;
+      const m = maskOf(a, mw, a.mh || drawCanvas.height);
+      const cells = new Uint8Array(n * n);
       for(let gy = 0; gy < n; gy++){
         for(let gx = 0; gx < n; gx++){
-          // 칸 한가운데만 찍어 보면 충분하다
           const px = Math.floor(gx * cs + cs / 2), py = Math.floor(gy * cs + cs / 2);
-          if(m[py * (a.mw || W) + px]) cells[gy * n + gx] = 1;
+          if(m[py * mw + px]) cells[gy * n + gx] = 1;
         }
       }
+      let g = out.find(o => o.color === a.color);
+      if(!g){ g = { color: a.color, cells }; out.push(g); }
+      else for(let i = 0; i < cells.length; i++) if(cells[i]) g.cells[i] = 1;
     }
-    return cells;
+    return out;
   }
 
   function pixelCellAt(p){
@@ -11486,7 +11502,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     // 오버레이는 1080 이 아니라 '화면 점 수' 좌표계다 — 칸 크기도 거기서 잰다
     const ov = $('pixelOverlay'), x = ov.getContext('2d');
     const cw = ov.width / pixelN, ch = ov.height / pixelN;
-    x.fillStyle = pixelDraw.erase ? 'rgba(210,210,215,0.85)' : strokeColor;
+    x.fillStyle = pixelDraw.erase ? 'rgba(210,210,215,0.85)' : pixelDraw.color;
     x.globalAlpha = pixelDraw.erase ? 1 : 0.75;
     for(const i of pixelDraw.seen){
       const gx = i % pixelN, gy = (i - gx) / pixelN;
@@ -11500,7 +11516,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
   function pixelDown(p, e){
     const al = activeLayer();
     if(!al){ toast('레이어가 없습니다.'); return; }
-    pixelDraw = { n: pixelN, lid: al.id, erase: !!e.altKey, seen: new Set() };
+    pixelDraw = { n: pixelN, lid: al.id, erase: currentTool === 'eraser' || !!e.altKey, color: strokeColor, seen: new Set() };
     pixelMove(p);
   }
   function pixelMove(p){
@@ -11520,28 +11536,43 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const lay = layers.find(l => l.id === d.lid);
     if(!lay) return;
 
-    // 이 레이어에 이미 있던 칸 + 이번에 찍은 칸 (지우개면 뺀다)
-    const cells = pixelCellsOfLayer(d.lid, d.n);
-    for(const i of d.seen) cells[i] = d.erase ? 0 : 1;
+    // 색마다 면 하나. 이번에 찍은 칸은 다른 색 면에서 빼고(한 칸 = 한 색),
+    // 지우개가 아니면 이 색 면에 넣는다. 안 건드린 칸은 그대로다.
+    const groups = pixelLayersOfLayer(d.lid, d.n);
+    for(const g of groups) for(const i of d.seen) g.cells[i] = 0;
+    if(!d.erase){
+      let g = groups.find(o => o.color === d.color);
+      if(!g){ g = { color: d.color, cells: new Uint8Array(d.n * d.n) }; groups.push(g); }
+      for(const i of d.seen) g.cells[i] = 1;
+    }
 
-    // 이 레이어의 옛 픽셀 액션은 걷어내고 하나로 다시 쓴다 — 칸이 겹쳐 쌓이지 않게
+    // 이 레이어의 옛 픽셀 액션은 걷어내고 색마다 하나씩 다시 쓴다 — 칸이 겹쳐 쌓이지 않게
     for(let k = actions.length - 1; k >= 0; k--){
       const a = actions[k];
       if(a.type === 'fill' && a.layer === d.lid && a.pixN === d.n) actions.splice(k, 1);
     }
-    lay.ctx.clearRect(0, 0, W, H);
-
-    let any = false;
-    for(let i = 0; i < cells.length; i++) if(cells[i]){ any = true; break; }
-    if(any){
-      const mask = pixelMaskFromCells(cells, d.n);
+    for(const g of groups){
+      let any = false;
+      for(let i = 0; i < g.cells.length; i++) if(g.cells[i]){ any = true; break; }
+      if(!any) continue;
+      const mask = pixelMaskFromCells(g.cells, d.n);
       const bb = maskBounds(mask, W, H);
-      const act = { type:'fill', id: ++actionCounter, layer: d.lid, color: strokeColor,
+      const act = { type:'fill', id: ++actionCounter, layer: d.lid, color: g.color,
                     tolerance: 0, x: (bb.mnX + bb.mxX) / 2, y: (bb.mnY + bb.mxY) / 2,
                     mw: W, mh: H, ox: 0, oy: 0, pixN: d.n, m: encodeMask(mask) };
       act._mask = mask; act._maskFor = act.m; act._mb = bb;
-      paintSplitFill(lay.ctx, mask, act.color, 0, 0, W, H, null, bb);
       actions.push(act);
+    }
+    // 이 레이어를 액션에서 다시 그린다 -- 같은 레이어의 획은 그대로 남는다
+    lay.ctx.clearRect(0, 0, W, H);
+    for(const a of actions){
+      if(a.layer !== d.lid) continue;
+      try {
+        if(a.type === 'stroke') renderStrokeFull(lay.ctx, a);
+        else if(a.type === 'fill'){ if(a.m || a._mask || a.src) replaySplitFill(a); else if(a.poly) paintVectorFill(lay.ctx, a); }
+        else if(a.type === 'layerRecolor') applyLayerRecolor(lay.ctx, a.color);
+        else if(a.type === 'image' && a.img) drawActionImage(lay.ctx, a);
+      } catch(err){ console.error('pixel replay', err); }
     }
     compositeLayers();
     renderLayersPanel();
@@ -11671,7 +11702,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       return;
     }
 
-    if(currentTool === 'pixel'){
+    if(pixelMode && (currentTool === 'brush' || currentTool === 'eraser')){
       e.preventDefault();
       try { drawCanvas.setPointerCapture(e.pointerId); } catch(err){}
       pixelDown(p, e);
@@ -13257,8 +13288,16 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
   document.querySelectorAll('.tool-select .tool-btn:not(.tool-clear-btn):not(#eyedropperBtn)').forEach(btn=>{
     btn.addEventListener('click', ()=>{
-      document.querySelectorAll('.tool-select .tool-btn:not(.tool-clear-btn):not(#eyedropperBtn)').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.tool-select .tool-btn:not(.tool-clear-btn):not(#eyedropperBtn):not([data-tool="pixel"])').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
+      if(btn.dataset.tool === 'pixel'){
+        // 켜고 끄는 스위치 -- 고른 도구(붓·지우개)는 그대로 둔다
+        setPixelMode(!pixelMode);
+        btn.classList.toggle('active', pixelMode);
+        const cur = document.querySelector('.tool-select .tool-btn[data-tool="' + currentTool + '"]');
+        if(cur) cur.classList.add('active');
+        return;
+      }
       const prevTool = currentTool;
       currentTool = btn.dataset.tool;
       if(currentTool !== 'lasso') clearLasso();
@@ -13283,7 +13322,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       updateBrushPreview();
       clearStrokeSelection();
       if(typeof syncPixelBar === 'function') syncPixelBar();
-      if(prevTool === 'pixel' && currentTool !== 'pixel' && pixelDraw) pixelUp();
+      if(pixelDraw) pixelUp();
     });
   });
 
@@ -14046,6 +14085,24 @@ showLayerMenu(ev.clientX, ev.clientY, [
     renderMyPalette();
     schedulePrefs();
   }
+  // ---- NU COLOR 창 ----
+  const NU_COLOR_HTML = "<!doctype html><html lang=\"ko\"><head><meta charset=\"utf-8\"><title>NU COLOR<\/title>\n<style>\nbody{margin:0;background:#1a1720;color:#eee;font:12px/1.5 system-ui,sans-serif;padding:12px 14px}\nh1{font-size:13px;letter-spacing:.14em;margin:0 0 8px;color:#bbb}\n.tabs{display:flex;gap:4px;margin-bottom:10px}\n.tabs button{font:600 11px system-ui;background:#2a2630;color:#ddd;border:1px solid #3a3545;border-radius:5px;padding:5px 9px;cursor:pointer}\n.tabs button.on{background:#eee;color:#1a1720;border-color:#eee}\n.row{display:grid;grid-template-columns:90px 1fr;gap:8px;align-items:center;margin-bottom:8px}\n.row .l{font-size:11px;color:#bbb;line-height:1.3}.row .l small{display:block;color:#777;font-size:10px}\n.sw{display:flex;flex-wrap:wrap;gap:4px}\n.c{width:26px;height:26px;border-radius:4px;border:1px solid rgba(255,255,255,.12);cursor:pointer;padding:0}\n.c:hover{outline:2px solid #fff;outline-offset:1px}\n.ramp{display:flex;flex-direction:column;gap:2px}.ramp .c{width:26px;height:14px;border-radius:2px}.ramp .c.k{height:22px;outline:1.5px solid #fff;outline-offset:-2px}\n.ramps{display:flex;flex-wrap:wrap;gap:5px}\n.hc{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}\n.hc div.sw{flex-wrap:nowrap;gap:2px}.hc .c{flex:1;width:auto;height:30px}.hc small{display:block;color:#777;font-size:10px;margin-top:2px}\n.foot{margin-top:10px;color:#777;font-size:10px}\n#msg{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);background:#eee;color:#1a1720;font:600 11px monospace;padding:5px 10px;border-radius:5px;opacity:0;transition:opacity .2s}\n#msg.on{opacity:1}\n<\/style><\/head><body>\n<h1>NU COLOR<\/h1>\n<div class=\"tabs\" id=\"tabs\"><\/div>\n<div id=\"pane\"><\/div>\n<div class=\"foot\">색을 누르면 NU-LAYER 의 지금 고른 칸(LINE / FILL)으로 들어갑니다. 아무 칸도 안 골랐으면 LINE 으로.<\/div>\n<div id=\"msg\"><\/div>\n<script>\nconst D={\"roles\":[{\"ko\":\"바탕\",\"en\":\"Ground\",\"cols\":[\"#ffffff\",\"#faf7f2\",\"#fdf8db\",\"#fdf2c8\",\"#f6d5e6\",\"#e3dbeb\"]},{\"ko\":\"살결\",\"en\":\"Skin\",\"cols\":[\"#fde2cd\",\"#fad7bd\",\"#febe95\",\"#f9aa71\",\"#f2af94\",\"#e08446\",\"#f6bfcb\",\"#f38f92\"]},{\"ko\":\"금빛·머리·별\",\"en\":\"Gold\",\"cols\":[\"#feee8e\",\"#ffe600\",\"#fcd301\",\"#ffb701\",\"#ffa401\",\"#fb7401\",\"#ff9f54\",\"#a86610\"]},{\"ko\":\"폭발·분홍 피\",\"en\":\"Burst\",\"cols\":[\"#faa0c4\",\"#fe7f94\",\"#fb4687\",\"#ee3b69\",\"#d2003d\",\"#eb020c\",\"#d140a8\",\"#972350\"]},{\"ko\":\"밤하늘·깊은 바탕\",\"en\":\"Cosmos\",\"cols\":[\"#021f7a\",\"#014dcf\",\"#141189\",\"#392553\",\"#65309a\",\"#7c2f8c\",\"#3b0325\",\"#8e061c\"]},{\"ko\":\"하늘·물·초록\",\"en\":\"Cool\",\"cols\":[\"#b8e9f8\",\"#8eceeb\",\"#0cbbe2\",\"#06a6e6\",\"#6fb2fc\",\"#0169a7\",\"#9edd4c\",\"#03bb78\"]},{\"ko\":\"선·그림자\",\"en\":\"Line\",\"cols\":[\"#060606\",\"#171620\",\"#292b53\",\"#691012\",\"#bab4a9\",\"#e3e5e6\"]}],\"sig\":[[\"#f8f7f4\",\"#f9f7f3\",\"#faf7f2\",\"#c3c0bb\",\"#8f8c87\"],[\"#fbede2\",\"#fce8d8\",\"#fde2cd\",\"#c9af9b\",\"#987f6b\"],[\"#ffd3b5\",\"#febf93\",\"#f9aa71\",\"#cc8149\",\"#a05a22\"],[\"#fdc7c7\",\"#f9acac\",\"#f38f92\",\"#cb696e\",\"#a3444b\"],[\"#ffee96\",\"#ffea62\",\"#ffe600\",\"#c7b400\",\"#908500\"],[\"#ffe694\",\"#ffdc5f\",\"#fcd301\",\"#c7a500\",\"#947800\"],[\"#ffcf8f\",\"#ffba59\",\"#ffa401\",\"#d17c00\",\"#a35700\"],[\"#ffba8a\",\"#ff9852\",\"#fb7401\",\"#d35100\",\"#ac2c00\"],[\"#ffc0c8\",\"#ffa1ae\",\"#fe7f94\",\"#d65971\",\"#af314f\"],[\"#ffa7b2\",\"#fb788d\",\"#ee3b69\",\"#ce004f\",\"#ae0036\"],[\"#ff9d84\",\"#fe664b\",\"#eb020c\",\"#cc0000\",\"#ae0000\"],[\"#f0a7d5\",\"#e278bf\",\"#d140a8\",\"#b4148d\",\"#980074\"],[\"#b999d2\",\"#9165b6\",\"#65309a\",\"#541e8b\",\"#420a7c\"],[\"#968dc3\",\"#5b549f\",\"#021f7a\",\"#001873\",\"#00116c\"],[\"#a6ddf0\",\"#73cce9\",\"#0cbbe2\",\"#0095bc\",\"#007197\"],[\"#818181\",\"#434343\",\"#060606\",\"#050505\",\"#040404\"]],\"series\":{\"The Annunciation\":[\"#edf2e7\",\"#fdf2c8\",\"#fad7bd\",\"#e08446\",\"#fcd301\",\"#ffe600\",\"#febe95\",\"#feb1d0\",\"#e73f5a\",\"#d2003d\",\"#f48393\",\"#f3a659\",\"#ff6693\",\"#fea8b6\",\"#f6bfcb\",\"#ffbd01\"],\"Torso\":[\"#f6e5d2\",\"#f9f8f3\",\"#feda01\",\"#381341\",\"#171620\",\"#ffa001\",\"#fb4687\",\"#15a8de\",\"#f99b7f\",\"#3b0325\",\"#ffb701\",\"#fe4267\",\"#020c4b\",\"#f2af94\",\"#653388\",\"#7be5fd\"],\"Danae\":[\"#e3e5e6\",\"#f7e5d3\",\"#ff9f54\",\"#f9aa71\",\"#040201\",\"#ffab01\",\"#f8c592\",\"#6fb2fc\",\"#dd4b01\",\"#f1e00d\",\"#f37093\",\"#fec801\",\"#fb7401\",\"#f48da9\",\"#e2425a\",\"#ee1813\"],\"Zodiac\":[\"#edeeef\",\"#f6cb01\",\"#fe7f94\",\"#070606\",\"#0cbbe2\",\"#bdbcb8\",\"#ffc253\",\"#9edd4c\",\"#0169a7\",\"#f8e072\",\"#ff7d00\",\"#ff9c35\",\"#03bb78\",\"#ffeca8\",\"#f7c591\",\"#a86610\"],\"Medusa\":[\"#faf7f2\",\"#030303\",\"#ffc201\",\"#bab4a9\",\"#ffe971\",\"#ff6f01\",\"#e3dbeb\",\"#fec368\",\"#fece86\",\"#ce0002\",\"#06a6e6\",\"#99d5f4\",\"#ffd35d\",\"#9c0001\",\"#b8e9f8\",\"#6ec0ee\"],\"Frames of Torso\":[\"#ffffff\",\"#f4e4d5\",\"#392553\",\"#fcea20\",\"#fb598d\",\"#fed401\",\"#ffa401\",\"#fc4971\",\"#f5ea91\",\"#7c2f8c\",\"#faa982\",\"#f42855\",\"#65309a\",\"#2d2f30\",\"#f59269\",\"#6dd3da\"],\"Digital\":[\"#fde2cd\",\"#f06e7c\",\"#fdf8db\",\"#f69d8b\",\"#b32c50\",\"#f8df06\",\"#ee3b69\",\"#fefffe\",\"#f38f92\",\"#c61958\",\"#dd4b4b\",\"#8e061c\",\"#feee8e\",\"#dc6860\",\"#972350\",\"#ece8a7\"],\"Laocoon · Drawings (mono)\":[\"#ffffff\",\"#e3e5e6\",\"#bab4a9\",\"#2d2f30\",\"#060606\"]},\"harm\":[{\"s\":\"The Annunciation\",\"cols\":[\"#ede5d2\",\"#d2003d\",\"#f48393\",\"#f3a659\",\"#f15370\",\"#ffe000\"]},{\"s\":\"Torso\",\"cols\":[\"#171620\",\"#ebd8cb\",\"#e34a82\",\"#653388\",\"#f2af94\",\"#ede8a0\"]},{\"s\":\"Torso\",\"cols\":[\"#f3f9de\",\"#331540\",\"#70309f\",\"#925fc9\",\"#feb187\",\"#fe4180\"]},{\"s\":\"Torso\",\"cols\":[\"#e9dac7\",\"#16a8de\",\"#fdd401\",\"#d94e6a\",\"#f19b38\",\"#b91e2f\"]},{\"s\":\"Torso\",\"cols\":[\"#feeedb\",\"#7be5fe\",\"#ffe001\",\"#fef59a\",\"#fe485d\",\"#fef57a\"]},{\"s\":\"Danae\",\"cols\":[\"#f8aa71\",\"#c4daea\",\"#f97921\",\"#ffb100\",\"#ffcf01\",\"#e14301\"]},{\"s\":\"Danae\",\"cols\":[\"#e1e5ea\",\"#014dcf\",\"#f1e00d\",\"#141189\",\"#8fceeb\",\"#feab01\"]},{\"s\":\"Danae\",\"cols\":[\"#ffffff\",\"#f37093\",\"#c71f2e\",\"#010101\",\"#faa267\",\"#ff2f00\"]},{\"s\":\"Zodiac\",\"cols\":[\"#000938\",\"#eae6db\",\"#f47f0b\",\"#f1d1a3\",\"#f5d300\",\"#f6bb02\"]},{\"s\":\"Zodiac\",\"cols\":[\"#fbf4e9\",\"#ffb968\",\"#b25ba9\",\"#ffad38\"]},{\"s\":\"Zodiac\",\"cols\":[\"#f7cc01\",\"#f1dccb\",\"#ff9901\",\"#f1544c\",\"#080605\",\"#fc7209\"]},{\"s\":\"Zodiac\",\"cols\":[\"#e6c601\",\"#a86610\",\"#eeaa01\",\"#e6d96f\",\"#6096d7\",\"#dddfe0\"]},{\"s\":\"Medusa\",\"cols\":[\"#fbf7f2\",\"#ffd4b5\",\"#e3dbec\",\"#bbb4a9\",\"#ffb101\",\"#cf0002\"]},{\"s\":\"Medusa\",\"cols\":[\"#f5e4cb\",\"#040303\",\"#fbe969\",\"#eeeff3\",\"#ffbe6b\",\"#febc01\"]},{\"s\":\"Frames of Torso\",\"cols\":[\"#ffffff\",\"#fc4971\",\"#f5ea91\",\"#6dd3da\",\"#021f7a\",\"#faa0c4\"]},{\"s\":\"Frames of Torso\",\"cols\":[\"#ffffff\",\"#392553\",\"#f9588c\",\"#92379f\",\"#f42755\",\"#fed401\"]},{\"s\":\"Digital\",\"cols\":[\"#fde2cd\",\"#f06e7c\",\"#ece8a7\",\"#972350\",\"#e81757\",\"#e72685\"]},{\"s\":\"Digital\",\"cols\":[\"#fce8e0\",\"#ed466a\",\"#dc6860\",\"#813141\",\"#43373a\",\"#fcf197\"]}]};\nconst tabs=[['c','역할별'],['d','작품 조합'],['a','시리즈'],['b','시그니처']];\nlet cur='c';const T=document.getElementById('tabs'),P=document.getElementById('pane'),M=document.getElementById('msg');let tt;\nfunction say(t){M.textContent=t;M.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>M.classList.remove('on'),1000)}\nfunction send(h){try{if(window.opener&&!window.opener.closed){window.opener.postMessage({type:'nucolor',hex:h},'*');say(h)}else say('NU-LAYER 창이 없습니다')}catch(e){say(h)}}\nfunction chip(h,cls){const b=document.createElement('button');b.className='c '+(cls||'');b.style.background=h;b.title=h;b.onclick=()=>send(h);return b}\nfunction row(lab,sub,cols){const r=document.createElement('div');r.className='row';const l=document.createElement('div');l.className='l';l.innerHTML=lab+(sub?'<small>'+sub+'<\/small>':'');const s=document.createElement('div');s.className='sw';cols.forEach(h=>s.appendChild(chip(h)));r.append(l,s);return r}\nfunction render(){T.innerHTML='';tabs.forEach(([k,n])=>{const b=document.createElement('button');b.textContent=n;b.className=k===cur?'on':'';b.onclick=()=>{cur=k;render()};T.appendChild(b)});P.innerHTML='';\n if(cur==='c')D.roles.forEach(r=>P.appendChild(row(r.ko,r.en,r.cols)));\n else if(cur==='a')Object.entries(D.series).forEach(([n,c])=>P.appendChild(row(n,c.length+'색',c)));\n else if(cur==='b'){const w=document.createElement('div');w.className='ramps';D.sig.forEach(rp=>{const c=document.createElement('div');c.className='ramp';rp.forEach((h,i)=>c.appendChild(chip(h,i===2?'k':'')));w.appendChild(c)});P.appendChild(w)}\n else{const w=document.createElement('div');w.className='hc';D.harm.forEach(h=>{const c=document.createElement('div');const s=document.createElement('div');s.className='sw';h.cols.forEach(x=>s.appendChild(chip(x)));c.appendChild(s);const sm=document.createElement('small');sm.textContent=h.s;c.appendChild(sm);w.appendChild(c)});P.appendChild(w)}}\nrender();\n<\/script><\/body><\/html>";
+  let nuColorWin = null;
+  function openNuColor(){
+    if(nuColorWin && !nuColorWin.closed){ nuColorWin.focus(); return; }
+    nuColorWin = window.open('', 'nucolor', 'width=560,height=720,resizable=yes,scrollbars=yes');
+    if(!nuColorWin){ toast('팝업이 막혔습니다 — 이 사이트의 팝업을 허용해 주세요.'); return; }
+    nuColorWin.document.open(); nuColorWin.document.write(NU_COLOR_HTML); nuColorWin.document.close();
+  }
+  if($('nuColorBtn')) $('nuColorBtn').addEventListener('click', openNuColor);
+  window.addEventListener('message', e => {
+    const d = e.data;
+    if(!d || d.type !== 'nucolor' || typeof d.hex !== 'string') return;
+    if(typeof pickTargetColor === 'function') pickTargetColor(d.hex);
+  });
+  // 마스터 모드로 들어오면 같이 연다
+  const _openNuOnMaster = () => { if(userRole === 'master' && !(nuColorWin && !nuColorWin.closed)) openNuColor(); };
+
   const myPaletteGrid = $('myPaletteGrid');
   // Clearing a slot re-renders the whole grid, which destroys the cell the
   // press started on -- so the click that follows pointerup lands on a BRAND
