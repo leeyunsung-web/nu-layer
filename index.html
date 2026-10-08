@@ -10382,7 +10382,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const copied = [];
     for(const a of prevOrder){
       if(a.layer !== src.id) continue;
-      if(a.type === 'strokeEdit' || a.type === 'pathOp' || a.type === 'lassoDelete' || a.type === 'mergeLayers' ||
+      if(a.type === 'strokeEdit' || a.type === 'pathOp' || a.type === 'pixelOp' || a.type === 'lassoDelete' || a.type === 'mergeLayers' ||
          a.type === 'dupLayer') continue;
       copied.push(cloneActionForLayer(a, nl.id));
     }
@@ -10420,7 +10420,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       newIds.push(nl.id);
       for(const a of prevOrder){
         if(a.layer !== m.id) continue;
-        if(a.type === 'strokeEdit' || a.type === 'pathOp' || a.type === 'lassoDelete' || a.type === 'mergeLayers' ||
+        if(a.type === 'strokeEdit' || a.type === 'pathOp' || a.type === 'pixelOp' || a.type === 'lassoDelete' || a.type === 'mergeLayers' ||
            a.type === 'dupLayer') continue;
         actions.push(cloneActionForLayer(a, nl.id));
       }
@@ -11488,6 +11488,46 @@ showLayerMenu(ev.clientX, ev.clientY, [
     return out;
   }
 
+  // 되돌리기·다시하기: 칸 하나의 색을 바꾸고 이 레이어의 픽셀 색면을 다시 쓴다
+  function pixelSetCell(lid, n, i, color){
+    const W = drawCanvas.width, H = drawCanvas.height;
+    const groups = pixelLayersOfLayer(lid, n);
+    for(const g of groups) g.cells[i] = 0;
+    if(color){
+      let g = groups.find(o => o.color === color);
+      if(!g){ g = { color, cells: new Uint8Array(n * n) }; groups.push(g); }
+      g.cells[i] = 1;
+    }
+    // 옛 픽셀 면이 있던 자리에 다시 넣는다 (같은 레이어의 획과 앞뒤 순서를 지키려고)
+    let at = -1;
+    for(let k = actions.length - 1; k >= 0; k--){
+      const a = actions[k];
+      if(a.type === 'fill' && a.layer === lid && a.pixN === n){ actions.splice(k, 1); at = k; }
+    }
+    if(at < 0) at = actions.length;
+    // 되돌리기 표시(pixelOp)가 맨 위에 있으면 그 아래에 둔다 -- 표시가 항상 맨 위여야 한 칸씩 되돌린다
+    const li = actions.length - 1;
+    if(li >= 0 && actions[li].type === 'pixelOp' && actions[li].layer === lid && at > li) at = li;
+    const fresh = [];
+    for(const g of groups){
+      let any = false;
+      for(let q = 0; q < g.cells.length; q++) if(g.cells[q]){ any = true; break; }
+      if(!any) continue;
+      const mask = pixelMaskFromCells(g.cells, n);
+      const bb = maskBounds(mask, W, H);
+      const act = { type:'fill', id: ++actionCounter, layer: lid, color: g.color,
+                    tolerance: 0, x: (bb.mnX + bb.mxX) / 2, y: (bb.mnY + bb.mxY) / 2,
+                    mw: W, mh: H, ox: 0, oy: 0, pixN: n, m: encodeMask(mask) };
+      act._mask = mask; act._maskFor = act.m; act._mb = bb;
+      fresh.push(act);
+    }
+    actions.splice(at, 0, ...fresh);
+    invalidateHiRes();
+    renderSingleLayer(lid);
+    compositeLayers();
+    renderLayersPanel();
+  }
+
   function pixelCellAt(p){
     const cs = pixelCellSize();
     const gx = Math.floor(p.x / cs), gy = Math.floor(p.y / cs);
@@ -11516,14 +11556,14 @@ showLayerMenu(ev.clientX, ev.clientY, [
   function pixelDown(p, e){
     const al = activeLayer();
     if(!al){ toast('레이어가 없습니다.'); return; }
-    pixelDraw = { n: pixelN, lid: al.id, erase: currentTool === 'eraser' || !!e.altKey, color: strokeColor, seen: new Set() };
+    pixelDraw = { n: pixelN, lid: al.id, erase: currentTool === 'eraser' || !!e.altKey, color: strokeColor, seen: new Set(), order: [] };
     pixelMove(p);
   }
   function pixelMove(p){
     if(!pixelDraw) return;
     const i = pixelCellAt(p);
     if(i < 0 || pixelDraw.seen.has(i)) return;
-    pixelDraw.seen.add(i);
+    pixelDraw.seen.add(i); pixelDraw.order.push(i);
     pixelPreview();
   }
   function pixelUp(){
@@ -11539,6 +11579,19 @@ showLayerMenu(ev.clientX, ev.clientY, [
     // 색마다 면 하나. 이번에 찍은 칸은 다른 색 면에서 빼고(한 칸 = 한 색),
     // 지우개가 아니면 이 색 면에 넣는다. 안 건드린 칸은 그대로다.
     const groups = pixelLayersOfLayer(d.lid, d.n);
+    // 되돌리기용: 칸마다 (이전 색 → 다음 색). 찍은 순서대로.
+    const next = d.erase ? null : d.color;
+    const cells = [];
+    for(const i of d.order){
+      let prev = null;
+      for(const g of groups) if(g.cells[i]){ prev = g.color; break; }
+      if(prev === next) continue;                    // 바뀌는 게 없는 칸은 되돌릴 것도 없다
+      cells.push({ i, prev, next });
+    }
+    if(!cells.length) return;
+    // 바로 앞 pixelOp 가 일부만 되돌려진 채면 그 나머지는 버린다 (새로 찍었으니)
+    const lastOp = actions[actions.length - 1];
+    if(lastOp && lastOp.type === 'pixelOp' && lastOp.k < lastOp.cells.length) lastOp.cells.length = lastOp.k;
     for(const g of groups) for(const i of d.seen) g.cells[i] = 0;
     if(!d.erase){
       let g = groups.find(o => o.color === d.color);
@@ -11563,17 +11616,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
       act._mask = mask; act._maskFor = act.m; act._mb = bb;
       actions.push(act);
     }
-    // 이 레이어를 액션에서 다시 그린다 -- 같은 레이어의 획은 그대로 남는다
-    lay.ctx.clearRect(0, 0, W, H);
-    for(const a of actions){
-      if(a.layer !== d.lid) continue;
-      try {
-        if(a.type === 'stroke') renderStrokeFull(lay.ctx, a);
-        else if(a.type === 'fill'){ if(a.m || a._mask || a.src) replaySplitFill(a); else if(a.poly) paintVectorFill(lay.ctx, a); }
-        else if(a.type === 'layerRecolor') applyLayerRecolor(lay.ctx, a.color);
-        else if(a.type === 'image' && a.img) drawActionImage(lay.ctx, a);
-      } catch(err){ console.error('pixel replay', err); }
-    }
+    actions.push({ type:'pixelOp', id: ++actionCounter, layer: d.lid, n: d.n, cells, k: cells.length,
+                   label: d.erase ? '픽셀 지우기' : '픽셀 찍기' });
+    renderSingleLayer(d.lid);
     compositeLayers();
     renderLayersPanel();
     redoStack.length = 0;
@@ -12978,6 +13023,21 @@ showLayerMenu(ev.clientX, ev.clientY, [
       toast('Nothing to undo.');
       return;
     }
+    {
+      // 픽셀은 한 칸씩 되돌린다. 마지막 칸까지 되돌리면 표시를 다시하기 쪽으로 넘긴다.
+      const last = actions[actions.length - 1];
+      if(last.type === 'pixelOp'){
+        if(last.k > 0){
+          last.k--;
+          const c = last.cells[last.k];
+          pixelSetCell(last.layer, last.n, c.i, c.prev);
+        }
+        if(last.k <= 0){ actions.pop(); redoStack.push(last); }
+        if(typeof syncLiveEdit === 'function') syncLiveEdit(true);
+        toast('픽셀 한 칸 되돌림' + (last.k > 0 ? ' (' + last.k + ' 남음)' : '') + '.');
+        return;
+      }
+    }
     const undoneAction = actions.pop();
     redoStack.push(undoneAction);
     // 획을 고친 표시 — 그림을 지우는 게 아니라 이전 모양으로 되돌린다.
@@ -13134,11 +13194,31 @@ showLayerMenu(ev.clientX, ev.clientY, [
   });
 
   $('redoBtn').addEventListener('click', () => {
-    if (redoStack.length === 0) {
+    const lastA = actions[actions.length - 1];
+    if (redoStack.length === 0 && !(lastA && lastA.type === 'pixelOp' && lastA.k < lastA.cells.length)) {
       toast('Nothing to redo.');
       return;
     }
+    {
+      // 일부만 되돌린 픽셀 표시가 맨 위에 있으면 그것부터 한 칸 다시 찍는다
+      const last = actions[actions.length - 1];
+      if(last && last.type === 'pixelOp' && last.k < last.cells.length){
+        const c = last.cells[last.k]; last.k++;
+        pixelSetCell(last.layer, last.n, c.i, c.next);
+        if(typeof syncLiveEdit === 'function') syncLiveEdit(true);
+        toast('픽셀 한 칸 다시 찍음.');
+        return;
+      }
+    }
     const redoneAction = redoStack.pop();
+    if(redoneAction.type === 'pixelOp'){
+      const c = redoneAction.cells[0]; redoneAction.k = 1;
+      actions.push(redoneAction);
+      pixelSetCell(redoneAction.layer, redoneAction.n, c.i, c.next);
+      if(typeof syncLiveEdit === 'function') syncLiveEdit(true);
+      toast('픽셀 한 칸 다시 찍음.');
+      return;
+    }
     if(redoneAction.type === 'flipLayer'){
       undoFlip(redoneAction);          // 다시 뒤집으면 원래대로
       actions.push(redoneAction);
