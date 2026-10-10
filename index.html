@@ -846,6 +846,8 @@
   .mgr-node:hover { border-color: var(--ink); }
   .mgr-node.dragging { opacity: 0.4; }
   .mgr-node.is-hidden { opacity: 0.45; border-style: dashed; }
+  .mgr-node.is-moved { box-shadow: inset 0 0 0 2px #e0a600; }
+  .mgr-pending { font-family: var(--font-mono); font-size: 11px; color: #a07600; margin-left: auto; }
   .mgr-node .node-eye { position:absolute; left:6px; top:6px; font-size:13px; line-height:1; padding:2px 6px; border:1px solid var(--border); border-radius:6px; background:var(--panel); cursor:pointer; }
   .mgr-node .node-eye:hover { border-color: var(--ink); }
   .mgr-node.drop-hot { border-color: var(--ink); background: var(--panel-alt); box-shadow: 0 0 0 2px var(--ink); }
@@ -1568,7 +1570,7 @@
 <div class="modal-backdrop" id="mgrModal">
   <div class="modal wide">
     <h2>ARCHIVE MANAGER</h2>
-    <p class="hint">Double-click a folder to open · drag a file onto a folder to move it · check files to select, then DELETE SELECTED · rename folders with the RENAME action. The automatic backup refreshes on your first visit each day, and deletions go through a confirmation prompt.</p>
+    <p class="hint">폴더는 두 번 눌러 열기 · 파일·폴더를 끌어 다른 폴더(또는 .. UP)에 놓으면 옮겨집니다 · 눈 단추로 아카이브에서 숨기기 · 옮기기·이름·삭제·숨김은 바로 서버에 가지 않고 모였다가 <b>✓ 적용</b>을 누르면 커밋 하나로 한꺼번에 반영됩니다. 하루 첫 방문 때 자동 백업이 갱신됩니다.</p>
     <div class="mgr-toolbar">
       <div class="mgr-crumbs" id="mgrCrumbs"><b>gallery</b></div>
       <span class="mgr-selinfo" id="mgrSelInfo"></span>
@@ -1580,6 +1582,9 @@
       <button class="btn btn-sm" id="mgrOfflineSave" title="Download every gallery original as a ZIP, folder structure intact (offline backup)">💾 OFFLINE SAVE</button>
       <button class="btn btn-sm" id="mgrRestoreBackup" title="Restore files that existed at yesterday's automatic backup but are gone now">⟲ RESTORE BACKUP</button>
       <button class="btn btn-sm btn-ghost" id="mgrRefresh">↻ REFRESH</button>
+      <span class="mgr-pending" id="mgrPending" hidden><b id="mgrPendingN">0</b> 개 바뀜 · 아직 반영 안 됨</span>
+      <button class="btn btn-sm btn-ghost" id="mgrDiscard" hidden title="바꾼 것을 모두 버리고 서버 상태로 되돌립니다">↩ 되돌리기</button>
+      <button class="btn btn-sm" id="mgrApply" hidden style="background:var(--ink); color:#fff; border-color:var(--ink);" title="바꾼 것을 한 번의 커밋으로 반영합니다 (옮기기·이름·삭제·숨김 모두 함께)">✓ 적용</button>
     </div>
     <div class="mgr-grid" id="mgrGrid">
       <div class="mgr-empty">Connect GitHub to manage stored files.</div>
@@ -5128,6 +5133,11 @@ showLayerMenu(ev.clientX, ev.clientY, [
   let mgrHiddenCache = { at: 0, set: new Set() };
   async function mgrHiddenSet(force){
     if(!force && Date.now() - mgrHiddenCache.at < 20000) return mgrHiddenCache.set;
+    if(!force && mgrModel && !mgrDirty()){
+      const set = new Set();
+      for(const p of mgrModel.files.keys()) if(/\/\.hidden$/.test(p)) set.add(p.replace(/\/\.hidden$/, ''));
+      mgrHiddenCache = { at: Date.now(), set }; return set;
+    }
     const set = new Set();
     try {
       const br = ghConfig.branch || 'main';
@@ -5148,34 +5158,16 @@ showLayerMenu(ev.clientX, ev.clientY, [
     for(const p of parts){ acc += (acc ? '/' : '') + p; if(set.has(acc)) return true; }
     return false;
   }
+  // 눈 단추·폴더 옮기기는 로컬 모델에만 적는다. ✓ 적용을 누르면 한 커밋으로 반영된다.
   async function toggleFolderHidden(path, hiddenNow){
-    const keep = `${path}/.hidden`;
-    toast(hiddenNow ? '폴더를 다시 보이게…' : '폴더를 숨기는 중…');
-    try {
-      if(hiddenNow){ const sha = await mgrGetSha(keep); await mgrDeleteFile(keep, sha, `Show folder ${path}`); }
-      else await mgrPutFile(keep, '', `Hide folder ${path}`);
-      mgrHiddenCache.at = 0;
-      toast(hiddenNow ? '아카이브에 보입니다.' : '아카이브에서 숨겼습니다.');
-      await new Promise(r=>setTimeout(r, 400));
-      refreshMgr();
-    } catch(e){ console.error(e); toast('실패: ' + e.message); }
+    if(!mgrModel) return;
+    mgrSetHiddenLocal(path, !hiddenNow);
+    toast(hiddenNow ? '아카이브에 보이게 (적용 전)' : '아카이브에서 숨김 (적용 전)');
+    refreshMgr();
   }
-
-  // 폴더를 다른 폴더 안으로: 통째로 복사한 뒤 원래 것을 지운다 (이름 바꾸기와 같은 길)
   async function moveFolder(srcPath, destFolderPath){
-    const name = srcPath.split('/').pop();
-    const newPath = `${destFolderPath}/${name}`.replace(/\/+/g,'/');
-    if(newPath === srcPath) return;
-    if(newPath.indexOf(srcPath + '/') === 0){ toast('폴더를 제 안으로 옮길 수는 없습니다.'); return; }
-    toast(`폴더 ${name} 옮기는 중…`);
-    try {
-      await copyFolderRecursive(srcPath, newPath);
-      await deleteFolderRecursive(srcPath);
-      mgrHiddenCache.at = 0;
-      await new Promise(r=>setTimeout(r, 700));
-      toast('폴더를 옮겼습니다.');
-      refreshMgr();
-    } catch(e){ console.error(e); toast('옮기기 실패: ' + e.message); }
+    if(!mgrModel) return;
+    if(mgrMoveDirLocal(srcPath, destFolderPath)){ toast('폴더를 옮겼습니다 (적용 전).'); refreshMgr(); }
   }
 
   function roleTagOf(name){
@@ -5184,16 +5176,169 @@ showLayerMenu(ev.clientX, ev.clientY, [
     return null;
   }
 
+  /* ---------- 매니저는 서버의 트리를 한 번 읽어 와서 로컬에서 고친다 ----------
+     옮기기·이름 바꾸기·삭제·숨김은 로컬 모델만 바꾸고(즉시 보임), ✓ 적용을 누르면
+     Git 트리 하나 + 커밋 하나 + ref 갱신 = 요청 세 번으로 전부 반영한다. 파일 내용은
+     한 번도 내려받거나 다시 올리지 않는다 — 블롭 sha 를 새 자리에 다시 가리킬 뿐이다.
+     예전 방식은 파일 하나 옮길 때 요청 네 번, 폴더를 옮기면 파일마다 받았다 올렸다. */
+  const EMPTY_BLOB_SHA = 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391';   // 빈 파일
+  let mgrModel = null;   // { commitSha, treeSha, files: Map<path,{sha,orig}>, dirs: Set<path>, truncated }
+  const rawUrlOf = p => `https://raw.githubusercontent.com/${ghConfig.owner}/${ghConfig.repo}/${ghConfig.branch || 'main'}/` + p.split('/').map(encodeURIComponent).join('/');
+  async function mgrLoadModel(){
+    const br = ghConfig.branch || 'main';
+    const commitSha = await ghGetRefSha(br);
+    if(!commitSha) throw new Error('branch not found');
+    const res = await fetch(`${ghApiBase()}/git/trees/${commitSha}?recursive=1&t=${Date.now()}`, { headers: ghHeaders(), cache:'no-store' });
+    if(!res.ok){ const e = await res.json().catch(()=>({})); throw new Error(`tree ${res.status}: ${e.message||res.statusText}`); }
+    const t = await res.json();
+    const files = new Map(), dirs = new Set();
+    const root = mgrRootPath;
+    for(const it of (t.tree || [])){
+      if(it.path !== root && it.path.indexOf(root + '/') !== 0) continue;
+      if(it.type === 'tree') dirs.add(it.path);
+      else if(it.type === 'blob'){
+        files.set(it.path, { sha: it.sha, orig: it.path });
+        const segs = it.path.split('/'); let acc = '';
+        for(let k = 0; k < segs.length - 1; k++){ acc += (k ? '/' : '') + segs[k]; dirs.add(acc); }   // 파일이 있는 폴더도 폴더
+      }
+    }
+    dirs.add(root);
+    mgrModel = { commitSha, treeSha: t.sha, files, dirs, truncated: !!t.truncated };
+    mgrHiddenCache.at = 0;
+    return mgrModel;
+  }
+  function mgrDirty(){
+    if(!mgrModel) return 0;
+    let n = 0;
+    const origs = new Set();
+    for(const [p, f] of mgrModel.files){ if(f.orig !== p) n++; if(f.orig) origs.add(f.orig); }
+    for(const o of (mgrModel.origAll || [])) if(!origs.has(o)) n++;
+    return n;
+  }
+  function mgrListModel(path){
+    // path 바로 아래의 폴더와 파일 (contents API 와 같은 모양)
+    const out = [], seen = new Set();
+    const pre = path + '/';
+    for(const d of mgrModel.dirs){
+      if(d.indexOf(pre) !== 0) continue;
+      const head = d.slice(pre.length).split('/')[0];
+      if(!seen.has(head)){ seen.add(head); out.push({ type:'dir', name: head, path: pre + head }); }
+    }
+    for(const [p, f] of mgrModel.files){
+      if(p.indexOf(pre) !== 0) continue;
+      const rest = p.slice(pre.length), head = rest.split('/')[0];
+      if(rest.indexOf('/') >= 0){ if(!seen.has(head)){ seen.add(head); out.push({ type:'dir', name: head, path: pre + head }); } continue; }
+      out.push({ type:'file', name: head, path: p, sha: f.sha, orig: f.orig, download_url: rawUrlOf(f.orig || p), moved: !!f.orig && f.orig !== p });
+    }
+    return out;
+  }
+  function mgrSyncPending(){
+    const n = mgrDirty();
+    $('mgrPending').hidden = !n; $('mgrPendingN').textContent = n;
+    $('mgrApply').hidden = !n; $('mgrDiscard').hidden = !n;
+  }
+  function mgrEnsureDir(path){
+    const parts = path.split('/').filter(Boolean); let acc = '';
+    for(const p of parts){ acc += (acc ? '/' : '') + p; mgrModel.dirs.add(acc); }
+  }
+  // ---- 로컬 편집 ----
+  function mgrMoveFileLocal(path, destDir){
+    const f = mgrModel.files.get(path); if(!f) return false;
+    const np = `${destDir}/${path.split('/').pop()}`.replace(/\/+/g,'/');
+    if(np === path) return false;
+    if(mgrModel.files.has(np)){ toast('그 폴더에 같은 이름의 파일이 있습니다.'); return false; }
+    mgrModel.files.delete(path); mgrModel.files.set(np, f); mgrEnsureDir(destDir); return true;
+  }
+  function mgrMoveDirLocal(src, destDir){
+    const name = src.split('/').pop();
+    const np = `${destDir}/${name}`.replace(/\/+/g,'/');
+    if(np === src) return false;
+    if(np.indexOf(src + '/') === 0){ toast('폴더를 제 안으로 옮길 수는 없습니다.'); return false; }
+    if(mgrModel.dirs.has(np)){ toast('그 자리에 같은 이름의 폴더가 있습니다.'); return false; }
+    mgrRenamePrefixLocal(src, np); return true;
+  }
+  function mgrRenamePrefixLocal(src, np){
+    const files = new Map();
+    for(const [p, f] of mgrModel.files) files.set(p === src || p.indexOf(src + '/') === 0 ? np + p.slice(src.length) : p, f);
+    mgrModel.files = files;
+    const dirs = new Set();
+    for(const d of mgrModel.dirs) dirs.add(d === src || d.indexOf(src + '/') === 0 ? np + d.slice(src.length) : d);
+    mgrModel.dirs = dirs; mgrEnsureDir(np);
+  }
+  function mgrDeleteFileLocal(path){ mgrModel.files.delete(path); }
+  function mgrDeleteDirLocal(path){
+    for(const p of [...mgrModel.files.keys()]) if(p.indexOf(path + '/') === 0) mgrModel.files.delete(p);
+    for(const d of [...mgrModel.dirs]) if(d === path || d.indexOf(path + '/') === 0) mgrModel.dirs.delete(d);
+  }
+  function mgrCreateDirLocal(path){ mgrEnsureDir(path); mgrModel.files.set(`${path}/.gitkeep`, { sha: EMPTY_BLOB_SHA, orig: null }); }
+  function mgrSetHiddenLocal(path, hidden){
+    const k = `${path}/.hidden`;
+    if(hidden) mgrModel.files.set(k, { sha: EMPTY_BLOB_SHA, orig: null }); else mgrModel.files.delete(k);
+  }
+  // ---- 적용: 트리 하나 + 커밋 하나 ----
+  async function mgrApply(){
+    if(!mgrModel || !mgrDirty()) return;
+    const entries = new Map();
+    // 자리가 바뀐(또는 새로 생긴) 파일은 새 자리에 그 blob 을 가리키고,
+    // 원래 있던 자리에 지금 아무것도 없으면 그 자리는 지운다 (옮긴 파일의 옛 자리 포함)
+    for(const [p, f] of mgrModel.files){ if(f.orig !== p) entries.set(p, { path: p, mode:'100644', type:'blob', sha: f.sha }); }
+    for(const o of mgrModel.origAll){ if(!mgrModel.files.has(o) && !entries.has(o)) entries.set(o, { path: o, mode:'100644', type:'blob', sha: null }); }
+    // 빈 폴더는 .gitkeep 으로 남긴다 (git 은 빈 폴더를 모른다)
+    for(const d of mgrModel.dirs){
+      if(d === mgrRootPath) continue;
+      let has = false;
+      for(const p of mgrModel.files.keys()) if(p.indexOf(d + '/') === 0){ has = true; break; }
+      if(!has){ const k = `${d}/.gitkeep`; mgrModel.files.set(k, { sha: EMPTY_BLOB_SHA, orig: null }); entries.set(k, { path: k, mode:'100644', type:'blob', sha: EMPTY_BLOB_SHA }); }
+    }
+    const n = entries.size;
+    $('mgrApply').disabled = true; toast(`적용 중… (${n} 항목)`);
+    try {
+      const br = ghConfig.branch || 'main';
+      const head = await ghGetRefSha(br);
+      if(head !== mgrModel.commitSha){
+        const go = await confirmDialog('서버가 그 사이에 바뀌었습니다 (다른 창에서 저장?). 그 위에 그대로 적용할까요?');
+        if(!go){ $('mgrApply').disabled = false; return; }
+      }
+      const headCommit = await ghGetCommit(head);
+      const tr = await fetch(`${ghApiBase()}/git/trees`, { method:'POST', headers: ghHeaders(), cache:'no-store',
+        body: JSON.stringify({ base_tree: headCommit.tree.sha, tree: [...entries.values()] }) });
+      if(!tr.ok){ const e = await tr.json().catch(()=>({})); throw new Error(`tree ${tr.status}: ${e.message||tr.statusText}`); }
+      const tree = await tr.json();
+      const cm = await fetch(`${ghApiBase()}/git/commits`, { method:'POST', headers: ghHeaders(), cache:'no-store',
+        body: JSON.stringify({ message: `Archive manager: ${n} change${n>1?'s':''}`, tree: tree.sha, parents: [head] }) });
+      if(!cm.ok){ const e = await cm.json().catch(()=>({})); throw new Error(`commit ${cm.status}: ${e.message||cm.statusText}`); }
+      const commit = await cm.json();
+      const rf = await fetch(`${ghApiBase()}/git/refs/heads/${br}`, { method:'PATCH', headers: ghHeaders(), cache:'no-store',
+        body: JSON.stringify({ sha: commit.sha, force: false }) });
+      if(!rf.ok){ const e = await rf.json().catch(()=>({})); throw new Error(`ref ${rf.status}: ${e.message||rf.statusText}`); }
+      bumpArchiveVersion();
+      toast('반영했습니다.');
+      mgrModel = null;
+      await refreshMgr(true);
+    } catch(e){ console.error(e); toast('적용 실패: ' + e.message); }
+    $('mgrApply').disabled = false;
+  }
+  async function mgrDiscard(){
+    if(mgrDirty() && !(await confirmDialog('바꾼 것을 모두 버릴까요?'))) return;
+    mgrModel = null; await refreshMgr(true);
+  }
+
   function openMgr(){
     if(userRole !== 'master'){ toast('Master access required.'); return; }
     if(!ghConfig || !ghConfig.token){ toast('Configure GitHub first (CONFIG at top).'); return; }
     mgrRootPath = (ghConfig.path || 'gallery').replace(/^\/+|\/+$/g,'');
     mgrCurrentPath = mgrRootPath;
     $('mgrModal').classList.add('show');
-    refreshMgr();
+    refreshMgr(true);
     mgrEnsureDailyBackup();   // 하루 단위 자동 백업 (archive-backup 브랜치)
   }
-  function closeMgr(){ $('mgrModal').classList.remove('show'); }
+  async function closeMgr(){
+    if(mgrDirty()){
+      const go = await confirmDialog('아직 반영하지 않은 변경이 ' + mgrDirty() + '개 있습니다. 적용하고 닫을까요?\n(취소하면 변경을 버리지 않고 창만 둡니다)');
+      if(go){ await mgrApply(); if(mgrDirty()) return; } else return;
+    }
+    $('mgrModal').classList.remove('show');
+  }
 
   function renderCrumbs(){
     const parts = mgrCurrentPath.split('/').filter(Boolean);
@@ -5212,18 +5357,25 @@ showLayerMenu(ev.clientX, ev.clientY, [
     });
   }
 
-  async function refreshMgr(){
+  async function refreshMgr(reload){
     renderCrumbs();
     const grid = $('mgrGrid');
-    grid.innerHTML = '<div class="mgr-empty">Loading…</div>';
     let items;
-    try { items = await mgrList(mgrCurrentPath); }
-    catch(e){ grid.innerHTML = `<div class="mgr-empty">Error: ${e.message}</div>`; return; }
+    if(reload || !mgrModel){
+      if(reload && mgrDirty() && !(await confirmDialog('새로 읽으면 반영하지 않은 변경이 사라집니다. 계속할까요?'))) return;
+      grid.innerHTML = '<div class="mgr-empty">Loading…</div>';
+      try { await mgrLoadModel(); mgrModel.origAll = new Set([...mgrModel.files.keys()]); }
+      catch(e){ grid.innerHTML = `<div class="mgr-empty">Error: ${e.message}</div>`; return; }
+    }
+    if(!mgrModel.dirs.has(mgrCurrentPath)) mgrCurrentPath = mgrRootPath;
+    items = mgrListModel(mgrCurrentPath);
 
     grid.innerHTML = '';
     mgrSelected.clear();
     updateMgrSelInfo();
-    const hiddenSet = await mgrHiddenSet();
+    mgrSyncPending();
+    const hiddenSet = new Set();
+    for(const p of mgrModel.files.keys()) if(/\/\.hidden$/.test(p)) hiddenSet.add(p.replace(/\/\.hidden$/, ''));
 
     // ".. UP" node (also a drop target to move file out one level)
     if(mgrCurrentPath !== mgrRootPath){
@@ -5258,6 +5410,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       const sub = escMgr(fn.date || '');
       const hid = hiddenSet.has(d.path);
       if(hid) node.classList.add('is-hidden');
+      if(isHiddenPath(parentPath(d.path), hiddenSet)) node.classList.add('is-hidden');
       node.draggable = true;
       node.innerHTML = `<button class="node-del" title="Delete folder">×</button>
         <button class="node-eye" title="${hid ? '숨김 — 누르면 아카이브에 다시 보입니다' : '보임 — 누르면 아카이브·불러오기·BATCH 에서 숨깁니다'}">${hid ? '◡' : '◉'}</button>
@@ -5266,7 +5419,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       node.addEventListener('dblclick', ()=>{ mgrCurrentPath = d.path; refreshMgr(); });
       node.querySelector('.node-del').addEventListener('click', (ev)=>{ ev.stopPropagation(); deleteFolder(d.path, d.name); });
       node.querySelector('.node-rename').addEventListener('click', (ev)=>{ ev.stopPropagation(); renameFolder(d.path, d.name); });
-      node.querySelector('.node-eye').addEventListener('click', (ev)=>{ ev.stopPropagation(); toggleFolderHidden(d.path, hid); });
+      node.querySelector('.node-eye').addEventListener('click', (ev)=>{ ev.stopPropagation(); mgrSetHiddenLocal(d.path, !hid); refreshMgr(); });
       // 폴더도 끌어서 다른 폴더(또는 .. UP)에 떨어뜨리면 그 안으로 들어간다
       node.addEventListener('dragstart', ()=>{ node.classList.add('dragging'); window._mgrDragDir = d.path; });
       node.addEventListener('dragend', ()=>{ node.classList.remove('dragging'); window._mgrDragDir = null; });
@@ -5276,7 +5429,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
     files.forEach(f=>{
       const node = document.createElement('div');
-      node.className = 'mgr-node is-file';
+      node.className = 'mgr-node is-file' + (f.moved ? ' is-moved' : '');
       node.draggable = true;
       node.dataset.path = f.path;
       node.dataset.name = f.name;
@@ -5329,48 +5482,27 @@ showLayerMenu(ev.clientX, ev.clientY, [
       e.preventDefault();
       node.classList.remove('drop-hot');
       const f = window._mgrDragFile, dir = window._mgrDragDir;
-      if(dir){ window._mgrDragDir = null; if(dir !== destFolderPath) await moveFolder(dir, destFolderPath); return; }
+      if(dir){ window._mgrDragDir = null; if(dir !== destFolderPath && mgrMoveDirLocal(dir, destFolderPath)) refreshMgr(); return; }
       if(!f) return;
-      await moveFile(f, destFolderPath);
+      if(mgrMoveFileLocal(f.path, destFolderPath)) refreshMgr();
     });
   }
 
   async function moveFile(fileItem, destFolderPath){
-    const newPath = `${destFolderPath}/${fileItem.name}`.replace(/\/+/g,'/');
-    if(newPath === fileItem.path){ return; }
-    toast(`Moving ${fileItem.name}…`);
-    try {
-      const b64 = await mgrGetBase64(fileItem);
-      await mgrPutFile(newPath, b64, `Move ${fileItem.name}`);
-      await mgrDeleteFile(fileItem.path, fileItem.sha, `Move ${fileItem.name} (remove old)`);
-      toast('File moved.');
-      refreshMgr();
-    } catch(e){ console.error(e); toast('Move failed: ' + e.message); }
+    if(!mgrModel) return;
+    if(mgrMoveFileLocal(fileItem.path, destFolderPath)){ toast('옮겼습니다 (적용 전).'); refreshMgr(); }
   }
 
   async function deleteFileNode(f){
-    const ok = await confirmDialog(`"${f.name}" will be deleted from the archive.\nAre you sure?`);
+    const ok = await confirmDialog(`"${f.name}" 을(를) 지웁니다 (✓ 적용을 누르면 반영).\n계속할까요?`);
     if(!ok) return;
-    toast(`Deleting ${f.name}…`);
-    try {
-      await mgrDeleteFile(f.path, f.sha, `Delete ${f.name}`);
-      loadedFilenames.delete(f.name);
-      toast('File deleted.');
-      await new Promise(r=>setTimeout(r, 500)); // let GitHub tree settle
-      await refreshMgr();
-    } catch(e){ console.error(e); toast('Delete failed: ' + e.message); }
+    mgrDeleteFileLocal(f.path); loadedFilenames.delete(f.name); refreshMgr();
   }
 
   async function deleteFolder(path, name){
-    const ok = await confirmDialog(`"${name}" and every file inside it will be deleted.\nAre you sure?`);
+    const ok = await confirmDialog(`"${name}" 과 그 안의 파일을 모두 지웁니다 (✓ 적용을 누르면 반영).\n계속할까요?`);
     if(!ok) return;
-    toast(`Deleting folder ${name}…`);
-    try {
-      await deleteFolderRecursive(path);
-      toast('Folder deleted.');
-      await new Promise(r=>setTimeout(r, 500));
-      await refreshMgr();
-    } catch(e){ console.error(e); toast('Folder delete failed: ' + e.message); }
+    mgrDeleteDirLocal(path); refreshMgr();
   }
   async function deleteFolderRecursive(path){
     const items = await mgrList(path);
@@ -5385,14 +5517,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
     if(!name) return;
     const clean = name.trim().replace(/[\/\\?%*:|"<>]/g,'-');
     if(!clean) return;
-    const keepPath = `${mgrCurrentPath}/${clean}/.gitkeep`;
-    toast(`Creating folder ${clean}…`);
-    try {
-      // empty file content (base64 of empty string)
-      await mgrPutFile(keepPath, '', `Create folder ${clean}`);
-      toast('Folder created.');
-      refreshMgr();
-    } catch(e){ console.error(e); toast('Create failed: ' + e.message); }
+    const p = `${mgrCurrentPath}/${clean}`;
+    if(mgrModel.dirs.has(p)){ toast('같은 이름의 폴더가 있습니다.'); return; }
+    mgrCreateDirLocal(p); refreshMgr();
   }
 
   // Rename a folder = copy all contents to new path, then delete the old tree.
@@ -5426,26 +5553,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
     if(!clean || clean === oldName) return;
     const parent = parentPath(path);
     const newPath = `${parent}/${clean}`.replace(/\/+/g,'/');
-    toast(`Renaming to ${clean}…`);
-    try {
-      await copyFolderRecursive(path, newPath);
-      await deleteFolderRecursive(path);
-      // GitHub's listing lags several seconds behind a copy+delete burst —
-      // a single early refresh showed the OLD structure ("rename didn't
-      // apply"). Poll until the listing actually reflects the rename.
-      const parentDir = parent || mgrRootPath;
-      let confirmed = false;
-      for(let attempt = 0; attempt < 7; attempt++){
-        await new Promise(r=>setTimeout(r, attempt === 0 ? 700 : 1300));
-        try {
-          const items = await mgrList(parentDir);
-          const names = items.filter(i=>i.type==='dir').map(i=>i.name);
-          if(names.includes(clean) && !names.includes(oldName)){ confirmed = true; break; }
-        } catch(e){ /* transient — keep polling */ }
-      }
-      await refreshMgr();
-      toast(confirmed ? 'Folder renamed.' : 'Folder renamed — listing may take a few more seconds.');
-    } catch(e){ console.error(e); toast('Rename failed: ' + e.message); }
+    if(mgrModel.dirs.has(newPath)){ toast('같은 이름의 폴더가 있습니다.'); return; }
+    mgrRenamePrefixLocal(path, newPath); refreshMgr();
   }
 
   async function copyFolderRecursive(srcPath, destPath){
@@ -5468,22 +5577,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
   async function bulkDeleteSelected(){
     const paths = Array.from(mgrSelected);
     if(paths.length === 0) return;
-    const confirmed = await confirmDialog(`${paths.length} selected file(s) will be deleted.\nAre you sure?`);
+    const confirmed = await confirmDialog(`${paths.length}개를 지웁니다 (✓ 적용을 누르면 반영).\n계속할까요?`);
     if(!confirmed) return;
-    let ok = 0;
-    for(const p of paths){
-      const f = mgrCurrentFiles.find(x=>x.path===p);
-      if(!f) continue;
-      try {
-        toast(`Deleting ${f.name}…`);
-        await mgrDeleteFile(f.path, f.sha, `Delete ${f.name}`);
-        loadedFilenames.delete(f.name);
-        ok++;
-      } catch(e){ console.error(f.name, e); }
-    }
-    toast(`Deleted ${ok}/${paths.length} file(s).`);
-    await new Promise(r=>setTimeout(r, 600));
-    await refreshMgr();
+    for(const p of paths){ const f = mgrCurrentFiles.find(x=>x.path===p); if(f){ mgrDeleteFileLocal(f.path); loadedFilenames.delete(f.name); } }
+    refreshMgr();
   }
 
   function selectAllFiles(){
@@ -5933,7 +6030,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
   $('openMgrBtn').addEventListener('click', openMgr);
   $('mgrClose').addEventListener('click', closeMgr);
-  $('mgrRefresh').addEventListener('click', refreshMgr);
+  $('mgrRefresh').addEventListener('click', () => refreshMgr(true));
+  $('mgrApply').addEventListener('click', mgrApply);
+  $('mgrDiscard').addEventListener('click', mgrDiscard);
   $('mgrNewFolder').addEventListener('click', createFolder);
   $('mgrDeleteSelected').addEventListener('click', bulkDeleteSelected);
   $('mgrSelectAll').addEventListener('click', selectAllFiles);
