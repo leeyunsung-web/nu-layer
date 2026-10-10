@@ -9802,8 +9802,20 @@ showLayerMenu(ev.clientX, ev.clientY, [
   }
   function pvHitHandle(q, a, ns){
     let best = null;
-    for(const h of pvHandles(a, ns)){ const d = pvDist(h.h, q); if(d <= pvR() && (!best || d < best.d)) best = { ...h, d }; }
+    for(const h of pvHandles(a, ns)){
+      // 앵커 반지름 안에 숨은 짧은 핸들은 앵커로 친다 (앵커를 옮기려다 핸들이 끌려 나오지 않게)
+      if(pvDist(h.h, ns[h.i]) <= pvR() * 1.2) continue;
+      const d = pvDist(h.h, q); if(d <= pvR() && (!best || d < best.d)) best = { ...h, d };
+    }
     return best;
+  }
+  // 손떨림으로 생긴 아주 짧은 핸들은 없는 것으로 (뾰족한 앵커로) 정리한다
+  function pvTidyNode(n){
+    if(!n) return;
+    const lim = pvR() * 1.2;
+    if(n.hi && pvDist(n, n.hi) <= lim) n.hi = null;
+    if(n.ho && pvDist(n, n.ho) <= lim) n.ho = null;
+    if(!n.hi && !n.ho) n.sm = false;
   }
 
   // ---- 펜이 지금 무엇을 할지 (커서 표시와 클릭이 같은 판단을 쓴다) ----
@@ -9901,6 +9913,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
     if(d.kind === 'new' && !d.moved && penDraft){
       const n = penDraft.nodes[d.i]; if(n){ n.hi = null; n.ho = null; n.sm = false; }
     }
+    if((d.kind === 'new' || d.kind === 'out') && penDraft) pvTidyNode(penDraft.nodes[d.i]);
+    if(d.kind === 'close' && penDraft) pvTidyNode(penDraft.nodes[0]);
     if(d.kind === 'close') penFinish();
   }
   function penFinish(){
@@ -10033,6 +10047,16 @@ showLayerMenu(ev.clientX, ev.clientY, [
       const sg = pvHitSegment(q, a, ns);
       if(sg){
         const L = ns.length;
+        // 앵커 근처(앵커 반지름의 2배 안)를 눌렀으면 선분을 휘지 않고 그 앵커를 옮긴다
+        // -- 굵은 선에서 앵커를 살짝 빗맞혀 선이 맘대로 휘던 일
+        let near = null;
+        ns.forEach((n, i) => { const d = pvDist(n, q); if(d <= pvR() * 2 && (!near || d < near.d)) near = { i, d }; });
+        if(near){
+          if(e.shiftKey){ if(nodeSel.sel.has(near.i)) nodeSel.sel.delete(near.i); else nodeSel.sel.add(near.i); }
+          else if(!nodeSel.sel.has(near.i)) nodeSel.sel = new Set([near.i]);
+          pvDrag = { kind:'nodes', id:a.id, start:q, moved:false };
+          return true;
+        }
         if(!e.shiftKey) nodeSel.sel = new Set();
         nodeSel.sel.add(sg.i); nodeSel.sel.add((sg.i + 1) % L);
         pvDrag = { kind:'bend', id:a.id, i:sg.i, t: Math.min(0.85, Math.max(0.15, sg.t)), start:q, moved:false };
@@ -10112,7 +10136,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
       return;
     }
     const a = actions.find(x => x.id === d.id);
-    if(a && d.moved) pvCommit(a, d.kind === 'handle' ? '핸들 옮김' : d.kind === 'bend' ? '선분 휘기' : '앵커 옮김');
+    if(a && d.moved){
+      if(d.kind === 'handle') pvTidyNode(a.nodes[d.i]);      // 앵커 위에 놓은 핸들은 거둔다
+      pvCommit(a, d.kind === 'handle' ? '핸들 옮김' : d.kind === 'bend' ? '선분 휘기' : '앵커 옮김');
+    }
   }
 
   // + / − (펜·직접 선택 둘 다에서)
