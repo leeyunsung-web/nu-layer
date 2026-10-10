@@ -450,6 +450,21 @@ function scaffold(nodes, closed, cfg){
 // 파생된 자식에게 주는 약한 변주 — 부모를 알아볼 만큼만 흔든다
 var CHILD_VARY = { rJit: 0.16, aJit: 0.07, hScale: 1, armD: 0, sym: true };
 
+/* 자식은 '씨앗 + 자리 번호'로 정해진다. 슬라이더(붙을 확률·크기)는 자식의 모양을
+   바꾸지 않으므로, 한 번 만든 자식은 기억해 두고 다시 쓴다. 전에는 슬라이더를
+   끌 때마다 36칸 × 획 수 × 자리 수만큼 vary() 를 매 프레임 다시 돌렸다 —
+   그림이 커지면 그것이 느린 느낌의 정체였다. */
+var kidCache = new Map();
+function kidAt(sig, base, i){
+  var key = base + ':' + i;
+  var k = kidCache.get(key);
+  if(k && k.sig === sig) return k;
+  var rnd = rng((base ^ (i * 2654435761)) >>> 0);
+  k = { sig: sig, p: rnd(), sz: 0.7 + rnd()*0.6, kid: vary(sig, CHILD_VARY, (rnd()*2147483647)|0), rot: rnd()*TAU };
+  kidCache.set(key, k);
+  return k;
+}
+
 /* ══════════════════ 그리기 ══════════════════ */
 
 function tracePath(ctx, nodes, closed){
@@ -485,13 +500,11 @@ function drawSig(ctx, sig, cx, cy, scale, opt){
       var s = spots[i];
       // 자리마다 제 난수를 쓴다 — 하나의 흐름을 나눠 쓰면 슬라이더를 조금
       // 움직일 때마다 '어떤 자식이 나올지'가 통째로 바뀌어 화면이 튄다.
-      var rnd = rng((base ^ (i * 2654435761)) >>> 0);
-      if(rnd() > s.w) continue;                      // 확률만큼만 붙인다
-      var cs = scale * d.size * (0.7 + rnd()*0.6);
+      var k = kidAt(sig, base, i);
+      if(k.p > s.w) continue;                        // 확률만큼만 붙인다
+      var cs = scale * d.size * k.sz;
       if(cs < 3) continue;
-      // 자식도 조금씩 달라야 뭉쳐 보이지 않는다 (같은 모양의 복사본은 금세 티가 난다)
-      var kid = vary(sig, CHILD_VARY, (rnd()*2147483647)|0);
-      tracePath(ctx, toNodes(kid, s.x, s.y, cs, rnd()*TAU), kid.closed);
+      tracePath(ctx, toNodes(k.kid, s.x, s.y, cs, k.rot), k.kid.closed);
       ctx.stroke();
     }
   }
@@ -517,14 +530,13 @@ function sigToSvgPaths(sig, cx, cy, scale, derive, seed){
   var out = [], nodes = toNodes(sig, cx, cy, scale, 0);
   out.push(pathD(nodes, sig.closed));
   if(derive && (derive.vert > 0 || derive.edge > 0)){
-    var spots = scaffold(nodes, sig.closed, derive), rnd = rng(seed || 7);
+    var spots = scaffold(nodes, sig.closed, derive), base = seed || 7;
     for(var i=0;i<spots.length;i++){
-      var s = spots[i];
-      if(rnd() > s.w) continue;
-      var cs = scale * derive.size * (0.7 + rnd()*0.6);
+      var s = spots[i], k = kidAt(sig, base, i);             // 화면과 같은 규칙
+      if(k.p > s.w) continue;
+      var cs = scale * derive.size * k.sz;
       if(cs < 3) continue;
-      var kid = vary(sig, CHILD_VARY, (rnd()*2147483647)|0);   // 화면과 같은 규칙
-      out.push(pathD(toNodes(kid, s.x, s.y, cs, rnd()*TAU), kid.closed));
+      out.push(pathD(toNodes(k.kid, s.x, s.y, cs, k.rot), k.kid.closed));
     }
   }
   return out;
@@ -768,7 +780,7 @@ function deriveCfg(){
 
 function generate(){
   var c = cfg(), n = +$('count').value, i, seed;
-  results = []; picked.clear();
+  results = []; picked.clear(); kidCache.clear();
   if(sceneMode()){
     for(i=0;i<n;i++){
       seed = (Math.random()*2147483647)|0;
@@ -783,6 +795,22 @@ function generate(){
     }
   }
   renderGrid();
+}
+
+// 변주 슬라이더를 끌면 같은 씨앗으로 다시 만든다 — 칸마다 '같은 결과가 조금씩'
+// 달라져서 손에 붙는다. 섞기 결과(t 가 있는 것)는 슬라이더와 무관하다.
+function regenSameSeeds(){
+  if(!results.length || results[0].t != null) return;
+  var c = cfg();
+  kidCache.clear();
+  if(sceneMode()){
+    if(!scene) return;
+    for(var i=0;i<results.length;i++) results[i] = { scene: varyScene(scene, c, results[i].seed), seed: results[i].seed };
+  } else {
+    var sig = currentSig(); if(!sig) return;
+    for(var j=0;j<results.length;j++) results[j] = { sig: vary(sig, c, results[j].seed), seed: results[j].seed };
+  }
+  paintGridSoon();
 }
 
 // 결과 하나를 캔버스에 — 획 하나든 그림 전체든 같은 입구로
@@ -1062,7 +1090,9 @@ function exportSvg(){
   el.addEventListener('input', function(){
     show();
     // 파생 슬라이더는 그림만 바뀐다 — 칸을 다시 만들 필요 없이 프레임당 한 번만 그린다
-    if(pair[0].charAt(0) === 'd' && results.length) paintGridSoon();
+    if(pair[0].charAt(0) === 'd'){ if(results.length) paintGridSoon(); }
+    // 변주 슬라이더는 같은 씨앗으로 다시 만든다 (끄는 동안 바로 보인다)
+    else if(pair[0] !== 'count' && results.length) regenSameSeeds();
   });
 });
 
@@ -1077,6 +1107,7 @@ $('bClear').addEventListener('click', newDraft);
 $('bAdd').addEventListener('click', addSample);
 $('bGen').addEventListener('click', generate);
 $('sceneOn').addEventListener('change', function(){ if(results.length) generate(); });
+$('sym').addEventListener('change', function(){ if(results.length) regenSameSeeds(); });
 $('bMix').addEventListener('click', mix);
 $('bSvgAll').addEventListener('click', exportSvg);
 $('bToCanvas').addEventListener('click', function(){ sendPicked('canvas'); });

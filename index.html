@@ -2737,6 +2737,23 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const next = [];
     for(const a of actions){
       const it = itemByOrig.get(a);
+      if(it && it.orig.nodes && !it.outside.length){
+        // 펜 패스가 통째로 안에 있으면 앵커·핸들을 옮긴다 -- 펜툴로 계속 고칠 수 있게
+        const nd = it.orig.nodes.map(n => {
+          const q = xformMapPoint(n.x, n.y);
+          const o = { x: q.x, y: q.y, sm: !!n.sm,
+                      hi: n.hi ? xformMapPoint(n.hi.x, n.hi.y) : null,
+                      ho: n.ho ? xformMapPoint(n.ho.x, n.ho.y) : null };
+          if(n.r != null) o.r = n.r * s;
+          return o;
+        });
+        const na = { ...it.orig, id: ++actionCounter, nodes: nd, cr: (it.orig.cr || 0) * s,
+                     width: Math.max(0.5, it.w0 * s) };
+        syncStrokeFromNodes(na);
+        if(!na.points.length) na.points = it.inside[0].map(p => xformMapPoint(p.x, p.y));
+        next.push(na);
+        continue;
+      }
       if(it){
         for(const seg of it.outside){
           next.push({ ...it.orig, id: ++actionCounter, points: seg });
