@@ -157,8 +157,12 @@
     try {
       const t = await api('https://api.github.com/repos/' + cfg.owner + '/' + cfg.repo
         + '/git/trees/' + encodeURIComponent(cfg.branch) + '?recursive=1&t=' + Date.now());
+      // 폴더에 ".hidden" 이 있으면 그 폴더(와 그 안)는 아카이브에 안 뜬다 (매니저의 눈 단추)
+      const hidden = (t.tree || []).filter(x => x.type === 'blob' && /(^|\/)\.hidden$/.test(x.path))
+                                   .map(x => x.path.replace(/\/?\.hidden$/, '') + '/');
+      const isHid = p => hidden.some(h => p.indexOf(h) === 0);
       const out = (t.tree || [])
-        .filter(x => x.type === 'blob' && x.path.indexOf(FOLDER + '/') === 0 && isImg(x.path))
+        .filter(x => x.type === 'blob' && x.path.indexOf(FOLDER + '/') === 0 && isImg(x.path) && !isHid(x.path))
         .map(x => mk(x.path, x.sha));
       return { files: out.sort(newest), how: 'git tree',
                warn: t.truncated ? 'the tree was truncated — some works may be missing' : '' };
@@ -176,9 +180,12 @@
       const out = [];
       for(const it of await dir(FOLDER)){
         if(it.type === 'file' && isImg(it.name)) out.push(mk(it.path, it.sha));
-        else if(it.type === 'dir')
-          for(const f of await dir(it.path))
+        else if(it.type === 'dir'){
+          const inner = await dir(it.path);
+          if(inner.some(f => f.type === 'file' && f.name === '.hidden')) continue;   // 숨긴 폴더
+          for(const f of inner)
             if(f.type === 'file' && isImg(f.name)) out.push(mk(f.path, f.sha));
+        }
       }
       return { files: out.sort(newest), how: 'contents API', warn: '' };
     } catch(e){ tried.push('contents: ' + e.message); }

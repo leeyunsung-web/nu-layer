@@ -845,6 +845,9 @@
   }
   .mgr-node:hover { border-color: var(--ink); }
   .mgr-node.dragging { opacity: 0.4; }
+  .mgr-node.is-hidden { opacity: 0.45; border-style: dashed; }
+  .mgr-node .node-eye { position:absolute; left:6px; top:6px; font-size:13px; line-height:1; padding:2px 6px; border:1px solid var(--border); border-radius:6px; background:var(--panel); cursor:pointer; }
+  .mgr-node .node-eye:hover { border-color: var(--ink); }
   .mgr-node.drop-hot { border-color: var(--ink); background: var(--panel-alt); box-shadow: 0 0 0 2px var(--ink); }
   .mgr-node .node-icon {
     font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
@@ -4738,7 +4741,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
       grid.innerHTML = `<p class="empty-hint">Scan failed: ${escMgr(e.message || String(e))}</p>`;
       return;
     }
-    const dirs = items.filter(i=>i.type==='dir').sort((a,b)=>b.name.localeCompare(a.name)); // newest date first
+    const hiddenSet = await mgrHiddenSet();
+    const dirs = items.filter(i=>i.type==='dir' && !isHiddenPath(i.path, hiddenSet)).sort((a,b)=>b.name.localeCompare(a.name)); // newest date first
     const files = items.filter(i=>i.type==='file' && /\.(png|jpe?g|webp)$/i.test(i.name))
                        .sort((a,b)=>a.name.localeCompare(b.name));
     grid.innerHTML = '';
@@ -5117,6 +5121,63 @@ showLayerMenu(ev.clientX, ev.clientY, [
     return await blobToBase64(blob);
   }
 
+  // ---- 숨긴 폴더 ----
+  // 폴더 안에 ".hidden" 빈 파일이 있으면 숨긴 폴더다. 아카이브(gallery)·ONLINE ARCHIVE
+  // LOAD·BATCH 에서 그 폴더(와 그 안의 폴더)는 안 뜬다. 매니저에서는 보이되 눈이 감겨 있다.
+  // 폴더마다 목록을 다시 받지 않으려고 트리 한 번으로 .hidden 자리를 모두 읽는다.
+  let mgrHiddenCache = { at: 0, set: new Set() };
+  async function mgrHiddenSet(force){
+    if(!force && Date.now() - mgrHiddenCache.at < 20000) return mgrHiddenCache.set;
+    const set = new Set();
+    try {
+      const br = ghConfig.branch || 'main';
+      const res = await fetch(`${ghApiBase()}/git/trees/${encodeURIComponent(br)}?recursive=1&t=${Date.now()}`, { headers: ghHeaders(), cache:'no-store' });
+      if(res.ok){
+        const t = await res.json();
+        for(const it of (t.tree || [])){
+          if(it.type === 'blob' && /(^|\/)\.hidden$/.test(it.path)) set.add(it.path.replace(/\/?\.hidden$/, ''));
+        }
+      }
+    } catch(e){ console.warn('hidden tree', e); }
+    mgrHiddenCache = { at: Date.now(), set };
+    return set;
+  }
+  function isHiddenPath(path, set){
+    const parts = String(path).split('/').filter(Boolean);
+    let acc = '';
+    for(const p of parts){ acc += (acc ? '/' : '') + p; if(set.has(acc)) return true; }
+    return false;
+  }
+  async function toggleFolderHidden(path, hiddenNow){
+    const keep = `${path}/.hidden`;
+    toast(hiddenNow ? '폴더를 다시 보이게…' : '폴더를 숨기는 중…');
+    try {
+      if(hiddenNow){ const sha = await mgrGetSha(keep); await mgrDeleteFile(keep, sha, `Show folder ${path}`); }
+      else await mgrPutFile(keep, '', `Hide folder ${path}`);
+      mgrHiddenCache.at = 0;
+      toast(hiddenNow ? '아카이브에 보입니다.' : '아카이브에서 숨겼습니다.');
+      await new Promise(r=>setTimeout(r, 400));
+      refreshMgr();
+    } catch(e){ console.error(e); toast('실패: ' + e.message); }
+  }
+
+  // 폴더를 다른 폴더 안으로: 통째로 복사한 뒤 원래 것을 지운다 (이름 바꾸기와 같은 길)
+  async function moveFolder(srcPath, destFolderPath){
+    const name = srcPath.split('/').pop();
+    const newPath = `${destFolderPath}/${name}`.replace(/\/+/g,'/');
+    if(newPath === srcPath) return;
+    if(newPath.indexOf(srcPath + '/') === 0){ toast('폴더를 제 안으로 옮길 수는 없습니다.'); return; }
+    toast(`폴더 ${name} 옮기는 중…`);
+    try {
+      await copyFolderRecursive(srcPath, newPath);
+      await deleteFolderRecursive(srcPath);
+      mgrHiddenCache.at = 0;
+      await new Promise(r=>setTimeout(r, 700));
+      toast('폴더를 옮겼습니다.');
+      refreshMgr();
+    } catch(e){ console.error(e); toast('옮기기 실패: ' + e.message); }
+  }
+
   function roleTagOf(name){
     if(/_MASTER_/i.test(name)) return 'master';
     if(/_GUEST_/i.test(name)) return 'guest';
@@ -5162,6 +5223,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     grid.innerHTML = '';
     mgrSelected.clear();
     updateMgrSelInfo();
+    const hiddenSet = await mgrHiddenSet();
 
     // ".. UP" node (also a drop target to move file out one level)
     if(mgrCurrentPath !== mgrRootPath){
@@ -5194,12 +5256,20 @@ showLayerMenu(ev.clientX, ev.clientY, [
       //   "2026-07-20"       → FOLDER / 2026-07-20
       const title = escMgr(fn.label || 'FOLDER');
       const sub = escMgr(fn.date || '');
+      const hid = hiddenSet.has(d.path);
+      if(hid) node.classList.add('is-hidden');
+      node.draggable = true;
       node.innerHTML = `<button class="node-del" title="Delete folder">×</button>
+        <button class="node-eye" title="${hid ? '숨김 — 누르면 아카이브에 다시 보입니다' : '보임 — 누르면 아카이브·불러오기·BATCH 에서 숨깁니다'}">${hid ? '◡' : '◉'}</button>
         <button class="node-rename" title="Rename folder title">RENAME</button>
-        <div class="node-icon" style="max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${title}</div><div class="node-name">${sub}</div>`;
+        <div class="node-icon" style="max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${title}</div><div class="node-name">${sub}${hid ? ' · HIDDEN' : ''}</div>`;
       node.addEventListener('dblclick', ()=>{ mgrCurrentPath = d.path; refreshMgr(); });
       node.querySelector('.node-del').addEventListener('click', (ev)=>{ ev.stopPropagation(); deleteFolder(d.path, d.name); });
       node.querySelector('.node-rename').addEventListener('click', (ev)=>{ ev.stopPropagation(); renameFolder(d.path, d.name); });
+      node.querySelector('.node-eye').addEventListener('click', (ev)=>{ ev.stopPropagation(); toggleFolderHidden(d.path, hid); });
+      // 폴더도 끌어서 다른 폴더(또는 .. UP)에 떨어뜨리면 그 안으로 들어간다
+      node.addEventListener('dragstart', ()=>{ node.classList.add('dragging'); window._mgrDragDir = d.path; });
+      node.addEventListener('dragend', ()=>{ node.classList.remove('dragging'); window._mgrDragDir = null; });
       addDropTarget(node, d.path);
       grid.appendChild(node);
     });
@@ -5258,7 +5328,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
     node.addEventListener('drop', async e=>{
       e.preventDefault();
       node.classList.remove('drop-hot');
-      const f = window._mgrDragFile;
+      const f = window._mgrDragFile, dir = window._mgrDragDir;
+      if(dir){ window._mgrDragDir = null; if(dir !== destFolderPath) await moveFolder(dir, destFolderPath); return; }
       if(!f) return;
       await moveFile(f, destFolderPath);
     });
@@ -5879,6 +5950,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const out = [];
     let items = [];
     try { items = await mgrList(path); } catch(e){ return out; }
+    if(items.some(i => i.type === 'file' && i.name === '.hidden')) return out;   // 숨긴 폴더
     const dirs  = items.filter(i=>i.type==='dir').sort((a,b)=>a.name.localeCompare(b.name));
     const files = items.filter(i=>i.type==='file' && /\.png$/i.test(i.name)).sort((a,b)=>a.name.localeCompare(b.name));
     out.push(...files);
