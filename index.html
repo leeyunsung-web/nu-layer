@@ -9291,12 +9291,42 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const a = simp.map(q => ({ x:q[0], y:q[1] }));
     if(a.length < 2) return a.map(p => ({ x:p.x, y:p.y, hi:null, ho:null }));
     const nodes = a.map(p => ({ x:p.x, y:p.y, hi:null, ho:null }));
-    // 캐트멀-롬의 접선을 베지어 핸들 길이(1/3)로 옮긴다.
+    // 어느 구간이 곧은지: 원래 점들이 두 앵커를 잇는 직선에서 거의 안 벗어나면 곧은 구간.
+    // (단순화가 남긴 점은 원래 점이므로 자리를 찾을 수 있다)
+    const idx = []; let k = 0;
+    for(const q of simp){ while(k < pts.length && (pts[k].x !== q[0] || pts[k].y !== q[1])) k++; idx.push(k < pts.length ? k : pts.length - 1); }
+    const straight = new Array(nodes.length - 1).fill(false);
+    const flatTol = Math.max(1.5, (tol == null ? 2 : tol) * 0.75);
+    for(let i = 0; i < nodes.length - 1; i++){
+      const A = a[i], B = a[i+1], dx = B.x - A.x, dy = B.y - A.y, l2 = dx*dx + dy*dy;
+      let far = 0;
+      for(let j = idx[i] + 1; j < idx[i+1]; j++){
+        const p = pts[j]; let t = l2 ? ((p.x-A.x)*dx + (p.y-A.y)*dy) / l2 : 0; t = t < 0 ? 0 : t > 1 ? 1 : t;
+        far = Math.max(far, Math.hypot(A.x + dx*t - p.x, A.y + dy*t - p.y));
+      }
+      straight[i] = far <= flatTol;
+    }
+    // 캐트멀-롬의 접선을 베지어 핸들 길이(1/3)로 옮긴다 -- 단, 꺾인 자리(35도 넘게 방향이 바뀜)는
+    // 뾰족한 앵커로 두고, 곧은 구간엔 핸들을 안 단다. 그래야 직선으로 그린 별이 손대는 순간 곡선이 안 된다.
+    const CORNER = Math.PI * 35 / 180;
     for(let i = 0; i < nodes.length; i++){
       const prev = a[i-1] || a[i], next = a[i+1] || a[i];
+      let corner = false;
+      if(i > 0 && i < nodes.length - 1){
+        const ux = a[i].x - prev.x, uy = a[i].y - prev.y, vx = next.x - a[i].x, vy = next.y - a[i].y;
+        const lu = Math.hypot(ux, uy), lv = Math.hypot(vx, vy);
+        if(lu > 1e-6 && lv > 1e-6){ const c = Math.max(-1, Math.min(1, (ux*vx + uy*vy) / (lu*lv))); corner = Math.acos(c) > CORNER; }
+      }
+      if(corner) continue;
+      // 거의 일직선 위의 중간 앵커(8도 안쪽)에 한쪽만 곧으면 양쪽 다 곧은 것으로 -- 한쪽 핸들만 남아 살짝 휘는 일을 막는다
+      if(i > 0 && i < nodes.length - 1 && (straight[i-1] || straight[i])){
+        const ux = a[i].x - prev.x, uy = a[i].y - prev.y, vx = next.x - a[i].x, vy = next.y - a[i].y;
+        const lu = Math.hypot(ux, uy), lv = Math.hypot(vx, vy);
+        if(lu > 1e-6 && lv > 1e-6 && Math.acos(Math.max(-1, Math.min(1, (ux*vx + uy*vy) / (lu*lv)))) < Math.PI * 8 / 180){ straight[i-1] = true; straight[i] = true; }
+      }
       const tx = (next.x - prev.x) / 6, ty = (next.y - prev.y) / 6;
-      if(i > 0)               nodes[i].hi = { x: nodes[i].x - tx, y: nodes[i].y - ty };
-      if(i < nodes.length-1)  nodes[i].ho = { x: nodes[i].x + tx, y: nodes[i].y + ty };
+      if(i > 0 && !straight[i-1])             nodes[i].hi = { x: nodes[i].x - tx, y: nodes[i].y - ty };
+      if(i < nodes.length-1 && !straight[i])  nodes[i].ho = { x: nodes[i].x + tx, y: nodes[i].y + ty };
     }
     return nodes;
   }
@@ -9441,6 +9471,41 @@ showLayerMenu(ev.clientX, ev.clientY, [
     a.points = s.points.map(p => ({ x:p.x, y:p.y, p:p.p }));
     a.closed = s.closed; a.edit = s.edit; a.pw = s.pw ? s.pw.slice() : null;
     if('cr' in s){ a.cr = s.cr || 0; a.join = s.join || null; }
+  }
+
+  // 펜 모양의 채움(색면)은 선에 딸려 있다. 선의 앵커를 고치면 채움도 같은 모양이 된다.
+  // live 동안은 다각형으로만 그리고(빠름), 손을 떼면 다시 굳힌다(마스크).
+  function linkedFillOf(a){
+    if(!a) return null;
+    if(a.fillId == null){
+      // 불러온 그림은 이어 놓은 표시가 없다 -- 같은 꼭짓점을 가진 다각형 채움을 찾아 잇는다 (한 번만)
+      a.fillId = -1;
+      if(a.closed && a.points && a.points.length > 2){
+        const P = a.points, n = P.length, mid = P[n >> 1];
+        for(let k = actions.length - 1; k >= 0; k--){
+          const f = actions[k];
+          if(f.type !== 'fill' || !f.poly || f.poly.length !== n || f.shapeOf != null) continue;
+          const ox = f.ox || 0, oy = f.oy || 0;
+          if(Math.abs(f.poly[0][0] + ox - P[0].x) > 0.6 || Math.abs(f.poly[0][1] + oy - P[0].y) > 0.6) continue;
+          if(Math.abs(f.poly[n >> 1][0] + ox - mid.x) > 0.6 || Math.abs(f.poly[n >> 1][1] + oy - mid.y) > 0.6) continue;
+          a.fillId = f.id; f.shapeOf = a.id; break;
+        }
+      }
+    }
+    if(a.fillId < 0) return null;
+    return actions.find(x => x.type === 'fill' && x.id === a.fillId) || null;
+  }
+  function syncLinkedFill(a, freeze){
+    const f = linkedFillOf(a);
+    if(!f) return null;
+    if(!a.closed || !a.points || a.points.length < 3) return f;
+    f.poly = a.points.map(p => [p.x, p.y]);
+    f.ox = 0; f.oy = 0;
+    f.m = null; f._mask = null; f._maskFor = null; f._mb = null;
+    let sx = 0, sy = 0; for(const p of a.points){ sx += p.x; sy += p.y; }
+    f.x = sx / a.points.length; f.y = sy / a.points.length;
+    if(freeze) freezeVectorFillNow(f);
+    return f;
   }
 
   let editBefore = null;   // 한 번의 조작을 시작할 때의 상태
@@ -9704,14 +9769,18 @@ showLayerMenu(ev.clientX, ev.clientY, [
     }
   }
   let pvRaf = 0, pvRafLayer = null;
+  let pvRafFillLayer = null;
   function pvLive(a){
     syncStrokeFromNodes(a);
     a._bb = null; a._bbFor = null;
     pvRafLayer = a.layer;
+    const lf = syncLinkedFill(a, false);
+    pvRafFillLayer = lf ? lf.layer : null;
     if(pvRaf) return;
     pvRaf = requestAnimationFrame(() => {
       pvRaf = 0;
       if(pvRafLayer != null && layerById(pvRafLayer)){ invalidateHiRes(); renderSingleLayer(pvRafLayer); }
+      if(pvRafFillLayer != null && pvRafFillLayer !== pvRafLayer && layerById(pvRafFillLayer)) renderSingleLayer(pvRafFillLayer);
       pvOverlay();
     });
   }
@@ -9720,6 +9789,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
     syncStrokeFromNodes(a);
     a._bb = null; a._bbFor = null;
     invalidateHiRes();
+    const lf = syncLinkedFill(a, true);
+    if(lf && lf.layer !== a.layer && layerById(lf.layer)) renderSingleLayer(lf.layer);
     commitEdit(a, label);
     invalidateSnapCache();
     pvOverlay();
@@ -13280,7 +13351,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     }
     if(undoneAction.type === 'strokeEdit'){
       const t = actions.find(a => a.id === undoneAction.targetId);
-      if(t){ restoreStroke(t, undoneAction.before); renderSingleLayer(t.layer); }
+      if(t){ restoreStroke(t, undoneAction.before); renderSingleLayer(t.layer); const lf = syncLinkedFill(t, true); if(lf && lf.layer !== t.layer && layerById(lf.layer)) renderSingleLayer(lf.layer); }
       if(nodeSel && nodeSel.id === undoneAction.targetId){
         const tt = actions.find(x => x.id === undoneAction.targetId);
         if(!tt || !tt.nodes || [...nodeSel.sel].some(i => i >= tt.nodes.length)) nodeSel.sel.clear();
@@ -13458,7 +13529,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     }
     if(redoneAction.type === 'strokeEdit'){
       const t = actions.find(a => a.id === redoneAction.targetId);
-      if(t){ restoreStroke(t, redoneAction.after); renderSingleLayer(t.layer); }
+      if(t){ restoreStroke(t, redoneAction.after); renderSingleLayer(t.layer); const lf = syncLinkedFill(t, true); if(lf && lf.layer !== t.layer && layerById(lf.layer)) renderSingleLayer(lf.layer); }
       actions.push(redoneAction);
       if(nodeSel && nodeSel.id === redoneAction.targetId){
         const tt = actions.find(x => x.id === redoneAction.targetId);
@@ -14340,6 +14411,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       return strokeAct;
     }
     const fill = makeShapeFill(strokeAct.points, penFillColor);
+    if(wantLine){ fill.shapeOf = strokeAct.id; strokeAct.fillId = fill.id; }   // 선을 고치면 채움도 따라온다
     const next = actions.slice();
     next.push(fill);
     if(wantLine) next.push(strokeAct);
