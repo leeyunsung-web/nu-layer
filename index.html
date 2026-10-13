@@ -14355,6 +14355,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         clearTimeout(clickTimer);
         clickTimer = setTimeout(() => {
           swArmed = (swArmed === tgt) ? null : tgt;
+          if(typeof nuColorToVary !== 'undefined') nuColorToVary = false;
           syncSwatches();
           if(swArmed) toast((tgt === 'line' ? 'LINE' : 'FILL') + ' 칸을 골랐습니다 — 팔레트 색을 누르면 들어갑니다.');
         }, 220);
@@ -14462,9 +14463,16 @@ showLayerMenu(ev.clientX, ev.clientY, [
     nuColorWin.document.open(); nuColorWin.document.write(NU_COLOR_HTML); nuColorWin.document.close();
   }
   if($('nuColorBtn')) $('nuColorBtn').addEventListener('click', openNuColor);
+  // NU VARY 가 NU COLOR 를 청했으면 거기서 누른 색은 NU VARY 로 넘긴다 (이 창의 칸을 누르면 다시 이 창으로)
+  let nuColorToVary = false;
   window.addEventListener('message', e => {
     const d = e.data;
     if(!d || d.type !== 'nucolor' || typeof d.hex !== 'string') return;
+    if(nuColorToVary && typeof nvWin !== 'undefined' && nvWin && !nvWin.closed){
+      try { nvWin.postMessage({ type:'nucolor', hex: d.hex }, '*'); } catch(err){}
+      return;
+    }
+    nuColorToVary = false;
     if(typeof pickTargetColor === 'function') pickTargetColor(d.hex);
   });
   // 마스터 모드로 들어오면 같이 연다
@@ -19445,7 +19453,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // 나중에 DIRECT(A) 로 앵커를 집어 고칠 수 있다.
   function nuVaryStrokeAct(item, layerId){
     const act = { type:'stroke', id:++actionCounter, tool:'brush',
-                  color: strokeColor, width: strokeWidthNow(),
+                  color: (typeof item.line === 'string' && item.line) ? item.line : strokeColor, width: strokeWidthNow(),
                   texture: currentTexture, grain: currentGrain,
                   seed: (Math.random()*2147483647)|0,
                   nodes: item.nodes.map(n => ({ x:n.x, y:n.y, sm: !!n.sm,
@@ -19457,15 +19465,25 @@ showLayerMenu(ev.clientX, ev.clientY, [
     return act;
   }
 
+  // NU VARY 에서 온 것은 제 폴더("NU VARY n")의 새 레이어에 올린다 -- 기존 그림과 섞이지 않게.
+  let nuVaryFolderN = 0;
   function nuVaryToCanvas(items){
+    const l = createLayer('NU VARY ' + (++nuVaryFolderN));
+    const idx = layers.findIndex(x => x.id === activeLayerId);
+    layers.splice(idx + 1, 0, l);
+    activeLayerId = l.id;
+    createFolderWithLayers([l]);
+    const f = folders.find(x => x.id === l.folderId); if(f) f.name = 'NU VARY ' + nuVaryFolderN;
+    lastFill = null;                       // 채움 레이어도 새로 (남의 VFILL 레이어를 안 쓴다)
     const al = activeLayer();
+    const keep = { fill: penFillColor, lineNone };
     let put = 0;
     // 한 결과가 여러 획으로 이루어져 있으면(그림 전체 변주) 낱낱이 펴서 올린다
     const flat = [];
     for(const it of items){
       if(!it) continue;
       if(Array.isArray(it.paths) && it.paths.length){
-        for(const q of it.paths) if(q && q.nodes) flat.push(q);
+        for(const q of it.paths) if(q && q.nodes) flat.push(Object.assign({ line: it.line, fill: it.fill }, q));
       } else if(it.nodes) flat.push(it);
     }
     for(const it of flat){
@@ -19480,11 +19498,18 @@ showLayerMenu(ev.clientX, ev.clientY, [
         nodes: it.nodes.map(n => ({ x:n.x+ox, y:n.y+oy, sm:n.sm,
                                     hi: n.hi ? { x:n.hi.x+ox, y:n.hi.y+oy } : null,
                                     ho: n.ho ? { x:n.ho.x+ox, y:n.ho.y+oy } : null })) };
-      const act = nuVaryStrokeAct(moved, al.id);
+      // NU VARY 에서 고른 선·면 색 (없으면 지금 칸의 색)
+      if('fill' in it || 'line' in it){
+        penFillColor = (typeof it.fill === 'string' && it.fill) ? it.fill : null;
+        lineNone = it.line === null;
+      }
+      const act = nuVaryStrokeAct(Object.assign(moved, { line: it.line }), al.id);
       const made = commitShapeWithFill(act, !!moved.closed);
-      if(made) put++;
+      if(made || (moved.closed && penFillColor)) put++;
     }
-    toast(put ? ('NU VARY 에서 ' + put + '개를 캔버스에 올렸습니다.')
+    penFillColor = keep.fill; lineNone = keep.lineNone; syncSwatches();
+    renderLayersPanel();
+    toast(put ? ('NU VARY 에서 ' + put + '개를 ' + (f ? f.name : '새 폴더') + ' 폴더에 올렸습니다.')
               : 'NU VARY 에서 받은 것이 없습니다.');
   }
 
@@ -19521,6 +19546,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
   window.addEventListener('message', (e) => {
     const d = e.data;
+    if(d && d.type === 'nuvary-nucolor'){ nuColorToVary = true; openNuColor(); return; }
     if(!d || d.type !== 'nuvary-out' || !Array.isArray(d.items)) return;
     if(d.mode === 'archive') nuVaryToArchive(d.items);
     else nuVaryToCanvas(d.items);
