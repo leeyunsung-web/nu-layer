@@ -11418,6 +11418,24 @@ showLayerMenu(ev.clientX, ev.clientY, [
     return true;
   }
 
+  // 도형 초안은 덧그림판(lassoOverlay)에 그리는데, 펜 안내·올가미·스냅 표시 등 여러 곳이 그 판을
+  // 통째로 지운다. 그래서 다른 메뉴를 누르면 초안이 '사라진' 것처럼 보였다 (초안 자체는 남아 있었다).
+  // 판을 지우는 모든 곳 뒤에 초안을 다시 그려 넣는다.
+  (function keepShapeDraftVisible(){
+    const oc = $('lassoOverlay'); if(!oc) return;
+    const c = oc.getContext('2d'); if(!c || c._shapeKeep) return;
+    const orig = c.clearRect.bind(c);
+    let busy = false;
+    c.clearRect = function(x, y, w, h){
+      orig(x, y, w, h);
+      if(shapeDraft && !busy && w >= oc.width && h >= oc.height){
+        busy = true;
+        try { drawShapeDraft(); } catch(e){} finally { busy = false; }
+      }
+    };
+    c._shapeKeep = true;
+  })();
+
   function shapeCancel(){
     if(!shapeDraft) return;
     shapeDraft = null;
@@ -13668,6 +13686,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         if(cur) cur.classList.add('active');
         return;
       }
+      if(shapeDraft && typeof shapeConfirm === 'function'){ shapeConfirm(); toast('도형을 놓았습니다.'); }   // 다른 도구로 바꿔도 초안은 버리지 않고 놓는다
       const prevTool = currentTool;
       currentTool = btn.dataset.tool;
       if(currentTool !== 'lasso') clearLasso();
