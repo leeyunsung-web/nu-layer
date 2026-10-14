@@ -459,6 +459,8 @@
   }
   .layer-row.hidden-layer .layer-name { opacity: 0.35; text-decoration: line-through; }
   .layer-row .layer-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .layer-row .layer-clip { color: #1f7bff; cursor: pointer; font-weight: 700; }
+  .layer-row .layer-clip:hover { text-decoration: line-through; }
   .layer-row .layer-mini {
     font-size: 10px; padding: 2px 6px; border-radius: 5px; border: 1px solid var(--border);
     background: var(--panel-alt); cursor: pointer; color: var(--ink-dim);
@@ -2091,6 +2093,14 @@ showLayerMenu(ev.clientX, ev.clientY, [
       attachInlineRename(name, ()=>l.name, v=>{ l.name = v; });
       row.appendChild(name);
 
+      if(l.clipTo != null){
+        const clipTag = document.createElement('span');
+        clipTag.className = 'layer-mini layer-clip';
+        clipTag.textContent = '✂';
+        clipTag.title = layerClipStroke(l) ? '마스크 레이어 — 모양 안에만 보입니다. 누르면 마스크 해제 (그린 것은 남습니다)' : '마스크 모양이 없어졌습니다 — 누르면 표시를 지웁니다';
+        clipTag.addEventListener('click', ev => { ev.stopPropagation(); releaseClip(l.id); });
+        row.appendChild(clipTag);
+      }
       const count = document.createElement('span');
       count.className = 'layer-mini';
       count.style.cursor = 'default';
@@ -2133,6 +2143,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
             fn: ()=> restoreErasedToLayer(l.id) },
           { label: '⬡ 외곽 라인만 따내기 → 새 선 레이어',
             fn: ()=> outlineFillLayer(l.id) },
+          ...(l.clipTo != null ? [{ label: '✂ 마스크 해제 (그린 것은 남김)', fn: ()=> releaseClip(l.id) }] : []),
           { label: selectedLayerIds.size > 1 ? ('📁 NEW FOLDER WITH ' + selectedLayerIds.size + ' SELECTED LAYERS') : '📁 NEW FOLDER WITH THIS LAYER',
             fn: ()=> createFolderWithLayers(selectedLayerIds.size > 1 ? layers.filter(x=>selectedLayerIds.has(x.id)) : [l]) }
         ];
@@ -4017,6 +4028,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
                     pts: packPoints(a.points) };
         if(a.nd){ o.nd = a.nd; if(a.cl) o.cl = 1; if(a.cr) o.cr = a.cr; }
         if(a.jn) o.jn = a.jn;
+        if(a.mk != null) o.mk = a.mk;
         // Recipes built by buildRecipeForBBox already use the compact keys
         // (tx/g/sd) — checking only a.texture DROPPED the texture here, which
         // is why spray strokes came back as smooth after a save+reload.
@@ -6368,8 +6380,11 @@ showLayerMenu(ev.clientX, ev.clientY, [
     t.left = s.left; t.top = s.top; t.width = s.width; t.height = s.height;
     t.display = s.display;                       // 판과 함께 보이고 함께 숨는다
   }
+  let liveClipSaved = false;   // 라이브 판에 마스크 클립을 걸어 둔 상태 (clip 은 restore 로만 풀린다)
+  function liveUnclip(c){ if(liveClipSaved){ c.restore(); liveClipSaved = false; } }
   function clearLiveCanvas(){
     const c = liveCanvas.getContext('2d');
+    liveUnclip(c);
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.clearRect(0, 0, liveCanvas.width, liveCanvas.height);
   }
@@ -6379,9 +6394,11 @@ showLayerMenu(ev.clientX, ev.clientY, [
     if(!a || hiresShownK <= 1 || preciseCanvas.style.display === 'none') return;
     const k = hiresShownK;
     const c = liveCanvas.getContext('2d');
+    liveUnclip(c);
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.clearRect(0, 0, liveCanvas.width, liveCanvas.height);
     if(hiresRect) c.translate(-hiresRect.x * k, -hiresRect.y * k);
+    { const cm = layerClipStroke(activeLayer()); if(cm){ c.save(); liveClipSaved = true; clipPathOf(c, cm, k, 0, 0); c.clip(); } }
     const heavy = (a.texture && a.texture !== 'smooth' && a.texture !== 'plotter') && k >= 3;
     if(a.tool === 'eraser'){
       const pts = a.points;
@@ -6482,6 +6499,12 @@ showLayerMenu(ev.clientX, ev.clientY, [
   }
 
   function renderLayerHiRes(l, k, target){
+    const cm = layerClipStroke(l);
+    if(!cm) return renderLayerHiRes0(l, k, target);
+    target.save(); clipPathOf(target, cm, k, 0, 0); target.clip();
+    try { renderLayerHiRes0(l, k, target); } finally { target.restore(); }
+  }
+  function renderLayerHiRes0(l, k, target){
     // 페인트통(마스크 없는 채움)이 섞인 레이어는 배율대로 다시 번지게 하면
     // 픽셀이 k² 배라 채움 몇 개로 초 단위가 된다. 그 레이어만 1080 결과를
     // 늘려 깔고, 그 위에 선은 배율대로 다시 그려 또렷하게 덮는다 -- 통째로
@@ -6734,7 +6757,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     // 채우기·이미지는 흐리게 깔아 위치만 알린다. 안 그리면 어느 면 안의
     // 선인지 모르고, 진하게 그리면 선이 묻힌다.
     dctx.globalAlpha = 0.28;
-    for(const l of layers) if(l.visible) dctx.drawImage(l.canvas, 0, 0);
+    for(const l of layers) if(l.visible) drawLayerImage(dctx, l);
     dctx.globalAlpha = 1;
     // 지우개가 지운 자리는 정확한 선에서도 지워져 있어야 한다. 굽기를
     // 거치면 살아남은 획만 남는다.
@@ -6760,7 +6783,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
     for(const a of acts){
       if(a.tool === 'eraser' || !vis.has(a.layer)) continue;
       if(!a.points || !a.points.length) continue;
+      const cm = layerClipStroke(layerById(a.layer));
+      if(cm){ px.save(); clipPathOf(px, cm, 1, 0, 0); px.clip(); }
       strokePlotterPath(px, a.points, Math.max(0.8, a.width || 1), a.color || '#111', false);
+      if(cm) px.restore();
     }
     preciseCanvas.style.display = '';
     syncOverlayRes(k);
@@ -6783,6 +6809,14 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const c = oc.getContext('2d');
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.clearRect(0, 0, W, H);
+    // 마스크 레이어가 활성이면 그 모양을 점선으로 -- 어디까지가 안쪽인지 보이게
+    { const cm = layerClipStroke(activeLayer());
+      if(cm){
+        const z0 = (typeof viewZoom === 'number' && viewZoom) || 1;
+        c.save(); clipPathOf(c, cm, 1, 0, 0);
+        c.setLineDash([6/z0, 5/z0]); c.lineWidth = 1.5/z0; c.strokeStyle = 'rgba(31,123,255,0.9)'; c.stroke();
+        c.restore();
+      } }
     if(drawFrame.w >= 0.999 && drawFrame.h >= 0.999) return;
     const fr = drawFrameRect();
     const z = (typeof viewZoom === 'number' && viewZoom) || 1;
@@ -6808,6 +6842,68 @@ showLayerMenu(ev.clientX, ev.clientY, [
     if(typeof toneplotDirty === 'function') toneplotDirty();
   }
 
+  /* ---------- 클리핑 마스크 ----------
+     레이어에 clipTo(닫힌 펜 획의 id)가 있으면 그 레이어는 그 모양 안만 보인다.
+     레이어 비트맵 자체는 그대로 두고(그리기 길은 하나도 안 바꾼다) 합성·고해상도·
+     저장할 때 모양대로 잘라 얹는다. 마스크 획의 앵커를 고치면 다음 합성부터 따라온다. */
+  function layerClipStroke(l){
+    if(!l || l.clipTo == null) return null;
+    const a = actions.find(x => x.id === l.clipTo && x.type === 'stroke');
+    if(!a || !a.points || a.points.length < 3) return null;
+    return a;
+  }
+  // 마스크 모양을 경로로 깐다 (beginPath 포함). k = 배율, ox/oy = 더한 자리
+  function clipPathOf(ctx, a, k, ox, oy){
+    k = k || 1; ox = ox || 0; oy = oy || 0;
+    ctx.beginPath();
+    const ns = (typeof pvNodesOf === 'function') ? pvNodesOf(a) : null;
+    if(ns && ns.length >= 3){
+      const E = expandCorners(ns, true, a.cr || 0), L = E.length;
+      ctx.moveTo(E[0].x * k + ox, E[0].y * k + oy);
+      for(let i = 0; i < L; i++){
+        const A = E[i], B = E[(i + 1) % L], c1 = A.ho || A, c2 = B.hi || B;
+        ctx.bezierCurveTo(c1.x * k + ox, c1.y * k + oy, c2.x * k + ox, c2.y * k + oy, B.x * k + ox, B.y * k + oy);
+      }
+    } else {
+      const Pn = a.points;
+      ctx.moveTo(Pn[0].x * k + ox, Pn[0].y * k + oy);
+      for(let i = 1; i < Pn.length; i++) ctx.lineTo(Pn[i].x * k + ox, Pn[i].y * k + oy);
+    }
+    ctx.closePath();
+  }
+  // 레이어 비트맵을 얹는다. 마스크가 있으면 그 모양 안만.
+  function drawLayerImage(ctx, l, dx, dy){
+    const m = layerClipStroke(l);
+    if(!m){ ctx.drawImage(l.canvas, dx || 0, dy || 0); return; }
+    ctx.save(); clipPathOf(ctx, m, 1, 0, 0); ctx.clip(); ctx.drawImage(l.canvas, dx || 0, dy || 0); ctx.restore();
+  }
+  // 마스크 레이어 만들기 / 들어가기: 이미 그 모양의 마스크 레이어가 있으면 그걸 고른다
+  function enterClipLayer(maskAct){
+    if(!maskAct || !maskAct.closed){ toast('닫힌 모양만 마스크가 됩니다 — 첫 앵커를 눌러 닫은 패스여야 해요.'); return null; }
+    let l = layers.find(x => x.clipTo === maskAct.id);
+    if(!l){
+      const host = layerById(maskAct.layer);
+      l = createLayer('MASK · ' + (host ? host.name : 'SHAPE'));
+      l.clipTo = maskAct.id;
+      const idx = layers.findIndex(x => x.id === maskAct.layer);
+      layers.splice(Math.max(0, idx) + 1, 0, l);                 // 모양 레이어 바로 위
+      if(host && host.folderId != null) l.folderId = host.folderId;
+      toast('마스크 레이어를 만들었습니다 — 이제 그리는 것은 이 모양 안에만 보입니다. ✂ 를 누르면 해제.');
+    } else toast('마스크 레이어 "' + l.name + '" 로 들어갑니다.');
+    activeLayerId = l.id;
+    if(typeof nodeSel !== 'undefined') nodeSel = null;
+    renderLayersPanel(); compositeLayers();
+    if(typeof pvOverlay === 'function') pvOverlay();
+    return l;
+  }
+  function releaseClip(lid){
+    const l = layers.find(x => x.id === lid); if(!l || l.clipTo == null) return;
+    l.clipTo = null;
+    if(/^MASK · /.test(l.name)) l.name = l.name.replace(/^MASK · /, '');
+    toast('마스크를 풀었습니다 — 그린 것은 그대로, 잘림만 없어집니다.');
+    renderLayersPanel(); compositeLayers();
+  }
+
   function compositeLayers(){
     if(preciseViewOn()){
       compositePrecise();
@@ -6820,7 +6916,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     dctx.globalCompositeOperation = 'source-over';
     dctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
     for(const l of layers){
-      if(l.visible) dctx.drawImage(l.canvas, 0, 0);
+      if(l.visible) drawLayerImage(dctx, l);
     }
     dctx.restore();
     refreshFrameGuide();
@@ -7507,7 +7603,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     c.width = drawCanvas.width; c.height = drawCanvas.height;
     const cx = c.getContext('2d', { willReadFrequently: true });
     for(const l of layers){
-      if(ids.includes(l.id)) cx.drawImage(l.canvas, 0, 0);
+      if(ids.includes(l.id)) drawLayerImage(cx, l);
     }
     return c;
   }
@@ -10281,6 +10377,16 @@ showLayerMenu(ev.clientX, ev.clientY, [
     pvOverlay();
   }
   const q2 = p => p;
+  // 닫힌 모양을 더블클릭하면 그 모양 안에 그리는 마스크 레이어로 (펜·직접 선택에서)
+  drawCanvas.addEventListener('dblclick', e => {
+    if(!(currentTool === 'pen' || currentTool === 'node') || penDraft) return;
+    const p = getPos(e); if(!p) return;
+    const a = pvPick(p);
+    if(!a || !a.closed){ return; }
+    e.preventDefault();
+    pvDrag = null;
+    enterClipLayer(a);
+  });
   function pvMove(p, e){
     pvHover = p; pvAlt = e.altKey; pvShift = e.shiftKey;
     if(pvDrag){
@@ -10540,7 +10646,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
     if(!on){ if(hint) hint.textContent = ''; return; }
     const k = pvK(), BLUE = '#1f7bff';
     c.save();
-    // 그리는 중인 패스: 실제 굵기·색으로
+    // 그리는 중인 패스: 실제 굵기·색으로 (마스크 레이어면 모양 안만)
+    const clipM = layerClipStroke(activeLayer());
+    if(penDraft && penDraft.nodes.length && clipM){ c.save(); clipPathOf(c, clipM, 1, 0, 0); c.clip(); }
     if(penDraft && penDraft.nodes.length){
       const ns = penDraft.nodes;
       if(ns.length > 1){
@@ -10556,6 +10664,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
           c.lineJoin = 'round';
         }
       }
+      if(clipM) c.restore();
       // 다음 선 미리보기 (마지막 앵커 → 커서)
       if(pvHover && !pvDrag){
         const it = pvIntent(pvHover, pvAlt);
@@ -10666,6 +10775,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     nl.visible = src.visible;
     if(src.folderId != null) nl.folderId = (opts && opts.folderId != null) ? opts.folderId : src.folderId;
     if(src.asFill) nl.asFill = true;
+    if(src.clipTo != null) nl.clipTo = src.clipTo;
     // 바로 위에
     const idx = layers.findIndex(x => x.id === src.id);
     layers.splice(idx + 1, 0, nl);
@@ -11561,7 +11671,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const tmp = document.createElement('canvas');
     tmp.width = drawCanvas.width; tmp.height = drawCanvas.height;
     const tc = tmp.getContext('2d');
-    for(const l of t.set) if(l.visible) tc.drawImage(l.canvas, 0, 0);
+    for(const l of t.set) if(l.visible) drawLayerImage(tc, l);
     const bb = getBBox(tmp);
     if(!bb){ toast('옮길 그림이 없습니다.'); return; }
     const cx = bb.minX + bb.w/2, cy = bb.minY + bb.h/2;
@@ -12217,9 +12327,9 @@ showLayerMenu(ev.clientX, ev.clientY, [
     base.clearRect(0,0,liveBase.width,liveBase.height);
     let seenActive = false;
     for(const l of layers){
-      if(l.id === al.id){ seenActive = true; base.drawImage(l.canvas, 0, 0); continue; }
+      if(l.id === al.id){ seenActive = true; base.drawImage(l.canvas, 0, 0); continue; }   // 활성 레이어는 합성할 때 잘린다
       if(!l.visible) continue;
-      (seenActive ? a : b).drawImage(l.canvas, 0, 0);
+      drawLayerImage(seenActive ? a : b, l);
     }
   }
   // ---- 프레임당 한 번만 그리기 ----
@@ -12282,8 +12392,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
     dctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
     for(const l of layers){
       if(!l.visible) continue;
-      if(movingLayer.ids.has(l.id)) dctx.drawImage(l.canvas, movingLayer.dx, movingLayer.dy);
-      else dctx.drawImage(l.canvas, 0, 0);
+      if(movingLayer.ids.has(l.id)) drawLayerImage(dctx, l, movingLayer.dx, movingLayer.dy);
+      else drawLayerImage(dctx, l);
     }
     dctx.restore();
     updateNavPreview();
@@ -12374,7 +12484,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const tmp = document.createElement('canvas');
     tmp.width = drawCanvas.width; tmp.height = drawCanvas.height;
     const tc = tmp.getContext('2d');
-    for(const l of t.set) if(l.visible) tc.drawImage(l.canvas, 0, 0);
+    for(const l of t.set) if(l.visible) drawLayerImage(tc, l);
     const bb = getBBox(tmp);
     if(!bb){ toast('뒤집을 그림이 없습니다.'); return false; }
     const axis = bb.minX + bb.w/2;
@@ -15109,6 +15219,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const result = [];
     const only = (onlyLayerIds && onlyLayerIds.size) ? onlyLayerIds : null;
     const layerIndexOf = a => Math.max(0, layers.findIndex(l=>l.id===a.layer));
+    const clipIds = new Set(layers.map(l => l.clipTo).filter(v => v != null));   // 마스크로 쓰이는 획
     actions.forEach(a=>{
       if(only && (a.type==='stroke' || a.type==='fill' || a.type==='layerRecolor' || a.type==='image')
               && !only.has(a.layer)) return;
@@ -15145,6 +15256,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
             if(a.cr) so.cr = a.cr;
           }
           if(a.join) so.jn = a.join;
+          if(clipIds.has(a.id)) so.mk = a.id;                 // 어느 레이어의 마스크인지 (meta.layers[].cl 과 짝)
           result.push(so);
         }
       } else if(a.type==='fill'){
@@ -15222,6 +15334,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       if(l && l.asFill) m.af = 1;
       if(l && l.visible === false) m.v = 0;
       if(l && l.isTrace) m.tr = 1;
+      if(l && l.clipTo != null && clipIds.has(l.clipTo)) m.cl = l.clipTo;
       return m;
     });
     const foldersMeta = folders
@@ -15583,7 +15696,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
               points: a.points.map(p=>({ x:p.x + offX, y:p.y + offY, p:p.p })),
               layer: layerIdFor(a),
               ...(a.nd ? { nd: a.nd, cl: a.cl ? 1 : 0, cr: a.cr || 0 } : {}),
-              ...(a.jn ? { join: a.jn } : {})
+              ...(a.jn ? { join: a.jn } : {}),
+              ...(a.mk != null ? { mk: a.mk } : {})
             });
           } else if(a.type === 'fill'){
             const act = {
@@ -15624,6 +15738,14 @@ showLayerMenu(ev.clientX, ev.clientY, [
           const baked = bakeErasers(added, a => a.layer, { preserveTextured: true });
           baked.forEach(a => { a.id = ++actionCounter; });
           actions.push(...baked);
+          // 마스크 레이어 잇기 (meta.layers[].cl ↔ 획의 mk)
+          if(meta && Array.isArray(meta.layers)){
+            for(const ml of meta.layers){
+              if(ml.cl == null || !liMap.has(ml.li)) continue;
+              const m = baked.find(x => x.type === 'stroke' && x.mk === ml.cl);
+              if(m) liMap.get(ml.li).clipTo = m.id;
+            }
+          }
           const repairFills = baked.filter(x => x.type === 'fill' && x.vfRepair);
           repairFills.forEach(x => { delete x.vfRepair; });
           // 먼저 썸네일에서 결과를 떠 온다 -- 저장 시점의 그림 그 자체다.
@@ -15720,7 +15842,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     const temp = document.createElement('canvas');
     temp.width = drawCanvas.width; temp.height = drawCanvas.height;
     const tc = temp.getContext('2d');
-    for(const l of layers){ if(memberIds.has(l.id) && l.visible && !l.isTrace) tc.drawImage(l.canvas, 0, 0); }
+    for(const l of layers){ if(memberIds.has(l.id) && l.visible && !l.isTrace) drawLayerImage(tc, l); }
     let bbox = getBBox(temp);
     if(!bbox){ toast('Folder layers are empty.'); return; }
     // The fill tool splits every fill onto its OWN layer, which (on older
@@ -15750,7 +15872,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     if(extraFill.length){
       extraFill.forEach(l=> memberIds.add(l.id));
       tc.clearRect(0, 0, temp.width, temp.height);
-      for(const l of layers){ if(memberIds.has(l.id)) tc.drawImage(l.canvas, 0, 0); }
+      for(const l of layers){ if(memberIds.has(l.id)) drawLayerImage(tc, l); }
       bbox = getBBox(temp) || bbox;
     }
     const cropped = cropCanvas(temp, bbox);
@@ -18509,6 +18631,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       if(a.type === 'stroke'){
         acts.push({ t:'s', tool:a.tool, color:a.color, width:a.width,
           texture:a.texture || 'smooth', grain: a.grain == null ? 50 : a.grain, seed: a.seed || 0,
+          ...(layers.some(l => l.clipTo === a.id) ? { mk: a.id } : {}),
           layer:a.layer, points:a.points.map(p=> p.p == null
             ? [Math.round(p.x*10)/10, Math.round(p.y*10)/10]
             : [Math.round(p.x*10)/10, Math.round(p.y*10)/10, Math.round(p.p*100)/100]) });
@@ -18545,7 +18668,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
     return JSON.stringify({
       v: 1, ts: Date.now(),
       layers: layers.map(l=>({ id:l.id, name:l.name, visible:l.visible, f: l.folderId || 0,
-                                 af: l.asFill ? 1 : 0, tr: l.isTrace ? 1 : 0 })),
+                                 af: l.asFill ? 1 : 0, tr: l.isTrace ? 1 : 0, ...(l.clipTo != null ? { cl: l.clipTo } : {}) })),
       folders: folders.map(f=>({ id:f.id, name:f.name, c: f.collapsed ? 1 : 0 })),
       active: activeLayerId,
       acts
@@ -18588,6 +18711,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         if(ld.f) l.folderId = ld.f;
         if(ld.af) l.asFill = true;
         if(ld.tr){ l.isTrace = true; traceLayerId = l.id; }
+        if(ld.cl != null) l._clipKey = ld.cl;                 // 획이 들어온 뒤 잇는다
         return l;
       });
       layerIdCounter = Math.max(layerIdCounter, ...st.layers.map(l=>l.id));
@@ -18604,9 +18728,11 @@ showLayerMenu(ev.clientX, ev.clientY, [
       let pendingImgs = 0;
       for(const a of st.acts){
         if(a.t === 's'){
-          actions.push({ type:'stroke', id:++actionCounter, tool:a.tool, color:a.color, width:a.width,
+          const so = { type:'stroke', id:++actionCounter, tool:a.tool, color:a.color, width:a.width,
             texture:a.texture, grain:a.grain, seed:a.seed, layer:a.layer,
-            points:a.points.map(p=>({ x:p[0], y:p[1], p:p[2] })) });
+            points:a.points.map(p=>({ x:p[0], y:p[1], p:p[2] })) };
+          if(a.mk != null){ so.mk = a.mk; so.closed = true; for(const l of layers) if(l._clipKey === a.mk){ l.clipTo = so.id; delete l._clipKey; } }
+          actions.push(so);
         } else if(a.t === 'f'){
           const o = { type:'fill', id:++actionCounter, x:a.x, y:a.y, color:a.color,
                       tolerance:a.tolerance, layer:a.layer };
