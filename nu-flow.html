@@ -1435,8 +1435,15 @@ const camSave=(()=>{ let t=0; return ()=>{ clearTimeout(t); t=setTimeout(()=>{ s
 function camZoomAt(nz,sx,sy){ const z0=G.camZ, z=clamp(nz,camLim().zmin,3.5), sw=stEl.clientWidth, sh=stEl.clientHeight, tx=G.camX*sw, ty=G.camY*sh; G.camX=(sx-(sx-tx)*z/z0)/sw; G.camY=(sy-(sy-ty)*z/z0)/sh; G.camZ=z; camSave(); }   // 손가락 아래 자리를 붙잡은 채 줌
 const relS=e=>{ const r=stEl.getBoundingClientRect(); return [e.clientX-r.left-stEl.clientWidth/2, e.clientY-r.top-stEl.clientHeight/2]; };
 stEl.addEventListener("wheel",e=>{ e.preventDefault(); const s=relS(e); camZoomAt(G.camZ*Math.exp(-e.deltaY*(e.deltaMode?0.05:0.0015)),s[0],s[1]); },{passive:false});
-const TCH=new Map(); let PAN=null, PINCH=null;
-stEl.addEventListener("pointerdown",e=>{ if(e.pointerType==="touch"){ TCH.set(e.pointerId,relS(e)); if(TCH.size===2){ const [a,b]=[...TCH.values()]; PINCH={d:HY(a[0]-b[0],a[1]-b[1])||1, m:[(a[0]+b[0])/2,(a[1]+b[1])/2], z:G.camZ, x:G.camX, y:G.camY}; for(const id of TCH.keys()) try{ cv.dispatchEvent(new PointerEvent("pointercancel",{pointerId:id,bubbles:true})); }catch(_){} e.stopPropagation(); e.preventDefault(); return; } }
+const TCH=new Map(); let PAN=null, PINCH=null, TPZ=null;
+const HAS_T=("ontouchstart" in window);
+const tRel=t=>{ const r=stEl.getBoundingClientRect(); return [t.clientX-r.left-stEl.clientWidth/2, t.clientY-r.top-stEl.clientHeight/2]; };
+stEl.addEventListener("touchstart",e=>{ if(e.touches.length>=2){ const a=tRel(e.touches[0]), b=tRel(e.touches[1]); TPZ={d:HY(a[0]-b[0],a[1]-b[1])||1, m:[(a[0]+b[0])/2,(a[1]+b[1])/2], z:G.camZ, x:G.camX, y:G.camY}; e.preventDefault(); } },{passive:false,capture:true});   // 두 손가락: 모았다 펼치면 줌, 같이 밀면 옮기기
+stEl.addEventListener("touchmove",e=>{ if(!TPZ || e.touches.length<2) return; e.preventDefault(); const a=tRel(e.touches[0]), b=tRel(e.touches[1]), d=HY(a[0]-b[0],a[1]-b[1])||1, m=[(a[0]+b[0])/2,(a[1]+b[1])/2], sw=stEl.clientWidth, sh=stEl.clientHeight, z=clamp(TPZ.z*d/TPZ.d,camLim().zmin,3.5);
+  G.camZ=z; G.camX=(m[0]-(TPZ.m[0]-TPZ.x*sw)*z/TPZ.z)/sw; G.camY=(m[1]-(TPZ.m[1]-TPZ.y*sh)*z/TPZ.z)/sh; camSave(); },{passive:false,capture:true});
+const tEnd=e=>{ if(TPZ && e.touches.length<2){ TPZ=null; } }; stEl.addEventListener("touchend",tEnd,{capture:true}); stEl.addEventListener("touchcancel",tEnd,{capture:true});
+document.addEventListener("gesturestart",e=>{ if(stEl.contains(e.target)) e.preventDefault(); });   // 아이폰·아이패드: 화면 자체가 확대되지 않게
+stEl.addEventListener("pointerdown",e=>{ if(e.pointerType==="touch" && !HAS_T){ TCH.set(e.pointerId,relS(e)); if(TCH.size===2){ const [a,b]=[...TCH.values()]; PINCH={d:HY(a[0]-b[0],a[1]-b[1])||1, m:[(a[0]+b[0])/2,(a[1]+b[1])/2], z:G.camZ, x:G.camX, y:G.camY}; for(const id of TCH.keys()) try{ cv.dispatchEvent(new PointerEvent("pointercancel",{pointerId:id,bubbles:true})); }catch(_){} e.stopPropagation(); e.preventDefault(); return; } }
   if(e.button===1 || e.button===2 || (e.button===0 && e.shiftKey)){ PAN={id:e.pointerId, s:relS(e), x:G.camX, y:G.camY}; try{ stEl.setPointerCapture(e.pointerId); }catch(_){} e.stopPropagation(); e.preventDefault(); } },true);   // 오른쪽·가운데 버튼이나 Shift+끌기 = 카메라 옮기기, 두 손가락 = 줌·옮기기
 stEl.addEventListener("pointermove",e=>{ if(PINCH && TCH.has(e.pointerId)){ TCH.set(e.pointerId,relS(e)); if(TCH.size>=2){ const [a,b]=[...TCH.values()], d=HY(a[0]-b[0],a[1]-b[1])||1, m=[(a[0]+b[0])/2,(a[1]+b[1])/2], sw=stEl.clientWidth, sh=stEl.clientHeight, z=clamp(PINCH.z*d/PINCH.d,camLim().zmin,3.5);
     G.camZ=z; G.camX=(m[0]-(PINCH.m[0]-PINCH.x*sw)*z/PINCH.z)/sw; G.camY=(m[1]-(PINCH.m[1]-PINCH.y*sh)*z/PINCH.z)/sh; camSave(); } e.stopPropagation(); return; }
@@ -1459,7 +1466,8 @@ cv.addEventListener("pointerdown",e=>{ if(e.button>0) return; const p=wpos(e), p
   if(e.pointerType!=="mouse"){ const now=performance.now(); if(now-TAP.t<350 && HY(e.clientX-TAP.x,e.clientY-TAP.y)<45){ TAP.t=0; if(BD.on()) BD.burst(pb[0],pb[1]); return; } TAP.t=now; TAP.x=e.clientX; TAP.y=e.clientY; } try{cv.setPointerCapture(e.pointerId);}catch(_){}
   if(BD.on() && BD.grab(e.pointerId,pb[0],pb[1])){ cv.classList.add("hold"); return; }   // 핏방울을 잡으면 물은 젓지 않는다
   if(HY(p[0]-CX,p[1]-CY)<30){ boom=e.pointerId; } else ptrs.set(e.pointerId,{x:p[0],y:p[1],t:performance.now()}); cv.classList.add("hold"); });
-cv.addEventListener("pointermove",e=>{ const p=wpos(e); if(BD.held(e.pointerId)){ const pb=wposP(e,2); BD.moveTo(e.pointerId,pb[0],pb[1]); return; } if(e.pointerId===boom){ CX=clamp(p[0],30,WW-30); CY=clamp(p[1],30,WH-30); return; } const q=ptrs.get(e.pointerId); if(!q) return;
+cv.addEventListener("pointermove",e=>{ if(TPZ || PINCH) return; const p=wpos(e);   // 두 손가락 줌 중에는 물을 젓지 않는다
+  if(BD.held(e.pointerId)){ const pb=wposP(e,2); BD.moveTo(e.pointerId,pb[0],pb[1]); return; } if(e.pointerId===boom){ CX=clamp(p[0],30,WW-30); CY=clamp(p[1],30,WH-30); return; } const q=ptrs.get(e.pointerId); if(!q) return;
   const now=performance.now(), dt=Math.max(.008,(now-q.t)/1000); let vx=(p[0]-q.x)/dt, vy=(p[1]-q.y)/dt; const l=HY(vx,vy); if(l>600){ vx*=600/l; vy*=600/l; }   // 젓기: 손가락 속도로 물을 민다
   stirs.push([p[0],p[1],vx,vy]); q.x=p[0]; q.y=p[1]; q.t=now; });
 const pup=e=>{ BD.release(e.pointerId); if(e.pointerId===boom) boom=-1; ptrs.delete(e.pointerId); if(!ptrs.size && boom<0) cv.classList.remove("hold"); };
