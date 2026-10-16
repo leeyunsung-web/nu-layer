@@ -96,7 +96,7 @@ canvas.hold{cursor:grabbing}
   <div class="ctl vis">
     <div class="it row" data-k="vA"><span>보이기</span><button id="vA" type="button" aria-pressed="true">분홍 A</button><button id="vB" type="button" aria-pressed="true">분홍 B</button><button id="vP" type="button" aria-pressed="true">보라</button><button id="vR" type="button" aria-pressed="true">붉은</button><button id="vD" type="button" aria-pressed="true">핏방울</button><small class="desc">오브젝트를 하나씩 켜고 끕니다. 끄면 그 액체는 지워지고 더 생기지 않으며 계산도 쉽니다.</small></div>
     <div class="it row" data-k="q1"><span>화질</span><button id="q1" type="button" aria-pressed="false">가볍게</button><button id="q2" type="button" aria-pressed="true">보통</button><button id="q3" type="button" aria-pressed="false">선명</button><button id="qA" type="button" aria-pressed="false">자동 낮추기</button><small class="desc">큰 창에서 그리는 해상도의 상한(가볍게 1080p · 보통 1440p · 선명 4K). '자동 낮추기'를 켜면 버벅일 때 저절로 낮췄다가 넉넉해지면 되돌립니다(바뀌는 순간 선명도가 툭 바뀌어 보여 기본은 꺼짐).</small></div>
-    <div class="it row" data-k="bSave"><span>도구</span><button id="bSave" type="button">⤓ 이미지 저장</button><button id="fpsT" type="button" aria-pressed="false">fps 표시</button><button id="sExp" type="button">설정 내보내기</button><button id="sImp" type="button">설정 불러오기</button><button id="sReset" type="button">초기 설정</button><button id="mEdit" type="button" aria-pressed="false">메뉴 편집</button><button id="mRestore" type="button">숨긴 메뉴 되돌리기</button><small class="desc">이미지 저장: 지금 화면을 PNG로. fps 표시: 화면이 실제로 초당 몇 장 그려지는지. 설정 내보내기·불러오기: 지금 값을 파일로 옮겨 다른 곳(깃허브 NU FLOW·내려받은 파일)에서도 그대로 씁니다. 초기 설정: 모든 조절값을 처음 값으로 되돌립니다(두 번 눌러야 실행, 숨긴 메뉴는 그대로). 메뉴 편집: 필요 없는 메뉴를 ✕로 숨깁니다(되돌리기 가능).</small></div>
+    <div class="it row" data-k="bSave"><span>도구</span><button id="bSave" type="button">⤓ 이미지 저장</button><button id="fpsT" type="button" aria-pressed="false">fps 표시</button><button id="gpuOn" type="button" aria-pressed="true" title="물 흐름 계산을 그래픽카드로 (느린 기기에서 훨씬 가볍다)">그래픽카드 엔진</button><button id="sExp" type="button">설정 내보내기</button><button id="sImp" type="button">설정 불러오기</button><button id="sReset" type="button">초기 설정</button><button id="mEdit" type="button" aria-pressed="false">메뉴 편집</button><button id="mRestore" type="button">숨긴 메뉴 되돌리기</button><small class="desc">이미지 저장: 지금 화면을 PNG로. fps 표시: 화면이 실제로 초당 몇 장 그려지는지. 설정 내보내기·불러오기: 지금 값을 파일로 옮겨 다른 곳(깃허브 NU FLOW·내려받은 파일)에서도 그대로 씁니다. 초기 설정: 모든 조절값을 처음 값으로 되돌립니다(두 번 눌러야 실행, 숨긴 메뉴는 그대로). 메뉴 편집: 필요 없는 메뉴를 ✕로 숨깁니다(되돌리기 가능).</small></div>
     <div class="it row wide" data-k="recOn"><span>녹화</span><button id="recOn" type="button" aria-pressed="false">되감기 녹화 켜기</button><button id="rec10" type="button" disabled>10초 전부터 저장</button><button id="rec30" type="button" disabled>30초 전부터 저장</button><button id="rec60" type="button" disabled>1분 전부터 저장</button><small class="desc"><span id="recS">켜 두면 최근 1분을 늘 기록해 두었다가, 버튼을 누른 순간 기준으로 그만큼 거슬러 올라간 장면을 MP4(1920×1080)로 저장합니다. 3D 모습 그대로 담깁니다. 켜 둔 동안은 그래픽 부담이 조금 늘어요.</span></small></div>
     <input id="sFile" type="file" accept=".json,application/json" hidden>
   </div>
@@ -388,7 +388,7 @@ const hh=(a,b)=>h(SEED,a,b);
 const HY=(a,b)=>Math.sqrt(a*a+b*b);   // Math.hypot보다 네 배쯤 빠르다 (매 칸 계산에 쓰임)
 let OVN=1; const VR=()=>{ const ix=WW*(1-1/OVN)/2, iy=WH*(1-1/OVN)/2; return [ix,iy,WW-ix,WH-iy]; };   // 3D 넓은 무대: 판이 화면보다 OVN배 크다 → 실제로 보이는 세상 범위
 const AREA=540000, CELL=5, CV=10, PAD=60, DT=1/30, NC=4, NL=2;
-const G={vis:[1,1,1,1], fxSprOn:0, fxSprN:0.25, fxSprS:1, fxSprC1:5, fxSprC2:9, fxSprLink:0, fxCrownOn:0, fxCrownS:.75, fxCrownC1:7, fxCrownC2:13, fxHeartOn:0, fxHeartN:4, fxHeartS:1, fxHeartC1:6, fxHeartC2:7, fxBubOn:0, fxBubN:5, fxBubS:1, fxBubC1:15, fxCloudOn:0, fxCloudN:5, fxCloudS:1, fxCloudC1:19, fxCloudC2:0, fxDotOn:1, fxDotN:40, fxDotS:1, fxWaveOn:0, fxWaveN:4, fxWaveSp:1, fxWaveC1:14, fxWaveC2:16, fxRayOn:0, fxRayN:10, fxRaySp:1, fxRayC1:0, fxRayC2:3, fxPaintOn:0, fxPaintN:0.6, fxPaintS:1, fxPaintC1:17, fxPaintC2:0, fxZebOn:0, fxZebN:7, fxZebSp:1, fxZebS:1, fxZebC1:13, fxZebC2:19, fxInkOn:1, fxInkC:13, d3kB:1, d3kF:1, d3kD:.4,d3Wide:1.25,swK:1.4,bkS:1.5,camZ:1,camX:0,camY:0,bgI:-1, d3kS:.3, smooth:.45, stOn:1, stN:9, stSize:1, stLen:4, stHV:.75, stBody:.3, stArmW:.55, skOn:1, skT0:1, skT1:0, skBoltIn:0, skBoltOut:0, skBoltN:1, skBoltLag:.12, skMig1:0, skMig2:0, skT2:1, skT3:1, skT4:1, skLink:1, skRate:.8, skSize:1, skLife:1.6, skPop:1, skSpikes:9, skJag:.6, skLine:2.2, skSpin:.5, skBoil:.6, skFloat:1, skCF:0, skCL:3, skCH:2, skMix:0, stCol:19, stMix:0, skStarN:6, skStarLife:12, skFlow:1,skVar:.8,skMin:.5,skMax:1.6,stSpin:8, stTw:1, tear:60, tearPer:15, tearSpd:.4, tearRnd:.75, tearLong:.3, tearCap:.75, tearRate:.05, tipLen:50, d3:1, d3Tilt:22, d3Depth:.5, d3Drift:.4, d3Mouse:.5, spread:1, rim:0, rimW:130, visc:1, lightA:225, sp:1, spShow:0, spDen:1, spW:34, spPull:1, spStr:1, spBg:.35, spArms:1, spRot:1, spWob:1, speed:1, carry:1, dry:1, circ:.9, lspd:.5, dir:1, sep:.5, merge:1, head:1.3, tail:.9, strands:1.5, round:1, init:6, add:3, per:3.4, spin:1, calm:1, out:1, tailDry:1.5,
+const G={vis:[1,1,1,1], fxSprOn:0, fxSprN:0.25, fxSprS:1, fxSprC1:5, fxSprC2:9, fxSprLink:0, fxCrownOn:0, fxCrownS:.75, fxCrownC1:7, fxCrownC2:13, fxHeartOn:0, fxHeartN:4, fxHeartS:1, fxHeartC1:6, fxHeartC2:7, fxBubOn:0, fxBubN:5, fxBubS:1, fxBubC1:15, fxCloudOn:0, fxCloudN:5, fxCloudS:1, fxCloudC1:19, fxCloudC2:0, fxDotOn:1, fxDotN:40, fxDotS:1, fxWaveOn:0, fxWaveN:4, fxWaveSp:1, fxWaveC1:14, fxWaveC2:16, fxRayOn:0, fxRayN:10, fxRaySp:1, fxRayC1:0, fxRayC2:3, fxPaintOn:0, fxPaintN:0.6, fxPaintS:1, fxPaintC1:17, fxPaintC2:0, fxZebOn:0, fxZebN:7, fxZebSp:1, fxZebS:1, fxZebC1:13, fxZebC2:19, fxInkOn:1, fxInkC:13, d3kB:1, d3kF:1, d3kD:.4,d3Wide:1.25,gpu:1,swK:1.4,bkS:1.5,camZ:1,camX:0,camY:0,bgI:-1, d3kS:.3, smooth:.45, stOn:1, stN:9, stSize:1, stLen:4, stHV:.75, stBody:.3, stArmW:.55, skOn:1, skT0:1, skT1:0, skBoltIn:0, skBoltOut:0, skBoltN:1, skBoltLag:.12, skMig1:0, skMig2:0, skT2:1, skT3:1, skT4:1, skLink:1, skRate:.8, skSize:1, skLife:1.6, skPop:1, skSpikes:9, skJag:.6, skLine:2.2, skSpin:.5, skBoil:.6, skFloat:1, skCF:0, skCL:3, skCH:2, skMix:0, stCol:19, stMix:0, skStarN:6, skStarLife:12, skFlow:1,skVar:.8,skMin:.5,skMax:1.6,stSpin:8, stTw:1, tear:60, tearPer:15, tearSpd:.4, tearRnd:.75, tearLong:.3, tearCap:.75, tearRate:.05, tipLen:50, d3:1, d3Tilt:22, d3Depth:.5, d3Drift:.4, d3Mouse:.5, spread:1, rim:0, rimW:130, visc:1, lightA:225, sp:1, spShow:0, spDen:1, spW:34, spPull:1, spStr:1, spBg:.35, spArms:1, spRot:1, spWob:1, speed:1, carry:1, dry:1, circ:.9, lspd:.5, dir:1, sep:.5, merge:1, head:1.3, tail:.9, strands:1.5, round:1, init:6, add:3, per:3.4, spin:1, calm:1, out:1, tailDry:1.5,
   mat:[{carry:1,dir:0,exitR:.3,sl:1,size:1,share:1,ksz:.42,brk:.55,hth:.36,hmin:40,bsz:.17,td:.5,nA:.16,dth:.5},{carry:.6,dir:0,exitR:.3,sl:1,size:1,share:.25,ksz:.42,brk:0,hth:.36,hmin:40,bsz:0,td:.62,nA:.3,dth:.5},{carry:.5,dir:0,exitR:.3,sl:1,size:1,share:.4,ksz:.4,brk:0,hth:.36,hmin:40,bsz:.17,td:.6,nA:.3,dth:.5},{carry:1,dir:0,exitR:.3,sl:1,size:1,share:1,ksz:.42,brk:.55,hth:.36,hmin:40,bsz:.17,td:.5,nA:.16,dth:.5}]};   // 오브젝트마다: 크기, 솟는 비율, 하이라이트·어두운 면 세부   // out: 밖으로 밀려나는 힘   // spin: 도는 힘, calm: 물이 제 흐름으로 돌아오는 빠르기   // init: 처음 개수, add: 한 번에 더 솟는 개수, per: 간격(초)   // head: 머리 뭉침, tail: 꼬리 늘어짐, strands: 떨어지는 가닥 수
 let RIM, rimKey='';
 const LIVE=[]; let UNI, THK, NSF, MX, MY, TMP2, RD=[], RDF, PV=[], backT=0, backPT=0, STEPPED=false, FLIP=false;   // PV: 한 박자 전의 잉크 (그리기는 PV→지금 사이를 이어서 그린다), FLIP: 이 채널은 반대로 돈다
@@ -503,7 +503,7 @@ function strandBlob(l,c,x,y,r,amt,tx,ty,key,u){ LIVE[l*NC+c]=true; const D=DYE[l
       const st=hh(hk,3)*G.tearCap*.6*(.4+.6*G.tearRnd), en=hh(hk,4)<G.tearLong?1:1-(.15+.6*hh(hk,5))*G.tearRnd*(as/R); if(u<st || u>en) continue;   // 가닥마다 시작·끝이 다르다 → 끝이 갈래로 갈라진다
       const tp=Math.min(1,(u-st)/.12,en>=1?1:(en-u)/.12), tri=1-Math.abs(2*f-1); w=amt*fa*Math.min(1,Math.max(0,tri*2.2-.35-(1-tp)*1.9)); }   // 가닥 끝으로 갈수록 가늘어져 뾰족하게 끝난다   // 가닥 사이는 비워 둔다
     if(w<=0) continue; const k=yy*gw+xx; D[k]=Math.min(1,D[k]+w); for(let q=0;q<NC;q++) if(q!==c) DYE[l][q][k]*=1-w; } }
-function push(x,y,r,vx,vy){ const x0=Math.max(1,Math.floor((x-r+PAD)/CV)), x1=Math.min(vw-2,Math.ceil((x+r+PAD)/CV)), y0=Math.max(1,Math.floor((y-r+PAD)/CV)), y1=Math.min(vh-2,Math.ceil((y+r+PAD)/CV)), ir=1/(r*r);
+function push(x,y,r,vx,vy){ if(G.gpu && GPUV.ok) GPUV.impulse(x,y,r,vx,vy); const x0=Math.max(1,Math.floor((x-r+PAD)/CV)), x1=Math.min(vw-2,Math.ceil((x+r+PAD)/CV)), y0=Math.max(1,Math.floor((y-r+PAD)/CV)), y1=Math.min(vh-2,Math.ceil((y+r+PAD)/CV)), ir=1/(r*r);
   for(let yy=y0;yy<=y1;yy++) for(let xx=x0;xx<=x1;xx++){ const dx=xx*CV-PAD-x, dy=yy*CV-PAD-y, d2=dx*dx+dy*dy; if(d2<r*r){ const k=yy*vw+xx, w=1-d2*ir; U[k]+=(vx-U[k])*w; V[k]+=(vy-V[k])*w; } } }
 let puffNo=0; const POURS=[];
 /* 주루룩: 한 번에 놓지 않고, 분출구에서 머리가 흐름을 따라 둥글게 나아가며 뒤에 잉크를 흘린다. 머리는 굵고, 흘리는 양은 끝으로 갈수록 가늘어진다 */
@@ -571,7 +571,7 @@ function stepA(){ if(backDue) backStep(); if(JAGON){ for(let k=0;k<vn;k++){ SU[k
   UM.fill(0); AM.fill(0);
   for(let l=0;l<NL;l++) for(let c=0;c<NC;c++){ const sl=l*NC+c; if(!LIVE[sl]){ TCN[sl]=0; continue; } const L=TLS[sl], m=markTiles(DYE[l][c],sl); for(let i=0;i<m;i++){ AM[L[i]]=1; if(l===NL-1 && c!==2) UM[L[i]]=1; } }
   UCN=0; ACN=0; for(let t=0;t<tW*tH;t++){ if(UM[t]) ULS[UCN++]=t; if(AM[t]) ALS[ACN++]=t; }
-  forces(DT); advectV(U,U2,DT); advectV(V,V2,DT); U.set(U2); V.set(V2); viscous(); project(); FRT=simT; const wd=G.strands>0; if(wd) wind(); fineV(ALS,ACN,wd); if(wd) driftNoise();
+  if(G.gpu && GPUV.init() && GPUV.ok){ const t0=performance.now(); GPUV.step(DT); GPUV.watch(performance.now()-t0); } else { forces(DT); advectV(U,U2,DT); advectV(V,V2,DT); U.set(U2); V.set(V2); viscous(); project(); } FRT=simT; const wd=G.strands>0; if(wd) wind(); fineV(ALS,ACN,wd); if(wd) driftNoise();
   if((bdF&1)===0) backDue=true; }   // 뒤쪽 층은 느리고 옅으니 두 박자에 한 번 (두 배 걸음)
 function stepB(){ for(let c=0;c<NC;c++) PV[NL-1][c].set(DYE[NL-1][c]);   // 한 박자 전 모습을 남겨 둔다 (그리기용)
   for(let l=0;l<NL;l++) for(let c=0;c<NC;c++){ const sl=l*NC+c; if(!LIVE[sl] || l===0) continue; const D=DYE[l][c], vs=l===0?FLW.back:1, dt=l===0?DT*2:DT, L=TLS[sl], m=TCN[sl]; FLIP=dirC(c)!==G.dir;
@@ -717,6 +717,75 @@ function jagLoop(L,l,ks){ const s=L.S[l], n=L.N[l], B=L.B; if(n<3) return; const
   g.closePath(); }
 const bPath=L=>{ if(!JAGON){ allPath(L); return; } g.beginPath(); for(let l=0;l<L.n;l++) jagLoop(L,l); };
 /* 먼 층은 바탕색 쪽으로 옅어진다 (공기 원근) */
+/* ── 그래픽카드 엔진 1단계: 물 흐름(속도장) 계산을 WebGL2로 한다.
+   목표 기류(소용돌이·나선·작은 소용돌이·가장자리) → 손으로 젓기·밀기 → 와류 보강 → 스스로 나르기 → 점성 → 압력(12번) 순서는 CPU와 똑같다.
+   결과 U·V는 한 박자 늦게 CPU로 읽어 와서 잉크·핏방울·별이 그대로 쓴다. */
+const GPUV=(()=>{
+  let gl=null, ok=false, w=0, h=0, P={}, T={}, F={}, vao=null, pbo=null, fence=null, rb=null, pending=false, imp=[], failed=false;
+  const VS="#version 300 es\nin vec2 p; void main(){ gl_Position=vec4(p,0.,1.); }";
+  const HEAD="#version 300 es\nprecision highp float; precision highp int; out vec4 o; uniform ivec2 S; ivec2 C(){ return ivec2(gl_FragCoord.xy); } bool inner(ivec2 c){ return c.x>0 && c.y>0 && c.x<S.x-1 && c.y<S.y-1; }\n";
+  const FS={
+    force: HEAD+`uniform sampler2D A; uniform float kf,t,CX,CY,RMX,WW,WH,CV,PAD; uniform float spin,dir,circ,outk,sp,spDen,spArms,spread,spRot,spWob,spW,spStr,spPull,spBg,rim,rimW,swK,S0,R0,v0,sub; uniform int NI; uniform vec4 IA[32]; uniform vec4 IB[32];
+      const float TAU=6.28318530718, SPR0=46.;
+      float sm(float x){ return x<=0.?0.:x>=1.?1.:x*x*(3.-2.*x); }
+      float spB(){ return 130./max(.2,spDen)/TAU; } float spL(){ return 250./max(.02,spread); }
+      float spBr(float r){ return spB()*(1.+max(0.,r-SPR0)/spL()); }
+      float spLine(float r,float t){ float u=max(0.,r-SPR0), L=spL(); return dir*(L/spB())*log(1.+u/L)+t*.05*spRot*dir+spWob*.22*sin(r*.018-t*.55); }
+      vec2 tgt0(float x,float y){ float rx=x-CX, ry=y-CY, r=sqrt(rx*rx+ry*ry)+1e-3, v=S0*spin*r/(R0+r)*(1.+.12*sin(t*.31)), ex=(v0*(.3+1.4*exp(-r/130.))+v*tan((1.-circ)*.75))*outk*(1.+.3*sin(t*.23+1.));
+        float vx=-ry/r*v*dir+rx/r*ex, vy=rx/r*v*dir+ry/r*ex;
+        if(sp>.5){ float ir=1./r, erx=rx*ir, ery=ry*ir, b=spBr(r), per=TAU/max(1.,floor(spArms+.5)), lf=spLine(r,t), phi=atan(ry,rx); float del=phi-lf; del-=per*floor(del/per+.5);
+          float off=dir*b*del, d=abs(off), Wd=max(4.,spW), wv=exp(-(d/Wd)*(d/Wd)), wa=exp(-(d/(2.2*Wd))*(d/(2.2*Wd)));
+          float q=1./sqrt(1.+(r/b)*(r/b)), kt=r*dir/b, vl=v*1.3*spStr, tx=(erx-ery*kt)*q, ty=(ery+erx*kt)*q, ar=clamp(off*1.2*spPull,-40.,40.)*wa;
+          float sx=(1.-wv)*vx*spBg+wv*vl*tx+ar*erx, sy=(1.-wv)*vy*spBg+wv*vl*ty+ar*ery, cw=sm((r-SPR0*.6)/(SPR0*.8));
+          vx=vx*(1.-cw)+sx*cw; vy=vy*(1.-cw)+sy*cw; float od=spread*22.*cw; vx+=erx*od; vy+=ery*od; }
+        for(int i=0;i<2;i++){ float a0=i==0?1.1:3.9, rho=i==0?.5:.62, om=i==0?.045:-.03, rs=i==0?120.:100., ws=i==0?1.:-.9; float a=a0+om*t, cx=CX+cos(a)*rho*RMX, cy=CY+sin(a)*rho*RMX*.8, dx=x-cx, dy=y-cy, rr=sqrt(dx*dx+dy*dy)+1e-3, k=sub*ws*exp(-rr/rs)*rr/rs; vx+=-dy/rr*k; vy+=dx/rr*k; }
+        if(rim>0.){ float de=min(min(x,WW-x),min(y,WH-y)), RW=max(20.,rimW); if(de<RW){ float f=rim*sm((RW-de)/RW), ux=rx/r, uy=ry/r, vr=vx*ux+vy*uy; if(vr>0.){ vx-=ux*vr*f; vy-=uy*vr*f; } vx*=1.-.6*f; vy*=1.-.6*f; } }
+        return vec2(vx,vy); }
+      vec2 tgt(float x,float y){ if(swK==1.) return tgt0(x,y); return tgt0(CX+(x-CX)/swK,CY+(y-CY)/swK)*swK; }
+      void main(){ ivec2 c=C(); vec2 u=texelFetch(A,c,0).xy; if(!inner(c)){ o=vec4(u,0,0); return; }
+        float wx=float(c.x)*CV-PAD, wy=float(c.y)*CV-PAD; u+=(tgt(wx,wy)-u)*kf;
+        for(int i=0;i<32;i++){ if(i>=NI) break; vec4 a=IA[i], b=IB[i]; float dx=wx-a.x, dy=wy-a.y, d2=dx*dx+dy*dy, r2=a.z*a.z; if(d2<r2){ float wgt=a.w>.5?(1.-d2/r2):(1.-d2/r2)*.5; u+=(b.xy-u)*wgt; } }
+        o=vec4(u,0,0); }`,
+    curl: HEAD+`uniform sampler2D A; uniform float CV; void main(){ ivec2 c=C(); if(!inner(c)){ o=vec4(0); return; } float i2=1./(2.*CV); float cu=(texelFetch(A,c+ivec2(1,0),0).y-texelFetch(A,c-ivec2(1,0),0).y)*i2-(texelFetch(A,c+ivec2(0,1),0).x-texelFetch(A,c-ivec2(0,1),0).x)*i2; o=vec4(cu,0,0,0); }`,
+    vort: HEAD+`uniform sampler2D A; uniform sampler2D Cu; uniform float k; void main(){ ivec2 c=C(); vec2 u=texelFetch(A,c,0).xy;
+        if(c.x>=2 && c.y>=2 && c.x<S.x-2 && c.y<S.y-2){ float nx=abs(texelFetch(Cu,c+ivec2(1,0),0).x)-abs(texelFetch(Cu,c-ivec2(1,0),0).x), ny=abs(texelFetch(Cu,c+ivec2(0,1),0).x)-abs(texelFetch(Cu,c-ivec2(0,1),0).x); float l=sqrt(nx*nx+ny*ny)+1e-5; nx/=l; ny/=l; float cc=texelFetch(Cu,c,0).x*k; u.x+=ny*cc; u.y-=nx*cc; }
+        int e=min(min(c.x,c.y),min(S.x-1-c.x,S.y-1-c.y)); if(e<3) u*=float(e)/3.; o=vec4(u,0,0); }`,
+    adv: HEAD+`uniform sampler2D A; uniform float s; vec2 bil(vec2 p){ p=clamp(p,vec2(0),vec2(S)-1.001); ivec2 i=ivec2(floor(p)); vec2 f=p-vec2(i); vec2 a=texelFetch(A,i,0).xy, b=texelFetch(A,i+ivec2(1,0),0).xy, c=texelFetch(A,i+ivec2(0,1),0).xy, d=texelFetch(A,i+ivec2(1,1),0).xy; return mix(mix(a,b,f.x),mix(c,d,f.x),f.y); }
+        void main(){ ivec2 c=C(); if(!inner(c)){ o=vec4(0); return; } vec2 u=texelFetch(A,c,0).xy; o=vec4(bil(vec2(c)-u*s),0,0); }`,
+    visc: HEAD+`uniform sampler2D A; uniform float nu; void main(){ ivec2 c=C(); vec2 u=texelFetch(A,c,0).xy; if(!inner(c)){ o=vec4(u,0,0); return; } vec2 l=texelFetch(A,c-ivec2(1,0),0).xy+texelFetch(A,c+ivec2(1,0),0).xy+texelFetch(A,c-ivec2(0,1),0).xy+texelFetch(A,c+ivec2(0,1),0).xy-4.*u; o=vec4(u+nu*l,0,0); }`,
+    div: HEAD+`uniform sampler2D A; void main(){ ivec2 c=C(); if(!inner(c)){ o=vec4(0); return; } o=vec4((texelFetch(A,c+ivec2(1,0),0).x-texelFetch(A,c-ivec2(1,0),0).x+texelFetch(A,c+ivec2(0,1),0).y-texelFetch(A,c-ivec2(0,1),0).y)*.5,0,0,0); }`,
+    pres: HEAD+`uniform sampler2D Pp; uniform sampler2D D; void main(){ ivec2 c=C(); float p=texelFetch(Pp,c,0).x; if(!inner(c)){ o=vec4(p,0,0,0); return; } o=vec4((texelFetch(Pp,c-ivec2(1,0),0).x+texelFetch(Pp,c+ivec2(1,0),0).x+texelFetch(Pp,c-ivec2(0,1),0).x+texelFetch(Pp,c+ivec2(0,1),0).x-texelFetch(D,c,0).x)*.25,0,0,0); }`,
+    grad: HEAD+`uniform sampler2D A; uniform sampler2D Pp; void main(){ ivec2 c=C(); vec2 u=texelFetch(A,c,0).xy; if(!inner(c)){ o=vec4(u,0,0); return; } u.x-=(texelFetch(Pp,c+ivec2(1,0),0).x-texelFetch(Pp,c-ivec2(1,0),0).x)*.5; u.y-=(texelFetch(Pp,c+ivec2(0,1),0).x-texelFetch(Pp,c-ivec2(0,1),0).x)*.5; o=vec4(u,0,0); }` };
+  function sh(t,s){ const o=gl.createShader(t); gl.shaderSource(o,s); gl.compileShader(o); if(!gl.getShaderParameter(o,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; }
+  function prog(fs){ const p=gl.createProgram(); gl.attachShader(p,sh(gl.VERTEX_SHADER,VS)); gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs)); gl.bindAttribLocation(p,0,"p"); gl.linkProgram(p); if(!gl.getProgramParameter(p,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p)); const u={}; const n=gl.getProgramParameter(p,gl.ACTIVE_UNIFORMS); for(let i=0;i<n;i++){ const a=gl.getActiveUniform(p,i), nm=a.name.replace(/\[0\]$/,""); u[nm]=gl.getUniformLocation(p,a.name); } return {p,u}; }
+  function tex(){ const t=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,t); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,w,h,0,gl.RGBA,gl.FLOAT,null); for(const [k,v] of [[gl.TEXTURE_MIN_FILTER,gl.NEAREST],[gl.TEXTURE_MAG_FILTER,gl.NEAREST],[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D,k,v); const f=gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER,f); gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,t,0); return {t,f}; }
+  function init(){ if(gl || failed) return ok; try{ const c=document.createElement("canvas"); gl=c.getContext("webgl2",{antialias:false,depth:false,stencil:false,premultipliedAlpha:false,preserveDrawingBuffer:false}); if(!gl || !gl.getExtension("EXT_color_buffer_float")) throw new Error("no float");
+      for(const k in FS) P[k]=prog(FS[k]); c.addEventListener("webglcontextlost",e=>{ e.preventDefault(); ok=false; failed=true; gl=null; },false);   // 그래픽카드가 끊기면 CPU로 돌아간다
+      vao=gl.createVertexArray(); gl.bindVertexArray(vao); const b=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,b); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0); ok=true; }
+    catch(e){ failed=true; ok=false; gl=null; if(window.console) console.warn("GPU 물 흐름 엔진을 쓸 수 없어 CPU로 계산합니다:",e && e.message); } return ok; }
+  function size(){ if(w===vw && h===vh) return; w=vw; h=vh; for(const k of ["v0","v1","cu","dv","p0","p1"]) T[k]=tex(); pbo=gl.createBuffer(); gl.bindBuffer(gl.PIXEL_PACK_BUFFER,pbo); gl.bufferData(gl.PIXEL_PACK_BUFFER,w*h*16,gl.STREAM_READ); gl.bindBuffer(gl.PIXEL_PACK_BUFFER,null); rb=new Float32Array(w*h*4); pending=false; fence=null; upload(); }
+  function upload(){ if(!ok || !w) return; const a=new Float32Array(w*h*4); for(let k=0;k<w*h;k++){ a[4*k]=U[k]; a[4*k+1]=V[k]; } gl.bindTexture(gl.TEXTURE_2D,T.v0.t); gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,w,h,gl.RGBA,gl.FLOAT,a); const z=new Float32Array(w*h*4); for(const k of ["p0","p1"]){ gl.bindTexture(gl.TEXTURE_2D,T[k].t); gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,w,h,gl.RGBA,gl.FLOAT,z); } pending=false; fence=null; }
+  function pass(name,out,binds,set){ const pr=P[name]; gl.useProgram(pr.p); gl.bindFramebuffer(gl.FRAMEBUFFER,T[out].f); gl.viewport(0,0,w,h); let u=0; for(const [nm,tk] of binds){ gl.activeTexture(gl.TEXTURE0+u); gl.bindTexture(gl.TEXTURE_2D,T[tk].t); gl.uniform1i(pr.u[nm],u); u++; } gl.uniform2i(pr.u.S,w,h); if(set) set(pr.u); gl.drawArrays(gl.TRIANGLE_STRIP,0,4); }
+  const swap=(a,b)=>{ const t=T[a]; T[a]=T[b]; T[b]=t; };
+  let waits=0; function collect(force){ if(!pending || !fence) return; const st=gl.clientWaitSync(fence,0,0); if(st===gl.TIMEOUT_EXPIRED && !force && ++waits<4) return; waits=0; gl.deleteSync(fence); fence=null; pending=false; gl.bindBuffer(gl.PIXEL_PACK_BUFFER,pbo); gl.getBufferSubData(gl.PIXEL_PACK_BUFFER,0,rb); gl.bindBuffer(gl.PIXEL_PACK_BUFFER,null); for(let k=0;k<w*h;k++){ U[k]=rb[4*k]; V[k]=rb[4*k+1]; } }   // 지난 박자에 그래픽카드가 계산해 둔 물 흐름을 받아 온다
+  function step(dt){ if(!ok) return; size(); collect();
+    const NI=Math.min(32,imp.length+stirs.length), IA=new Float32Array(128), IB=new Float32Array(128); let n=0;
+    for(const s of stirs){ if(n>=32) break; IA.set([s[0],s[1],50,0],4*n); IB.set([s[2],s[3],0,0],4*n); n++; } for(const q of imp){ if(n>=32) break; IA.set([q[0],q[1],q[2],1],4*n); IB.set([q[3],q[4],0,0],4*n); n++; } stirs.length=0; imp.length=0;
+    pass("force","v1",[["A","v0"]],u=>{ gl.uniform1f(u.kf,Math.min(1,FLW.kf*G.calm*dt)); gl.uniform1f(u.t,simT); gl.uniform1f(u.CX,CX); gl.uniform1f(u.CY,CY); gl.uniform1f(u.RMX,RMX); gl.uniform1f(u.WW,WW); gl.uniform1f(u.WH,WH); gl.uniform1f(u.CV,CV); gl.uniform1f(u.PAD,PAD);
+      for(const [k,v] of [["spin",G.spin],["dir",G.dir],["circ",G.circ],["outk",G.out],["sp",G.sp?1:0],["spDen",G.spDen],["spArms",G.spArms],["spread",G.spread],["spRot",G.spRot],["spWob",G.spWob],["spW",G.spW],["spStr",G.spStr],["spPull",G.spPull],["spBg",G.spBg],["rim",G.rim],["rimW",G.rimW],["swK",G.swK||1],["S0",FLW.S],["R0",FLW.R0],["v0",FLW.v0],["sub",FLW.sub]]) if(u[k]) gl.uniform1f(u[k],+v||0);
+      gl.uniform1i(u.NI,n); if(u.IA) gl.uniform4fv(u.IA,IA); if(u.IB) gl.uniform4fv(u.IB,IB); });
+    pass("curl","cu",[["A","v1"]],u=>gl.uniform1f(u.CV,CV));
+    pass("vort","v0",[["A","v1"],["Cu","cu"]],u=>gl.uniform1f(u.k,FLW.vort*CV*dt/Math.max(G.calm,.3)));
+    pass("adv","v1",[["A","v0"]],u=>gl.uniform1f(u.s,dt/CV));
+    const nu=Math.min(.22,.07*G.visc); if(nu>0){ pass("visc","v0",[["A","v1"]],u=>gl.uniform1f(u.nu,nu)); } else swap("v0","v1");
+    pass("div","dv",[["A","v0"]]);
+    for(let it=0;it<12;it++){ pass("pres","p1",[["Pp","p0"],["D","dv"]]); swap("p0","p1"); }
+    pass("grad","v1",[["A","v0"],["Pp","p0"]]); swap("v0","v1");
+    if(pending) return;   // 지난 결과를 아직 못 받았으면 이번에는 읽기를 걸지 않는다 (덮어쓰지 않게)
+    gl.bindFramebuffer(gl.FRAMEBUFFER,T.v0.f); gl.bindBuffer(gl.PIXEL_PACK_BUFFER,pbo); gl.readPixels(0,0,w,h,gl.RGBA,gl.FLOAT,0); gl.bindBuffer(gl.PIXEL_PACK_BUFFER,null); fence=gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE,0); gl.flush(); pending=true; }   // 결과는 다음 박자에 받아 온다 (기다리지 않게)
+  let avg=0, cnt=0, slow=false; function watch(ms){ avg+=(ms-avg)*.05; if(++cnt>90 && avg>6){ slow=true; ok=false; failed=true; if(window.console) console.warn('GPU 물 흐름 엔진이 이 기기에서는 더 느려 CPU로 돌아갑니다 ('+avg.toFixed(1)+'ms)'); } }   // 그래픽카드가 소프트웨어로 흉내 내는 기기에서는 오히려 느리다 → 스스로 끈다
+  return { watch, get slow(){ return slow; }, get ok(){ return ok; }, init, step, upload(){ if(ok){ size(); upload(); } }, sync(){ if(pending){ gl.finish(); collect(true); } }, impulse(x,y,r,vx,vy){ if(imp.length<32) imp.push([x,y,r,vx,vy]); } };
+})();
 
 /* ══ 핏방울 (BLOOD DROP): 소용돌이 없는 무중력. 같은 화면 위 투명한 겹 화면에 자기 자리를 두고 따로 논다. 설정도 따로 ══ */
 const BD=(function(){
@@ -1266,7 +1335,7 @@ BD.onPlace=()=>{ const r=bdRect(); BD.setZone(r[0],r[1],r[0]+r[2],r[1]+r[3]); };
 const lumH=h=>{ if(!h || h[0]!=="#") return 1; const v=parseInt(h.slice(1,7),16); return (.299*(v>>16&255)+.587*(v>>8&255)+.114*(v&255))/255; };
 function BGN(){ return G.bgI>=0 && PAL[G.bgI]?PAL[G.bgI]:SC.bg; }   // 배경색: 고르면 그 색, 아니면 장면 기본
 function setScene(i){ tphInit=false; scene=i; try{ localStorage.setItem("nu-flow-scene",String(i)); }catch(_){} SC=SCENES[i]; simT=0; puffNo=0; POURS.length=0; RMX=HY(WW,WH)*.5; placeCenter(); backT=0; U.fill(0); V.fill(0); for(let y=0;y<gh;y++) for(let x=0;x<gw;x++){ const k=y*gw+x; MX[k]=x*CELL; MY[k]=y*CELL; NSF[k]=pat(x*CELL,y*CELL,0); } for(const L of DYE) for(const D of L) D.fill(0);
-  SC.seed(1000+i*400); for(let y=1;y<vh-1;y++){ let k=y*vw+1; for(let x=1;x<vw-1;x++,k++){ const f=target(x*CV-PAD,y*CV-PAD,0); U[k]=f[0]; V[k]=f[1]; } } for(const E of EMA) for(const A of E) A.fill(0); LIVE.length=0;
+  SC.seed(1000+i*400); for(let y=1;y<vh-1;y++){ let k=y*vw+1; for(let x=1;x<vw-1;x++,k++){ const f=target(x*CV-PAD,y*CV-PAD,0); U[k]=f[0]; V[k]=f[1]; } } if(G.gpu && GPUV.ok) GPUV.upload(); for(const E of EMA) for(const A of E) A.fill(0); LIVE.length=0;
   const tb=$("tabs").children; for(let kk=0;kk<tb.length;kk++) tb[kk].setAttribute("aria-selected",kk===i?"true":"false"); $("nRule").textContent=SC.rule; $("nMove").textContent=SC.move; }
 function burst(cx,cy,R,sd){ const nn=14; g.beginPath();
   for(let k=0;k<nn*2;k++){ const tip=k%2===0, a=(k+(tip?(hh(sd+k,1)-.5)*.5:0))*Math.PI/nn+T*.05+sd, rr=tip?R*(.5+.75*hh(sd+k,2))*(1+.08*Math.sin(T*3+k+sd)):R*.3; g.lineTo(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr); }
@@ -1576,6 +1645,7 @@ let showFps=false; try{ showFps=localStorage.getItem("nu-flow-fps")==="1"; }catc
 const fpsEl=$("fpsM"); let fpsN=0, fpsT0=performance.now();
 function fpsTick(now){ if(!showFps){ fpsEl.hidden=true; return; } fpsN++; if(now-fpsT0>=500){ fpsEl.textContent=Math.round(fpsN*1000/(now-fpsT0))+" fps · 화질 "+Math.round(QF*100)+"%"; fpsN=0; fpsT0=now; } fpsEl.hidden=false; }
 function syncFps(){ $("fpsT").setAttribute("aria-pressed",showFps?"true":"false"); }
+{ const b=$("gpuOn"), sy=()=>{ b.setAttribute("aria-pressed",G.gpu?"true":"false"); b.textContent=G.gpu?(GPUV.ok?"그래픽카드 엔진 켜짐":"그래픽카드 엔진 (준비 중)"):"그래픽카드 엔진 꺼짐"; }; b.addEventListener("click",()=>{ G.gpu=G.gpu?0:1; if(G.gpu){ GPUV.init(); GPUV.upload(); } saveG(); sy(); }); setTimeout(()=>{ if(G.gpu) GPUV.init(); sy(); if(G.gpu && !GPUV.ok) b.textContent="그래픽카드 엔진 (이 기기는 안 됨)"; },1500); setInterval(()=>{ if(G.gpu && GPUV.slow) b.textContent="그래픽카드 엔진 (이 기기는 CPU가 더 빠름)"; },2000); sy(); }
 $("fpsT").addEventListener("click",()=>{ showFps=!showFps; try{ localStorage.setItem("nu-flow-fps",showFps?"1":"0"); }catch(_){} syncFps(); });
 syncFps();
 /* 핏방울 두 번 누르기: 가장 작은 방울들로 펑 하고 흩어진다 */
