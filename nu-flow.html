@@ -1,5 +1,5 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NU FLOW</title>
+<title>SWIRL FLOW</title>
 <style>
 /* 배치: 위에 요소를 고르는 탭, 가운데 화면 하나, 아래에 그 요소를 그림에서 어떻게 읽었고 어떻게 움직이게 했는지 두 줄. */
 :root{
@@ -86,7 +86,7 @@ canvas.hold{cursor:grabbing}
 <div class="wrap">
   <div class="ponly row" style="gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:4px"><button id="pOpen" type="button" class="pbtn">화면 창 열기</button><span id="pStatus" class="hint">화면 창을 찾는 중…</span></div>
   <header>
-    <h1>NU FLOW</h1>
+    <h1>SWIRL FLOW</h1>
     <p>배경 액체를 기류에 태우는 연구. 화면 전체가 한 통의 물이고, 폭발을 축으로 도는 기류가 그 물을 천천히 밀면 잉크 같은 액체가 흐름을 타고 늘어나고 감기고 응축합니다. 뒤쪽 물은 느리고 작고 옅습니다.</p>
   </header>
   <div class="tabrow"><div class="tabs" id="tabs" role="tablist" aria-label="배경 요소"></div><button id="touchMode" type="button" class="tmode" aria-pressed="false" title="오브젝트끼리 닿았을 때: 같은 색으로 녹아들기 / 색은 그대로 두고 뭉치기만">닿으면 같은 색</button></div>
@@ -811,7 +811,7 @@ const GPUV=(()=>{
     gl.bindFramebuffer(gl.FRAMEBUFFER,T.v0.f); gl.bindBuffer(gl.PIXEL_PACK_BUFFER,pbo); gl.readPixels(0,0,w,h,gl.RGBA,gl.FLOAT,0); gl.bindBuffer(gl.PIXEL_PACK_BUFFER,null); fence=gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE,0); gl.flush(); pending=true; }   // 결과는 다음 박자에 받아 온다 (기다리지 않게)
 
   /* ── 잉크 ── */
-  function dsize(){ if(dw===gw && dh===gh) return false; dw=gw; dh=gh; for(const k of ["f0","f1","b0","b1","t1","t2","t3","th","tq","tw","z"]) T[k]=tex(dw,dh); T.ns=tex(dw,dh,gl.R32F);
+  function dsize(){ if(dw===gw && dh===gh) return false; dw=gw; dh=gh; for(const k of ["f0","f1","b0","b1","fp","bp","t1","t2","t3","th","tq","tw","z"]) T[k]=tex(dw,dh); T.ns=tex(dw,dh,gl.R32F);
     D.red=[]; for(let r=0;r<2;r++){ const L=[]; let W=dw, H=dh; while(W>1 || H>1){ W=Math.ceil(W/2); H=Math.ceil(H/2); L.push(tex(W,H)); } D.red.push(L); }
     const mk=()=>{ const b=gl.createBuffer(); gl.bindBuffer(gl.PIXEL_PACK_BUFFER,b); gl.bufferData(gl.PIXEL_PACK_BUFFER,dw*dh*16,gl.STREAM_READ); gl.bindBuffer(gl.PIXEL_PACK_BUFFER,null); return b; };
     D.pboF=mk(); D.pboB=mk(); D.rbF=new Float32Array(dw*dh*4); D.rbB=new Float32Array(dw*dh*4); D.snapF=new Float32Array(dw*dh*4); D.snapB=new Float32Array(dw*dh*4); D.pendF=D.pendB=false; D.fenceF=D.fenceB=null; D.up=new Float32Array(dw*dh*4);
@@ -846,11 +846,92 @@ const GPUV=(()=>{
     emit();
     if(G.strands>0){ gl.bindTexture(gl.TEXTURE_2D,T.ns.t); gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,dw,dh,gl.RED,gl.FLOAT,NSF); }
     dUploadDiff(NL-1,"f0",D.snapF); dUploadDiff(0,"b0",D.snapB);
+    pass("pick","fp",[["A","f0"],["B","f0"]],u=>gl.uniform4f(u.on,1,1,1,1));   // 그리기용: 한 박자 전 모습
     layer("f0","f1",DT,1,true,8); swap("f0","f1"); if(!D.pendF) dRead("f0","F");
-    if(backDue){ backDue=false; const dt=simT-backT; backPT=backT; backT=simT; if(dt>0){ layer("b0","b1",dt,FLW.back,false,26); swap("b0","b1"); if(!D.pendB) dRead("b0","B"); } }   // 뒤쪽 층은 두 박자에 한 번
+    if(backDue){ backDue=false; const dt=simT-backT; backPT=backT; backT=simT; if(dt>0){ pass("pick","bp",[["A","b0"],["B","b0"]],u=>gl.uniform4f(u.on,1,1,1,1)); layer("b0","b1",dt,FLW.back,false,26); swap("b0","b1"); if(!D.pendB) dRead("b0","B"); } }   // 뒤쪽 층은 두 박자에 한 번
     gl.flush(); simT+=DT; return true; }
+  /* ── 3단계: 그리기 (잉크 층을 셰이더로 칠한다) ──
+     CPU 그리기와 같은 순서: 박자 사이 잇기·짧은 평활 → 두 번 흐림 → 가장자리 혹 → 높이(부풀림) → 빛(어두운 면·하이라이트 둘) → 흐림·시간 평활 → 몸통·테두리·명암 칠하기 */
+  const RFS={
+    interp: HEAD+`uniform sampler2D Pv; uniform sampler2D Cu; uniform sampler2D Sm; uniform float f,q; void main(){ ivec2 c=C(); vec4 p=texelFetch(Pv,c,0), r=p+(texelFetch(Cu,c,0)-p)*f; if(q>0.){ vec4 s=texelFetch(Sm,c,0); r=s+(r-s)*q; } o=mix(r,vec4(0),vec4(lessThan(r,vec4(1e-4)))); }`,
+    umax: HEAD+`uniform sampler2D A; uniform vec2 lv; void main(){ vec4 r=texelFetch(A,C(),0); o=vec4(max(r.r*lv.x,r.a*lv.y),0,0,0); }`,
+    blur: HEAD+`uniform sampler2D A; void main(){ ivec2 c=C(); if(!inner(c)){ o=vec4(0); return; } o=(texelFetch(A,c,0)*4.+texelFetch(A,c-ivec2(1,0),0)+texelFetch(A,c+ivec2(1,0),0)+texelFetch(A,c-ivec2(0,1),0)+texelFetch(A,c+ivec2(0,1),0))*.125; }`,
+    lobe: HEAD+`uniform sampler2D A; uniform sampler2D Nz; uniform ivec2 VS2; uniform float lb,RV; vec4 nzb(vec2 p){ p=clamp(p,vec2(0),vec2(VS2)-1.001); ivec2 i=ivec2(floor(p)); vec2 f=p-vec2(i); return mix(mix(texelFetch(Nz,i,0),texelFetch(Nz,i+ivec2(1,0),0),f.x),mix(texelFetch(Nz,i+ivec2(0,1),0),texelFetch(Nz,i+ivec2(1,1),0),f.x),f.y); }
+      void main(){ ivec2 c=C(); vec4 f=texelFetch(A,c,0); if(lb<=0. || !inner(c)){ o=f; return; } float n1=nzb(vec2(c)*RV).y; vec4 g=f+lb*(n1-.5)*2.*f*(1.-f)*4.; o=mix(f,g,vec4(greaterThan(f,vec4(.12)))*vec4(lessThan(f,vec4(.88)))); }`,
+    zinit: HEAD+`uniform sampler2D Z; uniform sampler2D Fd; void main(){ ivec2 c=C(); vec4 z=texelFetch(Z,c,0), f=texelFetch(Fd,c,0); vec4 ins=vec4(greaterThan(f,vec4(.5))); o=ins*mix(vec4(60.),z,vec4(greaterThan(z,vec4(0.)))); }`,
+    zjac: HEAD+`uniform sampler2D Z; uniform sampler2D Fd; uniform float S2; void main(){ ivec2 c=C(); vec4 f=texelFetch(Fd,c,0); if(!inner(c)){ o=vec4(0); return; } vec4 ins=vec4(greaterThan(f,vec4(.5))), e=(f-.5)/.25, ab=mix(vec4(0),(1.-e)*1.4,vec4(lessThan(e,vec4(1.))));
+      vec4 s=texelFetch(Z,c-ivec2(1,0),0)+texelFetch(Z,c+ivec2(1,0),0)+texelFetch(Z,c-ivec2(0,1),0)+texelFetch(Z,c+ivec2(0,1),0); o=ins*(s+S2)/(4.+ab); }`,
+    light: HEAD+`uniform sampler2D Z; uniform sampler2D Fd; uniform sampler2D Nz; uniform ivec2 VS2; uniform int mode; uniform float RV,CELL,LX,LY; uniform vec4 td,nA,ksz,csz,caz,bsz,brk;
+      vec4 nzb(vec2 p){ p=clamp(p,vec2(0),vec2(VS2)-1.001); ivec2 i=ivec2(floor(p)); vec2 f=p-vec2(i); return mix(mix(texelFetch(Nz,i,0),texelFetch(Nz,i+ivec2(1,0),0),f.x),mix(texelFetch(Nz,i+ivec2(0,1),0),texelFetch(Nz,i+ivec2(1,1),0),f.x),f.y); }
+      void main(){ ivec2 c=C(); if(!inner(c)){ o=vec4(0); return; } vec4 F=texelFetch(Fd,c,0), H=sqrt(max(texelFetch(Z,c,0),0.)), HL=sqrt(max(texelFetch(Z,c-ivec2(1,0),0),0.)), HR=sqrt(max(texelFetch(Z,c+ivec2(1,0),0),0.)), HD=sqrt(max(texelFetch(Z,c-ivec2(0,1),0),0.)), HU=sqrt(max(texelFetch(Z,c+ivec2(0,1),0),0.));
+        vec4 N=nzb(vec2(c)*RV); float rw=N.x, fl=N.y, wob=N.z, n3=N.w; const float LZ=.74; float LXY=sqrt(1.-LZ*LZ), gx0=LX*LXY, gy0=LY*LXY, i2=1./(2.*CELL); vec4 r=vec4(0);
+        for(int k=0;k<4;k++){ float f=F[k]; if(f<=.5) continue; float nx=-(HR[k]-HL[k])*i2, ny=-(HU[k]-HD[k])*i2, il=1./sqrt(nx*nx+ny*ny+1.); nx*=il; ny*=il; float nzz=il;
+          float sd=(td[k]+nA[k]*(fl-.5)-(nx*gx0+ny*gy0+nzz*LZ))*2.4-(rw>.3?2.4*(1.-sm((f-.5)*5.1/(rw*.25))):0.);
+          float nl=sqrt(nx*nx+ny*ny), fc=nl>1e-4?(nx*LX+ny*LY)/nl:0., sml=sm((20.-H[k])/9.), zhi=.83+.08*sml, zlo=zhi-(.2+.34*ksz[k]+.22*sml), bk=brk[k]>0.?brk[k]*n3:0.;
+          float sh=(sm((nzz-zlo)/.09+.5)*(1.-sm((nzz-zhi)/.09+.5))*sm((fc-(.98-1.3*ksz[k]))/.3+.5)-.5-bk+wob*2.)*1.1;
+          float c2=cos(caz[k]), s2=sin(caz[k]), fx=(LX*c2-LY*s2)*.62, fy=(LX*s2+LY*c2)*.62; float v=(nx*fx+ny*fy+nzz*1.785)*.5294-cos(csz[k])+wob*csz[k]; if(bsz[k]>0.){ float b2=(nx*(-LX*.954)+ny*(-LY*.954)+nzz*1.3)*.6202-cos(bsz[k]); if(b2>v) v=b2; }
+          r[k]=mode==0?sm(sd*1.1+.5):mode==1?sm(sh*2.2+.75):sm(v*14.*2.2+.6); }
+        o=r; }`,
+    ema: HEAD+`uniform sampler2D L; uniform sampler2D A; uniform sampler2D Fd; uniform float ea; void main(){ ivec2 c=C(); vec4 a=texelFetch(A,c,0); if(!inner(c)){ o=a*(1.-ea); return; } vec4 b=(texelFetch(L,c,0)*4.+texelFetch(L,c-ivec2(1,0),0)+texelFetch(L,c+ivec2(1,0),0)+texelFetch(L,c-ivec2(0,1),0)+texelFetch(L,c+ivec2(0,1),0))*.125;
+      vec4 ins=vec4(greaterThan(texelFetch(Fd,c,0),vec4(.5))); o=mix(a*(1.-ea),a+(b-a)*ea,ins); }`,
+    copy: HEAD+`uniform sampler2D A; void main(){ o=texelFetch(A,C(),0); }`,
+    pack3: HEAD+`uniform sampler2D A; uniform sampler2D B; uniform sampler2D Cc; void main(){ ivec2 c=C(); o=vec4(texelFetch(A,c,0).r,texelFetch(B,c,0).r,texelFetch(Cc,c,0).r,0); }`,
+    comp: `#version 300 es
+precision highp float; precision highp int; out vec4 o; uniform sampler2D Fd; uniform sampler2D A0; uniform sampler2D A1; uniform sampler2D A2; uniform sampler2D Fu; uniform sampler2D Au;
+      uniform vec2 GS; uniform float H,scale,CX,CY,bs,PAD,CELL; uniform vec4 base[4],core[4],hi[4],lin[4],rim[4]; uniform vec4 lw,live,shd,dth,hth; uniform float uon,uDth,uHth; uniform vec4 uCore,uHi;
+      vec4 cat(sampler2D t,vec2 g){ vec2 sp=g, tp=floor(sp-.5)+.5, f=sp-tp, w0=f*(-.5+f*(1.-.5*f)), w1=1.+f*f*(-2.5+1.5*f), w2=f*(.5+f*(2.-1.5*f)), w3=f*f*(-.5+.5*f), w12=w1+w2, o12=w2/w12; vec2 t0=(tp-1.)/GS, t3=(tp+2.)/GS, t12=(tp+o12)/GS;
+        return (texture(t,vec2(t0.x,t0.y))*w0.x+texture(t,vec2(t12.x,t0.y))*w12.x+texture(t,vec2(t3.x,t0.y))*w3.x)*w0.y+(texture(t,vec2(t0.x,t12.y))*w0.x+texture(t,vec2(t12.x,t12.y))*w12.x+texture(t,vec2(t3.x,t12.y))*w3.x)*w12.y+(texture(t,vec2(t0.x,t3.y))*w0.x+texture(t,vec2(t12.x,t3.y))*w12.x+texture(t,vec2(t3.x,t3.y))*w3.x)*w3.y; }   // 캐트멀-롬 보간: 격자 사이도 매끈한 곡선 테두리
+      void over(inout vec4 acc,vec3 rgb,float a){ acc=vec4(rgb*a,a)+acc*(1.-a); }
+      void main(){ vec2 p=vec2(gl_FragCoord.x,H-gl_FragCoord.y); vec2 X=p/scale; X=vec2(CX,CY)+(X-vec2(CX,CY))/bs; vec2 g=(X+PAD)/CELL+.5;
+        vec4 F=cat(Fd,g), a0=texture(A0,g/GS), a1=texture(A1,g/GS), a2=texture(A2,g/GS); vec4 dF=sqrt(dFdx(F)*dFdx(F)+dFdy(F)*dFdy(F))+1e-5, d=(F-.5)/dF;
+        vec4 g0=sqrt(dFdx(a0)*dFdx(a0)+dFdy(a0)*dFdy(a0))+1e-5, g1=sqrt(dFdx(a1)*dFdx(a1)+dFdy(a1)*dFdy(a1))+1e-5, g2=sqrt(dFdx(a2)*dFdx(a2)+dFdy(a2)*dFdy(a2))+1e-5;
+        vec4 acc=vec4(0); float lp=scale*bs;
+        for(int k=0;k<4;k++){ if(live[k]<.5) continue; float ins=clamp(d[k]+.5,0.,1.), ad=abs(d[k]), L=lw[k]*lp;
+          if(rim[k].a>0.) over(acc,rim[k].rgb,clamp(L-ad+.5,0.,1.)); over(acc,base[k].rgb,ins);
+          if(shd[k]>.5){ over(acc,core[k].rgb,ins*clamp((a0[k]-dth[k])/g0[k]+.5,0.,1.)); float h1=clamp((a1[k]-hth[k])/g1[k]+.5,0.,1.), h2=clamp((a2[k]-hth[k]-.1)/g2[k]+.5,0.,1.); over(acc,hi[k].rgb,ins*max(h1,h2)); }
+          if(lin[k].a>0.) over(acc,lin[k].rgb,clamp(L*.5-ad+.5,0.,1.)); }
+        if(uon>.5){ float u=cat(Fu,g).r, du=(u-.5)/(sqrt(dFdx(u)*dFdx(u)+dFdy(u)*dFdy(u))+1e-5), iu=clamp(du+.5,0.,1.); vec3 au=texture(Au,g/GS).rgb, gu=sqrt(dFdx(au)*dFdx(au)+dFdy(au)*dFdy(au))+1e-5;
+          over(acc,uCore.rgb,iu*clamp((au.r-uDth)/gu.r+.5,0.,1.)); over(acc,uHi.rgb,iu*max(clamp((au.g-uHth)/gu.g+.5,0.,1.),clamp((au.b-uHth-.1)/gu.b+.5,0.,1.))); }   // 두 분홍을 한 몸으로 명암
+        o=acc.a>1e-4?vec4(acc.rgb/acc.a,acc.a):vec4(0); }` };
+  let R=null, cv3=null;
+  function tex16(W,H){ const t=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,t); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA16F,W,H,0,gl.RGBA,gl.HALF_FLOAT,null); for(const [k,v] of [[gl.TEXTURE_MIN_FILTER,gl.LINEAR],[gl.TEXTURE_MAG_FILTER,gl.LINEAR],[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D,k,v); const f=gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER,f); gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,t,0); return {t,f,W,H}; }
+  function rinit(){ if(R && R.dw===dw && R.dh===dh) return true; try{ if(!P.comp) for(const k in RFS) P[k]=prog(RFS[k]); }catch(e){ if(window.console) console.warn("그래픽카드 그리기를 쓸 수 없어요:",e && e.message); return false; }
+    R={dw,dh}; for(const k of ["smF0","smF1","smB0","smB1","Rf","Rb","Ru","q1","q2","FdF","FdB","FdU","ZF0","ZF1","ZU0","ZU1","Lt","A0a","A0b","A1a","A1b","A2a","A2b","U0a","U0b","U1a","U1b","U2a","U2b"]) R[k]=tex(dw,dh); for(const k of ["hF","hB","hU","h0","h1","h2","hA"]) R[k]=tex16(dw,dh); R.nz=tex(vw,vh); R.zero=T.z; R.first=true; return true; }
+  const rs=(a,b)=>{ const t=R[a]; R[a]=R[b]; R[b]=t; };
+  function rp(name,out,binds,set){ const pr=P[name], O=R[out]||T[out]; gl.useProgram(pr.p); gl.bindFramebuffer(gl.FRAMEBUFFER,O.f); gl.viewport(0,0,O.W,O.H); let u=0; for(const [nm,tk] of binds){ gl.activeTexture(gl.TEXTURE0+u); gl.bindTexture(gl.TEXTURE_2D,(typeof tk==="string"?(R[tk]||T[tk]):tk).t); gl.uniform1i(pr.u[nm],u); u++; } if(pr.u.S) gl.uniform2i(pr.u.S,O.W,O.H); if(set) set(pr.u); gl.drawArrays(gl.TRIANGLE_STRIP,0,4); for(let i=0;i<u;i++){ gl.activeTexture(gl.TEXTURE0+i); gl.bindTexture(gl.TEXTURE_2D,null); } }
+  const hexv=c=>{ if(!c) return [0,0,0,0]; const v=parseInt(c.slice(1,7),16); return [(v>>16&255)/255,(v>>8&255)/255,(v&255)/255,1]; };
+  function shadeSet(Fd,Z0,Z1,A,mats,dt){   // 높이 → 빛 → 흐림·시간 평활 (네 색을 한 번에)
+    rp("zinit",Z1,[["Z",Z0],["Fd",Fd]]); rs(Z0,Z1); for(let it=0;it<16;it++){ rp("zjac",Z1,[["Z",Z0],["Fd",Fd]],u=>gl.uniform1f(u.S2,4*CELL*CELL)); rs(Z0,Z1); }
+    const tl=simT*G.lspd, la=G.lightA*Math.PI/180+.05*Math.sin(tl*.43), LX=Math.cos(la), LY=Math.sin(la), Tm=mats.map(M=>M?Object.assign({},M.lt,G.mat[M.idx===3?0:M.idx]):{}), v4=k=>Tm.map(t=>+t[k]||0), ea=1-Math.exp(-dt*G.lspd/.22);
+    for(let m=0;m<3;m++){ rp("light","Lt",[["Z",Z0],["Fd",Fd],["Nz","nz"]],u=>{ gl.uniform2i(u.VS2,vw,vh); gl.uniform1i(u.mode,m); gl.uniform1f(u.RV,RV); gl.uniform1f(u.CELL,CELL); gl.uniform1f(u.LX,LX); gl.uniform1f(u.LY,LY); for(const k of ["td","nA","ksz","csz","caz","bsz","brk"]) gl.uniform4f(u[k],...v4(k)); });
+      rp("ema",A[m][1],[["L","Lt"],["A",A[m][0]],["Fd",Fd]],u=>gl.uniform1f(u.ea,ea)); rs(A[m][0],A[m][1]); }
+    return Tm; }
+  function field(src,out){ rp("blur","q1",[["A",src]]); rp("blur","q2",[["A","q1"]]); rp("lobe",out,[["A","q2"],["Nz","nz"]],u=>{ gl.uniform2i(u.VS2,vw,vh); gl.uniform1f(u.lb,FLW.lobe); gl.uniform1f(u.RV,RV); }); }
+  /* 한 층을 그려서 캔버스로 돌려준다 (실패하면 null → CPU가 그린다) */
+  function renderLayer(l,a,dt){ if(!ok || !D.on || !rinit()) return null;
+    if(!cv3) cv3=gl.canvas; if(cv3.width!==W || cv3.height!==Hh){ cv3.width=W; cv3.height=Hh; }
+    if(l===NL-1){ const nzA=new Float32Array(vw*vh*4); for(let k=0;k<vw*vh;k++){ nzA[4*k]=NZ[0][k]; nzA[4*k+1]=NZ[1][k]; nzA[4*k+2]=NZ[2][k]; nzA[4*k+3]=NZ[3][k]; } if(R.nz.W!==vw||R.nz.H!==vh) R.nz=tex(vw,vh); gl.bindTexture(gl.TEXTURE_2D,R.nz.t); gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,vw,vh,gl.RGBA,gl.FLOAT,nzA); }
+    const front=l===NL-1, SL=!!G.mat[3].sl, mats=[0,1,2,3].map(c=>(l===0 && SC.backM)?SC.backM:SC.mats[c]);
+    let f=a; if(!front){ const now=simT-DT+a*DT, sp=backT-backPT; f=sp>1e-6?(now-backT+.5*DT)/sp:1; } f=Math.max(0,Math.min(1,f));
+    const sm0=front?"smF0":"smB0", sm1=front?"smF1":"smB1", Rr=front?"Rf":"Rb";
+    rp("interp",sm1,[["Pv",front?"fp":"bp"],["Cu",front?"f0":"b0"],["Sm",sm0]],u=>{ gl.uniform1f(u.f,f); gl.uniform1f(u.q,G.smooth||0); }); rs(sm0,sm1);
+    const FdK=front?"FdF":"FdB"; field(sm0,FdK); rp("copy",front?"hF":"hB",[["A",FdK]]);
+    const live=[0,1,2,3].map(c=>LIVE[l*NC+c]?1:0), shd=mats.map((M,c)=>front && M.shaded && !(SL && c!==1 && c!==2)?1:0); let Tm=mats.map(M=>Object.assign({},M.lt,G.mat[M.idx===3?0:M.idx]));
+    if(front){ Tm=shadeSet("FdF","ZF0","ZF1",[["A0a","A0b"],["A1a","A1b"],["A2a","A2b"]],mats,dt); rp("copy","h0",[["A","A0a"]]); rp("copy","h1",[["A","A1a"]]); rp("copy","h2",[["A","A2a"]]); }
+    const uon=front && SL && (live[0]||live[3]);
+    if(uon){ rp("umax","Ru",[["A",sm0]],u=>gl.uniform2f(u.lv,live[0],live[3])); field("Ru","FdU"); rp("copy","hU",[["A","FdU"]]); const m0=[SC.mats[0],SC.mats[0],SC.mats[0],SC.mats[0]]; shadeSet("FdU","ZU0","ZU1",[["U0a","U0b"],["U1a","U1b"],["U2a","U2b"]],m0,dt); rp("pack3","hA",[["A","U0a"],["B","U1a"],["Cc","U2a"]]); }
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null); gl.viewport(0,0,W,Hh); gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT);
+    const pr=P.comp; gl.useProgram(pr.p); const tx=[["Fd",front?"hF":"hB"],["A0","h0"],["A1","h1"],["A2","h2"],["Fu","hU"],["Au","hA"]]; tx.forEach(([nm,k],i)=>{ gl.activeTexture(gl.TEXTURE0+i); gl.bindTexture(gl.TEXTURE_2D,R[k].t); gl.uniform1i(pr.u[nm],i); });
+    const u=pr.u, bsc=front?1:SC.bscale*G.bkS; gl.uniform2f(u.GS,dw,dh); gl.uniform1f(u.H,Hh); gl.uniform1f(u.scale,scale); gl.uniform1f(u.CX,CX); gl.uniform1f(u.CY,CY); gl.uniform1f(u.bs,bsc); gl.uniform1f(u.PAD,PAD); gl.uniform1f(u.CELL,CELL);
+    const arr=(fn)=>{ const a2=new Float32Array(16); mats.forEach((M,c)=>a2.set(fn(M),4*c)); return a2; };
+    gl.uniform4fv(u.base,arr(M=>hexv(M.base))); gl.uniform4fv(u.core,arr(M=>hexv(M.core))); gl.uniform4fv(u.hi,arr(M=>hexv(M.hi))); gl.uniform4fv(u.lin,arr(M=>hexv(M.line))); gl.uniform4fv(u.rim,arr(M=>hexv(M.rim)));
+    gl.uniform4f(u.lw,...mats.map(M=>+M.lw||0)); gl.uniform4f(u.live,...live); gl.uniform4f(u.shd,...shd); gl.uniform4f(u.dth,...Tm.map(t=>+t.dth||.5)); gl.uniform4f(u.hth,...Tm.map(t=>+t.hth||.36));
+    const T0=Object.assign({},SC.mats[0].lt,G.mat[0]); gl.uniform1f(u.uon,uon?1:0); gl.uniform1f(u.uDth,+T0.dth||.5); gl.uniform1f(u.uHth,+T0.hth||.36); gl.uniform4f(u.uCore,...hexv(SC.mats[0].core)); gl.uniform4f(u.uHi,...hexv(SC.mats[0].hi));
+    gl.drawArrays(gl.TRIANGLE_STRIP,0,4); for(let i=0;i<tx.length;i++){ gl.activeTexture(gl.TEXTURE0+i); gl.bindTexture(gl.TEXTURE_2D,null); }
+    return cv3; }
+
   let avg=0, cnt=0, slow=false; function watch(ms){ avg+=(ms-avg)*.05; if(++cnt>90 && avg>6){ slow=true; ok=false; failed=true; D.on=false; if(window.console) console.warn("그래픽카드 엔진이 이 기기에서는 더 느려 CPU로 돌아갑니다 ("+avg.toFixed(1)+"ms)"); } }   // 소프트웨어로 흉내 내는 기기에서는 오히려 느리다 → 스스로 끈다
-  return { watch, dyeStep, get dyeOn(){ return D.on; }, dyeOff(){ D.on=false; }, get slow(){ return slow; }, get ok(){ return ok; }, init, step, upload(){ if(ok){ size(); upload(); if(D.on){ dsize(); dUploadAll(); } } }, sync(){ if(pending){ gl.finish(); collect(true); } }, dsync(){ if(!gl) return; gl.finish(); dCollectOne("F"); dCollectOne("B"); }, impulse(x,y,r,vx,vy){ if(imp.length<32) imp.push([x,y,r,vx,vy]); } };
+  return { renderLayer, watch, dyeStep, get dyeOn(){ return D.on; }, dyeOff(){ D.on=false; }, get slow(){ return slow; }, get ok(){ return ok; }, init, step, upload(){ if(ok){ size(); upload(); if(D.on){ dsize(); dUploadAll(); } } }, sync(){ if(pending){ gl.finish(); collect(true); } }, dsync(){ if(!gl) return; gl.finish(); dCollectOne("F"); dCollectOne("B"); }, impulse(x,y,r,vx,vy){ if(imp.length<32) imp.push([x,y,r,vx,vy]); } };
 })();
 
 /* ══ 핏방울 (BLOOD DROP): 소용돌이 없는 무중력. 같은 화면 위 투명한 겹 화면에 자기 자리를 두고 따로 논다. 설정도 따로 ══ */
@@ -1509,10 +1590,11 @@ function render(dt,a){ RA=((a||0)+.5)%1; STRANDS=!!SC.jag; JAGON=!!SC.jag && G.t
   g.setTransform(1,0,0,1,0,0); if(sp3) g.clearRect(0,0,W,Hh); else { g.fillStyle=BGN(); g.fillRect(0,0,W,Hh); } g.setTransform(scale,0,0,scale,0,0); g.lineJoin="round"; g.lineCap="round";
   fxTick(Math.min(dt/(G.speed||1),.1)); { const g0=g; g=sp3?gB:gMain; fxBack(); g=g0; }   // 이펙트 바탕 쪽: 액체 뒤
   for(let l=0;l<NL;l++){ g=(sp3 && l===0)?gB:gMain; g.save(); if(l===0){ g.translate(CX,CY); g.scale(SC.bscale*G.bkS,SC.bscale*G.bkS); g.translate(-CX,-CY); }
+    const gcv=(G.gpu && GPUV.ok && GPUV.dyeOn && !SC.jag)?GPUV.renderLayer(l,a,dt):null; if(gcv){ g.setTransform(1,0,0,1,0,0); g.drawImage(gcv,0,0,W,Hh); g.restore(); } else {   // 그래픽카드가 이 층을 통째로 그린다
     const SL=!!G.mat[3].sl;   // 분홍 B가 분홍 A와 같은 빛을 쓰면 두 분홍을 한 몸으로 명암을 넣는다
     for(let c=0;c<NC;c++){ const M=(l===0 && SC.backM)?SC.backM:SC.mats[c], both=SL && l===NL-1 && c!==1 && c!==2, sh=M.shaded && l===NL-1 && !both; if(!LIVE[l*NC+c]) continue; JSET=l*NC+c; prepare(src(l,c,a),M,sh,EMA[c],dt); paint(M,SC.fade[l],BGN(),sh); }   // 뒤쪽 층은 명암 없이 옅게
     if(SL && l===NL-1 && (LIVE[l*NC] || LIVE[l*NC+3])){ const D0=LIVE[l*NC]?src(l,0,a):DYE[l][0], D3=LIVE[l*NC+3]?src(l,3,a):DYE[l][3]; for(let k=0;k<n;k++) UNI[k]=D0[k]>D3[k]?D0[k]:D3[k]; JSET=8; prepare(UNI,SC.mats[0],true,EMA[0],dt); paint(SC.mats[0],0,BGN(),true,true); }   // 분홍 두 무리의 명암은 한 번에 (닿은 자리도 한 몸으로 빛난다)
-    g.restore();
+    g.restore(); }
     if(l===0){ if(sp3){ if(cvS.width!==W||cvS.height!==Hh){ cvS.width=W; cvS.height=Hh; } gS.setTransform(1,0,0,1,0,0); gS.clearRect(0,0,W,Hh); } if(SC.sparks || G.stOn){ const g0=g; if(sp3){ g=gS; g.setTransform(scale,0,0,scale,0,0); } sparkles(SC.sparks?SC.sparks[0]:"#FAD805",lumH(BGN())>.6?"#9C2F86":(SC.sparks?SC.sparks[1]:null)); g=g0; } if(SC.bolts) bolts(); if(SC.burst) burst(CX,CY,40,7000); } }
   g=gMain;
   if(G.sp && (G.spShow || performance.now()<spPeek)){ const m=spM(), Rm=HY(WW,WH)*.75, tt=simT-DT+a*DT;   // 라인 보기: 나선을 옅은 띠와 점선으로
