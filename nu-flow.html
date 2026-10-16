@@ -96,6 +96,7 @@ canvas.hold{cursor:grabbing}
     <div class="it row" data-k="vA"><span>보이기</span><button id="vA" type="button" aria-pressed="true">분홍 A</button><button id="vB" type="button" aria-pressed="true">분홍 B</button><button id="vP" type="button" aria-pressed="true">보라</button><button id="vR" type="button" aria-pressed="true">붉은</button><button id="vD" type="button" aria-pressed="true">핏방울</button><small class="desc">오브젝트를 하나씩 켜고 끕니다. 끄면 그 액체는 지워지고 더 생기지 않으며 계산도 쉽니다.</small></div>
     <div class="it row" data-k="q1"><span>화질</span><button id="q1" type="button" aria-pressed="false">가볍게</button><button id="q2" type="button" aria-pressed="true">보통</button><button id="q3" type="button" aria-pressed="false">선명</button><button id="qA" type="button" aria-pressed="false">자동 낮추기</button><small class="desc">큰 창에서 그리는 해상도의 상한(가볍게 1080p · 보통 1440p · 선명 4K). '자동 낮추기'를 켜면 버벅일 때 저절로 낮췄다가 넉넉해지면 되돌립니다(바뀌는 순간 선명도가 툭 바뀌어 보여 기본은 꺼짐).</small></div>
     <div class="it row" data-k="bSave"><span>도구</span><button id="bSave" type="button">⤓ 이미지 저장</button><button id="fpsT" type="button" aria-pressed="false">fps 표시</button><button id="sExp" type="button">설정 내보내기</button><button id="sImp" type="button">설정 불러오기</button><button id="sReset" type="button">초기 설정</button><button id="mEdit" type="button" aria-pressed="false">메뉴 편집</button><button id="mRestore" type="button">숨긴 메뉴 되돌리기</button><small class="desc">이미지 저장: 지금 화면을 PNG로. fps 표시: 화면이 실제로 초당 몇 장 그려지는지. 설정 내보내기·불러오기: 지금 값을 파일로 옮겨 다른 곳(깃허브 NU FLOW·내려받은 파일)에서도 그대로 씁니다. 초기 설정: 모든 조절값을 처음 값으로 되돌립니다(두 번 눌러야 실행, 숨긴 메뉴는 그대로). 메뉴 편집: 필요 없는 메뉴를 ✕로 숨깁니다(되돌리기 가능).</small></div>
+    <div class="it row wide" data-k="recOn"><span>녹화</span><button id="recOn" type="button" aria-pressed="false">되감기 녹화 켜기</button><button id="rec10" type="button" disabled>10초 전부터 저장</button><button id="rec30" type="button" disabled>30초 전부터 저장</button><button id="rec60" type="button" disabled>1분 전부터 저장</button><small class="desc"><span id="recS">켜 두면 최근 1분을 늘 기록해 두었다가, 버튼을 누른 순간 기준으로 그만큼 거슬러 올라간 장면을 MP4(1920×1080)로 저장합니다. 3D 모습 그대로 담깁니다. 켜 둔 동안은 그래픽 부담이 조금 늘어요.</span></small></div>
     <input id="sFile" type="file" accept=".json,application/json" hidden>
   </div>
   <h3 class="msub">카메라·배경</h3>
@@ -1064,14 +1065,15 @@ function loopPathT(L,l,r){ const s=L.S[l], n=L.N[l], LB=L.B; if(n<3) return; con
   for(let i=0;i<n;i++){ const x=X0(i), y=Y0(i), j=(i+1)%n; g.quadraticCurveTo(x,y,(x+X0(j))/2,(y+Y0(j))/2); } g.closePath(); }
 const mixC=(a,b,t)=>{ const p=h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)], A=p(a), B=p(b); return "rgb("+A.map((v,i)=>Math.round(v+(B[i]-v)*t)).join(",")+")"; };
 const PRC=[[],[],[],[]];
+const smallHole=l=>{ const a=BL.A[l]*BL.sign; return a<0 && a>-2500; };   // 방울 사이에 갇힌 작은 빈틈은 메운다 (테두리 고리만 떠 보이지 않게)
 function drawDepth(){ prepDepth(); const D=DPA; for(const [q,L] of [[1,CL],[2,HL],[3,H2]]){ const P=PRC[q]; P.length=L.n; for(let l=0;l<L.n;l++){ const p=parentOf(L,l); if(p>=0){ P[l]=D.root[p]; continue; } let b=-1, bd=1e18; for(let m=0;m<D.n;m++){ if(D.root[m]!==m) continue; const d=(D.cx[m]-LAV[0])**2+(D.cy[m]-LAV[1])**2; if(d<bd){ bd=d; b=m; } } P[l]=b; } }   // 소속을 못 찾은 조각은 가장 가까운 방울에 붙인다 (빠져서 깜빡이지 않게)
   for(const zb of [-1,0,1]) for(const ck of [0,1,2,3,5]){ let any=false; for(let l=0;l<D.n;l++) if(D.z[D.root[l]]===zb && D.col[D.root[l]]===ck){ any=true; break; } if(!any) continue; const CC=ck===1?CY:ck===2?CB:ck===3?CW:ck===5?CHT:C;   // 깊이별·색별로 나눠 칠한다
     const t=0, cb=t?mixC(CC.base,BGC,t):CC.base, cc=t?mixC(CC.core,BGC,t):CC.core, ch=t?mixC(CC.hi,BGC,t):CC.hi, cl=t?mixC(CC.line,BGC,t):CC.line, lw=3.4*(1+(zb<0?-.34:zb>0?.16:0)*G.dep);
-    g.beginPath(); for(let l=0;l<D.n;l++){ const r=D.root[l]; if((D.z[r]===zb && D.col[r]===ck)) loopPathT(BL,l,r); } g.fillStyle=cb; g.fill(); g.save(); g.clip();
+    g.beginPath(); for(let l=0;l<D.n;l++){ const r=D.root[l]; if((D.z[r]===zb && D.col[r]===ck) && !smallHole(l)) loopPathT(BL,l,r); } g.fillStyle=cb; g.fill(); g.save(); g.clip();
     g.beginPath(); for(let l=0;l<CL.n;l++){ const r=PRC[1][l]; if(r>=0 && (D.z[r]===zb && D.col[r]===ck)) loopPathT(CL,l,r); } g.fillStyle=cc; g.fill();
     for(const [L,lim,q] of [[HL,24,2],[H2,96,3]]) for(let l=0;l<L.n;l++){ const r=PRC[q][l], a=L.A[l]*L.sign; if(r<0 || (D.z[r]!==zb || D.col[r]!==ck)) continue; if(a>lim*.6 && a<=lim){ g.globalAlpha=(a-lim*.6)/(lim*.4); g.beginPath(); loopPathT(L,l,r); g.fillStyle=ch; g.fill(); } } g.globalAlpha=1;
     g.beginPath(); for(const [L,lim,q] of [[HL,24,2],[H2,96,3]]) for(let l=0;l<L.n;l++){ const r=PRC[q][l], a=L.A[l]*L.sign; if(r>=0 && (D.z[r]===zb && D.col[r]===ck) && (a>lim || a<0)) loopPathT(L,l,r); } g.fillStyle=ch; g.fill();
-    g.restore(); g.beginPath(); for(let l=0;l<D.n;l++){ const r=D.root[l]; if((D.z[r]===zb && D.col[r]===ck)) loopPathT(BL,l,r); } g.strokeStyle=cl; g.lineWidth=lw; g.stroke(); } }
+    g.restore(); g.beginPath(); for(let l=0;l<D.n;l++){ const r=D.root[l]; if((D.z[r]===zb && D.col[r]===ck) && !smallHole(l)) loopPathT(BL,l,r); } g.strokeStyle=cl; g.lineWidth=lw; g.stroke(); } }
 function draw(){
   g.setTransform(1,0,0,1,0,0); if(own) g.clearRect(0,0,W,Hh); g.setTransform(scale,0,0,scale,OXp*scale,OYp*scale); g.lineJoin="round"; g.lineCap="round";
   drawDepth(); sprDraw(); return;   // 늘 깊이·색별로 나눠 그린다 (깊이 차이 0이면 크기·자리는 그대로)   // 깊이 차이가 0이면 예전처럼 한 번에 그린다
@@ -1282,14 +1284,14 @@ function sparkles(fill,line){ if(!G.stOn) return; g.fillStyle=PAL[G.stCol]||fill
    움직임: 팡 — 0.16초 만에 살짝 넘치게 커졌다 제 크기로 돌아오고(오버슈트), 잠시 머문 뒤 작아지며 사라진다.
    터지는 별은 가시가 짧은 시차로 하나씩 튀어나오고 첫 순간 하얀 섬광, 번개는 한 획씩 그려지듯, 광선은 쏘아 나간 뒤 꼬리부터 빨려 들어간다 ── */
 /* 팔레트: 토르소 연작 17점에서 뽑은 색 (살색·회색 제외) */
-const PAL=["#FAD805","#F4D642","#F1E485","#EDA40E","#C57718","#E94D78","#E72B57","#BB1846","#E87799","#F2ABCD","#A7449D","#593997","#5D3251","#26123A","#159FDD","#70CCE8","#B3DCE5","#22720E","#F8F8F6","#FFFFFF"];
+const PAL=["#FAD805","#F4D642","#F1E485","#EDA40E","#C57718","#E94D78","#E72B57","#BB1846","#E87799","#F2ABCD","#A7449D","#593997","#5D3251","#26123A","#159FDD","#70CCE8","#B3DCE5","#22720E","#F8F8F6","#FFFFFF","#7BC950"];
 const PALN=["노랑","진노랑","연노랑","주황","진주황","분홍","진분홍","다홍","장미","연분홍","자주","보라","자두","밤하늘","파랑","하늘","연하늘","초록","크림","흰색"];
-const MIXS=[0,17,14,11,3,5,15,10];   // 여러 색 섞기: 노랑·초록·파랑·보라·주황·분홍·하늘·자주 (그림 속 색깔 별들)
+const MIXS=[0,20,14,11,3,5,15,10,0,15,20];   // 여러 색 섞기: 노랑·초록·파랑·보라·주황·분홍·하늘·자주 (그림 속 색깔 별들)
 function swatches(id,key){ const box=$(id); if(!box) return; const bs=[...box.querySelectorAll("button")];   // 색 칸 버튼은 페이지에 미리 들어 있다 (조절 창에서도 보이게)
   bs.forEach((b,i)=>{ b.setAttribute("aria-pressed",(G[key]|0)===i?"true":"false"); b.addEventListener("click",()=>{ G[key]=i; saveG(); bs.forEach((x,j)=>x.setAttribute("aria-pressed",j===i?"true":"false")); }); }); }
 const SPK=[], SKC={f:"#FFE11C",l:"#F2941A",h:"#FFF6AE"}; let skAcc=0, skSeed=0;
 function skSpawn(type,x,y,size,dir){ skSeed++; { const a=Math.min(G.skMin,G.skMax), b=Math.max(G.skMin,G.skMax); size*=a*Math.pow(b/a,Math.random()); }   // 크기 범위: 가장 작은 ~ 가장 큰 사이에서 무작위
-  SPK.push({cf:G.skMix?MIXS[Math.floor(hh(skSeed,15)*MIXS.length)]:undefined,type,x,y,size,dir:dir??hh(skSeed,1)*TAU,rot:(hh(skSeed,2)-.5)*.8,t:0,life:G.skLife*(.7+.6*hh(skSeed,3))*(type===2?.75:1),sd:skSeed*7919+Math.floor(Math.random()*99991)}); if(SPK.length>150) SPK.shift(); }   // 모양 씨앗은 매번 무작위 (열 때마다·터질 때마다 다른 모양)
+  SPK.push({cf:G.skMix?MIXS[Math.floor(Math.random()*MIXS.length)]:undefined,type,x,y,size,dir:dir??hh(skSeed,1)*TAU,rot:(hh(skSeed,2)-.5)*.8,t:0,life:G.skLife*(.7+.6*hh(skSeed,3))*(type===2?.75:1),sd:skSeed*7919+Math.floor(Math.random()*99991)}); if(SPK.length>150) SPK.shift(); }   // 모양 씨앗은 매번 무작위 (열 때마다·터질 때마다 다른 모양)
 function skTick(dt){ if(!G.skOn){ SPK.length=0; return; } const fl=G.skFloat && G.skT3, ts=[0,1,2,3,4].filter(i=>G["skT"+i] && !(fl && i===3));
   if(fl){ let nf=0; for(const s of SPK) if(s.fl) nf++; if(nf<Math.round(G.skStarN) && Math.random()<dt*1.5){ skSpawn(3,lerpV(0,.08+.84*Math.random()),lerpV(1,.08+.84*Math.random()),.6+.8*Math.random()); const s=SPK[SPK.length-1]; s.fl=1; s.life=G.skStarLife*(.7+.6*Math.random()); s.vx=0; s.vy=0; } }   // 떠다니는 별: 정한 개수만큼 늘 떠 있다
   for(const s of SPK){ if(!s.fl && !s.fl2 && !G.skFloat) continue; if(s.vx===undefined){ s.vx=0; s.vy=0; } const w=waterAt(s.x,s.y), k=Math.min(1,dt*2.2), ph=s.sd*1.7;   // 물 흐름을 따라 천천히, 제자리에서 둥실둥실
@@ -1322,8 +1324,9 @@ function shade(path,x,y,R){ const la=G.lightA*Math.PI/180, lx=Math.cos(la), ly=M
   g.beginPath(); g.arc(x+lx*R*.3,y+ly*R*.3,R*.86,0,TAU); g.rect(x-R*3,y-R*3,R*6,R*6); g.fillStyle=mixc(SKC.f,SKC.l,.45); g.fill("evenodd");   // 그늘 (면색과 테두리색 사이)
   g.beginPath(); g.ellipse(x+lx*R*.32,y+ly*R*.32,R*.3,R*.17,la+Math.PI/2,0,TAU); g.fillStyle=SKC.h; g.fill();   // 하이라이트 덩이
   g.beginPath(); g.arc(x+lx*R*.62-ly*R*.18,y+ly*R*.62+lx*R*.18,R*.065,0,TAU); g.fill(); g.restore(); }   // 작은 점
+const SHC=new Map(); function shadeH(h,k){ const key=h+k; let r=SHC.get(key); if(r) return r; const v=parseInt(h.slice(1,7),16); let c=[v>>16&255,v>>8&255,v&255]; c=c.map(x=>Math.round(k<0?x*(1+k):x+(255-x)*k)); r="rgb("+c.join(",")+")"; SHC.set(key,r); return r; }   // 섞인 색 스파크: 테두리는 같은 색을 진하게, 하이라이트는 밝게
 function skDraw(){ if(!G.skOn || !SPK.length) return; g.lineJoin="miter"; g.miterLimit=8; g.lineWidth=G.skLine;
-  for(const s of SPK){ SKC.f=PAL[s.cf??G.skCF]||PAL[0]; SKC.l=PAL[G.skCL]||PAL[3]; SKC.h=PAL[G.skCH]||PAL[2]; const R=46*G.skSize*s.size, h=n=>hh(s.sd*31+n,5), sp=s.rot+s.t*G.skSpin*.4*(h(1)<.5?-1:1);
+  for(const s of SPK){ SKC.f=PAL[s.cf??G.skCF]||PAL[0]; if(s.cf!==undefined && s.cf!==0){ SKC.l=shadeH(SKC.f,-.38); SKC.h=shadeH(SKC.f,.55); } else { SKC.l=PAL[G.skCL]||PAL[3]; SKC.h=PAL[G.skCH]||PAL[2]; } const R=46*G.skSize*s.size, h=n=>hh(s.sd*31+n,5), sp=s.rot+s.t*G.skSpin*.4*(h(1)<.5?-1:1);
     if(s.type===0){ const V=G.skVar, n=Math.max(4,Math.round(G.skSpikes*(1+(h(2)-.5)*1.1*V)+(h(9)-.5)*2)), lg=Math.floor(h(3)*n), bf=.36*(1+(h(4)-.5)*.9*V), st=1+(h(5)-.5)*.7*V, sa=h(6)*TAU, cs=Math.cos(sa), ss=Math.sin(sa); g.beginPath();   // 터지는 별: 가시 수·몸통·긴 가시·찌그러짐이 매번 다르다 (다양함)
       for(let k=0;k<n*2;k++){ const tip=!(k&1), q=k>>1, a=sp+k*Math.PI/n+(tip?(h(10+q)-.5)*G.skJag*.6:(h(70+q)-.5)*.5*V), pk=skPop(s.t,s.life,(tip?q:q+.5)*.014), base=R*bf*(1+(h(80+q)-.5)*.5*V)*skPop(s.t,s.life);
         const lng=(q===lg?.65:0)+(h(60+q)<.18*V?.4+.4*h(61+q):0), rr=tip?R*(.55+.55*G.skJag*h(30+q)+V*.45*(h(50+q)-.35)+lng)*pk:base; let dx=Math.cos(a)*rr, dy=Math.sin(a)*rr; const pa=dx*cs+dy*ss, pp=-dx*ss+dy*cs; dx=pa*st*cs-pp*ss/st; dy=pa*st*ss+pp*cs/st; const x=s.x+dx, y=s.y+dy; if(k) g.lineTo(x,y); else g.moveTo(x,y); }
@@ -1419,7 +1422,7 @@ function d3Tick(dt){ const on=!!G.d3; if(on!==D3.split){ D3.split=on; d3Mode(on)
   const dax=(G.d3Drift*4*Math.sin(t*.21)-G.d3Mouse*7*D3.my)*dg, ay=(G.d3Drift*6*Math.sin(t*.13+1.3)+G.d3Mouse*9*D3.mx)*dg, ax=G.d3Tilt*dg+dax;   // 시점이 움직인 만큼 깊이가 다른 판끼리 엇갈린다
   BD.cam(ay*70*G.d3kD,-dax*70*G.d3kD);   // 핏방울 깊이마다 엇갈리는 양
   const KS=[G.d3kB,G.d3kF,G.d3kD,G.d3kS];   // 오브젝트마다 3D를 받는 정도 (0이면 화면에 붙은 듯 평평)
-  for(let i=0;i<4;i++){ const q=KS[i], axi=ax*q, ayi=ay*q, daxi=dax*q, z=d3Z(i,Dm)*q, s=1+(D3.S[i]-1)*q; const tx=z*Math.sin(ayi), ty=-z*Math.sin(daxi); const ts=camS()+"perspective("+P.toFixed(1)+"px) translate3d("+tx.toFixed(2)+"px,"+ty.toFixed(2)+"px,"+z.toFixed(1)+"px) rotateX("+axi.toFixed(5)+"rad) rotateY("+ayi.toFixed(5)+"rad) scale("+s.toFixed(4)+")"; if(ts!==D3.TS[i]){ D3.TS[i]=ts; PLS[i].style.transform=ts; } if(i===1 || i===2){ const Hf=d3H(axi,ayi,P,tx,ty,z,s); D3.Hf[i]=Hf; D3.Hi[i]=inv3(Hf); } }
+  for(let i=0;i<4;i++){ const q=KS[i], axi=ax*q, ayi=ay*q, daxi=dax*q, z=d3Z(i,Dm)*q, s=1+(D3.S[i]-1)*q; const tx=z*Math.sin(ayi), ty=-z*Math.sin(daxi); const ts=camS()+"perspective("+P.toFixed(1)+"px) translate3d("+tx.toFixed(2)+"px,"+ty.toFixed(2)+"px,"+z.toFixed(1)+"px) rotateX("+axi.toFixed(5)+"rad) rotateY("+ayi.toFixed(5)+"rad) scale("+s.toFixed(4)+")"; if(ts!==D3.TS[i]){ D3.TS[i]=ts; PLS[i].style.transform=ts; } { const Hf=d3H(axi,ayi,P,tx,ty,z,s); D3.Hf[i]=Hf; if(i===1 || i===2) D3.Hi[i]=inv3(Hf); } }
   if(BD.on()) BD.setMap(d3Map); else BD.setMap(null); if(false){ } }
 addEventListener("pointermove",e=>{ const r=stEl.getBoundingClientRect(); if(!r.width) return; D3.tmx=clamp((e.clientX-r.left)/r.width*2-1,-1,1); D3.tmy=clamp((e.clientY-r.top)/r.height*2-1,-1,1); });
 function wposP(e,i){ const r=stEl.getBoundingClientRect(), cw=cv.clientWidth, ch=cv.clientHeight; let x=e.clientX-(r.left+stEl.clientLeft)-stEl.clientWidth/2-G.camX*stEl.clientWidth, y=e.clientY-(r.top+stEl.clientTop)-stEl.clientHeight/2-G.camY*stEl.clientHeight; x/=G.camZ; y/=G.camZ; if(i===2 && BD.on()) i=1;   // 카메라를 되돌리고, 방울은 소용돌이 판 위 자리로 보인다   // 기울어진 판 위의 자리로 되돌려 읽는다
@@ -1458,7 +1461,7 @@ cv.addEventListener("pointerup",pup); cv.addEventListener("pointercancel",pup); 
 const pct=v=>Math.round(v*100)+"%", KEY="swirl-flow-g";
 function saveG(){ try{ localStorage.setItem(KEY,JSON.stringify(G)); }catch(_){} }
 function loadG(){ try{ const o=JSON.parse(localStorage.getItem(KEY)||"{}"); for(const k in o) if(k in G && typeof o[k]==="number") G[k]=o[k]; if(Array.isArray(o.vis)) o.vis.forEach((v,i)=>{ if(i<4) G.vis[i]=v?1:0; }); if(Array.isArray(o.mat)) o.mat.forEach((m,i)=>{ if(G.mat[i]&&m) for(const k in m) if(k in G.mat[i] && typeof m[k]==="number") G.mat[i][k]=m[k]; }); }catch(_){} }
-loadG(); if(!G.skMig1){ G.skMig1=1; G.skT1=0; saveG(); } G.fxSprOn=0; G.fxSprLink=0; G.fxCrownOn=0; G.fxHeartOn=0; G.fxCloudOn=0; if(!G.skMig2){ G.skMig2=1; G.fxBubOn=0; G.skT3=0; saveG(); } if(!G.skMig3){ G.skMig3=1; G.skT2=0; saveG(); } if(!G.wMig){ G.wMig=1; G.d3Wide=1.2; saveG(); } if(!G.wMig2){ G.wMig2=1; G.d3Wide=1.4; saveG(); } if(!G.swMig){ G.swMig=1; G.swK=1.4; saveG(); }   // 떠다니는 오각별·비눗방울은 핏방울 원리의 별 방울·파란 물방울로 대신한다 (한 번만)   // 분사·왕관·그린 하트는 쓰지 않는다   // 번개는 일단 쉬게 둔다 (한 번만)
+loadG(); if(!G.skMig1){ G.skMig1=1; G.skT1=0; saveG(); } G.fxSprOn=0; G.fxSprLink=0; G.fxCrownOn=0; G.fxHeartOn=0; G.fxCloudOn=0; if(!G.skMig2){ G.skMig2=1; G.fxBubOn=0; G.skT3=0; saveG(); } if(!G.skMig3){ G.skMig3=1; G.skT2=0; saveG(); } if(!G.wMig){ G.wMig=1; G.d3Wide=1.2; saveG(); } if(!G.skMig4){ G.skMig4=1; G.skMix=1; saveG(); } if(!G.wMig2){ G.wMig2=1; G.d3Wide=1.4; saveG(); } if(!G.swMig){ G.swMig=1; G.swK=1.4; saveG(); }   // 떠다니는 오각별·비눗방울은 핏방울 원리의 별 방울·파란 물방울로 대신한다 (한 번만)   // 분사·왕관·그린 하트는 쓰지 않는다   // 번개는 일단 쉬게 둔다 (한 번만)
 function syncUI(){ $("dCW").setAttribute("aria-pressed",G.dir>0?"true":"false"); $("dCCW").setAttribute("aria-pressed",G.dir>0?"false":"true");
   $("gSep").value=G.sep; $("gSepV").textContent=pct(G.sep); $("gMerge").value=G.merge; $("gMergeV").textContent=pct(G.merge);
   $("gHead").value=G.head; $("gHeadV").textContent=pct(G.head); $("gTail").value=G.tail; $("gTailV").textContent=pct(G.tail); $("gStr").value=G.strands; $("gStrV").textContent=pct(G.strands); $("gRnd").value=G.round; $("gRndV").textContent=pct(G.round); $("gInit").value=G.init; $("gInitV").textContent=G.init+"개"; $("gAdd").value=G.add; $("gAddV").textContent=G.add+"개"; $("gPer").value=G.per; $("gPerV").textContent=G.per+"초"; $("gSpin").value=G.spin; $("gSpinV").textContent=pct(G.spin); $("gCalm").value=G.calm; $("gCalmV").textContent=pct(G.calm); $("gOut").value=G.out; $("gOutV").textContent=pct(G.out); $("gTD").value=G.tailDry; $("gTDV").textContent=pct(G.tailDry); for(const [id,k,f] of [["gSpread","spread",v=>pct(v)],["gRim","rim",v=>pct(v)],["gRimW","rimW",v=>Math.round(v)+"px"]]){ $(id).value=G[k]; $(id+"V").textContent=f(G[k]); } $("gVisc").value=G.visc; $("gViscV").textContent=pct(G.visc); $("gLA").value=G.lightA; $("gLAV").textContent=Math.round(G.lightA)+"°"; $("gCarry").value=G.carry; $("gCarryV").textContent=pct(G.carry); $("gDry").value=G.dry; $("gDryV").textContent=pct(G.dry); $("gSpd").value=G.speed; $("gSpdV").textContent=pct(G.speed); $("gCirc").value=G.circ; $("gCircV").textContent=pct(G.circ); $("gLs").value=G.lspd; $("gLsV").textContent=pct(G.lspd); }
@@ -1664,6 +1667,60 @@ const FMT={pct:v=>pct(v), n:v=>Math.round(v)+"개", ps:v=>v.toFixed(2)+"번/초"
 document.querySelectorAll("#mp7 input[type=range]").forEach(el=>{ const k=el.id, f=FMT[el.dataset.f]||FMT.pct, o=$(k+"V"); el.value=G[k]; o.textContent=f(G[k]); el.addEventListener("input",()=>{ G[k]=+el.value; o.textContent=f(G[k]); saveG(); }); });
 document.querySelectorAll("#mp7 button.tog").forEach(b=>{ const k=b.id; b.setAttribute("aria-pressed",G[k]?"true":"false"); b.addEventListener("click",()=>{ G[k]=G[k]?0:1; saveG(); b.setAttribute("aria-pressed",G[k]?"true":"false"); }); });
 document.querySelectorAll("#mp7 .sw").forEach(box=>swatches(box.id,box.id.slice(0,-1)));
+/* ── 되감기 녹화: 켜 두면 최근 1분을 1080p로 늘 기록해 두고, '10초 전부터 / 30초 전부터 / 1분 전부터' 버튼으로 방금 지나간 장면을 MP4로 저장한다.
+   3D 화면은 판 네 장이 따로 기울어져 있으므로, 화면과 똑같은 원근으로 한 장에 합쳐(WebGL) 녹화한다. */
+const REC={on:false, gl:null, cvs:null, prog:null, buf:null, tex:[], enc:null, chunks:[], cfg:null, last:0, n:0, t0:0, busy:false, codec:""};
+const RW=1920, RH=1080, RFPS=30, RKEEP=62e6;
+function recMsg(t,hold){ const e=$("recS"); if(e) e.textContent=t; if(hold) REC.hold=performance.now()+hold; }
+function recSync(){ const b=$("recOn"); if(b){ b.setAttribute("aria-pressed",REC.on?"true":"false"); b.textContent=REC.on?"● 되감기 녹화 켜짐":"되감기 녹화 켜기"; } for(const id of ["rec10","rec30","rec60"]){ const e=$(id); if(e) e.disabled=!REC.on; } }
+function recGL(){ if(REC.gl) return true; const c=document.createElement("canvas"); c.width=RW; c.height=RH; const gl=c.getContext("webgl",{alpha:false,antialias:true,preserveDrawingBuffer:true}); if(!gl) return false;
+  const sh=(t,s)=>{ const o=gl.createShader(t); gl.shaderSource(o,s); gl.compileShader(o); return o; }, p=gl.createProgram();
+  gl.attachShader(p,sh(gl.VERTEX_SHADER,"attribute vec4 p;attribute vec2 q;varying vec2 v;void main(){gl_Position=p;v=q;}"));
+  gl.attachShader(p,sh(gl.FRAGMENT_SHADER,"precision mediump float;varying vec2 v;uniform sampler2D t;void main(){gl_FragColor=texture2D(t,v);}"));
+  gl.linkProgram(p); if(!gl.getProgramParameter(p,gl.LINK_STATUS)) return false; gl.useProgram(p);
+  REC.buf=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,REC.buf); const lp=gl.getAttribLocation(p,"p"), lq=gl.getAttribLocation(p,"q");
+  gl.enableVertexAttribArray(lp); gl.vertexAttribPointer(lp,4,gl.FLOAT,false,24,0); gl.enableVertexAttribArray(lq); gl.vertexAttribPointer(lq,2,gl.FLOAT,false,24,16);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA);
+  for(let i=0;i<4;i++){ const t=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,t); for(const [k,v] of [[gl.TEXTURE_MIN_FILTER,gl.LINEAR],[gl.TEXTURE_MAG_FILTER,gl.LINEAR],[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D,k,v); REC.tex.push(t); }
+  REC.gl=gl; REC.cvs=c; REC.prog=p; return true; }
+const I3=[1,0,0,0,1,0,0,0,1];
+function recPlane(i,el,H){ const gl=REC.gl; if(!el.width || !el.height) return; const pw=el.clientWidth, ph=el.clientHeight, sw=stEl.clientWidth, sh=stEl.clientHeight;
+  const vw=sw/sh>RW/RH?sh*RW/RH:sw, vh=vw*RH/RW, z=G.camZ, tx=G.camX*sw, ty=G.camY*sh, V=[];   // 16:9로 가운데를 잘라 담는다
+  for(const [u,v,a,b] of [[-1,-1,0,0],[1,-1,1,0],[-1,1,0,1],[1,1,1,1]]){ const x=u*pw/2, y=v*ph/2, X=H[0]*x+H[1]*y+H[2], Y=H[3]*x+H[4]*y+H[5], W=H[6]*x+H[7]*y+H[8];
+    V.push((z*X+tx*W)/(vw/2), -(z*Y+ty*W)/(vh/2), 0, W, a, b); }   // 동차 좌표 그대로 넘겨 원근이 맞게 펴진다
+  gl.bindTexture(gl.TEXTURE_2D,REC.tex[i]); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,el);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(V),gl.STREAM_DRAW); gl.drawArrays(gl.TRIANGLE_STRIP,0,4); }
+function recDraw(){ const gl=REC.gl, bg=BGN(), v=parseInt((bg[0]==="#"?bg.slice(1,7):"F5F5EF"),16); gl.viewport(0,0,RW,RH); gl.clearColor((v>>16&255)/255,(v>>8&255)/255,(v&255)/255,1); gl.clear(gl.COLOR_BUFFER_BIT);
+  if(D3.split){ const P=[cvB,cvS,cv,cvBD]; for(let i=0;i<4;i++){ const el=P[i], H=D3.Hf[i]; if(!H || el.style.display==="none") continue; if(i===2 && !BD.on()) continue; recPlane(i,el,H); } }   // 화면에 놓인 순서대로 (뒤쪽 물 · 별빛 · 앞쪽 물 · 핏방울)
+  else recPlane(2,cv,I3); }
+async function recCodec(){ for(const c of ["avc1.640028","avc1.4d0028","avc1.42e028","vp09.00.40.08"]){ try{ const r=await VideoEncoder.isConfigSupported({codec:c,width:RW,height:RH,bitrate:10e6,framerate:RFPS}); if(r && r.supported) return c; }catch(_){} } return ""; }
+async function recStart(){ if(REC.on) return; if(typeof VideoEncoder!=="function"){ recMsg("이 브라우저는 녹화를 지원하지 않아요 (최신 크롬·엣지·사파리에서 돼요)"); return; }
+  if(!recGL()){ recMsg("그래픽(WebGL)을 쓸 수 없어 녹화할 수 없어요"); return; } const c=await recCodec(); if(!c){ recMsg("이 브라우저는 MP4(H.264) 1080p 녹화를 지원하지 않아요"); return; }
+  REC.codec=c; REC.chunks=[]; REC.cfg=null; REC.n=0; REC.t0=performance.now(); REC.last=0;
+  REC.enc=new VideoEncoder({ output:(ch,meta)=>{ if(meta && meta.decoderConfig) REC.cfg=meta.decoderConfig; const d=new Uint8Array(ch.byteLength); ch.copyTo(d); REC.chunks.push({d,k:ch.type==="key",ts:ch.timestamp,dur:ch.duration||Math.round(1e6/RFPS)}); recTrim(); },
+    error:e=>{ recMsg("녹화가 멈췄어요: "+(e && e.message || e)); recStop(); } });
+  const avc=c.startsWith("avc"); REC.enc.configure(Object.assign({codec:c,width:RW,height:RH,bitrate:10e6,framerate:RFPS,latencyMode:"realtime"},avc?{avc:{format:"avc"}}:{}));   // H.264가 없는 브라우저는 VP9로 (MP4 안에 담는 것은 같다)
+  REC.on=true; recSync(); recMsg("기록 중 · 최근 1분을 늘 담아 둡니다"); requestAnimationFrame(recLoop); }
+function recStop(){ REC.on=false; try{ if(REC.enc && REC.enc.state!=="closed") REC.enc.close(); }catch(_){} REC.enc=null; REC.chunks=[]; recSync(); }
+function recTrim(){ const ch=REC.chunks; if(!ch.length) return; const cut=ch[ch.length-1].ts-RKEEP; let k=0; for(let i=0;i<ch.length;i++){ if(ch[i].ts>cut) break; if(ch[i].k) k=i; } if(k>0) ch.splice(0,k); }   // 1분 남짓만 남긴다 (언제나 기준 장면부터 시작하게)
+function recLoop(now){ if(!REC.on) return; requestAnimationFrame(recLoop); if(document.hidden || now-REC.last<1000/RFPS-3) return; REC.last=now;
+  const enc=REC.enc; if(!enc || enc.encodeQueueSize>4) return;   // 기기가 밀리면 한 장 건너뛴다 (화면이 버벅이지 않게)
+  try{ recDraw(); if(!REC.n) REC.t0=now; const ts=Math.max(0,Math.round((now-REC.t0)*1000)), f=new VideoFrame(REC.cvs,{timestamp:ts,duration:Math.round(1e6/RFPS)}); enc.encode(f,{keyFrame:REC.n%RFPS===0}); f.close(); REC.n++; }catch(e){ recMsg("녹화 오류: "+(e && e.message || e)); recStop(); return; }
+  if(REC.n%15===0 && !REC.busy && !(now<(REC.hold||0))){ const ch=REC.chunks; if(ch.length) recMsg("기록 중 · 지금 저장할 수 있는 길이 "+Math.min(60,Math.floor((ch[ch.length-1].ts-ch[0].ts)/1e6))+"초"); } }
+let MUXP=null; function muxLib(){ if(window.Mp4Muxer) return Promise.resolve(window.Mp4Muxer); if(MUXP) return MUXP; MUXP=new Promise((res,rej)=>{ const s=document.createElement("script"); s.src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/build/mp4-muxer.js"; s.onload=()=>window.Mp4Muxer?res(window.Mp4Muxer):rej(new Error("muxer")); s.onerror=()=>{ MUXP=null; rej(new Error("muxer")); }; document.head.appendChild(s); }); return MUXP; }
+async function recSave(sec){ if(!REC.on || REC.busy) return; const ch=REC.chunks.slice(); if(!ch.length || !REC.cfg){ recMsg("아직 담긴 장면이 없어요. 잠시 뒤에 다시 눌러 주세요"); return; }
+  REC.busy=true; recMsg(sec+"초 영상 만드는 중…");
+  try{ const M=await muxLib(), end=ch[ch.length-1].ts, start=end-sec*1e6; let a=0; for(let i=0;i<ch.length;i++){ if(ch[i].ts>start) break; if(ch[i].k) a=i; } while(a<ch.length && !ch[a].k) a++;
+    const mx=new M.Muxer({target:new M.ArrayBufferTarget(), video:{codec:REC.codec.startsWith("avc")?"avc":"vp9",width:RW,height:RH,frameRate:RFPS}, fastStart:"in-memory", firstTimestampBehavior:"offset"});
+    for(let i=a;i<ch.length;i++){ const c=ch[i]; mx.addVideoChunkRaw(c.d,c.k?"key":"delta",c.ts,c.dur,i===a?{decoderConfig:REC.cfg}:undefined); } mx.finalize();
+    const blob=new Blob([mx.target.buffer],{type:"video/mp4"}), got=Math.round((end-ch[a].ts)/1e6), d=new Date(), p=v=>String(v).padStart(2,"0"), nm="nu-flow_"+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+"_"+p(d.getHours())+p(d.getMinutes())+p(d.getSeconds())+"_"+got+"s.mp4";
+    const dl=DLP?await DLP:null;
+    if(dl){ try{ await dl.save({filename:nm,data:blob}); recMsg("저장했어요 · "+nm,6000); }catch(e){ recMsg(e && e.code==="declined"?"저장을 취소했어요":"저장하지 못했어요 ("+(e && e.code || "오류")+")",6000); } }
+    else { const u=URL.createObjectURL(blob), aEl=document.createElement("a"); aEl.href=u; aEl.download=nm; document.body.appendChild(aEl); aEl.click(); aEl.remove(); setTimeout(()=>URL.revokeObjectURL(u),4000); recMsg("저장했어요 · "+nm,6000); }
+  }catch(e){ recMsg(e && e.message==="muxer"?"MP4 만드는 도구를 불러오지 못했어요 (인터넷 연결 확인)":"영상 만들기 실패: "+(e && e.message || e),8000); }
+  REC.busy=false; }
+if($("recOn")){ $("recOn").addEventListener("click",()=>{ if(REC.on){ recStop(); recMsg("꺼짐"); } else recStart(); }); for(const [id,s] of [["rec10",10],["rec30",30],["rec60",60]]) $(id).addEventListener("click",()=>recSave(s)); recSync(); }
+window.__rec=REC;
 requestAnimationFrame(frame);
 })();
 </script>
