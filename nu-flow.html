@@ -207,6 +207,9 @@ canvas.hold{cursor:grabbing}
     <label class="it" data-k="kSize"><span>방울 크기</span><input id="kSize" type="range" min="0.4" max="1.5" step="0.05" value="0.8"><output id="kSizeV">80%</output><small class="desc">처음 놓이는 방울 크기.</small></label>
     <div class="it row" data-k="kLeave"><span>밀려나가기</span><button id="kLeave" type="button" aria-pressed="true">밀려나가기</button><button id="kRefill" type="button" aria-pressed="true">다시 채우기</button><button id="kWall" type="button" aria-pressed="false">가장자리 벽</button><small class="desc">밀려나가기: 방울마다 머무는 시간이 지나면 제멋대로 고른 방향으로 서서히 화면 밖으로 나갑니다. 다시 채우기: 나간 만큼 소용돌이 가운데에서 새 방울이 생깁니다. 가장자리 벽: 켜면 방울이 화면 밖으로 못 나갑니다(꺼 두면 바깥으로 밀려 나가고 가운데에서 다시 생기며 돌고 돕니다).</small></div>
     <label class="it" data-k="kDwell"><span>머무는 시간</span><span class="numw"><input id="kDwell" type="number" min="1" max="600" step="1" value="12" inputmode="decimal"> 초</span><small class="desc">밀려나가기 전에 떠 있는 시간. 방울마다 이 값의 60~140%로 조금씩 다릅니다.</small></label>
+    <div class="it row" data-k="kHeart"><span>하트 방울</span><button id="kHeart" type="button" aria-pressed="true">하트 방울</button><button id="kHeartNow" type="button">하트 하나 더하기</button><small class="desc">로코로코처럼 지금 핏방울을 하트 모양 틀 안에 머물게 해 하트로 잡습니다. 출렁임·명암·하이라이트·잡아 늘리기는 핏방울 그대로입니다.</small></div>
+    <label class="it" data-k="kHeartR"><span>하트 비율</span><input id="kHeartR" type="range" min="0" max="1" step="0.05" value="0.3"><output id="kHeartRV">30%</output><small class="desc">새로 생기는 방울 가운데 하트로 나오는 비율.</small></label>
+    <label class="it" data-k="kHShape"><span>하트 모양 세기</span><input id="kHShape" type="range" min="0" max="3" step="0.05" value="1"><output id="kHShapeV">100%</output><small class="desc">하트 틀이 방울을 붙잡는 힘. 낮으면 말랑하게 흐트러지고, 높으면 또렷한 하트를 지킵니다.</small></label>
     <label class="it" data-k="kDep"><span>깊이 차이</span><input id="kDep" type="range" min="0" max="1" step="0.05" value="0.6"><output id="kDepV">60%</output><small class="desc">방울마다 먼 쪽·가운데·가까운 쪽 깊이가 정해져 있어, 먼 방울은 작고 흐리게, 가까운 방울은 조금 크게 보입니다. 3D 시점이 움직이면 깊이만큼 엇갈립니다. 0이면 모두 같은 깊이.</small></label>
     <label class="it" data-k="kPush"><span>밀려나는 힘</span><input id="kPush" type="range" min="0.2" max="3" step="0.05" value="1"><output id="kPushV">100%</output><small class="desc">밖으로 밀려나가는 빠르기.</small></label>
     <label class="it" data-k="kSep"><span>흩어진 뒤 안 합쳐짐</span><span class="numw"><input id="kSep" type="number" min="0" max="60" step="0.5" value="3" inputmode="decimal"> 초</span><small class="desc">방울을 두 번 눌러 펑 터뜨렸을 때 작은 방울들이 서로 다시 붙지 않는 시간.</small></label>
@@ -709,12 +712,14 @@ function step(){ const DS=DT*G.speed, DMP=Math.pow(P.DAMP,G.speed), VS=P.VISC*Ma
     if(inf>0 && waterAt){ ax+=(FWX[lb]-VX[i])*inf; ay+=(FWY[lb]-VY[i])*inf; }
     const lv=LLV[lb]; if(lv>0){ const f=G.push*110*Math.min(1,(t-lv)/2.5); ax+=LDX[lb]*f; ay+=LDY[lb]*f; }   // 밀려나는 방울: 벽 없이 서서히 빨라지며 화면 밖으로
     else if(G.walls){ if(x<m) ax+=(m-x)*140; else if(x>WW-m) ax-=(x-(WW-m))*140; if(y<m) ay+=(m-y)*140; else if(y>WH-m) ay-=(y-(WH-m))*140; }
+    let hpx=0, hpy=0; if(LHRT[lb] && G.hShape>0 && LCNT[lb]>6){ const s=Math.sqrt(LCNT[lb]*SP0*SP0*.866/HRT.area), a=LHA[lb]+.08*Math.sin(t*.9+lb), ca=Math.cos(a), sa=Math.sin(a), qx=(rx*ca+ry*sa)/s, qy=HRT.cy-(-rx*sa+ry*ca)/s, d=sdHeart(qx,qy)+.03;   // 하트 틀 (화면 아래쪽이 하트 끝)
+      if(d>0){ const e=.01, gx=(sdHeart(qx+e,qy)-sdHeart(qx-e,qy))/(2*e), gy=(sdHeart(qx,qy+e)-sdHeart(qx,qy-e))/(2*e), f=d*s*G.hShape*1400, wx=gx, wy=-gy, ux=wx*ca-wy*sa, uy=wx*sa+wy*ca; ax-=ux*f; ay-=uy*f; hpx=-ux*d*s*.3*Math.min(1,G.hShape); hpy=-uy*d*s*.3*Math.min(1,G.hShape); } }   // 틀 밖으로 삐져나간 만큼 안쪽으로 (말랑하게)
     if(G.outP>0){ const ox=LCX[lb]-CXs, oy=LCY[lb]-CYs, ol=Math.hypot(ox,oy)+1; ax+=ox/ol*G.outP*22; ay+=oy/ol*G.outP*22; }   // 나선 가운데에서 바깥으로 천천히 밀려난다
     let vx=(VX[i]+ax*DS)*DMP, vy=(VY[i]+ay*DS)*DMP;
     const tw=TW[i]; if(tw>0){ const tk=Math.min(tw*P.TOW,.5); vx+=(TVX[i]-vx)*tk; vy+=(TVY[i]-vy)*tk; }
     const g=GW[i]; if(g>0){ let tx=(GTX[i]-x)*26, ty=(GTY[i]-y)*26; const l=Math.hypot(tx,ty); if(l>1500){ tx*=1500/l; ty*=1500/l; } vx+=(tx-vx)*g; vy+=(ty-vy)*g; }
     const sp=vx*vx+vy*vy; if(sp>2250000){ const k=1500/Math.sqrt(sp); vx*=k; vy*=k; }
-    VX[i]=vx; VY[i]=vy; OX[i]=x; OY[i]=y; X[i]=x+vx*DS; Y[i]=y+vy*DS; RHO[i]=0; RHN[i]=0; DX[i]=0; DY[i]=0; }
+    VX[i]=vx; VY[i]=vy; OX[i]=x; OY[i]=y; X[i]=x+vx*DS+hpx; Y[i]=y+vy*DS+hpy; RHO[i]=0; RHN[i]=0; DX[i]=0; DY[i]=0; }   // 하트 틀 밖으로 나간 알갱이는 자리도 조금씩 안으로 되돌린다
   // 뭉침과 부피: 너무 성기면 끌어당기고 너무 배면 밀어낸다
   for(let p=0;p<NP;p++){ const i=PI_[p], j=PJ_[p], dx=X[j]-X[i], dy=Y[j]-Y[i], r2=dx*dx+dy*dy; if(r2>=h2) continue;
     const a=1-Math.sqrt(r2)*ih, a2=a*a; RHO[i]+=a2; RHO[j]+=a2; RHN[i]+=a2*a; RHN[j]+=a2*a; }
@@ -753,7 +758,7 @@ function towFrom(seeds,vx,vy,lam){ const qt=linked(seeds);
 /* ── 판 차리기 ── */
 const AREA=540000, SIZES=[60,46,38,31,25,20,16];
 let W=0, Hh=0, dpr=1, scale=1, extra=0;
-const G={on:1,dep:.6,flowInf:.3,fmax:120,outP:.5,walls:0,speed:1,sep:3,leave:1,dwell:12,push:1,refill:1,hi:1,co:1,dyn:1,fuse:3,size:.8,count:5,side:0,wf:.42,visc:1,wob:1,st:1};   // side: 0 오른쪽 1 왼쪽 2 위 3 아래 4 화면 전체   // 전체 조절값: 하이라이트 크기, 어두운 부분 크기, 출렁임
+const G={on:1,dep:.6,heart:1,heartR:.3,hShape:1,flowInf:.3,fmax:120,outP:.5,walls:0,speed:1,sep:3,leave:1,dwell:12,push:1,refill:1,hi:1,co:1,dyn:1,fuse:3,size:.8,count:5,side:0,wf:.42,visc:1,wob:1,st:1};   // side: 0 오른쪽 1 왼쪽 2 위 3 아래 4 화면 전체   // 전체 조절값: 하이라이트 크기, 어두운 부분 크기, 출렁임
 let sel=-1;                  // 선택한 방울에 속한 알갱이 하나 (방울이 합쳐지면 합쳐진 덩어리가 선택된다)
 let ZX0=0, ZY0=0, ZX1=930, ZY1=580;   // 처음 놓이는 자리 (화면은 소용돌이와 함께 쓴다)
 function place(R,key){ // 다른 방울과 겹치지 않는 빈자리를 고른다
@@ -766,7 +771,11 @@ function reset(){ N=0; nLobe=0; ptrs.clear(); extra=0; GW.fill(0); TW.fill(0); s
   for(let i=0;i<G.count;i++){ const R=Math.max(14,SIZES[i%SIZES.length]*G.size*(i>=SIZES.length?.75:1)), p=place(R,i+1); addShape(p[0],p[1],R-6,(h(SEED,i,90)-.5)*16,(h(SEED,i,91)-.5)*16,700+i*17); } btn(); selUI(); }
 function more(){ if(N>CAP-240) return; extra++; const R=Math.max(14,(17+22*h(SEED,300+extra,0))*G.size), p=place(R,400+extra); addShape(p[0],p[1],R-6,0,0,900+extra*13); btn(); }
 /* 여러 모양: 그림 속 방울처럼 둥근 것, 길쭉한 것, 강낭콩·땅콩(볼록함 둘), 애벌레(볼록함 셋·넷)가 섞인다. 이어 붙은 볼록함은 서로 녹아 하나가 되지 않아 모양이 남는다 */
+/* 하트 방울 (로코로코처럼): 새로 그리지 않고, 지금 핏방울 알갱이들을 하트 모양 틀 안에 머물게 한다. 출렁임·명암·늘리기는 핏방울 그대로 */
+function sdHeart(x,y){ x=Math.abs(x); if(y+x>1){ const dx=x-.25, dy=y-.75; return Math.sqrt(dx*dx+dy*dy)-Math.SQRT2/4; } const d1=x*x+(y-1)*(y-1), m=.5*Math.max(x+y,0), d2=(x-m)*(x-m)+(y-m)*(y-m); return Math.sqrt(Math.min(d1,d2))*Math.sign(x-y); }   // 아래 끝이 (0,0), 위로 볼록한 두 덩이
+const HRT=(()=>{ let a=0, cy=0, n=0; for(let y=-.2;y<1.3;y+=.01) for(let x=-.8;x<.8;x+=.01) if(sdHeart(x,y)<0){ n++; cy+=y; } return {area:n*1e-4, cy:cy/n}; })();
 function addShape(cx,cy,base,vx,vy,key){ const u=hh(key,80);
+  if(G.heart && base>=12 && hh(key,91)<G.heartR){ const k=addDrop(cx,cy,Math.max(base*1.7,62*G.size),vx,vy), l=nLobe-1;   /* 하트는 알갱이가 넉넉해야 오목한 윗부분과 뾰족한 끝이 산다 */ LHRT[l]=1; LKEEP[l]=1; LHA[l]=(hh(key,92)-.5)*.6; return k; }   // 하트 방울: 정한 비율만큼
   if(u<.42 || base<11) return addDrop(cx,cy,base,vx,vy);
   if(u<.58) return addDrop(cx,cy,base,vx,vy,1.3+.8*hh(key,81),hh(key,82)*TAU);
   const n=u<.85?2:3+(hh(key,83)<.4?1:0), bend=(hh(key,85)-.5)*1.4; let x=cx, y=cy, a=hh(key,84)*TAU, pr=0, k=0; const ls=[];
@@ -842,12 +851,12 @@ const LMAX=1024, LCNT=new Int32Array(LMAX), LOFF=new Int32Array(LMAX+1), LCUR=ne
       SB=[0,1,2,3,4,5,6,7].map(()=>new Float32Array(LMAX)),   // 덩이가 타고난 빛 성격 (LAC…L3Z는 지금 쓰는 값: 녹아드는 동안 큰 덩이 쪽으로 닮아 간다)
       LEX=new Float32Array(LMAX), LEV=new Float32Array(LMAX), L3A=new Float32Array(LMAX), LCX=new Float32Array(LMAX), LCY=new Float32Array(LMAX), LSP=new Float32Array(LMAX), LIR=new Float32Array(LMAX), LS0=new Float32Array(LMAX),
       LTO=new Int16Array(LMAX).fill(-1), LCAND=new Int16Array(LMAX), LFUS=new Int16Array(LMAX), LTM=new Float32Array(LMAX), LFD=new Float32Array(LMAX).fill(1),
-      LBORN=new Float32Array(LMAX), LNF=new Float32Array(LMAX), LLV=new Float32Array(LMAX), LDX=new Float32Array(LMAX), LDY=new Float32Array(LMAX), LDW=new Float32Array(LMAX), LFR=new Uint8Array(LMAX), LKEEP=new Uint8Array(LMAX), LDZ=new Int8Array(LMAX), FWX=new Float32Array(LMAX), FWY=new Float32Array(LMAX);   // 덩이 자리의 물 흐름 (소용돌이 쪽에서 빌려 온다)
+      LBORN=new Float32Array(LMAX), LNF=new Float32Array(LMAX), LLV=new Float32Array(LMAX), LDX=new Float32Array(LMAX), LDY=new Float32Array(LMAX), LDW=new Float32Array(LMAX), LFR=new Uint8Array(LMAX), LKEEP=new Uint8Array(LMAX), LDZ=new Int8Array(LMAX), LHRT=new Uint8Array(LMAX), LHA=new Float32Array(LMAX), FWX=new Float32Array(LMAX), FWY=new Float32Array(LMAX);   // 덩이 자리의 물 흐름 (소용돌이 쪽에서 빌려 온다)
 let waterAt=null;   // 태어난 때, 이때까지 안 합쳐짐, 밀려나기 시작한 때, 나가는 방향, 머무는 시간 배율
 const SE=[LAC,LAS,LEL,LSZ,L2C,L2S,L2Z,L3Z];
 let nLobe=0, lobeSerial=0;
 function styleLobe(l){ const k=++lobeSerial; // 덩이마다 빛을 받는 성격이 다르다
-  LBORN[l]=simT; LNF[l]=0; LLV[l]=0; LFR[l]=0; LKEEP[l]=0; { const r=hh(k,64); LDZ[l]=r<.4?-1:r<.75?0:1; } LDW[l]=.6+.8*hh(k,61); const da=hh(k,62)*TAU; LDX[l]=Math.cos(da); LDY[l]=Math.sin(da);   // 머무는 시간은 방울마다 조금씩 다르고, 나가는 방향은 제멋대로
+  LBORN[l]=simT; LNF[l]=0; LLV[l]=0; LFR[l]=0; LKEEP[l]=0; LHRT[l]=0; { const r=hh(k,64); LDZ[l]=r<.4?-1:r<.75?0:1; } LDW[l]=.6+.8*hh(k,61); const da=hh(k,62)*TAU; LDX[l]=Math.cos(da); LDY[l]=Math.sin(da);   // 머무는 시간은 방울마다 조금씩 다르고, 나가는 방향은 제멋대로
   const az=(hh(k,41)-.5)*.9, a2=az+(hh(k,44)<.5?-1:1)*(.85+.6*hh(k,45));
   LAC[l]=Math.cos(az); LAS[l]=Math.sin(az); LEL[l]=.42+.42*hh(k,42);          // 빛의 높이: 낮으면 가장자리에 붙은 초승달, 높으면 가운데 쪽 둥근 얼룩
   LSZ[l]=.33+.17*hh(k,43);                                                     // 큰 하이라이트의 크기
@@ -856,7 +865,7 @@ function styleLobe(l){ const k=++lobeSerial; // 덩이마다 빛을 받는 성�
   for(let q=0;q<8;q++) SB[q][l]=SE[q][l]; LS0[l]=(hh(k,51)<.5?-1:1)*(.5+.6*hh(k,52)); LTO[l]=-1; LTM[l]=0; LFD[l]=1; LCX[l]=0; LCY[l]=0; LSP[l]=0; LIR[l]=0; LEX[l]=0; LEV[l]=0; }
 const hh=(a,b)=>h(SEED,a,b);
 function newLobe(){ if(nLobe>=LMAX-2) packLobes(); const l=nLobe++; styleLobe(l); return l; }
-function packLobes(){ const map=new Int16Array(LMAX).fill(-1); let k=0; for(let i=0;i<N;i++){ const l=LBL[i]; if(map[l]<0){ map[l]=k; for(let q=0;q<8;q++){ SB[q][k]=SB[q][l]; SE[q][k]=SE[q][l]; } LS0[k]=LS0[l]; L3A[k]=L3A[l]; LEX[k]=LEX[l]; LEV[k]=LEV[l]; LBORN[k]=LBORN[l]; LNF[k]=LNF[l]; LLV[k]=LLV[l]; LDX[k]=LDX[l]; LDY[k]=LDY[l]; LDW[k]=LDW[l]; LFR[k]=LFR[l]; LKEEP[k]=LKEEP[l]; LDZ[k]=LDZ[l]; LTO[k]=-1; LTM[k]=0; LFD[k]=1; k++; } LBL[i]=map[l]; } nLobe=k; }
+function packLobes(){ const map=new Int16Array(LMAX).fill(-1); let k=0; for(let i=0;i<N;i++){ const l=LBL[i]; if(map[l]<0){ map[l]=k; for(let q=0;q<8;q++){ SB[q][k]=SB[q][l]; SE[q][k]=SE[q][l]; } LS0[k]=LS0[l]; L3A[k]=L3A[l]; LEX[k]=LEX[l]; LEV[k]=LEV[l]; LBORN[k]=LBORN[l]; LNF[k]=LNF[l]; LLV[k]=LLV[l]; LDX[k]=LDX[l]; LDY[k]=LDY[l]; LDW[k]=LDW[l]; LFR[k]=LFR[l]; LKEEP[k]=LKEEP[l]; LDZ[k]=LDZ[l]; LHRT[k]=LHRT[l]; LHA[k]=LHA[l]; LTO[k]=-1; LTM[k]=0; LFD[k]=1; k++; } LBL[i]=map[l]; } nLobe=k; }
 let FMX=1e9;
 function lobes(dt){ FMX=Math.PI*(G.fmax/2)*(G.fmax/2)/(SP0*SP0*.866); const n=gw*gh, inv=1/CELL, r2=RK*RK, ir=1/r2;   // 지름(px) → 알갱이 수
   for(let l=0;l<nLobe;l++){ LCNT[l]=0; BX0[l]=1e9; BY0[l]=1e9; BX1[l]=-1e9; BY1[l]=-1e9; LCX[l]=0; LCY[l]=0; LCAND[l]=-1; LFUS[l]=-1; }
@@ -1027,6 +1036,10 @@ $("kAdd").addEventListener("click",more); $("kReset").addEventListener("click",r
 const pct=v=>Math.round(v*100)+"%";
 [["kFmax","fmax"],["kOut","outP"],["kFlow","flowInf"],["kSpd","speed"],["kHi","hi"],["kCo","co"],["kDyn","dyn"],["kVisc","visc"],["kWob","wob"],["kSt","st"],["kSize","size"],["kWf","wf"]].forEach(([id,k])=>{ const el=$(id); el.addEventListener("input",()=>{ G[k]=+el.value; $(id+"V").textContent=fmK(k,G[k]); applyP(); save(); if(k==="wf" && onPlace) onPlace(); }); });
 $("kCount").addEventListener("input",()=>{ G.count=+$("kCount").value; $("kCountV").textContent=G.count+"개"; save(); });
+$("kHeart").addEventListener("click",()=>{ G.heart=G.heart?0:1; save(); syncUI(); });
+$("kHeartR").addEventListener("input",()=>{ G.heartR=+$("kHeartR").value; $("kHeartRV").textContent=pct(G.heartR); save(); });
+$("kHShape").addEventListener("input",()=>{ G.hShape=+$("kHShape").value; $("kHShapeV").textContent=pct(G.hShape); save(); });
+$("kHeartNow").addEventListener("click",()=>{ if(!G.on) return; const r=Math.max(50,Math.sqrt(170*SP0*SP0*.866/Math.PI)*G.size*1.2), x=CXs+(Math.random()-.5)*160, y=CYs+(Math.random()-.5)*120; addDrop(x,y,r,0,0); const l=nLobe-1; LHRT[l]=1; LKEEP[l]=1; LHA[l]=(Math.random()-.5)*.5; });
 $("kDep").addEventListener("input",()=>{ G.dep=+$("kDep").value; $("kDepV").textContent=pct(G.dep); save(); });
 $("kPush").addEventListener("input",()=>{ G.push=+$("kPush").value; $("kPushV").textContent=pct(G.push); save(); });
 $("kSep").addEventListener("input",()=>{ const v=+$("kSep").value; if(!(v>=0)) return; G.sep=Math.min(60,v); save(); });
@@ -1048,7 +1061,7 @@ function save(){ try{ localStorage.setItem(KEY,JSON.stringify(G)); }catch(_){} }
 function load(){ try{ const o=JSON.parse(localStorage.getItem(KEY)||"{}"); for(const k in o) if(k in G && typeof o[k]==="number") G[k]=o[k]; }catch(_){} }
 const SIDES=["kS0","kS1","kS2","kS3","kS4"];
 function syncUI(){ for(const [id,k] of [["kFmax","fmax"],["kOut","outP"],["kFlow","flowInf"],["kSpd","speed"],["kHi","hi"],["kCo","co"],["kDyn","dyn"],["kVisc","visc"],["kWob","wob"],["kSt","st"],["kSize","size"],["kWf","wf"]]){ $(id).value=G[k]; $(id+"V").textContent=fmK(k,G[k]); }
-  $("kFuse").value=G.fuse; $("kFuseV").textContent=G.fuse+"초"; $("kPush").value=G.push; $("kPushV").textContent=pct(G.push); $("kDep").value=G.dep; $("kDepV").textContent=pct(G.dep); if(document.activeElement!==$("kSep")) $("kSep").value=G.sep; if(document.activeElement!==$("kDwell")) $("kDwell").value=G.dwell; $("kLeave").setAttribute("aria-pressed",G.leave?"true":"false"); $("kRefill").setAttribute("aria-pressed",G.refill?"true":"false"); $("kWall").setAttribute("aria-pressed",G.walls?"true":"false"); $("kCount").value=G.count; $("kCountV").textContent=G.count+"개";
+  $("kFuse").value=G.fuse; $("kFuseV").textContent=G.fuse+"초"; $("kPush").value=G.push; $("kPushV").textContent=pct(G.push); $("kDep").value=G.dep; $("kDepV").textContent=pct(G.dep); $("kHeart").setAttribute("aria-pressed",G.heart?"true":"false"); $("kHeartR").value=G.heartR; $("kHeartRV").textContent=pct(G.heartR); $("kHShape").value=G.hShape; $("kHShapeV").textContent=pct(G.hShape); if(document.activeElement!==$("kSep")) $("kSep").value=G.sep; if(document.activeElement!==$("kDwell")) $("kDwell").value=G.dwell; $("kLeave").setAttribute("aria-pressed",G.leave?"true":"false"); $("kRefill").setAttribute("aria-pressed",G.refill?"true":"false"); $("kWall").setAttribute("aria-pressed",G.walls?"true":"false"); $("kCount").value=G.count; $("kCountV").textContent=G.count+"개";
   SIDES.forEach((id,i)=>$(id).setAttribute("aria-pressed",G.side===i?"true":"false")); $("kWf").disabled=G.side===4; $("bdBox").classList.toggle("dim",!G.on); }
 SIDES.forEach((id,i)=>$(id).addEventListener("click",()=>{ G.side=i; save(); syncUI(); if(onPlace) onPlace(); if(started) reset(); }));   // 자리를 바꾸면 그 자리에서 새로 시작
 load(); applyP(); syncUI();
@@ -1059,7 +1072,7 @@ return { G, setView, syncUI, setZone(a,b,c,d){ ZX0=a; ZY0=b; ZX1=c; ZY1=d; }, ce
   start(){ if(!started){ started=true; reset(); } },
   on(){ return !!G.on; },
   setOn(v){ G.on=v?1:0; save(); syncUI(); if(!G.on){ ptrs.clear(); if(own){ g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,W,Hh); } } },
-  useCtx(ctx){ g=ctx; own=false; cv.style.display="none"; }, cam(x,y){ camX=x; camY=y; }, bgc(c){ BGC=c; }, useOwn(){ if(own) return; g=gOwn; own=true; cv.style.display=""; }, compute(dt){ compute(dt); }, draw(){ draw(); },
+  useCtx(ctx){ g=ctx; own=false; cv.style.display="none"; }, cam(x,y){ camX=x; camY=y; }, bgc(c){ BGC=c; }, hdbg(){ const o=[]; for(let l=0;l<nLobe;l++) if(LHRT[l]) o.push([l,LCNT[l]]); return {n:nLobe,h:o}; }, useOwn(){ if(own) return; g=gOwn; own=true; cv.style.display=""; }, compute(dt){ compute(dt); }, draw(){ draw(); },
   set onPlace(f){ onPlace=f; },
   advance(dt){ advance(dt); }, render(dt){ render(dt); },
   grab(id,x,y){ return inReg(x,y) && grab(id,x-OXp,y-OYp); }, moveTo(id,x,y){ moveTo(id,x-OXp,y-OYp); }, release(id){ release(id); }, held(id){ return ptrs.has(id); } };
