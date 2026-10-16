@@ -95,15 +95,12 @@ canvas.hold{cursor:grabbing}
     <label class="it" data-k="d3Drift"><span>시점 흔들림</span><input id="d3Drift" type="range" min="0" max="1" step="0.05" value="0.4"><output id="d3DriftV">40%</output><small class="desc">카메라가 저절로 천천히 떠도는 정도. 0이면 시점이 멈춰 있습니다.</small></label>
     <label class="it" data-k="d3Mouse"><span>마우스 시점</span><input id="d3Mouse" type="range" min="0" max="1" step="0.05" value="0.5"><output id="d3MouseV">50%</output><small class="desc">마우스(손가락)가 있는 쪽으로 화면이 살짝 기우는 정도. 0이면 꺼집니다.</small></label>
   </div>
-  <h2 class="sect">배경 띠</h2>
+  <h2 class="sect">삐죽 테두리</h2>
   <div class="ctl">
-    <div class="it row" data-k="bgOn"><span>배경 띠</span><button id="bgOn" type="button" aria-pressed="true">띠 켜짐</button><button id="bgP0" type="button" aria-pressed="true">보라·검정</button><button id="bgP1" type="button" aria-pressed="false">회색·남색</button><button id="bgP2" type="button" aria-pressed="false">초록·흰색</button><small class="desc">토르소 그림의 사선으로 찢어진 띠를 소용돌이 뒤에 깝니다. 3D가 켜져 있으면 뒤쪽 판에 놓여 멀리 보입니다. 색 묶음을 고를 수 있습니다.</small></div>
-    <label class="it" data-k="bgN"><span>띠 개수</span><input id="bgN" type="range" min="1" max="10" step="1" value="5"><output id="bgNV">5개</output><small class="desc">화면을 가로지르는 띠의 수.</small></label>
-    <label class="it" data-k="bgAng"><span>띠 기울기</span><input id="bgAng" type="range" min="-80" max="80" step="1" value="-28"><output id="bgAngV">-28°</output><small class="desc">띠가 흐르는 방향의 각도. 0이면 가로, 값이 커질수록 세로에 가까워집니다.</small></label>
-    <label class="it" data-k="bgW"><span>띠 굵기</span><input id="bgW" type="range" min="0.4" max="2.5" step="0.05" value="1"><output id="bgWV">100%</output><small class="desc">띠의 폭.</small></label>
-    <label class="it" data-k="bgTear"><span>찢김</span><input id="bgTear" type="range" min="0" max="1.5" step="0.05" value="0.7"><output id="bgTearV">70%</output><small class="desc">가장자리 톱니의 길이. 높을수록 길고 날카롭게 찢어진 모양이 됩니다. 0이면 매끈한 띠.</small></label>
-    <label class="it" data-k="bgSpd"><span>흐름 속도</span><input id="bgSpd" type="range" min="0" max="2" step="0.05" value="0.5"><output id="bgSpdV">50%</output><small class="desc">톱니와 속도선이 띠를 따라 흘러가는 빠르기. 0이면 멈춘 그림.</small></label>
-    <label class="it" data-k="bgOp"><span>진하기</span><input id="bgOp" type="range" min="0" max="1" step="0.05" value="0.9"><output id="bgOpV">90%</output><small class="desc">배경 띠가 얼마나 진하게 보이는지. 낮추면 소용돌이가 더 도드라집니다.</small></label>
+    <label class="it" data-k="jag"><span>삐죽 길이</span><input id="jag" type="range" min="0" max="40" step="1" value="16"><output id="jagV">16px</output><small class="desc">'삐죽 소용돌이' 장면에서 바깥 테두리 톱니가 튀어나오는 길이. 0이면 매끈한 테두리. 작은 방울은 톱니도 작아집니다.</small></label>
+    <label class="it" data-k="jagPer"><span>톱니 간격</span><input id="jagPer" type="range" min="10" max="80" step="1" value="26"><output id="jagPerV">26px</output><small class="desc">톱니 하나의 폭. 작을수록 잘게, 클수록 굵직하게 찢어집니다.</small></label>
+    <label class="it" data-k="jagSpd"><span>톱니 흐름</span><input id="jagSpd" type="range" min="0" max="2" step="0.05" value="0.6"><output id="jagSpdV">60%</output><small class="desc">톱니가 테두리를 따라 흘러가는 빠르기. 0이면 톱니가 제자리에 있습니다.</small></label>
+    <label class="it" data-k="jagRnd"><span>들쭉날쭉</span><input id="jagRnd" type="range" min="0" max="1" step="0.05" value="0.6"><output id="jagRndV">60%</output><small class="desc">톱니 크기가 서로 다른 정도. 0이면 고른 톱니, 높을수록 길고 짧은 톱니가 섞이고 군데군데 매끈한 곳이 생깁니다.</small></label>
   </div>
   <h2 class="sect">소용돌이</h2>
   <div class="ctl">
@@ -212,7 +209,7 @@ const hh=(a,b)=>h(SEED,a,b);
 /* ── 격자 유체: 화면 전체가 한 통의 물이다. 격자마다 물의 속도와 잉크(분홍·보라·붉은) 농도가 있다.
    폭발을 축으로 도는 기류가 물을 천천히 밀고, 잉크는 물을 따라 늘어나고 감기며, 응축 항이 잉크를 또렷한 덩이로 뭉치고 가는 줄기를 구슬로 끊는다 ── */
 const AREA=540000, CELL=5, CV=10, PAD=60, DT=1/30, NC=4, NL=2;
-const G={vis:[1,1,1,1], bg:1, bgPal:0, bgN:5, bgAng:-28, bgW:1, bgTear:.7, bgSpd:.5, bgOp:.9, d3:1, d3Tilt:22, d3Depth:.5, d3Drift:.4, d3Mouse:.5, spread:1, rim:0, rimW:130, visc:1, lightA:225, sp:1, spShow:0, spDen:1, spW:34, spPull:1, spStr:1, spBg:.35, spArms:1, spRot:1, spWob:1, speed:1, carry:1, dry:1, circ:.9, lspd:.5, dir:1, sep:.5, merge:1, head:1.3, tail:.9, strands:1.5, round:1, init:6, add:3, per:3.4, spin:1, calm:1, out:1, tailDry:1.5,
+const G={vis:[1,1,1,1], jag:16, jagPer:26, jagSpd:.6, jagRnd:.6, d3:1, d3Tilt:22, d3Depth:.5, d3Drift:.4, d3Mouse:.5, spread:1, rim:0, rimW:130, visc:1, lightA:225, sp:1, spShow:0, spDen:1, spW:34, spPull:1, spStr:1, spBg:.35, spArms:1, spRot:1, spWob:1, speed:1, carry:1, dry:1, circ:.9, lspd:.5, dir:1, sep:.5, merge:1, head:1.3, tail:.9, strands:1.5, round:1, init:6, add:3, per:3.4, spin:1, calm:1, out:1, tailDry:1.5,
   mat:[{carry:1,dir:0,exitR:.3,sl:1,size:1,share:1,ksz:.42,brk:.55,hth:.36,hmin:40,bsz:.17,td:.5,nA:.16,dth:.5},{carry:.6,dir:0,exitR:.3,sl:1,size:1,share:.25,ksz:.42,brk:0,hth:.36,hmin:40,bsz:0,td:.62,nA:.3,dth:.5},{carry:.5,dir:0,exitR:.3,sl:1,size:1,share:.4,ksz:.4,brk:0,hth:.36,hmin:40,bsz:.17,td:.6,nA:.3,dth:.5},{carry:1,dir:0,exitR:.3,sl:1,size:1,share:1,ksz:.42,brk:.55,hth:.36,hmin:40,bsz:.17,td:.5,nA:.16,dth:.5}]};   // 오브젝트마다: 크기, 솟는 비율, 하이라이트·어두운 면 세부   // out: 밖으로 밀려나는 힘   // spin: 도는 힘, calm: 물이 제 흐름으로 돌아오는 빠르기   // init: 처음 개수, add: 한 번에 더 솟는 개수, per: 간격(초)   // head: 머리 뭉침, tail: 꼬리 늘어짐, strands: 떨어지는 가닥 수
 let RIM, rimKey='';
 const LIVE=[]; let UNI, THK, NSF, MX, MY, TMP2, RD=[], RDF, PV=[], backT=0, backPT=0, STEPPED=false, FLIP=false;   // PV: 한 박자 전의 잉크 (그리기는 PV→지금 사이를 이어서 그린다), FLIP: 이 채널은 반대로 돈다
@@ -451,12 +448,12 @@ function copyBox(A,B,X0,X1,Y0,Y1){ for(let y=Y0;y<=Y1;y++){ const k=y*gw; for(le
 const hex=c=>[parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)];
 function mixc(a,b,t){ const A=hex(a), B=hex(b); return "rgb("+Math.round(A[0]+(B[0]-A[0])*t)+","+Math.round(A[1]+(B[1]-A[1])*t)+","+Math.round(A[2]+(B[2]-A[2])*t)+")"; }
 function paint(M,fade,bg,shaded,only){ const B=M.BL, col=c=>fade>0?mixc(c,bg,fade):c; if(!B.n) return;
-  if(!only){ if(M.rim){ allPath(B); g.strokeStyle=col(M.rim); g.lineWidth=M.lw*2; g.stroke(); } allPath(B); g.fillStyle=col(M.base); g.fill(); }
-  if(shaded){ g.save(); if(only) allPath(B); g.clip(); allPath(M.CL); g.fillStyle=col(M.core); g.fill();
+  if(!only){ if(M.rim){ bPath(B); g.strokeStyle=col(M.rim); g.lineWidth=M.lw*2; g.stroke(); } bPath(B); g.fillStyle=col(M.base); g.fill(); }
+  if(shaded){ g.save(); if(only) bPath(B); g.clip(); allPath(M.CL); g.fillStyle=col(M.core); g.fill();
     const hm=G.mat[M.idx===3 && G.mat[3].sl?0:M.idx].hmin;   // 작은 하이라이트 조각은 크기에 따라 서서히 옅어진다 (기준을 넘나들 때 툭 나타나고 사라지지 않게)
     for(const [L,lim] of [[M.HL,hm],[M.H2,hm*3]]) for(let l=0;l<L.n;l++){ const a=L.A[l]*L.sign; if(a>lim*.6 && a<lim){ g.globalAlpha=(a-lim*.6)/(lim*.4); g.beginPath(); loopPath(L,l); g.fillStyle=col(M.hi); g.fill(); } } g.globalAlpha=1;
     g.beginPath(); for(let l=0;l<M.HL.n;l++){ const a=M.HL.A[l]*M.HL.sign; if(a>=hm || a<0) loopPath(M.HL,l); } for(let l=0;l<M.H2.n;l++){ const a=M.H2.A[l]*M.H2.sign; if(a>=hm*3 || a<0) loopPath(M.H2,l); } g.fillStyle=col(M.hi); g.fill(); g.restore(); }
-  if(M.line && !only){ allPath(B); g.strokeStyle=col(M.line); g.lineWidth=M.lw; g.stroke(); } }
+  if(M.line && !only){ bPath(B); g.strokeStyle=col(M.line); g.lineWidth=M.lw; g.stroke(); } }
 const MS=(()=>{ const cx=[0,1,1,0], cy=[0,0,1,1], ex=[.5,1,.5,0], ey=[0,.5,1,.5], ec=[[0,1],[1,2],[3,2],[0,3]], T=[];
   const ori=(e1,e2,k)=>((ex[e2]-ex[e1])*(cy[k]-ey[e1])-(ey[e2]-ey[e1])*(cx[k]-ex[e1]))>0?[e1,e2]:[e2,e1];
   for(let c=0;c<16;c++){ const ins=k=>(c>>k)&1, cr=[]; for(let e=0;e<4;e++) if(ins(ec[e][0])!==ins(ec[e][1])) cr.push(e);
@@ -486,6 +483,17 @@ const nz=(x,y,t,k)=>k? .5+.25*(Math.sin(x*.052+t*.5+1.7*Math.sin(y*.041-t*.23))+
 function loopPath(L,l){ const s=L.S[l], n=L.N[l], LB=L.B; if(n<3) return; const px=LB[s+2*n-2], py=LB[s+2*n-1]; g.moveTo((px+LB[s])/2,(py+LB[s+1])/2);
   for(let i=0;i<n;i++){ const x=LB[s+2*i], y=LB[s+2*i+1], j=(i+1)%n; g.quadraticCurveTo(x,y,(x+LB[s+2*j])/2,(y+LB[s+2*j+1])/2); } g.closePath(); }
 const allPath=L=>{ g.beginPath(); for(let l=0;l<L.n;l++) loopPath(L,l); };
+/* 삐죽 윤곽: 바깥 테두리를 따라 찢긴 톱니를 붙인다. 톱니 수는 테두리 길이에 맞춰 딱 떨어지게 정하고(이음매 없이), 테두리를 따라 천천히 흘러간다 */
+let JAGON=false;
+function jagLoop(L,l){ const s=L.S[l], n=L.N[l], B=L.B; if(n<3) return; const sg=L.sign, A=L.A[l], hole=A*sg<0, amp0=G.jag*Math.min(1,Math.sqrt(Math.abs(A))/70)*(hole?.5:1);
+  if(amp0<.4){ loopPath(L,l); return; }
+  let a0=0, best=-1e18, tot=0; for(let i=0;i<n;i++){ const x=B[s+2*i], y=B[s+2*i+1], v=x*.83+y*.56; if(v>best){ best=v; a0=i; } const j=(i+1)%n; tot+=Math.hypot(B[s+2*j]-x,B[s+2*j+1]-y); }   // 기준점: 늘 같은 쪽 끝 (테두리가 움직여도 톱니 자리가 튀지 않게)
+  const m=Math.max(3,Math.round(tot/G.jagPer)), per=tot/m, rnd=G.jagRnd, slide=(RT*G.jagSpd*34)%tot; let acc=0, px=0, py=0;
+  for(let q=0;q<=n;q++){ const i=(a0+q)%n, x=B[s+2*i], y=B[s+2*i+1]; if(q) acc+=Math.hypot(x-px,y-py); px=x; py=y;
+    const ip=(i-2+n)%n, inx=(i+2)%n, tx=B[s+2*inx]-B[s+2*ip], ty=B[s+2*inx+1]-B[s+2*ip+1], tl=Math.hypot(tx,ty)||1, nx=ty/tl*sg, ny=-tx/tl*sg;
+    let ph=(acc+tot-slide)/per; const k=Math.floor(ph), f=ph-k, kk=((k%m)+m)%m, am=amp0*(1-rnd+rnd*Math.pow(hh(9400+kk*7,1),1.5))*(hh(9400+kk*7,2)<rnd*.35?.15:1), o=am*f*f;   // 톱니: 천천히 솟다가 툭 끊긴다 (크기는 들쭉날쭉)
+    const X=x+nx*o, Y=y+ny*o; if(q===0) g.moveTo(X,Y); else g.lineTo(X,Y); } g.closePath(); }
+const bPath=L=>{ if(!JAGON){ allPath(L); return; } g.beginPath(); for(let l=0;l<L.n;l++) jagLoop(L,l); };
 /* 먼 층은 바탕색 쪽으로 옅어진다 (공기 원근) */
 
 /* ══ 핏방울 (BLOOD DROP): 소용돌이 없는 무중력. 같은 화면 위 투명한 겹 화면에 자기 자리를 두고 따로 논다. 설정도 따로 ══ */
@@ -906,6 +914,9 @@ const SCENES=[
    move:"화면 전체가 한 통의 물이다. 폭발을 축으로 도는 기류가 물을 천천히 밀고, 분홍·보라·붉은 잉크가 그 물을 타고 늘어나고 감긴다. 잉크는 응축해서 또렷한 덩이로 뭉치고, 가늘어진 목은 구슬로 끊긴다. 뒤쪽 물은 느리고 작고 옅다."}
 ];
 SCENES[0].mats.forEach((M,i)=>{ M.idx=i; });
+SCENES.push(Object.assign({},SCENES[0],{name:"삐죽 소용돌이", jag:true,
+  rule:"분홍 소용돌이와 같은 액체가 같은 기류를 타고 돈다. 다만 바깥 테두리가 찢긴 종이처럼 삐죽삐죽하다: 토르소 그림의 찢긴 줄기처럼 톱니가 테두리를 따라 흐른다.",
+  move:"분홍 소용돌이와 똑같이 움직인다 (조절값도 같이 쓴다). 톱니는 테두리를 따라 천천히 흘러가고, 크기가 들쭉날쭉하다."}));   // 장면 2: 분홍 소용돌이의 삐죽 버전
 let SC=SCENES[0], scene=0, T=0;
 /* 핏방울 자리: 화면의 한쪽 (세로 화면이면 위·아래). 소용돌이 축은 나머지 자리의 가운데로 */
 function bdSide(){ let sd=BD.G.side; if(WH>WW*1.05){ if(sd===0) sd=3; else if(sd===1) sd=2; } return sd; }
@@ -914,7 +925,7 @@ function placeCenter(){ CX=WW*.46; CY=WH*.5; }
 BD.useCtx(g); const WTR=[0,0]; BD.setWater((x,y)=>{ let px=(x+PAD)/CV, py=(y+PAD)/CV; px=px<0?0:px>vw-1.001?vw-1.001:px; py=py<0?0:py>vh-1.001?vh-1.001:py; const ix=px|0, iy=py|0, fx=px-ix, fy=py-iy, k=iy*vw+ix;
   WTR[0]=(U[k]*(1-fx)+U[k+1]*fx)*(1-fy)+(U[k+vw]*(1-fx)+U[k+vw+1]*fx)*fy; WTR[1]=(V[k]*(1-fx)+V[k+1]*fx)*(1-fy)+(V[k+vw]*(1-fx)+V[k+vw+1]*fx)*fy; return WTR; });   // 핏방울이 읽는 물 흐름   // 핏방울을 소용돌이와 같은 화면에 그린다: 겹 화면이 없어 큰 창에서도 가볍다
 BD.onPlace=()=>{ const r=bdRect(); BD.setZone(r[0],r[1],r[0]+r[2],r[1]+r[3]); };
-function setScene(i){ scene=i; SC=SCENES[i]; simT=0; puffNo=0; POURS.length=0; RMX=Math.hypot(WW,WH)*.5; placeCenter(); backT=0; U.fill(0); V.fill(0); for(let y=0;y<gh;y++) for(let x=0;x<gw;x++){ const k=y*gw+x; MX[k]=x*CELL; MY[k]=y*CELL; NSF[k]=pat(x*CELL,y*CELL,0); } for(const L of DYE) for(const D of L) D.fill(0);
+function setScene(i){ scene=i; try{ localStorage.setItem("nu-flow-scene",String(i)); }catch(_){} SC=SCENES[i]; simT=0; puffNo=0; POURS.length=0; RMX=Math.hypot(WW,WH)*.5; placeCenter(); backT=0; U.fill(0); V.fill(0); for(let y=0;y<gh;y++) for(let x=0;x<gw;x++){ const k=y*gw+x; MX[k]=x*CELL; MY[k]=y*CELL; NSF[k]=pat(x*CELL,y*CELL,0); } for(const L of DYE) for(const D of L) D.fill(0);
   SC.seed(1000+i*400); for(let y=1;y<vh-1;y++){ let k=y*vw+1; for(let x=1;x<vw-1;x++,k++){ const f=target(x*CV-PAD,y*CV-PAD,0); U[k]=f[0]; V[k]=f[1]; } } for(const E of EMA) for(const A of E) A.fill(0); LIVE.length=0;
   const tb=$("tabs").children; for(let kk=0;kk<tb.length;kk++) tb[kk].setAttribute("aria-selected",kk===i?"true":"false"); $("nRule").textContent=SC.rule; $("nMove").textContent=SC.move; }
 function burst(cx,cy,R,sd){ const nn=14; g.beginPath();
@@ -931,24 +942,9 @@ function src(l,c,a){ const sl=l*NC+c, D=DYE[l][c], P=PV[l][c]; if(!TCN[sl]) retu
   let f=a; if(l===0){ const now=simT-DT+a*DT, sp=backT-backPT; f=sp>1e-6?(now-backPT)/sp:1; } f=f<0?0:f>1?1:f;
   const R=RD[l][c], L=TLS[sl], m=TCN[sl]; R.fill(0); for(let i=0;i<m;i++){ tb(L[i]); for(let y=TB[2];y<TB[3];y++){ let k=y*gw+TB[0]; for(let x=TB[0];x<TB[1];x++,k++){ const p=P[k]; R[k]=p+(D[k]-p)*f; } } }
   RDF[sl]=frameNo; return R; }
-/* 배경 띠: 토르소 그림의 사선으로 찢어진 띠. 가장자리는 흐르는 쪽으로 찢긴 톱니이고, 톱니와 속도선이 띠를 따라 흘러간다 */
-const BGP=[{a:"#5B2A86",b:"#24102F",c:"#C08BEA",l:"#170820"},{a:"#5D6478",b:"#1C2540",c:"#D3D8E2",l:"#10162A"},{a:"#3F8F5A",b:"#F2F1E8",c:"#C6EBCD",l:"#1E4A2D"}];
-let bgT=0;
-function tornOff(i,u,side,w,sp,sd){ const v=u-bgT*70*sp, base=w*.5*(1+.22*Math.sin(v*.006+i*1.7+side+sd)+.12*Math.sin(v*.017+i*3.1+side*2+sd));
-  const per=38+30*hh(9200+i+sd*7,side>0?1:2), q=v/per+hh(9300+i,sd+3), k=Math.floor(q), f=q-k, amp=G.bgTear*w*.55*Math.pow(.2+.8*hh(k*7+(side>0?13:29)+i*101+sd*997,5),2);
-  return side*(base+amp*f*f*f*f); }   // 톱니: 천천히 길어지다 툭 끊기는 모양 (찢긴 종이처럼 한쪽으로 뾰족하다)
-function strip(c,i,bx,by,ux,uy,nx,ny,L,w,sp,sd){ c.beginPath(); for(let u=-L;u<=L;u+=8){ const o=tornOff(i,u,1,w,sp,sd); c.lineTo(bx+ux*u+nx*o,by+uy*u+ny*o); } for(let u=L;u>=-L;u-=8){ const o=tornOff(i,u,-1,w,sp,sd); c.lineTo(bx+ux*u+nx*o,by+uy*u+ny*o); } c.closePath(); }
-function bands(c,dt){ if(!G.bg || G.bgOp<=0) return; bgT+=dt*G.bgSpd; const P=BGP[G.bgPal|0]||BGP[0], th=G.bgAng*Math.PI/180, ux=Math.cos(th), uy=Math.sin(th), nx=-uy, ny=ux, L=Math.hypot(WW,WH)*.5+140, n=Math.max(1,G.bgN|0);
-  c.save(); c.globalAlpha=G.bgOp; c.lineJoin="miter"; c.miterLimit=5; c.lineCap="butt";
-  for(let i=0;i<n;i++){ const off=((i+.5)/n-.5)*1.7*L+(hh(9100+i,1)-.5)*L/n*.8, w=(34+80*hh(9100+i,2))*G.bgW, sp=.6+.8*hh(9100+i,3), bx=WW/2+nx*off, by=WH/2+ny*off;
-    strip(c,i,bx,by,ux,uy,nx,ny,L,w,sp,0); c.fillStyle=P.a; c.fill(); c.strokeStyle=P.l; c.lineWidth=2.2; c.stroke();   // 바깥 띠
-    const io=(hh(9100+i,4)-.5)*w*.25, ix=bx+nx*io, iy=by+ny*io; strip(c,i,ix,iy,ux,uy,nx,ny,L,w*.48,sp*1.1,1); c.fillStyle=P.b; c.fill();   // 안쪽 짙은 띠
-    c.strokeStyle=P.c; c.lineWidth=2; for(let s=0;s<2;s++){ const so=(s?-.32:.3)*w, d1=30+50*hh(9100+i,6+s), d2=24+60*hh(9100+i,8+s); c.setLineDash([d1,d2]); c.lineDashOffset=-bgT*90*sp*(1+.3*s); c.beginPath(); c.moveTo(bx-ux*L+nx*so,by-uy*L+ny*so); c.lineTo(bx+ux*L+nx*so,by+uy*L+ny*so); c.stroke(); } c.setLineDash([]); }   // 속도선
-  c.restore(); }
-function render(dt,a){ frameNo++; T=simT; dt=dt||1/60; a=a||0; RT=simT-DT+a*DT;
+function render(dt,a){ JAGON=!!SC.jag && G.jag>0; frameNo++; T=simT; dt=dt||1/60; a=a||0; RT=simT-DT+a*DT;
   const sp3=D3.split; g=gMain; if(sp3){ if(cvB.width!==W||cvB.height!==Hh){ cvB.width=W; cvB.height=Hh; } gB.setTransform(1,0,0,1,0,0); gB.clearRect(0,0,W,Hh); gB.setTransform(scale,0,0,scale,0,0); gB.lineJoin="round"; gB.lineCap="round"; }   // 3D: 뒤쪽 물은 뒤 판에 따로
   g.setTransform(1,0,0,1,0,0); if(sp3) g.clearRect(0,0,W,Hh); else { g.fillStyle=SC.bg; g.fillRect(0,0,W,Hh); } g.setTransform(scale,0,0,scale,0,0); g.lineJoin="round"; g.lineCap="round";
-  bands(sp3?gB:gMain,dt);   // 맨 뒤: 토르소 그림의 찢어진 배경 띠
   for(let l=0;l<NL;l++){ g=(sp3 && l===0)?gB:gMain; g.save(); if(l===0){ g.translate(CX,CY); g.scale(SC.bscale,SC.bscale); g.translate(-CX,-CY); }
     const SL=!!G.mat[3].sl;   // 분홍 B가 분홍 A와 같은 빛을 쓰면 두 분홍을 한 몸으로 명암을 넣는다
     for(let c=0;c<NC;c++){ const M=SC.mats[c], both=SL && l===NL-1 && c!==1 && c!==2, sh=M.shaded && l===NL-1 && !both; if(!LIVE[l*NC+c]) continue; prepare(src(l,c,a),M,sh,EMA[c],dt); paint(M,SC.fade[l],SC.bg,sh); }   // 뒤쪽 층은 명암 없이 옅게
@@ -1077,7 +1073,7 @@ function syncVis(){ for(const [id,c] of VIS) $(id).setAttribute("aria-pressed",G
 $("vD").addEventListener("click",()=>{ BD.setOn(!BD.on()); placeCenter(); syncVis(); });
 for(const [id,c] of VIS) $(id).addEventListener("click",()=>setVis(c,!G.vis[c]));
 syncVis();
-fit(); aspect=WW>WH?1:2; setScene(0);   // 저장된 값을 읽은 다음에 시작한다 (처음 개수 등이 첫 판부터 반영되도록)
+fit(); aspect=WW>WH?1:2; let sc0=0; try{ sc0=+localStorage.getItem("nu-flow-scene")||0; }catch(_){} setScene(sc0<SCENES.length?sc0:0);   // 마지막에 본 장면으로 연다   // 저장된 값을 읽은 다음에 시작한다 (처음 개수 등이 첫 판부터 반영되도록)
 
 /* 화질과 이미지 저장 */
 const QS=[["q1",2.1e6],["q2",3.7e6],["q3",8.4e6]];
@@ -1121,12 +1117,10 @@ for(const [id,k,f] of D3S) $(id).addEventListener("input",()=>{ G[k]=+$(id).valu
 function syncD3(){ for(const [id,k,f] of D3S){ $(id).value=G[k]; $(id+"V").textContent=f(G[k]); } $("d3On").setAttribute("aria-pressed",G.d3?"true":"false"); $("d3On").textContent=G.d3?"3D 켜짐":"3D 꺼짐"; }
 $("d3On").addEventListener("click",()=>{ G.d3=G.d3?0:1; saveG(); syncD3(); });
 syncD3();
-const BGS=[["bgN","bgN",v=>Math.round(v)+"개"],["bgAng","bgAng",v=>Math.round(v)+"°"],["bgW","bgW",v=>pct(v)],["bgTear","bgTear",v=>pct(v)],["bgSpd","bgSpd",v=>pct(v)],["bgOp","bgOp",v=>pct(v)]];
-for(const [id,k,f] of BGS) $(id).addEventListener("input",()=>{ G[k]=+$(id).value; $(id+"V").textContent=f(G[k]); saveG(); });
-function syncBg(){ for(const [id,k,f] of BGS){ $(id).value=G[k]; $(id+"V").textContent=f(G[k]); } $("bgOn").setAttribute("aria-pressed",G.bg?"true":"false"); $("bgOn").textContent=G.bg?"띠 켜짐":"띠 꺼짐"; for(let i=0;i<3;i++) $("bgP"+i).setAttribute("aria-pressed",(G.bgPal|0)===i?"true":"false"); }
-$("bgOn").addEventListener("click",()=>{ G.bg=G.bg?0:1; saveG(); syncBg(); });
-for(let i=0;i<3;i++) $("bgP"+i).addEventListener("click",()=>{ G.bgPal=i; saveG(); syncBg(); });
-syncBg();
+const JGS=[["jag","jag",v=>Math.round(v)+"px"],["jagPer","jagPer",v=>Math.round(v)+"px"],["jagSpd","jagSpd",v=>pct(v)],["jagRnd","jagRnd",v=>pct(v)]];
+for(const [id,k,f] of JGS) $(id).addEventListener("input",()=>{ G[k]=+$(id).value; $(id+"V").textContent=f(G[k]); saveG(); });
+function syncJag(){ for(const [id,k,f] of JGS){ $(id).value=G[k]; $(id+"V").textContent=f(G[k]); } }
+syncJag();
 requestAnimationFrame(frame);
 })();
 </script>
@@ -1174,7 +1168,7 @@ requestAnimationFrame(frame);
 if(window.NF_VIEW==="panel")(function(){
   const $=id=>document.getElementById(id); let bc=null; try{ bc=new BroadcastChannel("nu-flow"); }catch(_){}
   if(!bc){ $("pStatus").textContent="이 브라우저는 두 창 잇기를 지원하지 않습니다 — 한 화면 보기로 여세요."; return; }
-  ["분홍 소용돌이"].forEach((n,i)=>{ const b=document.createElement("button"); b.type="button"; b.id="st"+i; b.setAttribute("role","tab"); b.textContent=n; $("tabs").appendChild(b); });
+  ["분홍 소용돌이","삐죽 소용돌이"].forEach((n,i)=>{ const b=document.createElement("button"); b.type="button"; b.id="st"+i; b.setAttribute("role","tab"); b.textContent=n; $("tabs").appendChild(b); });
   ["분홍 A","분홍 B","보라","붉은"].forEach((n,i)=>{ const b=document.createElement("button"); b.type="button"; b.id="ot"+i; b.setAttribute("role","tab"); b.textContent=n; $("otabs").appendChild(b); });
   const LOCAL=new Set(["pOpen","mEdit","mRestore","sExp","sImp","sFile","sReset"]);   // 이 창에서만 하는 일 (메뉴 편집·설정 옮기기)
   document.addEventListener("input",e=>{ const el=e.target; if(!el.id || LOCAL.has(el.id)) return; bc.postMessage({t:"ev",id:el.id,k:"input",v:el.value}); });
