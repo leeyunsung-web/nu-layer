@@ -971,7 +971,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b115</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b116</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -990,6 +990,7 @@
       <button class="link-btn accent" id="openMgrBtn" style="display:none; font-family:var(--font-mono); font-size:11px; padding:8px 12px; border-radius:8px; border:1px solid var(--ink); background:var(--ink); color:#fff; cursor:pointer; font-weight:600;">ARCHIVE MANAGER</button>
       <button class="link-btn accent" id="tonePlotBtn" style="display:none; font-family:var(--font-mono); font-size:11px; padding:8px 12px; border-radius:8px; border:1px solid var(--ink); background:var(--ink); color:#fff; cursor:pointer; font-weight:600;" title="TONE PLOT 을 새 창으로 열고 지금 그림을 보냅니다 — 색 영역마다 해칭이나 스크린톤을 골라 플로터 SVG 로 바꿉니다" data-tp="v9.2">◫ TONE PLOT</button>
       <button class="link-btn accent" id="nuVaryBtn" style="display:none; font-family:var(--font-mono); font-size:11px; padding:8px 12px; border-radius:8px; border:1px solid var(--ink); background:var(--ink); color:#fff; cursor:pointer; font-weight:600;" title="NU VARY 를 새 창으로 열고 고른 패스를 보냅니다 — 꼭지점과 선을 읽어 비슷하지만 다른 패턴을 계속 만듭니다. 고른 결과는 캔버스로 받거나 바로 아카이브에 등록할 수 있습니다">✦ NU VARY</button>
+      <button class="link-btn accent" id="nuFlowBtn" style="display:none; font-family:var(--font-mono); font-size:11px; padding:8px 12px; border-radius:8px; border:1px solid var(--ink); background:var(--ink); color:#fff; cursor:pointer; font-weight:600;" title="NU FLOW 를 창 두 개로 엽니다 — 큰 이미지 화면과 조절 창 (nu-flow.html 이 같은 폴더에 있어야 합니다)">≋ NU FLOW</button>
       <button class="link-btn accent" id="stitchPaintBtn" style="display:none; font-family:var(--font-mono); font-size:11px; padding:8px 12px; border-radius:8px; border:1px solid var(--ink); background:var(--ink); color:#fff; cursor:pointer; font-weight:600;" title="STITCH PAINT 를 새 창으로 엽니다 — Brother NV180D 용 자수 그림판 (stitch-paint.html 이 같은 폴더에 있어야 합니다)">✂ STITCH PAINT</button>
       <div class="role-chip" id="roleChip">
         <span class="role-badge" id="roleBadge">GUEST</span>
@@ -1705,7 +1706,7 @@
     if(sw) sw.textContent = isMaster ? '⇄ GUEST' : '⇄ MASTER';
     $('openMgrBtn').style.display = isMaster ? 'inline-flex' : 'none';
     // 창을 여는 도구들. 아카이브 매니저와 같은 성격이라 나란히 두고 함께 여닫는다.
-    for(const id of ['tonePlotBtn', 'stitchPaintBtn', 'nuVaryBtn']){
+    for(const id of ['tonePlotBtn', 'stitchPaintBtn', 'nuVaryBtn', 'nuFlowBtn']){
       const b = $(id);
       if(b) b.style.display = isMaster ? 'inline-flex' : 'none';
     }
@@ -19597,6 +19598,23 @@ showLayerMenu(ev.clientX, ev.clientY, [
     toast('NU VARY 로 패스 ' + paths.length + '개를 보냈습니다.');
   }
   $('nuVaryBtn').addEventListener('click', openNuVary);
+
+  /* ============== NU FLOW 연동 ==============
+     기류를 타고 도는 액체(분홍 소용돌이)와 무중력 핏방울. 창 두 개로 연다:
+     큰 이미지 화면(nu-flow.html?view=stage)과 조절 창(?view=panel). 두 창은 BroadcastChannel 로 이어지고,
+     물리는 이미지 화면만 돌린다. 브라우저가 두 번째 창을 막으면 이미지 화면의 ⚙ 버튼으로 조절 창을 연다. */
+  let nfStage = null, nfPanel = null;
+  function openNuFlow(){
+    const sw = Math.min(1400, screen.availWidth - 520), sh = Math.min(900, screen.availHeight - 60);
+    if(nfStage && !nfStage.closed) nfStage.focus();
+    else nfStage = window.open('nu-flow.html?view=stage', 'nuflow-stage', 'popup,width=' + sw + ',height=' + sh + ',left=500,top=30');
+    if(!nfStage){ toast('팝업이 막혔습니다 — 이 사이트의 팝업을 허용해 주세요.'); return; }
+    if(nfPanel && !nfPanel.closed) nfPanel.focus();
+    else nfPanel = window.open('nu-flow.html?view=panel', 'nuflow-panel', 'popup,width=480,height=' + sh + ',left=10,top=30');
+    toast(nfPanel ? 'NU FLOW 이미지 화면과 조절 창을 열었습니다. 이미지 화면에서 F 키 = 전체 화면.'
+                  : 'NU FLOW 이미지 화면을 열었습니다 — 조절 창은 화면 오른쪽 위 ⚙ 버튼으로 여세요.');
+  }
+  $('nuFlowBtn').addEventListener('click', openNuFlow);
 
   // 받은 노드로 진짜 획을 만든다 — 펜 툴이 커밋할 때와 같은 모양이어야
   // 나중에 DIRECT(A) 로 앵커를 집어 고칠 수 있다.
