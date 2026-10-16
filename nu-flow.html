@@ -95,6 +95,16 @@ canvas.hold{cursor:grabbing}
     <label class="it" data-k="d3Drift"><span>시점 흔들림</span><input id="d3Drift" type="range" min="0" max="1" step="0.05" value="0.4"><output id="d3DriftV">40%</output><small class="desc">카메라가 저절로 천천히 떠도는 정도. 0이면 시점이 멈춰 있습니다.</small></label>
     <label class="it" data-k="d3Mouse"><span>마우스 시점</span><input id="d3Mouse" type="range" min="0" max="1" step="0.05" value="0.5"><output id="d3MouseV">50%</output><small class="desc">마우스(손가락)가 있는 쪽으로 화면이 살짝 기우는 정도. 0이면 꺼집니다.</small></label>
   </div>
+  <h2 class="sect">십자별</h2>
+  <div class="ctl">
+    <div class="it row" data-k="stOn"><span>십자별</span><button id="stOn" type="button" aria-pressed="true">십자별 켜짐</button><small class="desc">'삐죽 소용돌이' 장면에 떠 있는 하얀 네 갈래 반짝이. 끄면 보이지 않습니다.</small></div>
+    <label class="it" data-k="stN"><span>개수</span><input id="stN" type="range" min="1" max="30" step="1" value="9"><output id="stNV">9개</output><small class="desc">화면에 떠 있는 십자별의 수.</small></label>
+    <label class="it" data-k="stSize"><span>크기</span><input id="stSize" type="range" min="0.3" max="3" step="0.05" value="1"><output id="stSizeV">100%</output><small class="desc">십자별 전체 크기.</small></label>
+    <label class="it" data-k="stArm"><span>팔 길이</span><input id="stArm" type="range" min="1" max="5" step="0.1" value="2.4"><output id="stArmV">2.4배</output><small class="desc">가운데 몸통에 비해 팔이 뻗는 길이. 높을수록 가로세로로 길게 뻗은 날렵한 별이 됩니다.</small></label>
+    <label class="it" data-k="stHV"><span>가로 팔 비율</span><input id="stHV" type="range" min="0.3" max="1.2" step="0.05" value="0.75"><output id="stHVV">75%</output><small class="desc">세로 팔에 비해 가로 팔의 길이. 100%면 가로세로가 같고, 낮을수록 세로로 긴 별.</small></label>
+    <label class="it" data-k="stThin"><span>팔 굵기</span><input id="stThin" type="range" min="0.04" max="0.4" step="0.01" value="0.14"><output id="stThinV">14%</output><small class="desc">팔이 만나는 허리의 굵기. 낮을수록 팔이 바늘처럼 가늘고, 높을수록 통통합니다.</small></label>
+    <label class="it" data-k="stTw"><span>반짝임</span><input id="stTw" type="range" min="0" max="3" step="0.05" value="1"><output id="stTwV">100%</output><small class="desc">십자별이 커졌다 작아지며 반짝이는 빠르기. 0이면 멈춰 있습니다.</small></label>
+  </div>
   <h2 class="sect">찢긴 끝</h2>
   <div class="ctl">
     <label class="it" data-k="tear"><span>찢김 길이</span><input id="tear" type="range" min="0" max="160" step="1" value="60"><output id="tearV">60px</output><small class="desc">'삐죽 소용돌이' 장면에서 쓰입니다 (분홍 하이라이트도 같은 결로 찢깁니다). 흐르는 방향과 나란한 옆면은 매끈하게 쭉 늘어나고, 흐름을 마주 보는 앞뒤 끝면만 흐르는 쪽으로 길게 찢어집니다. 그 찢긴 조각의 최대 길이. 0이면 매끈한 끝.</small></label>
@@ -209,7 +219,7 @@ const hh=(a,b)=>h(SEED,a,b);
 /* ── 격자 유체: 화면 전체가 한 통의 물이다. 격자마다 물의 속도와 잉크(분홍·보라·붉은) 농도가 있다.
    폭발을 축으로 도는 기류가 물을 천천히 밀고, 잉크는 물을 따라 늘어나고 감기며, 응축 항이 잉크를 또렷한 덩이로 뭉치고 가는 줄기를 구슬로 끊는다 ── */
 const AREA=540000, CELL=5, CV=10, PAD=60, DT=1/30, NC=4, NL=2;
-const G={vis:[1,1,1,1], tear:60, tearPer:15, tearSpd:.4, tearRnd:.75, tearLong:.3, d3:1, d3Tilt:22, d3Depth:.5, d3Drift:.4, d3Mouse:.5, spread:1, rim:0, rimW:130, visc:1, lightA:225, sp:1, spShow:0, spDen:1, spW:34, spPull:1, spStr:1, spBg:.35, spArms:1, spRot:1, spWob:1, speed:1, carry:1, dry:1, circ:.9, lspd:.5, dir:1, sep:.5, merge:1, head:1.3, tail:.9, strands:1.5, round:1, init:6, add:3, per:3.4, spin:1, calm:1, out:1, tailDry:1.5,
+const G={vis:[1,1,1,1], stOn:1, stN:9, stSize:1, stArm:2.4, stHV:.75, stThin:.14, stTw:1, tear:60, tearPer:15, tearSpd:.4, tearRnd:.75, tearLong:.3, d3:1, d3Tilt:22, d3Depth:.5, d3Drift:.4, d3Mouse:.5, spread:1, rim:0, rimW:130, visc:1, lightA:225, sp:1, spShow:0, spDen:1, spW:34, spPull:1, spStr:1, spBg:.35, spArms:1, spRot:1, spWob:1, speed:1, carry:1, dry:1, circ:.9, lspd:.5, dir:1, sep:.5, merge:1, head:1.3, tail:.9, strands:1.5, round:1, init:6, add:3, per:3.4, spin:1, calm:1, out:1, tailDry:1.5,
   mat:[{carry:1,dir:0,exitR:.3,sl:1,size:1,share:1,ksz:.42,brk:.55,hth:.36,hmin:40,bsz:.17,td:.5,nA:.16,dth:.5},{carry:.6,dir:0,exitR:.3,sl:1,size:1,share:.25,ksz:.42,brk:0,hth:.36,hmin:40,bsz:0,td:.62,nA:.3,dth:.5},{carry:.5,dir:0,exitR:.3,sl:1,size:1,share:.4,ksz:.4,brk:0,hth:.36,hmin:40,bsz:.17,td:.6,nA:.3,dth:.5},{carry:1,dir:0,exitR:.3,sl:1,size:1,share:1,ksz:.42,brk:.55,hth:.36,hmin:40,bsz:.17,td:.5,nA:.16,dth:.5}]};   // 오브젝트마다: 크기, 솟는 비율, 하이라이트·어두운 면 세부   // out: 밖으로 밀려나는 힘   // spin: 도는 힘, calm: 물이 제 흐름으로 돌아오는 빠르기   // init: 처음 개수, add: 한 번에 더 솟는 개수, per: 간격(초)   // head: 머리 뭉침, tail: 꼬리 늘어짐, strands: 떨어지는 가닥 수
 let RIM, rimKey='';
 const LIVE=[]; let UNI, THK, NSF, MX, MY, TMP2, RD=[], RDF, PV=[], backT=0, backPT=0, STEPPED=false, FLIP=false;   // PV: 한 박자 전의 잉크 (그리기는 PV→지금 사이를 이어서 그린다), FLIP: 이 채널은 반대로 돈다
@@ -499,7 +509,7 @@ function jagLoop(L,l,ks){ const s=L.S[l], n=L.N[l], B=L.B; if(n<3) return; const
       if(w>.02){ const ph=((x-CX)*-VN[1]+(y-CY)*VN[0])/per+(ks?.5:0), k=Math.floor(ph), f=ph-k, kk=((k%4096)+4096)%4096, h1=hh(9400+kk*7,1), h2=hh(9400+kk*7,2), len=amp0*(1-rnd+rnd*(h2<.25?.12:Math.pow(h1,.8)*1.6))*(hh(9400+kk*7,3)<G.tearLong*(ks?.5:1)?1.8+1.6*hh(9400+kk*7,4):1), tri=1-Math.abs(2*f-1), sm=tri*tri*(3-2*tri), sd=dn>=0?1:-1, o=len*w*(.35*tri+.65*sm)*(sd>0?.28:1);   // 앞쪽 머리는 짧게 둥글게, 길게 찢긴 결은 지나온 뒤쪽으로 끌린다
         if(o>.5){ let cx=x, cy=y, rem=o, dx=VN[0]*sd, dy=VN[1]*sd; while(rem>0){ const st=rem<7?rem:7; if(velN(cx,cy)>0){ const ex=VN[0]*sd, ey=VN[1]*sd; dx=dx*.4+ex*.6; dy=dy*.4+ey*.6; const dl=Math.hypot(dx,dy)||1; dx/=dl; dy/=dl; } cx+=dx*st; cy+=dy*st; rem-=st; }
           X=cx+nx*o*.1; Y=cy+ny*o*.1; } } }   // 갈래는 곧게 뻗지 않고 물이 흐르는 길을 따라 한 걸음씩 휘어 나간다 (둥글게 도는 줄기에서는 갈래도 둥글게)   // 갈래는 흐르는 쪽으로 뻗고, 자리는 공간에 고정돼 늘어난 결처럼 보인다
-    { if(JOn!==n){ JO=[]; JOn=n; } const J=JO[JSET]||(JO[JSET]={x:new Float32Array(n),y:new Float32Array(n),t:new Int32Array(n).fill(-99)}); let gx=Math.round((x+PAD)/CELL), gy=Math.round((y+PAD)/CELL); gx=gx<0?0:gx>=gw?gw-1:gx; gy=gy<0?0:gy>=gh?gh-1:gy; const k=gy*gw+gx, dX=X-x, dY=Y-y;
+    { const gn=gw*gh; if(JOn!==gn){ JO=[]; JOn=gn; } const J=JO[JSET]||(JO[JSET]={x:new Float32Array(gn),y:new Float32Array(gn),t:new Int32Array(gn).fill(-99)}); let gx=Math.round((x+PAD)/CELL), gy=Math.round((y+PAD)/CELL); gx=gx<0?0:gx>=gw?gw-1:gx; gy=gy<0?0:gy>=gh?gh-1:gy; const k=gy*gw+gx, dX=X-x, dY=Y-y;
       if(frameNo-J.t[k]>8){ J.x[k]=dX; J.y[k]=dY; } else if(J.t[k]!==frameNo){ J.x[k]+=(dX-J.x[k])*.06; J.y[k]+=(dY-J.y[k])*.06; } J.t[k]=frameNo; X=x+J.x[k]; Y=y+J.y[k]; }   // 같은 자리에서는 찢긴 모양이 천천히만 바뀐다 (파르르 떨지 않게)
     if(i===0) g.moveTo(X,Y); else g.lineTo(X,Y); } g.closePath(); }
 const bPath=L=>{ if(!JAGON){ allPath(L); return; } g.beginPath(); for(let l=0;l<L.n;l++) jagLoop(L,l); };
@@ -950,8 +960,9 @@ const BX=new Float32Array(40), BY=new Float32Array(40);
 function bolts(){ g.lineJoin="miter"; g.miterLimit=6; for(let b=0;b<4;b++){ const th=b*TAU/4+hh(7100+b,1)*.9+T*.03, nn=7, seg=(30+22*hh(7100+b,2))*(1+.1*Math.sin(T*2.3+b*2)), wd=24+10*hh(7100+b,3); let x=CX+Math.cos(th)*40, y=CY+Math.sin(th)*40;
     for(let k=0;k<nn;k++){ const f=target(x,y,T), l=Math.hypot(f[0],f[1])+1e-6, dx=-f[0]/l, dy=-f[1]/l, u=k/(nn-1), o=(k%2?1:-1)*(k===0?0:1)*(13+9*hh(7100+b,10+k))*(1-.4*u), w=wd*Math.pow(1-u,.8)*.5, px=x-dy*o, py=y+dx*o; BX[k]=px-dy*w+dx*w*.8; BY[k]=py+dx*w+dy*w*.8; BX[2*nn-1-k]=px+dy*w-dx*w*.8; BY[2*nn-1-k]=py-dx*w-dy*w*.8; const rx=x-CX, ry=y-CY, rl=Math.hypot(rx,ry)+1e-6; x+=(dx*.5+rx/rl*.85)*seg; y+=(dy*.5+ry/rl*.85)*seg; }
     g.beginPath(); g.moveTo(BX[0],BY[0]); for(let k=1;k<2*nn;k++) g.lineTo(BX[k],BY[k]); g.closePath(); g.fillStyle="#FEF102"; g.fill(); g.strokeStyle="#F29113"; g.lineWidth=1.8; g.stroke(); } g.lineJoin="round"; }
-function sparkles(fill,line){ g.fillStyle=fill; g.lineJoin="miter"; for(let k=0;k<9;k++){ const x=hh(8000+k,1)*WW, y=hh(8000+k,2)*WH, t=.55+.45*Math.sin(T*(.8+1.4*hh(8000+k,6))+hh(8000+k,5)*TAU), r=(9+20*hh(8000+k,3)*hh(8000+k,4))*(.35+.65*t*t)*(SC.sparkS||1), w=r*.13;
-    g.beginPath(); g.moveTo(x,y-r*1.25); g.quadraticCurveTo(x+w,y-w,x+r,y); g.quadraticCurveTo(x+w,y+w,x,y+r*1.25); g.quadraticCurveTo(x-w,y+w,x-r,y); g.quadraticCurveTo(x-w,y-w,x,y-r*1.25); g.fill(); if(line){ g.strokeStyle=line; g.lineWidth=1.6; g.stroke(); } } g.lineJoin="round"; }
+function sparkles(fill,line){ if(!G.stOn) return; g.fillStyle=fill; g.lineJoin="miter"; const N=Math.round(G.stN), A=G.stArm, HV=G.stHV;   // 십자별: 세로 팔이 길고 가로 팔은 조금 짧으며, 허리가 가늘게 오목하다
+  for(let k=0;k<N;k++){ const x=hh(8000+k,1)*WW, y=hh(8000+k,2)*WH, t=.55+.45*Math.sin(T*G.stTw*(.8+1.4*hh(8000+k,6))+hh(8000+k,5)*TAU), r=(9+20*hh(8000+k,3)*hh(8000+k,4))*(.35+.65*t*t)*(SC.sparkS||1)*G.stSize*.6, w=r*G.stThin, v=r*A, h=r*A*HV;
+    g.beginPath(); g.moveTo(x,y-v); g.quadraticCurveTo(x+w,y-w,x+h,y); g.quadraticCurveTo(x+w,y+w,x,y+v); g.quadraticCurveTo(x-w,y+w,x-h,y); g.quadraticCurveTo(x-w,y-w,x,y-v); g.fill(); if(line){ g.strokeStyle=line; g.lineWidth=1.6; g.stroke(); } } g.lineJoin="round"; }
 /* 프레임 사이 잇기: 물리는 1/30초마다 한 박자지만, 화면은 한 박자 전 모습과 지금 모습 사이를 매 프레임 이어서 그린다 → 툭 튀지 않고 초당 60장으로 흐른다 (속도를 늦춰도 마찬가지) */
 function src(l,c,a){ const sl=l*NC+c, D=DYE[l][c], P=PV[l][c]; if(!TCN[sl]) return D; if(RDF[sl]===frameNo) return RD[l][c];
   let f=a; if(l===0){ const now=simT-DT+a*DT, sp=backT-backPT; f=sp>1e-6?(now-backPT)/sp:1; } f=f<0?0:f>1?1:f;
@@ -1136,6 +1147,11 @@ const JGS=[["tear","tear",v=>Math.round(v)+"px"],["tearLong","tearLong",v=>pct(v
 for(const [id,k,f] of JGS) $(id).addEventListener("input",()=>{ G[k]=+$(id).value; $(id+"V").textContent=f(G[k]); saveG(); });
 function syncJag(){ for(const [id,k,f] of JGS){ $(id).value=G[k]; $(id+"V").textContent=f(G[k]); } }
 syncJag();
+const STS=[["stN","stN",v=>Math.round(v)+"개"],["stSize","stSize",v=>pct(v)],["stArm","stArm",v=>v.toFixed(1)+"배"],["stHV","stHV",v=>pct(v)],["stThin","stThin",v=>pct(v)],["stTw","stTw",v=>pct(v)]];
+for(const [id,k,f] of STS) $(id).addEventListener("input",()=>{ G[k]=+$(id).value; $(id+"V").textContent=f(G[k]); saveG(); });
+function syncSt(){ for(const [id,k,f] of STS){ $(id).value=G[k]; $(id+"V").textContent=f(G[k]); } $("stOn").setAttribute("aria-pressed",G.stOn?"true":"false"); $("stOn").textContent=G.stOn?"십자별 켜짐":"십자별 꺼짐"; }
+$("stOn").addEventListener("click",()=>{ G.stOn=G.stOn?0:1; saveG(); syncSt(); });
+syncSt();
 requestAnimationFrame(frame);
 })();
 </script>
