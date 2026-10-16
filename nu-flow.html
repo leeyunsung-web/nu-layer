@@ -89,6 +89,9 @@ canvas.hold{cursor:grabbing}
   <div class="ctl">
     <div class="it row" data-k="dCW"><span>도는 방향</span><button id="dCW" type="button" aria-pressed="true">시계</button><button id="dCCW" type="button" aria-pressed="false">반시계</button><small class="desc">소용돌이 전체가 도는 방향. 오브젝트마다 따로 정하려면 아래 오브젝트 칸에서 고릅니다.</small></div>
     <div class="it row" data-k="spOn"><span>나선</span><button id="spOn" type="button" aria-pressed="true">나선 쓰기</button><button id="spShow" type="button" aria-pressed="false">라인 보기</button><small class="desc">소용돌이를 보이지 않는 나선(@) 라인으로 만듭니다. 액체는 라인을 레일처럼 타고 감기며 바깥으로 나갑니다. 라인은 평소엔 숨어 있고, 나선 손잡이를 움직이는 동안만 점선으로 잠깐 보입니다. 계속 보려면 '라인 보기', 다시 숨기려면 '라인 숨기기'. 화면 가운데를 끌면 나선이 옮겨집니다.</small></div>
+    <label class="it" data-k="gSpread"><span>퍼짐</span><input id="gSpread" type="range" min="0" max="3" step="0.05" value="1"><output id="gSpreadV">100%</output><small class="desc">나선이 바깥으로 갈수록 넓게 열리고 액체가 감기면서도 바깥으로 계속 밀려 나가는 정도. 높을수록 가운데에서 맴돌지 않고 화면 밖까지 확 퍼집니다.</small></label>
+    <label class="it" data-k="gRim"><span>가장자리 쌓임</span><input id="gRim" type="range" min="0" max="1" step="0.05" value="0"><output id="gRimV">0%</output><small class="desc">화면 가장자리 띠에서 흐름이 느려지고 마르지 않아 액체가 겹겹이 쌓이는 정도. 0%보다 크면 화면 밖으로 나가는 대신 가장자리에 쌓입니다.</small></label>
+    <label class="it" data-k="gRimW"><span>쌓이는 폭</span><input id="gRimW" type="range" min="40" max="300" step="5" value="130"><output id="gRimWV">130px</output><small class="desc">가장자리에서 쌓이는 띠의 두께.</small></label>
     <label class="it" data-k="spDen"><span>나선 밀도</span><input id="spDen" type="range" min="0.4" max="3" step="0.05" value="1"><output id="spDenV">100%</output><small class="desc">감기는 줄 사이 간격. 높을수록 촘촘하게 감깁니다.</small></label>
     <label class="it" data-k="spW"><span>나선 폭</span><input id="spW" type="range" min="8" max="90" step="1" value="34"><output id="spWV">34px</output><small class="desc">라인을 따라 흐르는 띠의 두께. 넓을수록 굵은 물줄기가 함께 실립니다.</small></label>
     <label class="it" data-k="spPull"><span>끌어당김</span><input id="spPull" type="range" min="0" max="3" step="0.05" value="1"><output id="spPullV">100%</output><small class="desc">라인 근처의 액체를 라인 쪽으로 끌어오는 힘.</small></label>
@@ -188,8 +191,9 @@ const hh=(a,b)=>h(SEED,a,b);
 /* ── 격자 유체: 화면 전체가 한 통의 물이다. 격자마다 물의 속도와 잉크(분홍·보라·붉은) 농도가 있다.
    폭발을 축으로 도는 기류가 물을 천천히 밀고, 잉크는 물을 따라 늘어나고 감기며, 응축 항이 잉크를 또렷한 덩이로 뭉치고 가는 줄기를 구슬로 끊는다 ── */
 const AREA=540000, CELL=5, CV=10, PAD=60, DT=1/30, NC=4, NL=2;
-const G={vis:[1,1,1,1], visc:1, lightA:225, sp:1, spShow:0, spDen:1, spW:34, spPull:1, spStr:1, spBg:.35, spArms:1, spRot:1, spWob:1, speed:1, carry:1, dry:1, circ:.9, lspd:.5, dir:1, sep:.5, merge:1, head:1.3, tail:.9, strands:1.5, round:1, init:6, add:3, per:3.4, spin:1, calm:1, out:1, tailDry:1.5,
+const G={vis:[1,1,1,1], spread:1, rim:0, rimW:130, visc:1, lightA:225, sp:1, spShow:0, spDen:1, spW:34, spPull:1, spStr:1, spBg:.35, spArms:1, spRot:1, spWob:1, speed:1, carry:1, dry:1, circ:.9, lspd:.5, dir:1, sep:.5, merge:1, head:1.3, tail:.9, strands:1.5, round:1, init:6, add:3, per:3.4, spin:1, calm:1, out:1, tailDry:1.5,
   mat:[{carry:1,dir:0,exitR:.3,sl:1,size:1,share:1,ksz:.42,brk:.55,hth:.36,hmin:40,bsz:.17,td:.5,nA:.16,dth:.5},{carry:.6,dir:0,exitR:.3,sl:1,size:1,share:.25,ksz:.42,brk:0,hth:.36,hmin:40,bsz:0,td:.62,nA:.3,dth:.5},{carry:.5,dir:0,exitR:.3,sl:1,size:1,share:.4,ksz:.4,brk:0,hth:.36,hmin:40,bsz:.17,td:.6,nA:.3,dth:.5},{carry:1,dir:0,exitR:.3,sl:1,size:1,share:1,ksz:.42,brk:.55,hth:.36,hmin:40,bsz:.17,td:.5,nA:.16,dth:.5}]};   // 오브젝트마다: 크기, 솟는 비율, 하이라이트·어두운 면 세부   // out: 밖으로 밀려나는 힘   // spin: 도는 힘, calm: 물이 제 흐름으로 돌아오는 빠르기   // init: 처음 개수, add: 한 번에 더 솟는 개수, per: 간격(초)   // head: 머리 뭉침, tail: 꼬리 늘어짐, strands: 떨어지는 가닥 수
+let RIM, rimKey='';
 const LIVE=[]; let UNI, THK, NSF, MX, MY, TMP2, RD=[], RDF, PV=[], backT=0, backPT=0, STEPPED=false, FLIP=false;   // PV: 한 박자 전의 잉크 (그리기는 PV→지금 사이를 이어서 그린다), FLIP: 이 채널은 반대로 돈다
 const dirC=c=>G.mat[c].dir||G.dir;
 const TR={bead:0,tgt:0};   // 끊김 진단용 표시   // 오브젝트마다의 도는 방향 (0이면 전체를 따른다)   // RD: 그리기용으로 물을 따라 반 박자 밀어 둔 잉크 (프레임 사이를 메운다)
@@ -206,7 +210,7 @@ function fit(){ const cw=cv.clientWidth, ch=cv.clientHeight, d0=Math.min(window.
   if(w>0 && h2>0 && (cv.width!==w||cv.height!==h2)){ cv.width=w; cv.height=h2; } W=cv.width; Hh=cv.height; scale=Math.sqrt(W*Hh/AREA); WW=W/scale; WH=Hh/scale;
   const ngw=Math.ceil((WW+2*PAD)/CELL)+2, ngh=Math.ceil((WH+2*PAD)/CELL)+2; if(ngw===gw && ngh===gh) return; const og=gw?{gw,gh,vw,vh,U,V,DYE}:null; gw=ngw; gh=ngh; n=gw*gh; const A=()=>new Float32Array(n);   // 크기가 바뀌어도 처음부터 다시 하지 않는다: 아래에서 물과 잉크를 새 격자로 옮겨 담는다
   vw=Math.ceil((WW+2*PAD)/CV)+2; vh=Math.ceil((WH+2*PAD)/CV)+2; vn=vw*vh; const B=()=>new Float32Array(vn);
-  U=B(); V=B(); U2=B(); V2=B(); PR=B(); DV=B(); CURL=B(); UF=A(); VF=A(); UNI=A(); THK=A(); NSF=A(); MX=A(); MY=A(); TMP2=A(); BASEX=A(); BASEY=A(); WUF=A(); WVF=A(); DRY=A(); dryX=1e9; WU=B(); WV=B(); CEL=new Int32Array(n); LBL=new Int32Array(n); STK=new Int32Array(n);
+  U=B(); V=B(); U2=B(); V2=B(); PR=B(); DV=B(); CURL=B(); UF=A(); VF=A(); UNI=A(); RIM=A(); rimKey=''; THK=A(); NSF=A(); MX=A(); MY=A(); TMP2=A(); BASEX=A(); BASEY=A(); WUF=A(); WVF=A(); DRY=A(); dryX=1e9; WU=B(); WV=B(); CEL=new Int32Array(n); LBL=new Int32Array(n); STK=new Int32Array(n);
   tW=Math.ceil(gw/TL); tH=Math.ceil(gh/TL); const tn=tW*tH; TMK=new Uint8Array(tn); UM=new Uint8Array(tn); AM=new Uint8Array(tn); ULS=new Int32Array(tn); ALS=new Int32Array(tn); TLS=[]; for(let i=0;i<NL*NC;i++) TLS.push(new Int32Array(tn)); TCN=new Int32Array(NL*NC); TU=B(); TV=B(); tgN=0;
   for(let y=0;y<gh;y++) for(let x=0;x<gw;x++){ BASEX[y*gw+x]=x*CELL; BASEY[y*gw+x]=y*CELL; } NZ=[B(),B(),B(),B()]; TMP=A(); F=A(); Zf=A(); HT=A(); AB=A(); SD=A(); SH=A(); S2=A(); FC=A(); FL=A(); FM=A(); F2=A();
   DYE=[]; EMA=[]; for(let l=0;l<NL;l++){ const L=[]; for(let c=0;c<NC;c++) L.push(A()); DYE.push(L); } for(let c=0;c<NC;c++) EMA.push([A(),A(),A()]);
@@ -222,15 +226,18 @@ const SUB=[{a:1.1,rho:.5,om:.045,r:120,w:1},{a:3.9,rho:.62,om:-.03,r:100,w:-.9}]
 const SPR0=46;
 const spB=()=>130/Math.max(.2,G.spDen)/TAU;   // 줄 간격 / 2π  (밀도가 높을수록 촘촘)
 const spM=()=>Math.max(1,Math.round(G.spArms));
-const spLine=(r,t)=>G.dir*(r-SPR0)/spB()+t*.05*G.spRot*G.dir+G.spWob*.22*Math.sin(r*.018-t*.55);   // 반지름 r에서 라인이 지나는 각도
+const spL=()=>250/Math.max(.02,G.spread);   // 퍼짐: 바깥으로 갈수록 줄 간격이 넓어진다 (나선이 열린다)
+const spBr=r=>spB()*(1+Math.max(0,r-SPR0)/spL());   // 반지름 r에서의 줄 간격 / 2π
+const spLine=(r,t)=>{ const u=Math.max(0,r-SPR0), L=spL(); return G.dir*(L/spB())*Math.log(1+u/L)+t*.05*G.spRot*G.dir+G.spWob*.22*Math.sin(r*.018-t*.55); };   // 반지름 r에서 라인이 지나는 각도
 function target(x,y,t){ const rx=x-CX, ry=y-CY, r=Math.hypot(rx,ry)+1e-3, v=FLW.S*G.spin*r/(FLW.R0+r)*(1+.12*Math.sin(t*.31)), ex=(FLW.v0*(.3+1.4*Math.exp(-r/130))+v*Math.tan((1-G.circ)*.75))*G.out*(1+.3*Math.sin(t*.23+1));   // 원형 유지: 바깥으로 나가는 빠르기를 도는 빠르기에 비례시켜 늘 같은 각도로 감기는 나선(로그 나선)이 된다 → 어디서든 곡선   // 회오리: 밖으로 밀려나는 흐름 (멀수록 더 빠르게)
   let vx=-ry/r*v*G.dir+rx/r*ex, vy=rx/r*v*G.dir+ry/r*ex;
-  if(G.sp){ const ir=1/r, erx=rx*ir, ery=ry*ir, b=spB(), per=TAU/spM(), lf=spLine(r,t), phi=Math.atan2(ry,rx);   // 나선: 보이지 않는 @ 모양 라인. 라인 둘레의 띠에서는 물이 라인을 따라 흐르고, 띠 근처는 라인 쪽으로 끌려온다
+  if(G.sp){ const ir=1/r, erx=rx*ir, ery=ry*ir, b=spBr(r), per=TAU/spM(), lf=spLine(r,t), phi=Math.atan2(ry,rx);   // 나선: 보이지 않는 @ 모양 라인. 라인 둘레의 띠에서는 물이 라인을 따라 흐르고, 띠 근처는 라인 쪽으로 끌려온다
     let del=phi-lf; del-=per*Math.round(del/per); const off=G.dir*b*del, d=Math.abs(off), W=Math.max(4,G.spW), w=Math.exp(-(d/W)*(d/W)), wa=Math.exp(-(d/(2.2*W))*(d/(2.2*W)));
     const q=1/Math.sqrt(1+(r/b)*(r/b)), kt=r*G.dir/b, vl=v*1.3*G.spStr, tx=(erx-ery*kt)*q, ty=(ery+erx*kt)*q, ar=Math.max(-40,Math.min(40,off*1.2*G.spPull))*wa;
     const sx=(1-w)*vx*G.spBg+w*vl*tx+ar*erx, sy=(1-w)*vy*G.spBg+w*vl*ty+ar*ery, cw=sm((r-SPR0*.6)/(SPR0*.8));   // 가운데 구멍(분출구) 안은 예전 흐름
-    vx=vx*(1-cw)+sx*cw; vy=vy*(1-cw)+sy*cw; }
+    vx=vx*(1-cw)+sx*cw; vy=vy*(1-cw)+sy*cw; const od=G.spread*22*cw; vx+=erx*od; vy+=ery*od; }   // 퍼짐: 감기면서도 바깥으로 계속 밀려 나간다
   for(const s of SUB){ const a=s.a+s.om*t, cx=CX+Math.cos(a)*s.rho*RMX, cy=CY+Math.sin(a)*s.rho*RMX*.8, dx=x-cx, dy=y-cy, rr=Math.hypot(dx,dy)+1e-3, k=FLW.sub*s.w*Math.exp(-rr/s.r)*rr/s.r; vx+=-dy/rr*k; vy+=dx/rr*k; }
+  if(G.rim>0){ const de=Math.min(x,WW-x,y,WH-y), RW=Math.max(20,G.rimW); if(de<RW){ const f=G.rim*sm((RW-de)/RW), ux=rx/r, uy=ry/r, vr=vx*ux+vy*uy; if(vr>0){ vx-=ux*vr*f; vy-=uy*vr*f; } vx*=1-.6*f; vy*=1-.6*f; } }   // 가장자리 쌓임: 가장자리 띠에서는 바깥으로 못 나가고 느려져 쌓인다
   FO[0]=vx; FO[1]=vy; return FO; }
 const stirs=[];   // 손가락이 젓는 자리: [x,y,vx,vy]
 function forces(dt){ const t=simT, kf=Math.min(1,FLW.kf*G.calm*dt);
@@ -277,7 +284,7 @@ function project(){ for(let y=1;y<vh-1;y++){ let k=y*vw+1; for(let x=1;x<vw-1;x+
 function mkDry(){ dryX=CX; dryY=CY; for(let y=0;y<gh;y++){ let k=y*gw; for(let x=0;x<gw;x++,k++){ const wx=x*CELL-PAD-CX, wy=y*CELL-PAD-CY; DRY[k]=Math.exp(-(wx*wx+wy*wy)/11000); } } }   // 가운데 가까울수록 빨리 마른다 (미리 계산)
 function condense(D,dt,ew,L,cnt){ const a=FLW.cond*G.merge*dt, e=FLW.lap*dt*(.7+.35*G.visc), fs=FRAY*dt*.04/(.5+.5*G.visc), dk=FLW.decay*G.dry*dt, td=G.tailDry; let mx=0, lost=0, wsum=0;   // 흩어짐: 가는 줄기는 군데군데 삭아서 방울로 끊긴다 (깎인 양은 조각 테두리로 되돌려 양을 지킨다)
   for(let i=0;i<cnt;i++){ tb(L[i]); const x0=TB[0], x1=TB[1], y1=TB[3];
-    for(let y=TB[2];y<y1;y++){ let k=y*gw+x0; for(let x=x0;x<x1;x++,k++){ const d=D[k], lap=D[k-1]+D[k+1]+D[k-gw]+D[k+gw]-4*d; let v=d+e*lap+a*d*(1-d)*(d-.5)*4-dk*(1+td*DRY[k]);
+    for(let y=TB[2];y<y1;y++){ let k=y*gw+x0; for(let x=x0;x<x1;x++,k++){ const d=D[k], lap=D[k-1]+D[k+1]+D[k-gw]+D[k+gw]-4*d; let v=d+e*lap+a*d*(1-d)*(d-.5)*4-dk*(1+td*DRY[k])*(1-RIM[k]);
       if(fs>0 && d>0){ const th=THK[k]; if(th>0){ const q=e*lap*FLW.rnd*th; v+=fs*th*NSF[k]*d+q; lost-=q; const w=d*(1-d)*th; TMP2[k]=w; wsum+=w; } else TMP2[k]=0; } else TMP2[k]=0;
       v=v<0?0:v>1?1:v; TMP[k]=v; if(v>mx) mx=v; } } }
   condense.mx=mx; const gg=(fs>0 && lost>0 && wsum>0)?lost/wsum:0;
@@ -295,7 +302,7 @@ function pour(key,th,l,c,delay){ let cc=(c===0 && hh(key,11)<G.sep)?3:c; if(!G.v
   const sz=G.mat[cc].size, w0=(c===1?9:c===2?12+6*hh(key,4):26+16*hh(key,4))*sz, len=(c===2?70+50*hh(key,3):300+200*hh(key,3))*Math.sqrt(sz);
   const dr=dirC(cc), rw=.7*(1-.6*G.circ), tx=-Math.sin(th)*dr*.7+Math.cos(th)*rw, ty=Math.cos(th)*dr*.7+Math.sin(th)*rw;   // 머리는 도는 방향(접선)으로 먼저 나간다
   let r0=(55+25*hh(key,12))*(1+.5*G.circ), dx0=tx, dy0=ty;
-  if(G.sp){ const per=TAU/spM(), b=spB(); let del=(th-spLine(SPR0,simT))*G.dir; del-=per*Math.floor(del/per); r0=SPR0+b*del*.98+4; const f=target(CX+Math.cos(th)*r0,CY+Math.sin(th)*r0,simT), fl=Math.hypot(f[0],f[1])||1; dx0=f[0]/fl; dy0=f[1]/fl; }   // 나선 위에서 솟아 라인 방향으로 나간다
+  if(G.sp){ const per=TAU/spM(), b=spB(); let del=(th-spLine(SPR0,simT))*G.dir; del-=per*Math.floor(del/per); r0=SPR0+spBr(SPR0)*del*.98+4; const f=target(CX+Math.cos(th)*r0,CY+Math.sin(th)*r0,simT), fl=Math.hypot(f[0],f[1])||1; dx0=f[0]/fl; dy0=f[1]/fl; }   // 나선 위에서 솟아 라인 방향으로 나간다
   POURS.push({x:CX+Math.cos(th)*r0,y:CY+Math.sin(th)*r0,x0:CX+Math.cos(th)*r0,y0:CY+Math.sin(th)*r0,dx:dx0,dy:dy0,l,c:cc,w0,len,s:0,spd:170+70*hh(key,5),key,tail:hh(key,30)<.6,delay:delay||0,tough:hh(key,31)<G.mat[cc].exitR,cs:0}); }   // tough: 화면 밖까지 나가는 줄기 (오브젝트마다 비율)
 function spawnBurst(k,count){ for(let q=0;q<count;q++){ const key=5000+k*7+q*97, l=hh(key,0)<.4?0:1, c=pickC(key), th=k*2.4+q*TAU/Math.max(count,1)+hh(key,2)*.6;
     if(q>0 && hh(key,9)<.3){ const r0=RMX*(.5+.5*hh(key,6)), r=6+14*hh(key,3); const bc=hh(key,7)<.6?0:2; if(G.vis[bc]) blob(l,bc,CX+Math.cos(th)*r0,CY+Math.sin(th)*r0*.8,r,1.2); continue; }   // 멀리서 방울 하나
@@ -308,7 +315,7 @@ function emit(){ const k=Math.floor(simT/Math.max(G.per,.5)); if(k!==puffNo){ pu
     // 한 줄기로 흘린다: 앞서가는 머리가 두껍고 뒤로 끌리는 꼬리는 가늘며 끝은 둥근 방울. 가닥으로 흩어지는 것은 나중에 흐름 속에서 일어난다
     const hf=1+(G.head-1)*sm((u-.5)/.35), tb=Math.min(.8,Math.max(.08,.38+(.9-G.tail)*.35)), r=P.w0*((tb+(1-tb)*Math.pow(u,1.3))*hf+.2*Math.exp(-Math.pow(u/.06,2)))*(1+.08*Math.sin(u*9+P.key)); blob(P.l,P.c,P.x,P.y,Math.max(r,4),1.1);
     const tf=flowAt(P.x,P.y,P.c), tl=Math.hypot(tf[0],tf[1])+1e-6, rx=P.x-CX, ry=P.y-CY, rl=Math.hypot(rx,ry)+1e-6;   // 머리의 방향: 기류의 접선 쪽으로 점점 더 기울어 둥글게 휜다
-    const rb=(.9-.75*u)*(1-.85*G.circ)*(G.sp?.12:1); let tx=tf[0]/tl+rx/rl*rb, ty=tf[1]/tl+ry/rl*rb; const nn=Math.hypot(tx,ty); tx/=nn; ty/=nn; P.dx=tx; P.dy=ty; P.x+=tx*ds; P.y+=ty*ds;   // 머리는 기류를 따라 둥글게 (원형 유지가 높을수록 곧장 밖으로 나가지 않는다)
+    const rb=(.9-.75*u)*(1-.85*G.circ)*(G.sp?.12+.12*G.spread:1); let tx=tf[0]/tl+rx/rl*rb, ty=tf[1]/tl+ry/rl*rb; const nn=Math.hypot(tx,ty); tx/=nn; ty/=nn; P.dx=tx; P.dy=ty; P.x+=tx*ds; P.y+=ty*ds;   // 머리는 기류를 따라 둥글게 (원형 유지가 높을수록 곧장 밖으로 나가지 않는다)
     push(P.x,P.y,P.w0*(.6+.8*u),tx*P.spd*.45*(.3+.7*u),ty*P.spd*.45*(.3+.7*u)); } }   // 미는 힘은 머리에 실린다   // 머리가 물을 미는 힘은 약하게: 물결이 쌓여 흐름이 흐트러지지 않도록
 function flowAt(x,y,c){ const f=target(x,y,simT); if(dirC(c)===G.dir) return f; const rx=x-CX, ry=y-CY, ir=1/(Math.hypot(rx,ry)+1e-3), tx=-ry*ir, ty=rx*ir, vt=f[0]*tx+f[1]*ty; f[0]-=2*vt*tx; f[1]-=2*vt*ty; return f; }
 /* 나르는 머리: 잉크를 다 흘린 줄기의 머리가 소용돌이 라인을 따라 계속 나아가며 둘레의 물을 같이 끌고 간다 → 몸통은 따라오고 꼬리는 늘어진다.
@@ -319,9 +326,10 @@ function carry(P){ const mc=G.mat[P.c].carry??1, rx0=P.x-CX, ry0=P.y-CY, rl0=Mat
   const prog=(rl0-P.rS)/Math.max(30,edgeR(rx0/rl0,ry0/rl0)-P.rS), going=P.goal>=1e8, ease=going?1:Math.max(0,Math.min(1,(P.goal-prog)/.15));
   if(!going && prog>=P.goal) return true;
   const k=Math.exp(-P.cs/(900*Math.max(G.carry,.05))), v=Math.max(60*G.carry,P.spd*.6*k)*(.35+.65*ease); const ds=v*DT; P.cs+=ds;
-  const tf=flowAt(P.x,P.y,P.c), tl=Math.hypot(tf[0],tf[1])+1e-6, rx=P.x-CX, ry=P.y-CY, rl=Math.hypot(rx,ry)+1e-6, rb=G.sp?.01:(P.tough?.22*Math.max(G.out,.2):.08);
+  const tf=flowAt(P.x,P.y,P.c), tl=Math.hypot(tf[0],tf[1])+1e-6, rx=P.x-CX, ry=P.y-CY, rl=Math.hypot(rx,ry)+1e-6, rb=G.sp?.06*G.spread:(P.tough?.22*Math.max(G.out,.2):.08);
   let tx=tf[0]/tl+rx/rl*rb, ty=tf[1]/tl+ry/rl*rb; const nn=Math.hypot(tx,ty); tx/=nn; ty/=nn; P.dx+=(tx-P.dx)*.3; P.dy+=(ty-P.dy)*.3; const dl=Math.hypot(P.dx,P.dy)||1; P.dx/=dl; P.dy/=dl;
-  P.x+=P.dx*ds; P.y+=P.dy*ds; if(P.x<-PAD*.7 || P.x>WW+PAD*.7 || P.y<-PAD*.7 || P.y>WH+PAD*.7) return true;   // 화면 밖으로 나가면 끝
+  P.x+=P.dx*ds; P.y+=P.dy*ds; if(G.rim>0 && Math.min(P.x,WW-P.x,P.y,WH-P.y)<G.rimW*.6) return true;   // 쌓임 띠에 닿으면 끌기를 멈추고 거기 쌓인다
+  if(P.x<-PAD*.7 || P.x>WW+PAD*.7 || P.y<-PAD*.7 || P.y>WH+PAD*.7) return true;   // 화면 밖으로 나가면 끝
   push(P.x,P.y,P.w0*1.35*G.head,P.dx*v,P.dy*v); blob(P.l,P.c,P.x,P.y,P.w0*.75*G.head,going?.12:.07*ease);   // 끄는 동안 머리에 조금씩 보태 형태를 지킨다   // 머리 둘레의 물을 같이 끈다 · 끝까지 가는 머리는 조금씩 보태 마르지 않게
   return false; }
 function pat(wx,wy,t){ return Math.sin(wx*.21+1.7*Math.sin(wy*.13+t*.3))*Math.cos(wy*.19+1.5*Math.sin(wx*.11-t*.25)); }
@@ -347,7 +355,8 @@ function backStep(){ backDue=false; const dt=simT-backT; backPT=backT; backT=sim
   for(let c=0;c<NC;c++){ if(!LIVE[c]) continue; const D=DYE[0][c], m=markTiles(D,c), L=TLS[c]; PV[0][c].set(D); FRAY=0; FLIP=dirC(c)!==G.dir; advect(D,TMP,dt,FLW.back,L,m); FLIP=false; D.set(TMP); condense(D,dt,26,L,m); if(condense.mx<.02){ LIVE[c]=false; D.fill(0); PV[0][c].fill(0); } } }
 /* 한 박자를 반으로 나눠 두 프레임에 걸쳐 한다: 앞 반(stepA)은 물의 흐름, 뒤 반(stepB)은 잉크를 나르고 다듬기. 한 프레임에 일이 몰려 툭 걸리지 않게 */
 function step(){ stepA(); stepB(); }
-function stepA(){ if(backDue) backStep(); bdF++; if(CX!==dryX || CY!==dryY) mkDry();
+function mkRim(){ const key=G.rim+'/'+G.rimW+'/'+gw+'/'+gh; if(key===rimKey) return; rimKey=key; const RW=Math.max(20,G.rimW); for(let y=0;y<gh;y++){ let k=y*gw; for(let x=0;x<gw;x++,k++){ const wx=x*CELL-PAD, wy=y*CELL-PAD, de=Math.min(wx,WW-wx,wy,WH-wy); RIM[k]=G.rim>0 && de<RW?G.rim*.95*sm((RW-de)/RW):0; } } }   // 쌓임 띠에서는 마르지 않는다
+function stepA(){ if(backDue) backStep(); bdF++; mkRim(); if(CX!==dryX || CY!==dryY) mkDry();
   UM.fill(0); AM.fill(0);
   for(let l=0;l<NL;l++) for(let c=0;c<NC;c++){ const sl=l*NC+c; if(!LIVE[sl]){ TCN[sl]=0; continue; } const L=TLS[sl], m=markTiles(DYE[l][c],sl); for(let i=0;i<m;i++){ AM[L[i]]=1; if(l===NL-1 && c!==2) UM[L[i]]=1; } }
   UCN=0; ACN=0; for(let t=0;t<tW*tH;t++){ if(UM[t]) ULS[UCN++]=t; if(AM[t]) ALS[ACN++]=t; }
@@ -529,8 +538,8 @@ function step(){ const DS=DT*G.speed, DMP=Math.pow(P.DAMP,G.speed), VS=P.VISC*Ma
   simT+=DS;
 }
 let born=0; const SP0=9.2;   // 처음 놓을 때 알갱이 사이 거리
-function addDrop(cx,cy,R,vx,vy){ const rows=Math.ceil(R/(SP0*.866))+1, lobe=newLobe(); let k=0;
-  for(let a=-rows;a<=rows;a++) for(let b=-rows-1;b<=rows+1;b++){ const x=(b+(a&1)*.5)*SP0, y=a*SP0*.866; if(x*x+y*y>R*R || N>=CAP) continue;
+function addDrop(cx,cy,R,vx,vy,asp,ang){ asp=asp||1; const ca=Math.cos(ang||0), sa=Math.sin(ang||0), Rm=R*Math.max(asp,1/asp), rows=Math.ceil(Rm/(SP0*.866))+1, lobe=newLobe(); let k=0;   // asp: 길쭉한 정도, ang: 방향
+  for(let a=-rows;a<=rows;a++) for(let b=-rows-1;b<=rows+1;b++){ const x=(b+(a&1)*.5)*SP0, y=a*SP0*.866, xr=(x*ca+y*sa)/asp, yr=(-x*sa+y*ca)*asp; if(xr*xr+yr*yr>R*R || N>=CAP) continue;
     X[N]=cx+x; Y[N]=cy+y; VX[N]=vx||0; VY[N]=vy||0; GW[N]=0; QX[N]=X[N]; QY[N]=Y[N]; QVX[N]=VX[N]; QVY[N]=VY[N]; LM[N]=6; AH[N]=1; AC[N]=1;
     PH[N]=h(SEED,N,7+born); ZP[N]=Math.max((R+9)*(R+9)-x*x-y*y,0); DOT[N]=0; BUB[N]=0; CWt[N]=0; HWt[N]=0; H2t[N]=0; LBL[N]=lobe; N++; k++; } born++; return k; }
 
@@ -559,8 +568,15 @@ function place(R,key){ // 다른 방울과 겹치지 않는 빈자리를 고른�
     const s=m-R; if(s>bs){ bs=s; bx=x; by=y; } if(s>46) break; }
   return [bx,by]; }
 function reset(){ N=0; nLobe=0; ptrs.clear(); extra=0; GW.fill(0); TW.fill(0); simT=0; sel=-1;
-  for(let i=0;i<G.count;i++){ const R=Math.max(14,SIZES[i%SIZES.length]*G.size*(i>=SIZES.length?.75:1)), p=place(R,i+1); addDrop(p[0],p[1],R-6,(h(SEED,i,90)-.5)*16,(h(SEED,i,91)-.5)*16); } btn(); selUI(); }
-function more(){ if(N>CAP-240) return; extra++; const R=Math.max(14,(17+22*h(SEED,300+extra,0))*G.size), p=place(R,400+extra); addDrop(p[0],p[1],R-6,0,0); btn(); }
+  for(let i=0;i<G.count;i++){ const R=Math.max(14,SIZES[i%SIZES.length]*G.size*(i>=SIZES.length?.75:1)), p=place(R,i+1); addShape(p[0],p[1],R-6,(h(SEED,i,90)-.5)*16,(h(SEED,i,91)-.5)*16,700+i*17); } btn(); selUI(); }
+function more(){ if(N>CAP-240) return; extra++; const R=Math.max(14,(17+22*h(SEED,300+extra,0))*G.size), p=place(R,400+extra); addShape(p[0],p[1],R-6,0,0,900+extra*13); btn(); }
+/* 여러 모양: 그림 속 방울처럼 둥근 것, 길쭉한 것, 강낭콩·땅콩(볼록함 둘), 애벌레(볼록함 셋·넷)가 섞인다. 이어 붙은 볼록함은 서로 녹아 하나가 되지 않아 모양이 남는다 */
+function addShape(cx,cy,base,vx,vy,key){ const u=hh(key,80);
+  if(u<.42 || base<11) return addDrop(cx,cy,base,vx,vy);
+  if(u<.58) return addDrop(cx,cy,base,vx,vy,1.3+.8*hh(key,81),hh(key,82)*TAU);
+  const n=u<.85?2:3+(hh(key,83)<.4?1:0), bend=(hh(key,85)-.5)*1.4; let x=cx, y=cy, a=hh(key,84)*TAU, pr=0, k=0; const ls=[];
+  for(let q=0;q<n;q++){ const r=Math.max(8,base*(.5+.45*hh(key,86+q))); if(q>0){ const st=(pr+r)*.8; x+=Math.cos(a)*st; y+=Math.sin(a)*st; a+=bend; } k+=addDrop(x,y,r,vx,vy); ls.push(nLobe-1); pr=r; }
+  for(const l of ls) LKEEP[l]=1; return k; }
 function btn(){ $("kAdd").disabled=N>CAP-240; }
 
 /* ── 손가락: 잡은 곳은 손을 따라오고, 이어진 나머지는 멀수록 늦게 끌려온다 ── */
@@ -631,12 +647,12 @@ const LMAX=1024, LCNT=new Int32Array(LMAX), LOFF=new Int32Array(LMAX+1), LCUR=ne
       SB=[0,1,2,3,4,5,6,7].map(()=>new Float32Array(LMAX)),   // 덩이가 타고난 빛 성격 (LAC…L3Z는 지금 쓰는 값: 녹아드는 동안 큰 덩이 쪽으로 닮아 간다)
       LEX=new Float32Array(LMAX), LEV=new Float32Array(LMAX), L3A=new Float32Array(LMAX), LCX=new Float32Array(LMAX), LCY=new Float32Array(LMAX), LSP=new Float32Array(LMAX), LIR=new Float32Array(LMAX), LS0=new Float32Array(LMAX),
       LTO=new Int16Array(LMAX).fill(-1), LCAND=new Int16Array(LMAX), LFUS=new Int16Array(LMAX), LTM=new Float32Array(LMAX), LFD=new Float32Array(LMAX).fill(1),
-      LBORN=new Float32Array(LMAX), LNF=new Float32Array(LMAX), LLV=new Float32Array(LMAX), LDX=new Float32Array(LMAX), LDY=new Float32Array(LMAX), LDW=new Float32Array(LMAX), LFR=new Uint8Array(LMAX), FWX=new Float32Array(LMAX), FWY=new Float32Array(LMAX);   // 덩이 자리의 물 흐름 (소용돌이 쪽에서 빌려 온다)
+      LBORN=new Float32Array(LMAX), LNF=new Float32Array(LMAX), LLV=new Float32Array(LMAX), LDX=new Float32Array(LMAX), LDY=new Float32Array(LMAX), LDW=new Float32Array(LMAX), LFR=new Uint8Array(LMAX), LKEEP=new Uint8Array(LMAX), FWX=new Float32Array(LMAX), FWY=new Float32Array(LMAX);   // 덩이 자리의 물 흐름 (소용돌이 쪽에서 빌려 온다)
 let waterAt=null;   // 태어난 때, 이때까지 안 합쳐짐, 밀려나기 시작한 때, 나가는 방향, 머무는 시간 배율
 const SE=[LAC,LAS,LEL,LSZ,L2C,L2S,L2Z,L3Z];
 let nLobe=0, lobeSerial=0;
 function styleLobe(l){ const k=++lobeSerial; // 덩이마다 빛을 받는 성격이 다르다
-  LBORN[l]=simT; LNF[l]=0; LLV[l]=0; LFR[l]=0; LDW[l]=.6+.8*hh(k,61); const da=hh(k,62)*TAU; LDX[l]=Math.cos(da); LDY[l]=Math.sin(da);   // 머무는 시간은 방울마다 조금씩 다르고, 나가는 방향은 제멋대로
+  LBORN[l]=simT; LNF[l]=0; LLV[l]=0; LFR[l]=0; LKEEP[l]=0; LDW[l]=.6+.8*hh(k,61); const da=hh(k,62)*TAU; LDX[l]=Math.cos(da); LDY[l]=Math.sin(da);   // 머무는 시간은 방울마다 조금씩 다르고, 나가는 방향은 제멋대로
   const az=(hh(k,41)-.5)*.9, a2=az+(hh(k,44)<.5?-1:1)*(.85+.6*hh(k,45));
   LAC[l]=Math.cos(az); LAS[l]=Math.sin(az); LEL[l]=.42+.42*hh(k,42);          // 빛의 높이: 낮으면 가장자리에 붙은 초승달, 높으면 가운데 쪽 둥근 얼룩
   LSZ[l]=.33+.17*hh(k,43);                                                     // 큰 하이라이트의 크기
@@ -645,7 +661,7 @@ function styleLobe(l){ const k=++lobeSerial; // 덩이마다 빛을 받는 성�
   for(let q=0;q<8;q++) SB[q][l]=SE[q][l]; LS0[l]=(hh(k,51)<.5?-1:1)*(.5+.6*hh(k,52)); LTO[l]=-1; LTM[l]=0; LFD[l]=1; LCX[l]=0; LCY[l]=0; LSP[l]=0; LIR[l]=0; LEX[l]=0; LEV[l]=0; }
 const hh=(a,b)=>h(SEED,a,b);
 function newLobe(){ if(nLobe>=LMAX-2) packLobes(); const l=nLobe++; styleLobe(l); return l; }
-function packLobes(){ const map=new Int16Array(LMAX).fill(-1); let k=0; for(let i=0;i<N;i++){ const l=LBL[i]; if(map[l]<0){ map[l]=k; for(let q=0;q<8;q++){ SB[q][k]=SB[q][l]; SE[q][k]=SE[q][l]; } LS0[k]=LS0[l]; L3A[k]=L3A[l]; LEX[k]=LEX[l]; LEV[k]=LEV[l]; LBORN[k]=LBORN[l]; LNF[k]=LNF[l]; LLV[k]=LLV[l]; LDX[k]=LDX[l]; LDY[k]=LDY[l]; LDW[k]=LDW[l]; LFR[k]=LFR[l]; LTO[k]=-1; LTM[k]=0; LFD[k]=1; k++; } LBL[i]=map[l]; } nLobe=k; }
+function packLobes(){ const map=new Int16Array(LMAX).fill(-1); let k=0; for(let i=0;i<N;i++){ const l=LBL[i]; if(map[l]<0){ map[l]=k; for(let q=0;q<8;q++){ SB[q][k]=SB[q][l]; SE[q][k]=SE[q][l]; } LS0[k]=LS0[l]; L3A[k]=L3A[l]; LEX[k]=LEX[l]; LEV[k]=LEV[l]; LBORN[k]=LBORN[l]; LNF[k]=LNF[l]; LLV[k]=LLV[l]; LDX[k]=LDX[l]; LDY[k]=LDY[l]; LDW[k]=LDW[l]; LFR[k]=LFR[l]; LKEEP[k]=LKEEP[l]; LTO[k]=-1; LTM[k]=0; LFD[k]=1; k++; } LBL[i]=map[l]; } nLobe=k; }
 let FMX=1e9;
 function lobes(dt){ FMX=Math.PI*(G.fmax/2)*(G.fmax/2)/(SP0*SP0*.866); const n=gw*gh, inv=1/CELL, r2=RK*RK, ir=1/r2;   // 지름(px) → 알갱이 수
   for(let l=0;l<nLobe;l++){ LCNT[l]=0; BX0[l]=1e9; BY0[l]=1e9; BX1[l]=-1e9; BY1[l]=-1e9; LCX[l]=0; LCY[l]=0; LCAND[l]=-1; LFUS[l]=-1; }
@@ -662,8 +678,8 @@ function lobes(dt){ FMX=Math.PI*(G.fmax/2)*(G.fmax/2)/(SP0*SP0*.866); const n=gw
   // 덩이 정리: 남의 덩이 깊숙이 섞여 들어간 알갱이는 그 덩이가 된다. 그리고 어느 덩이가 더 큰 덩이와 맞닿아 있는지 적어 둔다
   for(let i=0;i<N;i++){ const k=Math.round(Y[i]*inv)*gw+Math.round(X[i]*inv), lid=LID[k], own=LBL[i]; if(lid<0) continue; const a=M1[k], b=M2[k]; let o=-1;
     if(LNF[own]>simT || LNF[lid]>simT) continue;   // 안 합쳐지는 동안은 섞이지도 않는다
-    if(lid!==own){ o=lid; if((LCNT[own]<7 || a-b>(a+b)*.36) && LCNT[lid]<FMX) LBL[i]=lid; } else if(b>.7) o=LI2[k];
-    if(o>=0 && LCNT[o]+LCNT[own]>FMX) o=-1;   // 정한 크기를 넘게는 하나로 합쳐지지 않는다: 붙은 채로 골이 남아 여러 모양이 된다
+    if(lid!==own){ o=lid; if((LCNT[own]<7 || a-b>(a+b)*.36) && LCNT[lid]<FMX && !LKEEP[own] && !LKEEP[lid]) LBL[i]=lid; } else if(b>.7) o=LI2[k];
+    if(o>=0 && (LCNT[o]+LCNT[own]>FMX || LKEEP[o] || LKEEP[own])) o=-1;   // 정한 크기를 넘게는 하나로 합쳐지지 않는다: 붙은 채로 골이 남아 여러 모양이 된다
     if(o>=0 && (LCNT[o]>LCNT[own] || (LCNT[o]===LCNT[own] && o<own)) && (LCAND[own]<0 || LCNT[o]>LCNT[LCAND[own]])) LCAND[own]=o; }
   // 맞닿은 지 정해 둔 시간이 지나면 작은 덩이가 큰 덩이에 녹아든다: 사이의 골이 옅어지고, 빛 성격이 큰 덩이를 닮아 가다가, 한 덩이가 된다
   let any=false;
@@ -764,15 +780,16 @@ function manage(dt){ mgT+=dt; if(mgT<.25) return; mgT=0; if(!N && !owed) return;
   if(G.leave) for(let l=0;l<nLobe;l++){ if(!LCNT[l] || LLV[l]>0) continue; if(held.has(l)){ LBORN[l]=simT; continue; } if(simT-LBORN[l]>G.dwell*LDW[l]){ LLV[l]=simT; const ox=LCX[l]-CXs, oy=LCY[l]-CYs, ol=Math.hypot(ox,oy)+1, ja=(hh(l+lobeSerial,63)-.5)*1.2, ca=Math.cos(ja), sa=Math.sin(ja), ux=ox/ol, uy=oy/ol; LDX[l]=ux*ca-uy*sa; LDY[l]=ux*sa+uy*ca; } }   // 나가는 방향: 가운데에서 바깥쪽으로 (조금씩 제멋대로)
   for(let l=0;l<nLobe;l++){ if(!LCNT[l] || held.has(l)) continue; if(BX0[l]>WW+40 || BX1[l]<-40 || BY0[l]>WH+40 || BY1[l]<-40){ owed+=removeLobe(l); LCNT[l]=0; LLV[l]=0; } }
   if(!G.refill){ owed=0; return; }
-  while(owed>=6 && N<CAP-120){ const cnt=Math.min(owed,140), r=Math.sqrt(cnt*SP0*SP0*.866/Math.PI)+2, p=placeNear(CXs,CYs,r+6), a=hh(born,70)*TAU, sp=15+25*hh(born,71); owed-=addDrop(p[0],p[1],r,Math.cos(a)*sp,Math.sin(a)*sp)||cnt; }   // 가운데에서 새로 생겨 천천히 떠난다
+  for(let t=0;t<(owed>160?2:1) && owed>=3 && N<CAP-120;t++){ const want=Math.min(owed,Math.round(4+34*Math.pow(hh(born,74),2))), r=Math.max(8,Math.sqrt(want*SP0*SP0*.866/Math.PI)), a=hh(born,70)*TAU, d0=12+45*hh(born,72), p=placeNear(CXs+Math.cos(a)*d0,CYs+Math.sin(a)*d0,r+6), sp=40+90*hh(born,71);
+    owed-=Math.max(3,addShape(p[0],p[1],r,Math.cos(a)*sp,Math.sin(a)*sp,born*7+11)); }   // 다시 채우기: 작은 방울을 하나씩, 크기와 모양을 섞어 가운데에서 사방으로 흩뿌린다   // 가운데에서 새로 생겨 천천히 떠난다
   btn(); }
 /* 두 번 누르면 펑: 그 방울을 가장 작은 방울들로 쪼개 사방으로 튀긴다. 정한 초 동안은 서로 다시 붙지 않는다 */
 function burst(x,y){ let best=-1, bd=1e9; for(let i=0;i<N;i++){ const d=(X[i]-x)**2+(Y[i]-y)**2; if(d<bd){ bd=d; best=i; } } if(best<0 || bd>54*54) return false;
-  for(const id of [...ptrs.keys()]) release(id); const qt=linked([best]); if(qt<8) return false; const idx=Array.from(que.subarray(0,qt)), K=Math.max(2,Math.round(qt/6));
+  for(const id of [...ptrs.keys()]) release(id); const qt=linked([best]); if(qt<8) return false; const idx=Array.from(que.subarray(0,qt)), K=Math.max(2,Math.round(qt/8));
   let cx=0, cy=0; for(const i of idx){ cx+=X[i]; cy+=Y[i]; } cx/=qt; cy/=qt;
-  const sx=new Float32Array(K), sy=new Float32Array(K), as=new Int32Array(qt); for(let g2=0;g2<K;g2++){ const i=idx[Math.floor(g2*qt/K)]; sx[g2]=X[i]; sy[g2]=Y[i]; }
+  const sx=new Float32Array(K), sy=new Float32Array(K), sw=new Float32Array(K), as=new Int32Array(qt); for(let g2=0;g2<K;g2++) sw[g2]=Math.pow(hh(born+g2,75),1.6)*600; for(let g2=0;g2<K;g2++){ const i=idx[Math.floor(g2*qt/K)]; sx[g2]=X[i]; sy[g2]=Y[i]; }   // 조각마다 몫이 달라 크기가 섞인다
   for(let it=0;it<3;it++){ const ax=new Float32Array(K), ay=new Float32Array(K), an=new Int32Array(K);
-    for(let q=0;q<qt;q++){ const i=idx[q]; let bb=0, bdd=1e9; for(let g2=0;g2<K;g2++){ const d=(X[i]-sx[g2])**2+(Y[i]-sy[g2])**2; if(d<bdd){ bdd=d; bb=g2; } } as[q]=bb; ax[bb]+=X[i]; ay[bb]+=Y[i]; an[bb]++; }
+    for(let q=0;q<qt;q++){ const i=idx[q]; let bb=0, bdd=1e9; for(let g2=0;g2<K;g2++){ const d=(X[i]-sx[g2])**2+(Y[i]-sy[g2])**2-sw[g2]; if(d<bdd){ bdd=d; bb=g2; } } as[q]=bb; ax[bb]+=X[i]; ay[bb]+=Y[i]; an[bb]++; }
     for(let g2=0;g2<K;g2++) if(an[g2]){ sx[g2]=ax[g2]/an[g2]; sy[g2]=ay[g2]/an[g2]; } }
   const lob=new Int32Array(K), vx=new Float32Array(K), vy=new Float32Array(K);
   for(let g2=0;g2<K;g2++){ lob[g2]=newLobe(); LNF[lob[g2]]=simT+G.sep; LFR[lob[g2]]=1; const dx=sx[g2]-cx, dy=sy[g2]-cy, dl=Math.hypot(dx,dy)||1, a=Math.atan2(dy,dx)+(hh(born+g2,72)-.5)*.6, sp=(150+150*hh(born+g2,73))*(.6+.4*Math.min(1,dl/30)); vx[g2]=Math.cos(a)*sp; vy[g2]=Math.sin(a)*sp; }
@@ -908,7 +925,7 @@ function loadG(){ try{ const o=JSON.parse(localStorage.getItem(KEY)||"{}"); for(
 loadG();
 function syncUI(){ $("dCW").setAttribute("aria-pressed",G.dir>0?"true":"false"); $("dCCW").setAttribute("aria-pressed",G.dir>0?"false":"true");
   $("gSep").value=G.sep; $("gSepV").textContent=pct(G.sep); $("gMerge").value=G.merge; $("gMergeV").textContent=pct(G.merge);
-  $("gHead").value=G.head; $("gHeadV").textContent=pct(G.head); $("gTail").value=G.tail; $("gTailV").textContent=pct(G.tail); $("gStr").value=G.strands; $("gStrV").textContent=pct(G.strands); $("gRnd").value=G.round; $("gRndV").textContent=pct(G.round); $("gInit").value=G.init; $("gInitV").textContent=G.init+"개"; $("gAdd").value=G.add; $("gAddV").textContent=G.add+"개"; $("gPer").value=G.per; $("gPerV").textContent=G.per+"초"; $("gSpin").value=G.spin; $("gSpinV").textContent=pct(G.spin); $("gCalm").value=G.calm; $("gCalmV").textContent=pct(G.calm); $("gOut").value=G.out; $("gOutV").textContent=pct(G.out); $("gTD").value=G.tailDry; $("gTDV").textContent=pct(G.tailDry); $("gVisc").value=G.visc; $("gViscV").textContent=pct(G.visc); $("gLA").value=G.lightA; $("gLAV").textContent=Math.round(G.lightA)+"°"; $("gCarry").value=G.carry; $("gCarryV").textContent=pct(G.carry); $("gDry").value=G.dry; $("gDryV").textContent=pct(G.dry); $("gSpd").value=G.speed; $("gSpdV").textContent=pct(G.speed); $("gCirc").value=G.circ; $("gCircV").textContent=pct(G.circ); $("gLs").value=G.lspd; $("gLsV").textContent=pct(G.lspd); }
+  $("gHead").value=G.head; $("gHeadV").textContent=pct(G.head); $("gTail").value=G.tail; $("gTailV").textContent=pct(G.tail); $("gStr").value=G.strands; $("gStrV").textContent=pct(G.strands); $("gRnd").value=G.round; $("gRndV").textContent=pct(G.round); $("gInit").value=G.init; $("gInitV").textContent=G.init+"개"; $("gAdd").value=G.add; $("gAddV").textContent=G.add+"개"; $("gPer").value=G.per; $("gPerV").textContent=G.per+"초"; $("gSpin").value=G.spin; $("gSpinV").textContent=pct(G.spin); $("gCalm").value=G.calm; $("gCalmV").textContent=pct(G.calm); $("gOut").value=G.out; $("gOutV").textContent=pct(G.out); $("gTD").value=G.tailDry; $("gTDV").textContent=pct(G.tailDry); for(const [id,k,f] of [["gSpread","spread",v=>pct(v)],["gRim","rim",v=>pct(v)],["gRimW","rimW",v=>Math.round(v)+"px"]]){ $(id).value=G[k]; $(id+"V").textContent=f(G[k]); } $("gVisc").value=G.visc; $("gViscV").textContent=pct(G.visc); $("gLA").value=G.lightA; $("gLAV").textContent=Math.round(G.lightA)+"°"; $("gCarry").value=G.carry; $("gCarryV").textContent=pct(G.carry); $("gDry").value=G.dry; $("gDryV").textContent=pct(G.dry); $("gSpd").value=G.speed; $("gSpdV").textContent=pct(G.speed); $("gCirc").value=G.circ; $("gCircV").textContent=pct(G.circ); $("gLs").value=G.lspd; $("gLsV").textContent=pct(G.lspd); }
 syncUI();
 $("gHead").addEventListener("input",()=>{ G.head=+$("gHead").value; $("gHeadV").textContent=pct(G.head); saveG(); });
 $("gTail").addEventListener("input",()=>{ G.tail=+$("gTail").value; $("gTailV").textContent=pct(G.tail); saveG(); });
@@ -951,6 +968,8 @@ for(const [id,k,f] of SPS) $(id).addEventListener("input",()=>{ G[k]=+$(id).valu
 $("spOn").addEventListener("click",()=>{ G.sp=G.sp?0:1; saveG(); syncSp(); }); $("spShow").addEventListener("click",()=>{ G.spShow=G.spShow?0:1; saveG(); syncSp(); });
 function syncSp(){ for(const [id,k,f] of SPS){ $(id).value=G[k]; $(id+"V").textContent=f(G[k]); } $("spOn").setAttribute("aria-pressed",G.sp?"true":"false"); $("spShow").setAttribute("aria-pressed",G.spShow?"true":"false"); $("spShow").textContent=G.spShow?"라인 숨기기":"라인 보기"; }
 syncSp();
+const SPRS=[["gSpread","spread",v=>pct(v)],["gRim","rim",v=>pct(v)],["gRimW","rimW",v=>Math.round(v)+"px"]];
+for(const [id,k,f] of SPRS) $(id).addEventListener("input",()=>{ G[k]=+$(id).value; $(id+"V").textContent=f(G[k]); saveG(); });
 $("gVisc").addEventListener("input",()=>{ G.visc=+$("gVisc").value; $("gViscV").textContent=pct(G.visc); saveG(); });
 $("gLA").addEventListener("input",()=>{ G.lightA=+$("gLA").value; $("gLAV").textContent=Math.round(G.lightA)+"°"; saveG(); });
 $("gCarry").addEventListener("input",()=>{ G.carry=+$("gCarry").value; $("gCarryV").textContent=pct(G.carry); saveG(); });
