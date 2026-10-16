@@ -1056,6 +1056,19 @@ function skTick(dt){ if(!G.skOn){ SPK.length=0; return; } const ts=[0,1,2,3,4].f
 function skPop(t,life,d){ t-=d||0; if(t<=0) return 0; const a=.16; let s=1;
   if(t<a){ const u=t/a-1, c1=1.70158*G.skPop, c3=c1+1; s=1+c3*u*u*u+c1*u*u; }   // 팡: 넘치게 커졌다 제 크기로 (오버슈트)
   const out=Math.min(.38,life*.4); if(t>life-out){ const u=Math.max(0,(life-t)/out); s*=u*u*(3-2*u); } return Math.max(0,s); }   // 끝: 부드럽게 작아지며 사라진다
+/* 계단 꺾임 창 (그림 속 번개·광선의 공통 모양): 납작한 창이 정한 자리에서 계단처럼 꺾인다. 꺾이는 곳에서 한쪽 가장자리는 앞으로 튀어나오고 다른 쪽은 물러나 ⚡ 홈이 생긴다.
+   point: 뿌리도 뾰족하게(번개), cut: 뿌리 쪽에서부터 사라진 비율(광선이 빨려 들어갈 때), grow: 뿌리에서 끝까지 뻗어 나간 비율 */
+function notchSpike(x0,y0,a,L,W,steps,sg,point,cut,grow){ const ca=Math.cos(a), sa=Math.sin(a); if(L*grow<2) return;
+  const wd=u=>W*.5*(point?Math.min(1,u/.14):1)*Math.pow(Math.max(0,1-u),.8), P=(u,o)=>[x0+ca*u*L-sa*o, y0+sa*u*L+ca*o];
+  const top=[], bot=[]; let Y=0; const s0=Math.min(cut,.98), uE=Math.min(1,grow);
+  top.push(P(s0,Y-wd(s0))); bot.push(P(s0,Y+wd(s0)));
+  for(const st of steps){ if(st<=s0 || st>=uE) continue; const w=wd(st), jj=w*1.15*sg, f=w*1.5/L, b=w*.25/L;   // 그 자리의 굵기에 맞춘 꺾임 폭(jj)과 튀어나옴(f)
+    if(sg>0){ top.push(P(st+f,Y-w)); top.push(P(st-b,Y+jj-w)); bot.push(P(st+b,Y+w)); bot.push(P(st-f,Y+jj+w)); }   // 위 가장자리는 앞으로, 아래 가장자리는 뒤로 튀어나온다 (⚡)
+    else { top.push(P(st+b,Y-w)); top.push(P(st-f,Y+jj-w)); bot.push(P(st+f,Y+w)); bot.push(P(st-b,Y+jj+w)); }
+    Y+=jj; }
+  const tip=P(uE,Y); g.beginPath(); g.moveTo(top[0][0],top[0][1]); for(let q=1;q<top.length;q++) g.lineTo(top[q][0],top[q][1]);
+  if(uE<1){ g.lineTo(...P(uE,Y-wd(uE))); g.lineTo(...P(uE,Y+wd(uE))); } else g.lineTo(tip[0],tip[1]);
+  for(let q=bot.length-1;q>=0;q--) g.lineTo(bot[q][0],bot[q][1]); g.closePath(); g.fillStyle=SKC.f; g.fill(); if(G.skLine>0){ g.strokeStyle=SKC.l; g.lineWidth=G.skLine; g.stroke(); } }
 function skDraw(){ if(!G.skOn || !SPK.length) return; g.lineJoin="miter"; g.miterLimit=8; g.lineWidth=G.skLine;
   for(const s of SPK){ const R=46*G.skSize*s.size, h=n=>hh(s.sd*31+n,5), sp=s.rot+s.t*G.skSpin*.4*(h(1)<.5?-1:1);
     if(s.type===0){ const n=Math.round(G.skSpikes+(h(2)-.5)*3), lg=Math.floor(h(3)*n); g.beginPath();   // 터지는 별
@@ -1063,17 +1076,13 @@ function skDraw(){ if(!G.skOn || !SPK.length) return; g.lineJoin="miter"; g.mite
         const rr=tip?R*(.55+.55*G.skJag*h(30+q)+(q===lg?.65:0))*pk:base; const x=s.x+Math.cos(a)*rr, y=s.y+Math.sin(a)*rr; if(k) g.lineTo(x,y); else g.moveTo(x,y); }
       g.closePath(); g.fillStyle=SKC.f; g.fill(); g.strokeStyle=SKC.l; g.stroke();
       if(s.t<.08){ g.beginPath(); g.arc(s.x,s.y,R*.55*(1-s.t/.08),0,TAU); g.fillStyle="#FFFFFF"; g.fill(); } }   // 첫 순간 하얀 섬광
-    else if(s.type===1){ const m=2+Math.floor(h(2)*2), pr=Math.min(1,s.t/.12), sc=skPop(s.t,s.life);   // 번개 갈래: 만화식 지그재그 번개가 한 획씩 그려지듯
-      for(let j=0;j<m;j++){ const a=s.dir+(j-(m-1)/2)*.5+(h(20+j)-.5)*.3, ca=Math.cos(a), sa=Math.sin(a), L=R*(1+.6*h(25+j))*sc, z=R*.2*sc, w=Math.max(1.5,R*.11*sc);
-        const pts=[[0,0],[.45,z],[.4,-z*.6],[1,z*.2]].map(([u,o])=>[s.x+ca*(R*.3+L*u)-sa*o, s.y+sa*(R*.3+L*u)+ca*o]); const n=1+Math.ceil(pr*3);
-        g.beginPath(); g.moveTo(pts[0][0],pts[0][1]); for(let q=1;q<=Math.min(3,n-1);q++){ const f=Math.min(1,pr*3-(q-1)), A=pts[q-1], B=pts[q]; g.lineTo(A[0]+(B[0]-A[0])*f,A[1]+(B[1]-A[1])*f); }
-        g.lineCap="butt"; if(G.skLine>0){ g.strokeStyle=SKC.l; g.lineWidth=w+G.skLine*2; g.stroke(); } g.strokeStyle=SKC.f; g.lineWidth=w; g.stroke(); g.lineWidth=G.skLine; g.lineCap="round"; } }
-    else if(s.type===2){ const m=2+Math.floor(h(2)*3), gr=1-Math.pow(1-Math.min(1,s.t/.18),3), rt=Math.max(0,(s.t-s.life*.45)/(s.life*.55));   // 뻗는 광선: 쏘아 나간 뒤 꼬리부터 빨려 들어간다
-      for(let j=0;j<m;j++){ const a=s.dir+(j-(m-1)/2)*.28+(h(20+j)-.5)*.2, ca=Math.cos(a), sa=Math.sin(a), L=R*(3+2.5*h(25+j))*gr, s0=L*rt*rt, wd=R*(.22+.12*h(27+j))*(1-rt*.5), zz=7;
-        if(L-s0<2) continue; g.beginPath();
-        for(let q=0;q<=zz;q++){ const u=q/zz, d=s0+(L-s0)*u, w=wd*(1-u)*(1+(q%2?.35:-.2)*G.skJag); g.lineTo(s.x+ca*d-sa*w,s.y+sa*d+ca*w); }
-        for(let q=zz;q>=0;q--){ const u=q/zz, d=s0+(L-s0)*u, w=wd*(1-u)*(1+(q%2?-.2:.35)*G.skJag); g.lineTo(s.x+ca*d+sa*w,s.y+sa*d-ca*w); }
-        g.closePath(); g.fillStyle=SKC.f; g.fill(); g.strokeStyle=SKC.l; g.stroke(); } }
+    else if(s.type===1){ const m=h(2)<.75?1:2, pr=1-Math.pow(1-Math.min(1,s.t/.1),3), sc=skPop(s.t,s.life);   // 번개: 그림 속 모양 — 양 끝이 뾰족한 창이 두 번 계단처럼 꺾인다
+      for(let j=0;j<m;j++){ const a=s.dir+(j-(m-1)/2)*.6+(h(20+j)-.5)*.25, L=R*(1.5+.6*h(25+j))*sc, W=R*(.42+.1*h(26+j))*sc; if(L<3) continue;
+        notchSpike(s.x+Math.cos(a)*R*.25+(j-(m-1)/2)*Math.sin(a)*W*2.6,s.y+Math.sin(a)*R*.25-(j-(m-1)/2)*Math.cos(a)*W*2.6,a,L,W,[.36,.66],h(28+j)<.5?1:-1,true,0,pr); } }
+    else if(s.type===2){ const m=3+Math.floor(h(2)*3), gr=1-Math.pow(1-Math.min(1,s.t/.2),3), rt=Math.max(0,(s.t-s.life*.5)/(s.life*.5));   // 뻗는 광선: 같은 계단 꺾임의 긴 쐐기가 부채꼴로 나란히 — 쏘아 나간 뒤 뿌리부터 빨려 들어간다
+      const nx=-Math.sin(s.dir), ny=Math.cos(s.dir);
+      for(let j=0;j<m;j++){ const off=(j-(m-1)/2)*R*.55*(1+.3*h(30+j)), a=s.dir+(j-(m-1)/2)*.07+(h(20+j)-.5)*.06, L=R*(3.5+3*h(25+j)), W=R*(.32+.22*h(27+j));
+        notchSpike(s.x+nx*off,s.y+ny*off,a,L,W,h(29+j)<.5?[.42]:[.32,.62],h(28+j)<.5?1:-1,false,rt*rt,gr); } }
     else if(s.type===3){ const sc=skPop(s.t,s.life), a0=sp+Math.sin(s.t*7)*.12*Math.exp(-s.t*3)-Math.PI/2, Ro=R*.95*sc, Ri=Ro*.5;   // 오각별: 팡 튀어나와 살짝 흔들린다
       if(Ro<.5) continue; const star=(ro,ri,ox,oy)=>{ g.beginPath(); for(let k=0;k<10;k++){ const rr=k&1?ri:ro, a=a0+k*Math.PI/5; const x=s.x+ox+Math.cos(a)*rr, y=s.y+oy+Math.sin(a)*rr; if(k) g.lineTo(x,y); else g.moveTo(x,y); } g.closePath(); };
       g.lineJoin="round"; star(Ro,Ri,0,0); g.fillStyle=SKC.f; g.fill(); g.strokeStyle=SKC.l; g.stroke(); if(s.size>.9){ star(Ro*.45,Ri*.45,-Ro*.12,-Ro*.12); g.fillStyle=SKC.h; g.fill(); } g.lineJoin="miter"; }
