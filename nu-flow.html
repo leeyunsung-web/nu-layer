@@ -496,8 +496,9 @@ function jagLoop(L,l,ks){ const s=L.S[l], n=L.N[l], B=L.B; if(n<3) return; const
   for(let i=0;i<n;i++){ const x=B[s+2*i], y=B[s+2*i+1], ip=(i-6+n)%n, inx=(i+6)%n, tx=B[s+2*inx]-B[s+2*ip], ty=B[s+2*inx+1]-B[s+2*ip+1], tl=Math.hypot(tx,ty)||1, nx=ty/tl*sg, ny=-tx/tl*sg;
     let X=x, Y=y; const sp=velN(x,y);
     if(sp>0){ const dn=nx*VN[0]+ny*VN[1], w=Math.pow(Math.abs(dn),2.6)*Math.min(1,sp*40);   // 흐름을 마주 보는 끝면일수록 많이 찢긴다 (늘어난 옆면은 매끈)
-      if(w>.02){ const ph=((x-CX)*-VN[1]+(y-CY)*VN[0])/per+(ks?.5:0), k=Math.floor(ph), f=ph-k, kk=((k%4096)+4096)%4096, h1=hh(9400+kk*7,1), h2=hh(9400+kk*7,2), len=amp0*(1-rnd+rnd*(h2<.25?.12:Math.pow(h1,.8)*1.6))*(hh(9400+kk*7,3)<G.tearLong*(ks?.5:1)?2.4+2.6*hh(9400+kk*7,4):1), tri=1-Math.abs(2*f-1), o=len*w*tri, sd=dn>=0?1:-1;
-        X+=(VN[0]*sd*.85+nx*.15)*o; Y+=(VN[1]*sd*.85+ny*.15)*o; } }   // 갈래는 흐르는 쪽으로 뻗고, 자리는 공간에 고정돼 늘어난 결처럼 보인다
+      if(w>.02){ const ph=((x-CX)*-VN[1]+(y-CY)*VN[0])/per+(ks?.5:0), k=Math.floor(ph), f=ph-k, kk=((k%4096)+4096)%4096, h1=hh(9400+kk*7,1), h2=hh(9400+kk*7,2), len=amp0*(1-rnd+rnd*(h2<.25?.12:Math.pow(h1,.8)*1.6))*(hh(9400+kk*7,3)<G.tearLong*(ks?.5:1)?1.8+1.6*hh(9400+kk*7,4):1), tri=1-Math.abs(2*f-1), sm=tri*tri*(3-2*tri), sd=dn>=0?1:-1, o=len*w*(.35*tri+.65*sm)*(sd>0?.28:1);   // 앞쪽 머리는 짧게 둥글게, 길게 찢긴 결은 지나온 뒤쪽으로 끌린다
+        if(o>.5){ let cx=x, cy=y, rem=o, dx=VN[0]*sd, dy=VN[1]*sd; while(rem>0){ const st=rem<7?rem:7; if(velN(cx,cy)>0){ const ex=VN[0]*sd, ey=VN[1]*sd; dx=dx*.4+ex*.6; dy=dy*.4+ey*.6; const dl=Math.hypot(dx,dy)||1; dx/=dl; dy/=dl; } cx+=dx*st; cy+=dy*st; rem-=st; }
+          X=cx+nx*o*.1; Y=cy+ny*o*.1; } } }   // 갈래는 곧게 뻗지 않고 물이 흐르는 길을 따라 한 걸음씩 휘어 나간다 (둥글게 도는 줄기에서는 갈래도 둥글게)   // 갈래는 흐르는 쪽으로 뻗고, 자리는 공간에 고정돼 늘어난 결처럼 보인다
     if(i===0) g.moveTo(X,Y); else g.lineTo(X,Y); } g.closePath(); }
 const bPath=L=>{ if(!JAGON){ allPath(L); return; } g.beginPath(); for(let l=0;l<L.n;l++) jagLoop(L,l); };
 /* 먼 층은 바탕색 쪽으로 옅어진다 (공기 원근) */
