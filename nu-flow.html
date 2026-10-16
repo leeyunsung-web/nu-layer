@@ -52,7 +52,22 @@ canvas.hold{cursor:grabbing}
 .v-panel .stage{display:none}
 .v-panel .wrap{max-width:none;padding:12px 14px 24px}
 .v-panel .ponly{display:flex!important}
-.ctl.vis button[aria-pressed="false"]{background:var(--panel);color:var(--soft);text-decoration:line-through}
+/* 조절 칸: 메뉴마다 이름 · 손잡이 · 값, 그 아래 한 줄 설명 */
+.ctl{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:8px 22px;align-items:start}
+.ctl .it{display:grid;grid-template-columns:8.2em minmax(0,1fr) auto;align-items:center;gap:2px 8px;position:relative;padding-right:4px}
+.ctl .it.row{display:flex;flex-wrap:wrap;gap:4px 6px;grid-column:1/-1}
+.ctl .it>span:first-child{white-space:nowrap}
+.ctl .it input[type=range]{width:100%}
+.ctl .desc{grid-column:1/-1;flex-basis:100%;font-size:11.5px;line-height:1.4;color:var(--soft);font-weight:500}
+.ctl .numw{display:flex;align-items:center;gap:4px;font-weight:700;color:var(--ink)}
+.ctl input[type=number]{width:5.2em;font:inherit;font-size:13px;padding:4px 6px;border:2px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
+.ctl .tabs.sub,.ctl #oNote,.ctl .sel,.ctl>.row{grid-column:1/-1}
+.sect{margin:6px 0 -4px;font-size:15px;font-weight:900;letter-spacing:.08em}.sect small{font-size:12px;font-weight:600;color:var(--soft);letter-spacing:0;margin-left:6px}
+.ctl .it .hx{position:absolute;right:-6px;top:-6px;min-height:0!important;width:22px;height:22px;padding:0!important;border-radius:50%!important;font-size:12px!important;line-height:1;background:#33123A!important;color:#fff!important;border:0!important}
+.ctl .it.hid,.ctl [hidden]{display:none!important}
+.editing .ctl .it{outline:2px dashed rgba(156,47,134,.35);outline-offset:3px;border-radius:6px}
+.fpsm{position:absolute;left:10px;top:10px;font:700 12px/1.3 ui-monospace,Menlo,monospace;color:#33123A;background:rgba(255,255,255,.85);border:2px solid #9C2F86;border-radius:8px;padding:3px 8px;line-height:1.3}
+.ctl.vis [data-k="vA"] button[aria-pressed="false"]{background:var(--panel);color:var(--soft);text-decoration:line-through}
 .ctl label{display:flex;gap:8px;align-items:center}.ctl input[type=range]{width:120px;accent-color:#F9618D}.ctl output{min-width:3em;font-variant-numeric:tabular-nums}
 </style>
 
@@ -63,66 +78,78 @@ canvas.hold{cursor:grabbing}
     <p>배경 액체를 기류에 태우는 연구. 화면 전체가 한 통의 물이고, 폭발을 축으로 도는 기류가 그 물을 천천히 밀면 잉크 같은 액체가 흐름을 타고 늘어나고 감기고 응축합니다. 뒤쪽 물은 느리고 작고 옅습니다.</p>
   </header>
   <div class="tabs" id="tabs" role="tablist" aria-label="배경 요소"></div>
-  <div class="stage"><canvas id="cv" aria-label="기류를 타고 도는 액체 화면. 끌면 물이 저어지고, 핏방울을 잡아 끌면 늘어납니다."></canvas><canvas id="cv2" aria-hidden="true"></canvas></div>
-  <div class="ctl vis"><div class="row"><span>보이기</span><button id="vA" type="button" aria-pressed="true">분홍 A</button><button id="vB" type="button" aria-pressed="true">분홍 B</button><button id="vP" type="button" aria-pressed="true">보라</button><button id="vR" type="button" aria-pressed="true">붉은</button><button id="vD" type="button" aria-pressed="true">핏방울</button></div>
-    <div class="row"><span>화질</span><button id="q1" type="button" aria-pressed="false" title="큰 화면에서도 가장 가볍게 (약 1080p 상한)">가볍게</button><button id="q2" type="button" aria-pressed="true" title="약 1440p 상한">보통</button><button id="q3" type="button" aria-pressed="false" title="4K까지 선명하게 (무거움)">선명</button></div>
-    <button id="bSave" type="button" title="지금 화면을 PNG 이미지로 저장">⤓ 이미지 저장</button></div>
+  <div class="stage"><canvas id="cv" aria-label="기류를 타고 도는 액체 화면. 끌면 물이 저어지고, 핏방울을 잡아 끌면 늘어납니다."></canvas><canvas id="cv2" aria-hidden="true"></canvas><div id="fpsM" class="fpsm" hidden></div></div>
+  <div class="ctl vis">
+    <div class="it row" data-k="vA"><span>보이기</span><button id="vA" type="button" aria-pressed="true">분홍 A</button><button id="vB" type="button" aria-pressed="true">분홍 B</button><button id="vP" type="button" aria-pressed="true">보라</button><button id="vR" type="button" aria-pressed="true">붉은</button><button id="vD" type="button" aria-pressed="true">핏방울</button><small class="desc">오브젝트를 하나씩 켜고 끕니다. 끄면 그 액체는 지워지고 더 생기지 않으며 계산도 쉽니다.</small></div>
+    <div class="it row" data-k="q1"><span>화질</span><button id="q1" type="button" aria-pressed="false">가볍게</button><button id="q2" type="button" aria-pressed="true">보통</button><button id="q3" type="button" aria-pressed="false">선명</button><small class="desc">큰 창에서 그리는 해상도의 상한(가볍게 1080p · 보통 1440p · 선명 4K). 버벅이면 저절로 조금 낮췄다가 넉넉해지면 되돌립니다.</small></div>
+    <div class="it row" data-k="bSave"><span>도구</span><button id="bSave" type="button">⤓ 이미지 저장</button><button id="fpsT" type="button" aria-pressed="false">fps 표시</button><button id="sExp" type="button">설정 내보내기</button><button id="sImp" type="button">설정 불러오기</button><button id="mEdit" type="button" aria-pressed="false">메뉴 편집</button><button id="mRestore" type="button">숨긴 메뉴 되돌리기</button><small class="desc">이미지 저장: 지금 화면을 PNG로. fps 표시: 화면이 실제로 초당 몇 장 그려지는지. 설정 내보내기·불러오기: 지금 값을 파일로 옮겨 다른 곳(깃허브 NU FLOW·내려받은 파일)에서도 그대로 씁니다. 메뉴 편집: 필요 없는 메뉴를 ✕로 숨깁니다(되돌리기 가능).</small></div>
+    <input id="sFile" type="file" accept=".json,application/json" hidden>
+  </div>
+  <h2 class="sect">소용돌이</h2>
   <div class="ctl">
-    <div class="row"><span>도는 방향</span><button id="dCW" type="button" aria-pressed="true">시계</button><button id="dCCW" type="button" aria-pressed="false">반시계</button></div>
-    <label><span>소용돌이 속도</span><input id="gSpd" type="range" min="0.1" max="2" step="0.05" value="1"><output id="gSpdV">100%</output></label>
-    <label><span>따로 놀기</span><input id="gSep" type="range" min="0" max="1" step="0.05" value="0.5"><output id="gSepV">50%</output></label>
-    <label><span>뭉치는 힘</span><input id="gMerge" type="range" min="0.3" max="2" step="0.05" value="1"><output id="gMergeV">100%</output></label>
-    <label><span>머리 뭉침</span><input id="gHead" type="range" min="0.6" max="2.2" step="0.05" value="1.3"><output id="gHeadV">130%</output></label>
-    <label><span>꼬리 늘어짐</span><input id="gTail" type="range" min="0" max="1.5" step="0.05" value="0.9"><output id="gTailV">90%</output></label>
-    <label><span>꼬리 흩어짐</span><input id="gStr" type="range" min="0" max="4" step="0.1" value="1.5"><output id="gStrV">150%</output></label>
-    <label><span>방울 맺힘</span><input id="gRnd" type="range" min="0" max="3" step="0.1" value="1"><output id="gRndV">100%</output></label>
-    <label><span>도는 힘</span><input id="gSpin" type="range" min="0" max="6" step="0.1" value="1"><output id="gSpinV">100%</output></label>
-    <label><span>원형 유지</span><input id="gCirc" type="range" min="0" max="1" step="0.05" value="0.9"><output id="gCircV">90%</output></label>
-    <label><span>밖으로 밀림</span><input id="gOut" type="range" min="0" max="4" step="0.1" value="1"><output id="gOutV">100%</output></label>
-    <label><span>꼬리 갈라짐</span><input id="gTD" type="range" min="0" max="8" step="0.2" value="1.5"><output id="gTDV">150%</output></label>
-    <label><span>흐름 되살림</span><input id="gCalm" type="range" min="0.2" max="4" step="0.1" value="1"><output id="gCalmV">100%</output></label>
-    <label><span>빛 움직임</span><input id="gLs" type="range" min="0.1" max="1.5" step="0.05" value="0.5"><output id="gLsV">50%</output></label>
-    <label><span>처음 개수</span><input id="gInit" type="range" min="0" max="12" step="1" value="6"><output id="gInitV">6개</output></label>
-    <label><span>추가 개수</span><input id="gAdd" type="range" min="0" max="6" step="1" value="3"><output id="gAddV">3개</output></label>
-    <label><span>추가 간격</span><input id="gPer" type="range" min="1" max="12" step="0.5" value="3.4"><output id="gPerV">3.4초</output></label>
-    <button id="bReset" type="button">처음으로</button>
+    <div class="it row" data-k="dCW"><span>도는 방향</span><button id="dCW" type="button" aria-pressed="true">시계</button><button id="dCCW" type="button" aria-pressed="false">반시계</button><small class="desc">소용돌이 전체가 도는 방향. 오브젝트마다 따로 정하려면 아래 오브젝트 칸에서 고릅니다.</small></div>
+    <label class="it" data-k="gSpd"><span>소용돌이 속도</span><input id="gSpd" type="range" min="0.1" max="2" step="0.05" value="1"><output id="gSpdV">100%</output><small class="desc">전체가 흐르는 빠르기. 느리게 해도 화면은 초당 60장으로 부드럽게 이어집니다.</small></label>
+    <label class="it" data-k="gSpin"><span>도는 힘</span><input id="gSpin" type="range" min="0" max="6" step="0.1" value="1"><output id="gSpinV">100%</output><small class="desc">소용돌이 기류의 세기. 높을수록 빨리 감깁니다.</small></label>
+    <label class="it" data-k="gCirc"><span>원형 유지</span><input id="gCirc" type="range" min="0" max="1" step="0.05" value="0.9"><output id="gCircV">90%</output><small class="desc">원을 따라 감기는 정도. 높을수록 곧게 뻗지 않고 동그랗게 돌며 천천히 퍼집니다.</small></label>
+    <label class="it" data-k="gOut"><span>밖으로 밀림</span><input id="gOut" type="range" min="0" max="4" step="0.1" value="1"><output id="gOutV">100%</output><small class="desc">돌면서 바깥으로 밀려나는 힘. 끝까지 나가는 줄기가 화면 밖으로 빠져나가는 빠르기도 이것을 따릅니다.</small></label>
+    <label class="it" data-k="gCarry"><span>끝까지 가는 힘</span><input id="gCarry" type="range" min="0.2" max="3" step="0.05" value="1"><output id="gCarryV">100%</output><small class="desc">줄기가 다 솟은 뒤에도 머리가 몸통을 끌고 소용돌이 라인을 따라 나아가는 힘과 거리. 높을수록 오래, 멀리 갑니다.</small></label>
+    <label class="it" data-k="gCalm"><span>흐름 되살림</span><input id="gCalm" type="range" min="0.2" max="4" step="0.1" value="1"><output id="gCalmV">100%</output><small class="desc">줄기가 밀거나 손으로 저어 흐트러진 물이 본래 소용돌이로 돌아오는 빠르기. 높을수록 형태가 또렷하게 유지됩니다.</small></label>
+    <label class="it" data-k="gDry"><span>마르는 빠르기</span><input id="gDry" type="range" min="0" max="3" step="0.05" value="1"><output id="gDryV">100%</output><small class="desc">모든 액체가 조금씩 말라 사라지는 빠르기. 낮추면 형태가 오래 남습니다.</small></label>
+    <label class="it" data-k="gSep"><span>따로 놀기</span><input id="gSep" type="range" min="0" max="1" step="0.05" value="0.5"><output id="gSepV">50%</output><small class="desc">분홍 줄기 가운데 분홍 B로 솟는 비율. B는 A와 닿아도 섞이지 않고 붙기만 합니다.</small></label>
+    <label class="it" data-k="gMerge"><span>뭉치는 힘</span><input id="gMerge" type="range" min="0.3" max="2" step="0.05" value="1"><output id="gMergeV">100%</output><small class="desc">같은 액체끼리 합쳐지고 둥글게 뭉치는 세기.</small></label>
+    <label class="it" data-k="gHead"><span>머리 뭉침</span><input id="gHead" type="range" min="0.6" max="2.2" step="0.05" value="1.3"><output id="gHeadV">130%</output><small class="desc">줄기 앞머리의 굵기. 머리가 끌고 가는 물의 폭도 이것을 따릅니다.</small></label>
+    <label class="it" data-k="gTail"><span>꼬리 늘어짐</span><input id="gTail" type="range" min="0" max="1.5" step="0.05" value="0.9"><output id="gTailV">90%</output><small class="desc">꼬리가 가늘고 길게 끌리는 정도. 높을수록 꼬리가 가늘어집니다.</small></label>
+    <label class="it" data-k="gStr"><span>꼬리 흩어짐</span><input id="gStr" type="range" min="0" max="4" step="0.1" value="1.5"><output id="gStrV">150%</output><small class="desc">가늘어진 꼬리가 흐름 속에서 갈라져 가닥과 방울로 흩어지는 세기 (굵은 머리는 영향 없음).</small></label>
+    <label class="it" data-k="gRnd"><span>방울 맺힘</span><input id="gRnd" type="range" min="0" max="3" step="0.1" value="1"><output id="gRndV">100%</output><small class="desc">꼬리에서 떨어진 작은 조각이 둥근 방울로 맺히는 빠르기.</small></label>
+    <label class="it" data-k="gTD"><span>꼬리 갈라짐</span><input id="gTD" type="range" min="0" max="8" step="0.2" value="1.5"><output id="gTDV">150%</output><small class="desc">가운데 가까운 꼬리가 뭉치지 않고 빨리 말라 갈라지는 정도.</small></label>
+    <label class="it" data-k="gLs"><span>빛 움직임</span><input id="gLs" type="range" min="0.1" max="1.5" step="0.05" value="0.5"><output id="gLsV">50%</output><small class="desc">하이라이트·어두운 면이 옮겨 가고 일렁이는 빠르기. 75% 아래면 명암 계산이 절반으로 줄어 가벼워집니다.</small></label>
+    <label class="it" data-k="gInit"><span>처음 개수</span><input id="gInit" type="range" min="0" max="12" step="1" value="6"><output id="gInitV">6개</output><small class="desc">시작할 때 솟는 줄기 수.</small></label>
+    <label class="it" data-k="gAdd"><span>추가 개수</span><input id="gAdd" type="range" min="0" max="6" step="1" value="3"><output id="gAddV">3개</output><small class="desc">그 뒤로 한 번에 더 솟는 줄기 수 (0이면 더 솟지 않음).</small></label>
+    <label class="it" data-k="gPer"><span>추가 간격</span><input id="gPer" type="range" min="1" max="12" step="0.5" value="3.4"><output id="gPerV">3.4초</output><small class="desc">더 솟는 간격(초).</small></label>
+    <div class="it row" data-k="bReset"><span>다시 시작</span><button id="bReset" type="button">처음으로</button><small class="desc">지금 값으로 소용돌이를 새로 시작합니다.</small></div>
   </div>
   <div class="ctl obj">
     <div class="tabs sub" id="otabs" role="tablist" aria-label="오브젝트"></div>
     <p id="oNote" class="hint"></p>
-    <label><span>크기</span><input id="oSize" type="range" min="0.5" max="2.2" step="0.05" value="1"><output id="oSizeV">100%</output></label>
-    <label><span>솟는 비율</span><input id="oShare" type="range" min="0" max="3" step="0.05" value="1"><output id="oShareV">100%</output></label>
-    <label><span>하이라이트 크기</span><input id="oKsz" type="range" min="0.15" max="0.75" step="0.01" value="0.42"><output id="oKszV">42%</output></label>
-    <label><span>하이라이트 끊김</span><input id="oBrk" type="range" min="0" max="1" step="0.02" value="0.55"><output id="oBrkV">55%</output></label>
-    <label><span>하이라이트 양</span><input id="oHth" type="range" min="0.2" max="0.6" step="0.01" value="0.36"><output id="oHthV">64%</output></label>
-    <label><span>작은 조각 지우기</span><input id="oHmin" type="range" min="5" max="250" step="5" value="40"><output id="oHminV">40</output></label>
-    <label><span>반사광</span><input id="oBsz" type="range" min="0" max="0.45" step="0.01" value="0.17"><output id="oBszV">17%</output></label>
-    <label><span>어두운 면 넓이</span><input id="oTd" type="range" min="0.3" max="0.85" step="0.01" value="0.5"><output id="oTdV">50%</output></label>
-    <label><span>어두운 면 흔들림</span><input id="oNa" type="range" min="0" max="0.45" step="0.01" value="0.16"><output id="oNaV">16%</output></label>
-    <label><span>어두운 면 양</span><input id="oDth" type="range" min="0.3" max="0.7" step="0.01" value="0.5"><output id="oDthV">50%</output></label>
+    <div class="it row" data-k="oD0"><span>도는 방향</span><button id="oD0" type="button" aria-pressed="true">전체 따라</button><button id="oD1" type="button" aria-pressed="false">시계</button><button id="oD2" type="button" aria-pressed="false">반시계</button><small class="desc">이 오브젝트만 따로 도는 방향. '전체 따라'는 위의 도는 방향을 따릅니다.</small></div>
+    <label class="it" data-k="oExit"><span>끝까지 나가는 비율</span><span class="numw"><input id="oExit" type="number" min="0" max="100" step="1" value="30" inputmode="decimal"> %</span><small class="desc">이 오브젝트 줄기 가운데 화면 밖까지 형태를 유지하며 나가는 비율. 나머지는 중간에 힘이 빠져 흩어집니다.</small></label>
+    <div class="it row" data-k="oSL" id="oSLrow"><span>빛 함께 쓰기</span><button id="oSL" type="button" aria-pressed="true">분홍 A와 같은 빛</button><small class="desc">켜면 분홍 A와 B가 닿은 자리가 한 몸처럼 빛납니다. B의 빛 손잡이를 움직이면 저절로 꺼지고 B만의 빛을 씁니다.</small></div>
+    <label class="it" data-k="oSize"><span>크기</span><input id="oSize" type="range" min="0.5" max="2.2" step="0.05" value="1"><output id="oSizeV">100%</output><small class="desc">줄기의 굵기와 길이.</small></label>
+    <label class="it" data-k="oShare"><span>솟는 비율</span><input id="oShare" type="range" min="0" max="3" step="0.05" value="1"><output id="oShareV">100%</output><small class="desc">새 줄기가 이 오브젝트로 솟는 비중 (분홍 B는 위의 '따로 놀기'로 정함).</small></label>
+    <label class="it" data-k="oKsz"><span>하이라이트 크기</span><input id="oKsz" type="range" min="0.15" max="0.75" step="0.01" value="0.42"><output id="oKszV">42%</output><small class="desc">큰 하이라이트(빛이 바로 되비치는 띠)의 크기.</small></label>
+    <label class="it" data-k="oBrk"><span>하이라이트 끊김</span><input id="oBrk" type="range" min="0" max="1" step="0.02" value="0.55"><output id="oBrkV">55%</output><small class="desc">하이라이트가 군데군데 끊겨 여러 조각으로 줄지어 보이는 정도.</small></label>
+    <label class="it" data-k="oHth"><span>하이라이트 양</span><input id="oHth" type="range" min="0.2" max="0.6" step="0.01" value="0.36"><output id="oHthV">64%</output><small class="desc">하이라이트가 차지하는 넓이.</small></label>
+    <label class="it" data-k="oHmin"><span>작은 조각 지우기</span><input id="oHmin" type="range" min="5" max="250" step="5" value="40"><output id="oHminV">40</output><small class="desc">이보다 작은 하이라이트 조각은 그리지 않습니다 (자잘한 점 정리).</small></label>
+    <label class="it" data-k="oBsz"><span>반사광</span><input id="oBsz" type="range" min="0" max="0.45" step="0.01" value="0.17"><output id="oBszV">17%</output><small class="desc">그늘 쪽 가장자리에 비치는 되비침 빛의 크기.</small></label>
+    <label class="it" data-k="oTd"><span>어두운 면 넓이</span><input id="oTd" type="range" min="0.3" max="0.85" step="0.01" value="0.5"><output id="oTdV">50%</output><small class="desc">빛을 등진 쪽 어두운 면이 차지하는 넓이.</small></label>
+    <label class="it" data-k="oNa"><span>어두운 면 흔들림</span><input id="oNa" type="range" min="0" max="0.45" step="0.01" value="0.16"><output id="oNaV">16%</output><small class="desc">어두운 면 경계가 물결처럼 일렁이는 정도.</small></label>
+    <label class="it" data-k="oDth"><span>어두운 면 양</span><input id="oDth" type="range" min="0.3" max="0.7" step="0.01" value="0.5"><output id="oDthV">50%</output><small class="desc">어두운 면의 진하기(경계 문턱).</small></label>
   </div>
+  <h2 class="sect">핏방울 <small>소용돌이 없는 무중력 · 설정 따로</small></h2>
   <div class="ctl obj" id="bdBox">
-    <div class="row"><span class="ttl">핏방울</span><span class="sub">소용돌이 없는 무중력 · 설정 따로</span></div>
-    <div class="row"><span>자리</span><button id="kS0" type="button" aria-pressed="true">오른쪽</button><button id="kS1" type="button" aria-pressed="false">왼쪽</button><button id="kS2" type="button" aria-pressed="false">위</button><button id="kS3" type="button" aria-pressed="false">아래</button><button id="kS4" type="button" aria-pressed="false">화면 전체</button></div>
-    <label><span>핏방울 속도</span><input id="kSpd" type="range" min="0.1" max="2" step="0.05" value="1"><output id="kSpdV">100%</output></label>
-    <label><span>자리 크기</span><input id="kWf" type="range" min="0.25" max="0.7" step="0.01" value="0.42"><output id="kWfV">42%</output></label>
-    <label><span>처음 개수</span><input id="kCount" type="range" min="1" max="12" step="1" value="5"><output id="kCountV">5개</output></label>
-    <label><span>방울 크기</span><input id="kSize" type="range" min="0.4" max="1.5" step="0.05" value="0.8"><output id="kSizeV">80%</output></label>
-    <label><span>하이라이트</span><input id="kHi" type="range" min="0" max="2" step="0.01" value="1"><output id="kHiV">100%</output></label>
-    <label><span>어두운 부분</span><input id="kCo" type="range" min="0" max="2" step="0.01" value="1"><output id="kCoV">100%</output></label>
-    <label><span>출렁임</span><input id="kDyn" type="range" min="0" max="2" step="0.01" value="1"><output id="kDynV">100%</output></label>
-    <label><span>하나 되기까지</span><input id="kFuse" type="range" min="0" max="12" step="0.5" value="3"><output id="kFuseV">3초</output></label>
-    <label><span>끈기</span><input id="kVisc" type="range" min="0.3" max="2.5" step="0.05" value="1"><output id="kViscV">100%</output></label>
-    <label><span>꿈틀거림</span><input id="kWob" type="range" min="0" max="2.5" step="0.05" value="1"><output id="kWobV">100%</output></label>
-    <label><span>뭉치는 힘</span><input id="kSt" type="range" min="0.5" max="2" step="0.05" value="1"><output id="kStV">100%</output></label>
-    <div class="row"><button id="kAdd" type="button">방울 더하기</button><button id="kReset" type="button">핏방울 처음으로</button></div>
+    <div class="it row" data-k="kS0"><span>자리</span><button id="kS0" type="button" aria-pressed="true">오른쪽</button><button id="kS1" type="button" aria-pressed="false">왼쪽</button><button id="kS2" type="button" aria-pressed="false">위</button><button id="kS3" type="button" aria-pressed="false">아래</button><button id="kS4" type="button" aria-pressed="false">화면 전체</button><small class="desc">핏방울이 처음 놓이는 곳 (벽은 없어서 화면 어디로든 떠다닙니다). 세로 화면에서는 오른쪽→아래, 왼쪽→위.</small></div>
+    <label class="it" data-k="kSpd"><span>핏방울 속도</span><input id="kSpd" type="range" min="0.1" max="2" step="0.05" value="1"><output id="kSpdV">100%</output><small class="desc">방울이 움직이고 출렁이는 빠르기. 느려도 매 프레임 움직입니다.</small></label>
+    <label class="it" data-k="kWf"><span>자리 크기</span><input id="kWf" type="range" min="0.25" max="0.7" step="0.01" value="0.42"><output id="kWfV">42%</output><small class="desc">처음 놓이는 자리의 크기.</small></label>
+    <label class="it" data-k="kCount"><span>처음 개수</span><input id="kCount" type="range" min="1" max="12" step="1" value="5"><output id="kCountV">5개</output><small class="desc">'핏방울 처음으로'를 누르면 놓이는 방울 수.</small></label>
+    <label class="it" data-k="kSize"><span>방울 크기</span><input id="kSize" type="range" min="0.4" max="1.5" step="0.05" value="0.8"><output id="kSizeV">80%</output><small class="desc">처음 놓이는 방울 크기.</small></label>
+    <div class="it row" data-k="kLeave"><span>밀려나가기</span><button id="kLeave" type="button" aria-pressed="true">밀려나가기</button><button id="kRefill" type="button" aria-pressed="true">다시 채우기</button><small class="desc">밀려나가기: 방울마다 머무는 시간이 지나면 제멋대로 고른 방향으로 서서히 화면 밖으로 나갑니다. 다시 채우기: 나간 만큼 소용돌이 가운데에서 새 방울이 생깁니다.</small></div>
+    <label class="it" data-k="kDwell"><span>머무는 시간</span><span class="numw"><input id="kDwell" type="number" min="1" max="600" step="1" value="12" inputmode="decimal"> 초</span><small class="desc">밀려나가기 전에 떠 있는 시간. 방울마다 이 값의 60~140%로 조금씩 다릅니다.</small></label>
+    <label class="it" data-k="kPush"><span>밀려나는 힘</span><input id="kPush" type="range" min="0.2" max="3" step="0.05" value="1"><output id="kPushV">100%</output><small class="desc">밖으로 밀려나가는 빠르기.</small></label>
+    <label class="it" data-k="kSep"><span>흩어진 뒤 안 합쳐짐</span><span class="numw"><input id="kSep" type="number" min="0" max="60" step="0.5" value="3" inputmode="decimal"> 초</span><small class="desc">방울을 두 번 눌러 펑 터뜨렸을 때 작은 방울들이 서로 다시 붙지 않는 시간.</small></label>
+    <label class="it" data-k="kHi"><span>하이라이트</span><input id="kHi" type="range" min="0" max="2" step="0.01" value="1"><output id="kHiV">100%</output><small class="desc">방울 하이라이트 크기.</small></label>
+    <label class="it" data-k="kCo"><span>어두운 부분</span><input id="kCo" type="range" min="0" max="2" step="0.01" value="1"><output id="kCoV">100%</output><small class="desc">방울 속 어두운 덩어리 크기.</small></label>
+    <label class="it" data-k="kDyn"><span>출렁임</span><input id="kDyn" type="range" min="0" max="2" step="0.01" value="1"><output id="kDynV">100%</output><small class="desc">방울 안의 흐름과 빛이 출렁이는 정도 (빛이 움직이는 빠르기도 이것을 따름).</small></label>
+    <label class="it" data-k="kFuse"><span>하나 되기까지</span><input id="kFuse" type="range" min="0" max="12" step="0.5" value="3"><output id="kFuseV">3초</output><small class="desc">닿은 방울이 한 방울로 합쳐지기까지 걸리는 시간.</small></label>
+    <label class="it" data-k="kVisc"><span>끈기</span><input id="kVisc" type="range" min="0.3" max="2.5" step="0.05" value="1"><output id="kViscV">100%</output><small class="desc">꿀처럼 뭉근하게 따라오는 정도.</small></label>
+    <label class="it" data-k="kWob"><span>꿈틀거림</span><input id="kWob" type="range" min="0" max="2.5" step="0.05" value="1"><output id="kWobV">100%</output><small class="desc">제자리에서 느리게 꿈틀대는 세기.</small></label>
+    <label class="it" data-k="kSt"><span>뭉치는 힘</span><input id="kSt" type="range" min="0.5" max="2" step="0.05" value="1"><output id="kStV">100%</output><small class="desc">방울이 둥글게 뭉치려는 힘 (표면장력).</small></label>
+    <div class="it row" data-k="kAdd"><span>방울</span><button id="kAdd" type="button">방울 더하기</button><button id="kReset" type="button">핏방울 처음으로</button><small class="desc">방울 하나를 더하거나, 지금 값으로 핏방울을 새로 놓습니다. 화면에서 방울을 두 번 누르면 펑 하고 가장 작은 방울들로 흩어집니다.</small></div>
     <div id="kSel" class="sel off"><p id="kSelMsg" class="hint">방울을 누르면 그 방울만 따로 조절할 수 있습니다.</p>
       <label><span>이 방울 하이라이트</span><input id="kSHi" type="range" min="0" max="2" step="0.01" value="1" disabled><output id="kSHiV">–</output></label>
       <label><span>이 방울 어두운 부분</span><input id="kSCo" type="range" min="0" max="2" step="0.01" value="1" disabled><output id="kSCoV">–</output></label></div>
-    <p class="hint">핏방울은 기류를 타지 않고 제자리에서 떠 있습니다. '핏방울 속도'는 방울이 움직이고 출렁이는 빠르기입니다(느려도 매 프레임 움직임). 잡아 끌면 주욱 늘어나고, 닿으면 '하나 되기까지'만큼 지나 한 방울이 됩니다. '처음 개수'·'방울 크기'는 '핏방울 처음으로'를 누르면 반영됩니다. '자리'는 핏방울이 처음 놓이는 곳일 뿐 벽이 아니어서, 방울은 소용돌이와 같은 화면 어디로든 떠다니고 끌려갑니다(자리를 바꾸면 그 자리에서 새로 시작). 세로 화면에서는 오른쪽→아래, 왼쪽→위입니다. 빛의 움직임은 '출렁임'으로 느리게 할 수 있습니다.</p>
   </div>
   <dl class="note"><dt>그림에서</dt><dd id="nRule"></dd><dt>움직임</dt><dd id="nMove"></dd></dl>
-  <p class="hint">'보이기'에서 오브젝트를 하나씩 켜고 끌 수 있습니다(끄면 그 액체는 지워지고 더 솟지 않으며 계산도 쉽니다). 화면을 끌면 물을 젓는 것이라 줄기들이 그 흐름을 따라 휩니다. 핏방울을 잡으면 물은 젓지 않고 방울만 끌려옵니다. 한가운데를 끌면 축이 옮겨집니다. '따로 놀기'는 새 줄기가 다른 줄기와 뭉치지 않고 닿기만 할 비율, '뭉치는 힘'은 같은 무리끼리 합쳐지는 세기, '머리 뭉침'은 앞머리의 굵기, '꼬리 늘어짐'은 꼬리가 가늘게 끌리는 길이, '꼬리 흩어짐'은 가늘어진 꼬리가 흐름 속에서 잔바람에 갈라져 가닥과 방울로 흩어지는 세기입니다(두꺼운 머리는 영향을 받지 않음). '도는 힘'은 소용돌이 기류의 세기(최대 600%), '소용돌이 속도'는 전체가 흐르는 빠르기(느리게 해도 화면은 초당 60장으로 매끄럽게 그려짐), '원형 유지'는 액체가 직선으로 뻗지 않고 원을 따라 감기는 정도(높을수록 동그랗게 돌며 천천히 퍼짐), '밖으로 밀림'은 회오리처럼 돌면서 바깥으로 밀려나가는 힘, '빛 움직임'은 하이라이트·어두운 면이 옮겨 가고 일렁이는 빠르기(낮을수록 느리고, 75% 아래에서는 명암 계산도 절반으로 줄어 가벼워짐), '꼬리 갈라짐'은 가운데 가까운 꼬리가 뭉치지 않고 빨리 말라 갈라져 떨어지는 정도, '흐름 되살림'은 줄기가 밀고 젓고 해서 흐트러진 물이 본래 소용돌이로 되돌아오는 빠르기(높을수록 형태가 오래 또렷함). '처음 개수'는 시작할 때 솟는 줄기 수, '추가 개수·간격'은 그 뒤로 몇 초마다 몇 개씩 더 솟는지입니다(추가 개수 0이면 더 솟지 않음). 아래 오브젝트 칸에서는 네 액체(분홍 A·B, 보라, 붉은)를 따로 조절합니다: 크기, 솟는 비율, 하이라이트의 크기·끊김·양·작은 조각 지우기·반사광, 어두운 면의 넓이·흔들림·양. 조절값은 이 브라우저에 저장되고, '처음으로'를 누르면 새 값으로 다시 시작합니다.</p>
+  <p class="hint">화면을 끌면 물이 저어지고, 한가운데를 끌면 소용돌이 축이 옮겨집니다. 핏방울을 잡아 끌면 늘어나고, 두 번 누르면 펑 하고 흩어집니다. 조절값은 이 브라우저에 저장되어 다음에 열어도 마지막 값 그대로입니다.</p>
 </div>
 <div class="fbar" id="fbar"><button id="fbPanel" type="button" title="조절 창을 따로 엽니다">⚙ 조절 창</button><button id="fbFull" type="button" title="전체 화면 (F 키)">⛶ 전체 화면</button><button id="fbSave" type="button" title="지금 화면을 PNG로 저장">⤓ 이미지 저장</button></div>
 <script>
@@ -146,9 +173,10 @@ const hh=(a,b)=>h(SEED,a,b);
 /* ── 격자 유체: 화면 전체가 한 통의 물이다. 격자마다 물의 속도와 잉크(분홍·보라·붉은) 농도가 있다.
    폭발을 축으로 도는 기류가 물을 천천히 밀고, 잉크는 물을 따라 늘어나고 감기며, 응축 항이 잉크를 또렷한 덩이로 뭉치고 가는 줄기를 구슬로 끊는다 ── */
 const AREA=540000, CELL=5, CV=10, PAD=60, DT=1/30, NC=4, NL=2;
-const G={vis:[1,1,1,1], speed:1, circ:.9, lspd:.5, dir:1, sep:.5, merge:1, head:1.3, tail:.9, strands:1.5, round:1, init:6, add:3, per:3.4, spin:1, calm:1, out:1, tailDry:1.5,
-  mat:[{size:1,share:1,ksz:.42,brk:.55,hth:.36,hmin:40,bsz:.17,td:.5,nA:.16,dth:.5},{size:1,share:.25,ksz:.42,brk:0,hth:.36,hmin:40,bsz:0,td:.62,nA:.3,dth:.5},{size:1,share:.4,ksz:.4,brk:0,hth:.36,hmin:40,bsz:.17,td:.6,nA:.3,dth:.5},{size:1,share:1,ksz:.42,brk:.55,hth:.36,hmin:40,bsz:.17,td:.5,nA:.16,dth:.5}]};   // 오브젝트마다: 크기, 솟는 비율, 하이라이트·어두운 면 세부   // out: 밖으로 밀려나는 힘   // spin: 도는 힘, calm: 물이 제 흐름으로 돌아오는 빠르기   // init: 처음 개수, add: 한 번에 더 솟는 개수, per: 간격(초)   // head: 머리 뭉침, tail: 꼬리 늘어짐, strands: 떨어지는 가닥 수
-const LIVE=[]; let UNI, THK, NSF, MX, MY, TMP2, RD=[], RDF, backT=0, STEPPED=false;   // RD: 그리기용으로 물을 따라 반 박자 밀어 둔 잉크 (프레임 사이를 메운다)
+const G={vis:[1,1,1,1], speed:1, carry:1, dry:1, circ:.9, lspd:.5, dir:1, sep:.5, merge:1, head:1.3, tail:.9, strands:1.5, round:1, init:6, add:3, per:3.4, spin:1, calm:1, out:1, tailDry:1.5,
+  mat:[{dir:0,exitR:.3,sl:1,size:1,share:1,ksz:.42,brk:.55,hth:.36,hmin:40,bsz:.17,td:.5,nA:.16,dth:.5},{dir:0,exitR:.3,sl:1,size:1,share:.25,ksz:.42,brk:0,hth:.36,hmin:40,bsz:0,td:.62,nA:.3,dth:.5},{dir:0,exitR:.3,sl:1,size:1,share:.4,ksz:.4,brk:0,hth:.36,hmin:40,bsz:.17,td:.6,nA:.3,dth:.5},{dir:0,exitR:.3,sl:1,size:1,share:1,ksz:.42,brk:.55,hth:.36,hmin:40,bsz:.17,td:.5,nA:.16,dth:.5}]};   // 오브젝트마다: 크기, 솟는 비율, 하이라이트·어두운 면 세부   // out: 밖으로 밀려나는 힘   // spin: 도는 힘, calm: 물이 제 흐름으로 돌아오는 빠르기   // init: 처음 개수, add: 한 번에 더 솟는 개수, per: 간격(초)   // head: 머리 뭉침, tail: 꼬리 늘어짐, strands: 떨어지는 가닥 수
+const LIVE=[]; let UNI, THK, NSF, MX, MY, TMP2, RD=[], RDF, PV=[], backT=0, backPT=0, STEPPED=false, FLIP=false;   // PV: 한 박자 전의 잉크 (그리기는 PV→지금 사이를 이어서 그린다), FLIP: 이 채널은 반대로 돈다
+const dirC=c=>G.mat[c].dir||G.dir;   // 오브젝트마다의 도는 방향 (0이면 전체를 따른다)   // RD: 그리기용으로 물을 따라 반 박자 밀어 둔 잉크 (프레임 사이를 메운다)
 /* 빠르게: 화면을 8×8칸 묶음으로 나눠, 잉크가 있는 묶음(과 그 둘레)만 계산한다 */
 let TU, TV, tgN=0, tgX=1e9, tgY=1e9;
 const TL=8, TB=new Int32Array(4); let tW=0, tH=0, TMK, UM, AM, ULS, ALS, UCN=0, ACN=0, TLS=[], TCN, BASEX, BASEY, WU, WV, WUF, WVF, DRY, dryX=1e9, dryY=1e9, CEL, LBL, STK;   // NSF: 물에 실려 떠다니는 '삭는 무늬' (꼬리가 군데군데 잘록해지는 자리)   // 층·채널마다 잉크가 남아 있는지   // 조절값: 도는 방향, 따로 노는 비율, 뭉치는 힘
@@ -167,9 +195,9 @@ function fit(){ const cw=cv.clientWidth, ch=cv.clientHeight, d0=Math.min(window.
   for(let y=0;y<gh;y++) for(let x=0;x<gw;x++){ BASEX[y*gw+x]=x*CELL; BASEY[y*gw+x]=y*CELL; } NZ=[B(),B(),B(),B()]; TMP=A(); F=A(); Zf=A(); HT=A(); AB=A(); SD=A(); SH=A(); S2=A(); FC=A(); FL=A(); FM=A(); F2=A();
   DYE=[]; EMA=[]; for(let l=0;l<NL;l++){ const L=[]; for(let c=0;c<NC;c++) L.push(A()); DYE.push(L); } for(let c=0;c<NC;c++) EMA.push([A(),A(),A()]);
   nextE=new Int32Array(2*n).fill(-1); starts=new Int32Array(2*n); EX=new Float32Array(2*n); EY=new Float32Array(2*n);
-  RD=[]; for(let l=0;l<NL;l++){ const L=[]; for(let c=0;c<NC;c++) L.push(A()); RD.push(L); } RDF=new Int32Array(NL*NC).fill(-1); MX.set(BASEX); MY.set(BASEY);
+  RD=[]; PV=[]; for(let l=0;l<NL;l++){ const L=[], P2=[]; for(let c=0;c<NC;c++){ L.push(A()); P2.push(A()); } RD.push(L); PV.push(P2); } RDF=new Int32Array(NL*NC).fill(-1); MX.set(BASEX); MY.set(BASEY);
   if(og){ const cp=(S,ow,oh,D,nw,nh)=>{ const mw=Math.min(ow,nw), mh=Math.min(oh,nh); for(let y=0;y<mh;y++) for(let x=0;x<mw;x++) D[y*nw+x]=S[y*ow+x]; };
-    cp(og.U,og.vw,og.vh,U,vw,vh); cp(og.V,og.vw,og.vh,V,vw,vh); for(let l=0;l<NL;l++) for(let c=0;c<NC;c++) cp(og.DYE[l][c],og.gw,og.gh,DYE[l][c],gw,gh); } }
+    cp(og.U,og.vw,og.vh,U,vw,vh); cp(og.V,og.vw,og.vh,V,vw,vh); for(let l=0;l<NL;l++) for(let c=0;c<NC;c++){ cp(og.DYE[l][c],og.gw,og.gh,DYE[l][c],gw,gh); PV[l][c].set(DYE[l][c]); } } }
 const gx=x=>(x+PAD)/CELL, gy=y=>(y+PAD)/CELL;   // 세상 좌표 → 격자 좌표
 function bilin(A,x,y,w,h){ x=clamp(x,0,w-1.001); y=clamp(y,0,h-1.001); const ix=x|0, iy=y|0, fx=x-ix, fy=y-iy, k=iy*w+ix; return (A[k]*(1-fx)+A[k+1]*fx)*(1-fy)+(A[k+w]*(1-fx)+A[k+w+1]*fx)*fy; }
 /* 기류의 목표 속도: 폭발을 도는 소용돌이 + 느린 퍼짐 + 떠다니는 작은 소용돌이 둘 */
@@ -210,7 +238,8 @@ function fineV(L,cnt,wd){ const vw1=vw-1.001, vh1=vh-1.001;
 let FRAY=0, FRT=0;
 function advect(A,B,dt,vs,L,cnt){ const s=dt/CELL*vs, fr=FRAY*s, gw1=gw-1.001, gh1=gh-1.001; B.fill(0);   // 잉크를 물에 실어 나른다 (잉크가 있는 묶음만). 엷은 데는 잔바람에 갈라진다
   for(let i=0;i<cnt;i++){ tb(L[i]); const x0=TB[0], x1=TB[1], y1=TB[3];
-    for(let y=TB[2];y<y1;y++){ let k=y*gw+x0; for(let x=x0;x<x1;x++,k++){ let ux=UF[k], vy=VF[k]; if(fr>0){ const th=THK[k]; if(th>0){ ux+=fr*th*WUF[k]; vy+=fr*th*WVF[k]; } }
+    for(let y=TB[2];y<y1;y++){ let k=y*gw+x0; for(let x=x0;x<x1;x++,k++){ let ux=UF[k], vy=VF[k]; if(FLIP){ const rx=x*CELL-PAD-CX, ry=y*CELL-PAD-CY, ir=1/(Math.sqrt(rx*rx+ry*ry)+1e-3), tx=-ry*ir, ty=rx*ir, vt=ux*tx+vy*ty; ux-=2*vt*tx; vy-=2*vt*ty; }   // 반대로 도는 오브젝트: 도는 성분만 뒤집는다 (밖으로 밀리는 성분은 그대로)
+      if(fr>0){ const th=THK[k]; if(th>0){ ux+=fr*th*WUF[k]; vy+=fr*th*WVF[k]; } }
       let px=x-ux*s, py=y-vy*s; px=px<0?0:px>gw1?gw1:px; py=py<0?0:py>gh1?gh1:py; const ix=px|0, iy=py|0, fx=px-ix, fy=py-iy, q=iy*gw+ix;
       B[k]=(A[q]*(1-fx)+A[q+1]*fx)*(1-fy)+(A[q+gw]*(1-fx)+A[q+gw+1]*fx)*fy; } } } }
 function project(){ for(let y=1;y<vh-1;y++){ let k=y*vw+1; for(let x=1;x<vw-1;x++,k++){ DV[k]=(U[k+1]-U[k-1]+V[k+vw]-V[k-vw])*.5; } }   // 지난 박자의 압력에서 시작하니 적게 돌려도 된다
@@ -218,7 +247,7 @@ function project(){ for(let y=1;y<vh-1;y++){ let k=y*vw+1; for(let x=1;x<vw-1;x+
   for(let y=1;y<vh-1;y++){ let k=y*vw+1; for(let x=1;x<vw-1;x++,k++){ U[k]-=(PR[k+1]-PR[k-1])*.5; V[k]-=(PR[k+vw]-PR[k-vw])*.5; } } }
 /* 응축: 잉크가 반쯤 섞인 곳은 있거나 없거나로 갈라지고, 가장자리는 둥글어지며, 가는 목은 끊긴다 (Allen–Cahn) */
 function mkDry(){ dryX=CX; dryY=CY; for(let y=0;y<gh;y++){ let k=y*gw; for(let x=0;x<gw;x++,k++){ const wx=x*CELL-PAD-CX, wy=y*CELL-PAD-CY; DRY[k]=Math.exp(-(wx*wx+wy*wy)/11000); } } }   // 가운데 가까울수록 빨리 마른다 (미리 계산)
-function condense(D,dt,ew,L,cnt){ const a=FLW.cond*G.merge*dt, e=FLW.lap*dt, fs=FRAY*dt*.04, dk=FLW.decay*dt, td=G.tailDry; let mx=0, lost=0, wsum=0;   // 흩어짐: 가는 줄기는 군데군데 삭아서 방울로 끊긴다 (깎인 양은 조각 테두리로 되돌려 양을 지킨다)
+function condense(D,dt,ew,L,cnt){ const a=FLW.cond*G.merge*dt, e=FLW.lap*dt, fs=FRAY*dt*.04, dk=FLW.decay*G.dry*dt, td=G.tailDry; let mx=0, lost=0, wsum=0;   // 흩어짐: 가는 줄기는 군데군데 삭아서 방울로 끊긴다 (깎인 양은 조각 테두리로 되돌려 양을 지킨다)
   for(let i=0;i<cnt;i++){ tb(L[i]); const x0=TB[0], x1=TB[1], y1=TB[3];
     for(let y=TB[2];y<y1;y++){ let k=y*gw+x0; for(let x=x0;x<x1;x++,k++){ const d=D[k], lap=D[k-1]+D[k+1]+D[k-gw]+D[k+gw]-4*d; let v=d+e*lap+a*d*(1-d)*(d-.5)*4-dk*(1+td*DRY[k]);
       if(fs>0 && d>0){ const th=THK[k]; if(th>0){ const q=e*lap*FLW.rnd*th; v+=fs*th*NSF[k]*d+q; lost-=q; const w=d*(1-d)*th; TMP2[k]=w; wsum+=w; } else TMP2[k]=0; } else TMP2[k]=0;
@@ -236,20 +265,32 @@ let puffNo=0; const POURS=[];
 function pickC(key){ const m=G.mat, vv=G.vis, a=m[0].share*((vv[0]||vv[3])?1:0), b=m[1].share*vv[1], c=m[2].share*vv[2], t=a+b+c; if(t<=0) return 0; const r=hh(key,1)*t; return r<a?0:r<a+b?1:2; }
 function pour(key,th,l,c,delay){ let cc=(c===0 && hh(key,11)<G.sep)?3:c; if(!G.vis[cc]){ if(cc===3 && G.vis[0]) cc=0; else if(cc===0 && G.vis[3]) cc=3; else return; }   // 꺼 둔 오브젝트는 솟지 않는다
   const sz=G.mat[cc].size, w0=(c===1?9:c===2?12+6*hh(key,4):26+16*hh(key,4))*sz, len=(c===2?70+50*hh(key,3):300+200*hh(key,3))*Math.sqrt(sz);
-  const rw=.7*(1-.6*G.circ), tx=-Math.sin(th)*G.dir*.7+Math.cos(th)*rw, ty=Math.cos(th)*G.dir*.7+Math.sin(th)*rw;   // 머리는 도는 방향(접선)으로 먼저 나간다
-  const r0=(55+25*hh(key,12))*(1+.5*G.circ); POURS.push({x:CX+Math.cos(th)*r0,y:CY+Math.sin(th)*r0,x0:CX+Math.cos(th)*r0,y0:CY+Math.sin(th)*r0,dx:tx,dy:ty,l,c:cc,w0,len,s:0,spd:170+70*hh(key,5),key,tail:hh(key,30)<.6,delay:delay||0}); }
+  const dr=dirC(cc), rw=.7*(1-.6*G.circ), tx=-Math.sin(th)*dr*.7+Math.cos(th)*rw, ty=Math.cos(th)*dr*.7+Math.sin(th)*rw;   // 머리는 도는 방향(접선)으로 먼저 나간다
+  const r0=(55+25*hh(key,12))*(1+.5*G.circ); POURS.push({x:CX+Math.cos(th)*r0,y:CY+Math.sin(th)*r0,x0:CX+Math.cos(th)*r0,y0:CY+Math.sin(th)*r0,dx:tx,dy:ty,l,c:cc,w0,len,s:0,spd:170+70*hh(key,5),key,tail:hh(key,30)<.6,delay:delay||0,tough:hh(key,31)<G.mat[cc].exitR,cs:0}); }   // tough: 화면 밖까지 나가는 줄기 (오브젝트마다 비율)
 function spawnBurst(k,count){ for(let q=0;q<count;q++){ const key=5000+k*7+q*97, l=hh(key,0)<.4?0:1, c=pickC(key), th=k*2.4+q*TAU/Math.max(count,1)+hh(key,2)*.6;
     if(q>0 && hh(key,9)<.3){ const r0=RMX*(.5+.5*hh(key,6)), r=6+14*hh(key,3); const bc=hh(key,7)<.6?0:2; if(G.vis[bc]) blob(l,bc,CX+Math.cos(th)*r0,CY+Math.sin(th)*r0*.8,r,1.2); continue; }   // 멀리서 방울 하나
     pour(key,th,l,c,0); } }
 function seedPours(){ for(let q=0;q<G.init;q++){ const key=4000+q*31, l=hh(key,0)<.4?0:1, c=pickC(key); pour(key,q*TAU/Math.max(G.init,1)+hh(key,2)*.5,l,c,q*.22); } }
 function emit(){ const k=Math.floor(simT/Math.max(G.per,.5)); if(k!==puffNo){ puffNo=k; if(k>0) spawnBurst(k,Math.round(G.add)); }
-  for(let i=POURS.length-1;i>=0;i--){ const P=POURS[i]; if(P.delay>0){ P.delay-=DT; continue; } const u0=P.s/P.len, ds=P.spd*(P.strand?.8:(.45+.55*Math.pow(1-u0,.7)))*DT; P.s+=ds; const u=P.s/P.len;   // 머리는 빠르고 힘 있게, 꼬리로 갈수록 힘이 빠진다
-    if(u>=1){ POURS.splice(i,1); continue; }
+  for(let i=POURS.length-1;i>=0;i--){ const P=POURS[i]; if(P.delay>0){ P.delay-=DT; continue; } if(P.s>=P.len){ if(carry(P)) POURS.splice(i,1); continue; }   // 다 흘린 줄기: 나르는 머리
+    const u0=P.s/P.len, ds=P.spd*(P.strand?.8:(.45+.55*Math.pow(1-u0,.7)))*DT; P.s+=ds; const u=P.s/P.len;   // 머리는 빠르고 힘 있게, 꼬리로 갈수록 힘이 빠진다
+    if(u>=1){ P.s=P.len; continue; }   // 다 흘린 뒤에는 나르는 머리가 되어 몸통을 끌고 간다 (다음 박자부터)
     // 한 줄기로 흘린다: 앞서가는 머리가 두껍고 뒤로 끌리는 꼬리는 가늘며 끝은 둥근 방울. 가닥으로 흩어지는 것은 나중에 흐름 속에서 일어난다
-    const hf=1+(G.head-1)*sm((u-.5)/.35), r=P.w0*((.38+.62*Math.pow(u,1.3))*hf+.2*Math.exp(-Math.pow(u/.06,2)))*(1+.08*Math.sin(u*9+P.key)); blob(P.l,P.c,P.x,P.y,Math.max(r,4),1.1);
-    const tf=target(P.x,P.y,simT), tl=Math.hypot(tf[0],tf[1])+1e-6, rx=P.x-CX, ry=P.y-CY, rl=Math.hypot(rx,ry)+1e-6;   // 머리의 방향: 기류의 접선 쪽으로 점점 더 기울어 둥글게 휜다
+    const hf=1+(G.head-1)*sm((u-.5)/.35), tb=Math.min(.8,Math.max(.08,.38+(.9-G.tail)*.35)), r=P.w0*((tb+(1-tb)*Math.pow(u,1.3))*hf+.2*Math.exp(-Math.pow(u/.06,2)))*(1+.08*Math.sin(u*9+P.key)); blob(P.l,P.c,P.x,P.y,Math.max(r,4),1.1);
+    const tf=flowAt(P.x,P.y,P.c), tl=Math.hypot(tf[0],tf[1])+1e-6, rx=P.x-CX, ry=P.y-CY, rl=Math.hypot(rx,ry)+1e-6;   // 머리의 방향: 기류의 접선 쪽으로 점점 더 기울어 둥글게 휜다
     const rb=(.9-.75*u)*(1-.85*G.circ); let tx=tf[0]/tl+rx/rl*rb, ty=tf[1]/tl+ry/rl*rb; const nn=Math.hypot(tx,ty); tx/=nn; ty/=nn; P.dx=tx; P.dy=ty; P.x+=tx*ds; P.y+=ty*ds;   // 머리는 기류를 따라 둥글게 (원형 유지가 높을수록 곧장 밖으로 나가지 않는다)
     push(P.x,P.y,P.w0*(.6+.8*u),tx*P.spd*.45*(.3+.7*u),ty*P.spd*.45*(.3+.7*u)); } }   // 미는 힘은 머리에 실린다   // 머리가 물을 미는 힘은 약하게: 물결이 쌓여 흐름이 흐트러지지 않도록
+function flowAt(x,y,c){ const f=target(x,y,simT); if(dirC(c)===G.dir) return f; const rx=x-CX, ry=y-CY, ir=1/(Math.hypot(rx,ry)+1e-3), tx=-ry*ir, ty=rx*ir, vt=f[0]*tx+f[1]*ty; f[0]-=2*vt*tx; f[1]-=2*vt*ty; return f; }
+/* 나르는 머리: 잉크를 다 흘린 줄기의 머리가 소용돌이 라인을 따라 계속 나아가며 둘레의 물을 같이 끌고 간다 → 몸통은 따라오고 꼬리는 늘어진다.
+   끝까지 가는 줄기(tough)는 힘이 서서히 줄되 바닥 빠르기를 지켜 화면 밖까지 나가고, 머리에 잉크를 조금씩 보태 형태를 지킨다. 나머지는 짧게 가다 힘이 다해 흩어진다 */
+function carry(P){ if(P.cmax===undefined) P.cmax=P.tough?1e9:(80+260*hh(P.key,32))*G.carry;
+  const k=Math.exp(-P.cs/(700*Math.max(G.carry,.05))), v=P.tough?Math.max(70*G.carry,P.spd*.6*k):P.spd*.55*k*Math.max(0,1-P.cs/P.cmax);
+  if(v<6 || P.cs>P.cmax) return true; const ds=v*DT; P.cs+=ds;
+  const tf=flowAt(P.x,P.y,P.c), tl=Math.hypot(tf[0],tf[1])+1e-6, rx=P.x-CX, ry=P.y-CY, rl=Math.hypot(rx,ry)+1e-6, rb=P.tough?.22*Math.max(G.out,.2):.08;
+  let tx=tf[0]/tl+rx/rl*rb, ty=tf[1]/tl+ry/rl*rb; const nn=Math.hypot(tx,ty); tx/=nn; ty/=nn; P.dx+=(tx-P.dx)*.3; P.dy+=(ty-P.dy)*.3; const dl=Math.hypot(P.dx,P.dy)||1; P.dx/=dl; P.dy/=dl;
+  P.x+=P.dx*ds; P.y+=P.dy*ds; if(P.x<-PAD*.7 || P.x>WW+PAD*.7 || P.y<-PAD*.7 || P.y>WH+PAD*.7) return true;   // 화면 밖으로 나가면 끝
+  push(P.x,P.y,P.w0*1.35*G.head,P.dx*v,P.dy*v); if(P.tough) blob(P.l,P.c,P.x,P.y,P.w0*.75*G.head,.12);   // 머리 둘레의 물을 같이 끈다 · 끝까지 가는 머리는 조금씩 보태 마르지 않게
+  return false; }
 function pat(wx,wy,t){ return Math.sin(wx*.21+1.7*Math.sin(wy*.13+t*.3))*Math.cos(wy*.19+1.5*Math.sin(wx*.11-t*.25)); }
 /* 떨어져 나간 작은 조각은 표면장력으로 금방 둥근 방울이 된다: 조각마다 같은 넓이의 원으로 양을 옮긴다 (양 보존) */
 function bead(D){ LBL.fill(0); let id=0;
@@ -269,19 +310,19 @@ function driftNoise(){ if((dnF++)&1) return; FRAY=0; if(!UCN) return;   // 물�
   advect(MX,TMP,DT*2,1,ULS,UCN); MX.set(BASEX); copyTiles(TMP,MX,ULS,UCN); advect(MY,TMP,DT*2,1,ULS,UCN); MY.set(BASEY); copyTiles(TMP,MY,ULS,UCN);
   for(let i=0;i<UCN;i++){ tb(ULS[i]); for(let y=TB[2];y<TB[3];y++){ let k=y*gw+TB[0]; for(let x=TB[0];x<TB[1];x++,k++){ const mx=MX[k]+=(BASEX[k]-MX[k])*.024, my=MY[k]+=(BASEY[k]-MY[k])*.024; NSF[k]=pat(mx,my,simT); } } } }
 let bdF=0, backDue=false;
-function backStep(){ backDue=false; const dt=simT-backT; backT=simT; if(dt<=0) return;   // 뒤쪽 층: 앞쪽 박자 사이의 빈 프레임에 따로 한다 (일이 프레임마다 고르게 나뉜다)
-  for(let c=0;c<NC;c++){ if(!LIVE[c]) continue; const D=DYE[0][c], m=markTiles(D,c), L=TLS[c]; FRAY=0; advect(D,TMP,dt,FLW.back,L,m); D.set(TMP); condense(D,dt,26,L,m); if(condense.mx<.02){ LIVE[c]=false; D.fill(0); } } }
-function step(){ if(backDue) backStep(); bdF++; if(CX!==dryX || CY!==dryY) mkDry();
+function backStep(){ backDue=false; const dt=simT-backT; backPT=backT; backT=simT; if(dt<=0) return;   // 뒤쪽 층: 앞쪽 박자 사이의 빈 프레임에 따로 한다 (일이 프레임마다 고르게 나뉜다)
+  for(let c=0;c<NC;c++){ if(!LIVE[c]) continue; const D=DYE[0][c], m=markTiles(D,c), L=TLS[c]; PV[0][c].set(D); FRAY=0; FLIP=dirC(c)!==G.dir; advect(D,TMP,dt,FLW.back,L,m); FLIP=false; D.set(TMP); condense(D,dt,26,L,m); if(condense.mx<.02){ LIVE[c]=false; D.fill(0); PV[0][c].fill(0); } } }
+function step(){ if(backDue) backStep(); bdF++; for(let c=0;c<NC;c++) PV[NL-1][c].set(DYE[NL-1][c]); if(CX!==dryX || CY!==dryY) mkDry();   // 한 박자 전 모습을 남겨 둔다 (그리기용)
   UM.fill(0); AM.fill(0);
   for(let l=0;l<NL;l++) for(let c=0;c<NC;c++){ const sl=l*NC+c; if(!LIVE[sl]){ TCN[sl]=0; continue; } const L=TLS[sl], m=markTiles(DYE[l][c],sl); for(let i=0;i<m;i++){ AM[L[i]]=1; if(l===NL-1 && c!==2) UM[L[i]]=1; } }
   UCN=0; ACN=0; for(let t=0;t<tW*tH;t++){ if(UM[t]) ULS[UCN++]=t; if(AM[t]) ALS[ACN++]=t; }
   forces(DT); advectV(U,U2,DT); advectV(V,V2,DT); U.set(U2); V.set(V2); project(); FRT=simT; const wd=G.strands>0; if(wd) wind(); fineV(ALS,ACN,wd); if(wd) driftNoise();
   if((bdF&1)===0) backDue=true;   // 뒤쪽 층은 느리고 옅으니 두 박자에 한 번 (두 배 걸음)
-  for(let l=0;l<NL;l++) for(let c=0;c<NC;c++){ const sl=l*NC+c; if(!LIVE[sl] || l===0) continue; const D=DYE[l][c], vs=l===0?FLW.back:1, dt=l===0?DT*2:DT, L=TLS[sl], m=TCN[sl];
+  for(let l=0;l<NL;l++) for(let c=0;c<NC;c++){ const sl=l*NC+c; if(!LIVE[sl] || l===0) continue; const D=DYE[l][c], vs=l===0?FLW.back:1, dt=l===0?DT*2:DT, L=TLS[sl], m=TCN[sl]; FLIP=dirC(c)!==G.dir;
     if(l===NL-1 && c!==2){ FRAY=G.strands*40; if(FRAY>0) thin(D,THK); advect(D,TMP,dt,vs,L,m); advect(TMP,F2,-dt,vs,L,m); F.fill(0);   // 앞쪽 잉크는 되돌려 보정(BFECC)해서 번지지 않게 나른다
       for(let i=0;i<m;i++){ tb(L[i]); for(let y=TB[2];y<TB[3];y++){ let k=y*gw+TB[0]; for(let x=TB[0];x<TB[1];x++,k++){ const v=D[k]+(D[k]-F2[k])*.5; F[k]=v<0?0:v>1?1:v; } } }
       advect(F,TMP,dt,vs,L,m); } else { FRAY=0; advect(D,TMP,dt,vs,L,m); }
-    D.set(TMP); condense(D,dt,l===0?26:8,L,m); if(FRAY>0 && G.round>0 && (bdF%6)===c) bead(D); FRAY=0; if(condense.mx<.02){ LIVE[sl]=false; D.fill(0); } }
+    D.set(TMP); condense(D,dt,l===0?26:8,L,m); if(FRAY>0 && G.round>0 && (bdF%6)===c) bead(D); FRAY=0; FLIP=false; if(condense.mx<.02){ LIVE[sl]=false; D.fill(0); PV[l][c].fill(0); } }
   emit(); simT+=DT; }
 
 /* ── 겉모양: 잉크 농도의 경계선을 따서 셀 셰이딩 (핏방울과 같은 순서: 테두리 → 높낮이 → 빛 → 어두운 면·하이라이트 덩이) ── */
@@ -417,7 +458,8 @@ function step(){ const DS=DT*G.speed, DMP=Math.pow(P.DAMP,G.speed), VS=P.VISC*Ma
   for(let i=0;i<N;i++){ const x=X[i], y=Y[i], lb=LBL[i], rx=x-LCX[lb], ry=y-LCY[lb], sw=LSP[lb]*Math.max(0,1-Math.sqrt(rx*rx+ry*ry)*LIR[lb]);   // 덩이 안에서 천천히 도는 흐름 (안쪽이 더 빨리 돈다)
     let ax=-ry*sw+P.WOB*(Math.cos(y*.021+1.3*Math.sin(t*.61))*Math.sin(t*.83+x*.004)+.6*Math.cos(y*.043+x*.017+t*.47)),
         ay=rx*sw+P.WOB*(-Math.cos(x*.019+1.1*Math.cos(t*.53))*Math.sin(t*.71+y*.005)-.6*Math.cos(x*.039-y*.015-t*.59));
-    if(x<m) ax+=(m-x)*140; else if(x>WW-m) ax-=(x-(WW-m))*140; if(y<m) ay+=(m-y)*140; else if(y>WH-m) ay-=(y-(WH-m))*140;
+    const lv=LLV[lb]; if(lv>0){ const f=G.push*110*Math.min(1,(t-lv)/2.5); ax+=LDX[lb]*f; ay+=LDY[lb]*f; }   // 밀려나는 방울: 벽 없이 서서히 빨라지며 화면 밖으로
+    else { if(x<m) ax+=(m-x)*140; else if(x>WW-m) ax-=(x-(WW-m))*140; if(y<m) ay+=(m-y)*140; else if(y>WH-m) ay-=(y-(WH-m))*140; }
     let vx=(VX[i]+ax*DS)*DMP, vy=(VY[i]+ay*DS)*DMP;
     const tw=TW[i]; if(tw>0){ const tk=Math.min(tw*P.TOW,.5); vx+=(TVX[i]-vx)*tk; vy+=(TVY[i]-vy)*tk; }
     const g=GW[i]; if(g>0){ let tx=(GTX[i]-x)*26, ty=(GTY[i]-y)*26; const l=Math.hypot(tx,ty); if(l>1500){ tx*=1500/l; ty*=1500/l; } vx+=(tx-vx)*g; vy+=(ty-vy)*g; }
@@ -428,11 +470,11 @@ function step(){ const DS=DT*G.speed, DMP=Math.pow(P.DAMP,G.speed), VS=P.VISC*Ma
     const a=1-Math.sqrt(r2)*ih, a2=a*a; RHO[i]+=a2; RHO[j]+=a2; RHN[i]+=a2*a; RHN[j]+=a2*a; }
   for(let p=0;p<NP;p++){ const i=PI_[p], j=PJ_[p], dx=X[j]-X[i], dy=Y[j]-Y[i], r2=dx*dx+dy*dy; if(r2>=h2) continue;
     const r=Math.sqrt(r2)+1e-6, a=1-r*ih; let D=(P.K*((RHO[i]+RHO[j])*.5-P.RHO0)*a+P.KN*(RHN[i]+RHN[j])*.5*a*a)*.5/r, c=P.ST*a;
-    if(LBL[i]!==LBL[j]){ const li=LBL[i], lj=LBL[j], f=P.XL+(1-P.XL)*(1-(LTO[li]===lj?LFD[li]:LTO[lj]===li?LFD[lj]:1)); c*=f; if(D<0) D*=f; }   // 서로 다른 덩이끼리는 덜 끌어당긴다: 붙기는 하지만 각자 둥글게 남아 사이가 잘록해진다
+    if(LBL[i]!==LBL[j]){ const li=LBL[i], lj=LBL[j], f=P.XL+(1-P.XL)*(1-(LTO[li]===lj?LFD[li]:LTO[lj]===li?LFD[lj]:1)); c*=f; if(D<0) D*=f; if(LNF[li]>simT || LNF[lj]>simT){ c=0; if(D<0) D=0; } }   // 막 흩어진 방울은 정한 초 동안 서로 끌어당기지 않는다   // 서로 다른 덩이끼리는 덜 끌어당긴다: 붙기는 하지만 각자 둥글게 남아 사이가 잘록해진다
     DX[i]+=dx*(c-D); DY[i]+=dy*(c-D); DX[j]-=dx*(c-D); DY[j]-=dy*(c-D); }
   const idt=1/DS;
   for(let i=0;i<N;i++){ let ddx=DX[i], ddy=DY[i]; const l=ddx*ddx+ddy*ddy; if(l>16){ const k=4/Math.sqrt(l); ddx*=k; ddy*=k; }
-    let nx=X[i]+ddx, ny=Y[i]+ddy; nx=nx<22?22:nx>WW-22?WW-22:nx; ny=ny<22?22:ny>WH-22?WH-22:ny; X[i]=nx; Y[i]=ny; VX[i]=(X[i]-OX[i])*idt; VY[i]=(Y[i]-OY[i])*idt; }
+    let nx=X[i]+ddx, ny=Y[i]+ddy; if(!(LLV[LBL[i]]>0)){ nx=nx<22?22:nx>WW-22?WW-22:nx; ny=ny<22?22:ny>WH-22?WH-22:ny; } X[i]=nx; Y[i]=ny; VX[i]=(X[i]-OX[i])*idt; VY[i]=(Y[i]-OY[i])*idt; }
   // 속(어두운 덩어리)의 자리: 살보다 무거운 듯 한 박자 늦게 따라오고, 멈추면 앞으로 쏠렸다가 되돌아온다
   const w2=P.CW*P.CW, cd=2*P.CZ*P.CW;
   for(let i=0;i<N;i++){ let qx=QX[i], qy=QY[i]; const vx=QVX[i]+((X[i]-qx)*w2-(QVX[i]-VX[i])*cd)*DS, vy=QVY[i]+((Y[i]-qy)*w2-(QVY[i]-VY[i])*cd)*DS;
@@ -461,7 +503,7 @@ function towFrom(seeds,vx,vy,lam){ const qt=linked(seeds);
 /* ── 판 차리기 ── */
 const AREA=540000, SIZES=[60,46,38,31,25,20,16];
 let W=0, Hh=0, dpr=1, scale=1, extra=0;
-const G={on:1,speed:1,hi:1,co:1,dyn:1,fuse:3,size:.8,count:5,side:0,wf:.42,visc:1,wob:1,st:1};   // side: 0 오른쪽 1 왼쪽 2 위 3 아래 4 화면 전체   // 전체 조절값: 하이라이트 크기, 어두운 부분 크기, 출렁임
+const G={on:1,speed:1,sep:3,leave:1,dwell:12,push:1,refill:1,hi:1,co:1,dyn:1,fuse:3,size:.8,count:5,side:0,wf:.42,visc:1,wob:1,st:1};   // side: 0 오른쪽 1 왼쪽 2 위 3 아래 4 화면 전체   // 전체 조절값: 하이라이트 크기, 어두운 부분 크기, 출렁임
 let sel=-1;                  // 선택한 방울에 속한 알갱이 하나 (방울이 합쳐지면 합쳐진 덩어리가 선택된다)
 let ZX0=0, ZY0=0, ZX1=930, ZY1=580;   // 처음 놓이는 자리 (화면은 소용돌이와 함께 쓴다)
 function place(R,key){ // 다른 방울과 겹치지 않는 빈자리를 고른다
@@ -542,10 +584,12 @@ const LMAX=1024, LCNT=new Int32Array(LMAX), LOFF=new Int32Array(LMAX+1), LCUR=ne
       LAC=new Float32Array(LMAX), LAS=new Float32Array(LMAX), LEL=new Float32Array(LMAX), LSZ=new Float32Array(LMAX), L2C=new Float32Array(LMAX), L2S=new Float32Array(LMAX), L2Z=new Float32Array(LMAX), L3Z=new Float32Array(LMAX),
       SB=[0,1,2,3,4,5,6,7].map(()=>new Float32Array(LMAX)),   // 덩이가 타고난 빛 성격 (LAC…L3Z는 지금 쓰는 값: 녹아드는 동안 큰 덩이 쪽으로 닮아 간다)
       LEX=new Float32Array(LMAX), LEV=new Float32Array(LMAX), L3A=new Float32Array(LMAX), LCX=new Float32Array(LMAX), LCY=new Float32Array(LMAX), LSP=new Float32Array(LMAX), LIR=new Float32Array(LMAX), LS0=new Float32Array(LMAX),
-      LTO=new Int16Array(LMAX).fill(-1), LCAND=new Int16Array(LMAX), LFUS=new Int16Array(LMAX), LTM=new Float32Array(LMAX), LFD=new Float32Array(LMAX).fill(1);
+      LTO=new Int16Array(LMAX).fill(-1), LCAND=new Int16Array(LMAX), LFUS=new Int16Array(LMAX), LTM=new Float32Array(LMAX), LFD=new Float32Array(LMAX).fill(1),
+      LBORN=new Float32Array(LMAX), LNF=new Float32Array(LMAX), LLV=new Float32Array(LMAX), LDX=new Float32Array(LMAX), LDY=new Float32Array(LMAX), LDW=new Float32Array(LMAX);   // 태어난 때, 이때까지 안 합쳐짐, 밀려나기 시작한 때, 나가는 방향, 머무는 시간 배율
 const SE=[LAC,LAS,LEL,LSZ,L2C,L2S,L2Z,L3Z];
 let nLobe=0, lobeSerial=0;
 function styleLobe(l){ const k=++lobeSerial; // 덩이마다 빛을 받는 성격이 다르다
+  LBORN[l]=simT; LNF[l]=0; LLV[l]=0; LDW[l]=.6+.8*hh(k,61); const da=hh(k,62)*TAU; LDX[l]=Math.cos(da); LDY[l]=Math.sin(da);   // 머무는 시간은 방울마다 조금씩 다르고, 나가는 방향은 제멋대로
   const az=(hh(k,41)-.5)*.9, a2=az+(hh(k,44)<.5?-1:1)*(.85+.6*hh(k,45));
   LAC[l]=Math.cos(az); LAS[l]=Math.sin(az); LEL[l]=.42+.42*hh(k,42);          // 빛의 높이: 낮으면 가장자리에 붙은 초승달, 높으면 가운데 쪽 둥근 얼룩
   LSZ[l]=.33+.17*hh(k,43);                                                     // 큰 하이라이트의 크기
@@ -554,7 +598,7 @@ function styleLobe(l){ const k=++lobeSerial; // 덩이마다 빛을 받는 성�
   for(let q=0;q<8;q++) SB[q][l]=SE[q][l]; LS0[l]=(hh(k,51)<.5?-1:1)*(.5+.6*hh(k,52)); LTO[l]=-1; LTM[l]=0; LFD[l]=1; LCX[l]=0; LCY[l]=0; LSP[l]=0; LIR[l]=0; LEX[l]=0; LEV[l]=0; }
 const hh=(a,b)=>h(SEED,a,b);
 function newLobe(){ if(nLobe>=LMAX-2) packLobes(); const l=nLobe++; styleLobe(l); return l; }
-function packLobes(){ const map=new Int16Array(LMAX).fill(-1); let k=0; for(let i=0;i<N;i++){ const l=LBL[i]; if(map[l]<0){ map[l]=k; for(let q=0;q<8;q++){ SB[q][k]=SB[q][l]; SE[q][k]=SE[q][l]; } LS0[k]=LS0[l]; L3A[k]=L3A[l]; LEX[k]=LEX[l]; LEV[k]=LEV[l]; LTO[k]=-1; LTM[k]=0; LFD[k]=1; k++; } LBL[i]=map[l]; } nLobe=k; }
+function packLobes(){ const map=new Int16Array(LMAX).fill(-1); let k=0; for(let i=0;i<N;i++){ const l=LBL[i]; if(map[l]<0){ map[l]=k; for(let q=0;q<8;q++){ SB[q][k]=SB[q][l]; SE[q][k]=SE[q][l]; } LS0[k]=LS0[l]; L3A[k]=L3A[l]; LEX[k]=LEX[l]; LEV[k]=LEV[l]; LBORN[k]=LBORN[l]; LNF[k]=LNF[l]; LLV[k]=LLV[l]; LDX[k]=LDX[l]; LDY[k]=LDY[l]; LDW[k]=LDW[l]; LTO[k]=-1; LTM[k]=0; LFD[k]=1; k++; } LBL[i]=map[l]; } nLobe=k; }
 function lobes(dt){ const n=gw*gh, inv=1/CELL, r2=RK*RK, ir=1/r2;
   for(let l=0;l<nLobe;l++){ LCNT[l]=0; BX0[l]=1e9; BY0[l]=1e9; BX1[l]=-1e9; BY1[l]=-1e9; LCX[l]=0; LCY[l]=0; LCAND[l]=-1; LFUS[l]=-1; }
   for(let i=0;i<N;i++){ const l=LBL[i], x=X[i], y=Y[i]; LCNT[l]++; LCX[l]+=x; LCY[l]+=y; if(x<BX0[l]) BX0[l]=x; if(x>BX1[l]) BX1[l]=x; if(y<BY0[l]) BY0[l]=y; if(y>BY1[l]) BY1[l]=y; }
@@ -569,6 +613,7 @@ function lobes(dt){ const n=gw*gh, inv=1/CELL, r2=RK*RK, ir=1/r2;
     for(let gy=cy0;gy<=cy1;gy++){ let k=gy*gw+cx0; for(let gx=cx0;gx<=cx1;gx++,k++){ const v=TMP[k]; if(v<=0) continue; if(v>M1[k]){ M2[k]=M1[k]; LI2[k]=LID[k]; M1[k]=v; LID[k]=l; } else if(v>M2[k]){ M2[k]=v; LI2[k]=l; } } } }
   // 덩이 정리: 남의 덩이 깊숙이 섞여 들어간 알갱이는 그 덩이가 된다. 그리고 어느 덩이가 더 큰 덩이와 맞닿아 있는지 적어 둔다
   for(let i=0;i<N;i++){ const k=Math.round(Y[i]*inv)*gw+Math.round(X[i]*inv), lid=LID[k], own=LBL[i]; if(lid<0) continue; const a=M1[k], b=M2[k]; let o=-1;
+    if(LNF[own]>simT || LNF[lid]>simT) continue;   // 안 합쳐지는 동안은 섞이지도 않는다
     if(lid!==own){ o=lid; if(LCNT[own]<7 || a-b>(a+b)*.36) LBL[i]=lid; } else if(b>.7) o=LI2[k];
     if(o>=0 && (LCNT[o]>LCNT[own] || (LCNT[o]===LCNT[own] && o<own)) && (LCAND[own]<0 || LCNT[o]>LCNT[LCAND[own]])) LCAND[own]=o; }
   // 맞닿은 지 정해 둔 시간이 지나면 작은 덩이가 큰 덩이에 녹아든다: 사이의 골이 옅어지고, 빛 성격이 큰 덩이를 닮아 가다가, 한 덩이가 된다
@@ -653,7 +698,34 @@ function draw(){
 
 /* ── 돌리기 ── */
 let last=performance.now(), acc=0;
-function advance(dt){ acc+=dt; let k=0; while(acc>=DT && k<4){ hands(); step(); acc-=DT; k++; } if(k===4) acc=0; }
+function advance(dt){ acc+=dt; let k=0; while(acc>=DT && k<4){ hands(); step(); acc-=DT; k++; } if(k===4) acc=0; manage(dt); }
+/* 밀려나기와 다시 채우기: 방울마다 정한 시간(머무는 시간 × 방울마다 다른 배율)이 지나면 제멋대로 고른 방향으로 서서히 밀려 화면 밖으로 나간다.
+   다 나가면 지우고, 나간 만큼의 방울을 소용돌이 가운데에서 새로 만든다 */
+const PA=[X,Y,VX,VY,OX,OY,RHO,RHN,DX,DY,TW,TVX,TVY,GW,GTX,GTY,QX,QY,QVX,QVY,LM,AH,AC,PH,ZP,DOT,BUB,CWt,HWt,H2t,LBL];
+let mgT=0, CXs=465, CYs=290, owed=0;
+function heldLobes(){ const s=new Set(); for(const p of ptrs.values()) for(const i of p.idx) if(i<N) s.add(LBL[i]); return s; }
+function removeLobe(l){ const map=new Int32Array(N).fill(-1); let w=0; for(let i=0;i<N;i++){ if(LBL[i]===l) continue; if(w!==i) for(const A of PA) A[w]=A[i]; map[i]=w; w++; } const gone=N-w; N=w;
+  for(const p of ptrs.values()){ const s2=[]; for(let q=0;q<p.seeds.length;q+=3){ const m2=map[p.seeds[q]]; if(m2>=0) s2.push(m2,p.seeds[q+1],p.seeds[q+2]); } p.seeds=s2; p.idx=p.idx.map(i=>map[i]).filter(i=>i>=0); }
+  sel=sel>=0 && sel<map.length?map[sel]:-1; return gone; }
+function placeNear(cx,cy,R){ let bx=cx, by=cy, bs=-1e9; for(let k=0;k<24;k++){ const a=k*2.4, rr=k===0?0:(R+12)*Math.sqrt(k)*.9, x=clamp(cx+Math.cos(a)*rr,R+30,WW-R-30), y=clamp(cy+Math.sin(a)*rr,R+30,WH-R-30); let m=1e9;
+    for(let i=0;i<N;i+=2){ const d=Math.hypot(X[i]-x,Y[i]-y); if(d<m) m=d; } const s=m-R; if(s>bs){ bs=s; bx=x; by=y; } if(s>14) break; } return [bx,by]; }
+function manage(dt){ mgT+=dt; if(mgT<.25) return; mgT=0; if(!N && !owed) return; const held=heldLobes();
+  if(G.leave) for(let l=0;l<nLobe;l++){ if(!LCNT[l] || LLV[l]>0) continue; if(held.has(l)){ LBORN[l]=simT; continue; } if(simT-LBORN[l]>G.dwell*LDW[l]) LLV[l]=simT; }
+  for(let l=0;l<nLobe;l++){ if(!(LLV[l]>0) || !LCNT[l]) continue; if(BX0[l]>WW+40 || BX1[l]<-40 || BY0[l]>WH+40 || BY1[l]<-40){ owed+=removeLobe(l); LCNT[l]=0; LLV[l]=0; } }
+  if(!G.refill){ owed=0; return; }
+  while(owed>=6 && N<CAP-120){ const cnt=Math.min(owed,140), r=Math.sqrt(cnt*SP0*SP0*.866/Math.PI)+2, p=placeNear(CXs,CYs,r+6), a=hh(born,70)*TAU, sp=15+25*hh(born,71); owed-=addDrop(p[0],p[1],r,Math.cos(a)*sp,Math.sin(a)*sp)||cnt; }   // 가운데에서 새로 생겨 천천히 떠난다
+  btn(); }
+/* 두 번 누르면 펑: 그 방울을 가장 작은 방울들로 쪼개 사방으로 튀긴다. 정한 초 동안은 서로 다시 붙지 않는다 */
+function burst(x,y){ let best=-1, bd=1e9; for(let i=0;i<N;i++){ const d=(X[i]-x)**2+(Y[i]-y)**2; if(d<bd){ bd=d; best=i; } } if(best<0 || bd>54*54) return false;
+  for(const id of [...ptrs.keys()]) release(id); const qt=linked([best]); if(qt<8) return false; const idx=Array.from(que.subarray(0,qt)), K=Math.max(2,Math.round(qt/6));
+  let cx=0, cy=0; for(const i of idx){ cx+=X[i]; cy+=Y[i]; } cx/=qt; cy/=qt;
+  const sx=new Float32Array(K), sy=new Float32Array(K), as=new Int32Array(qt); for(let g2=0;g2<K;g2++){ const i=idx[Math.floor(g2*qt/K)]; sx[g2]=X[i]; sy[g2]=Y[i]; }
+  for(let it=0;it<3;it++){ const ax=new Float32Array(K), ay=new Float32Array(K), an=new Int32Array(K);
+    for(let q=0;q<qt;q++){ const i=idx[q]; let bb=0, bdd=1e9; for(let g2=0;g2<K;g2++){ const d=(X[i]-sx[g2])**2+(Y[i]-sy[g2])**2; if(d<bdd){ bdd=d; bb=g2; } } as[q]=bb; ax[bb]+=X[i]; ay[bb]+=Y[i]; an[bb]++; }
+    for(let g2=0;g2<K;g2++) if(an[g2]){ sx[g2]=ax[g2]/an[g2]; sy[g2]=ay[g2]/an[g2]; } }
+  const lob=new Int32Array(K), vx=new Float32Array(K), vy=new Float32Array(K);
+  for(let g2=0;g2<K;g2++){ lob[g2]=newLobe(); LNF[lob[g2]]=simT+G.sep; const dx=sx[g2]-cx, dy=sy[g2]-cy, dl=Math.hypot(dx,dy)||1, a=Math.atan2(dy,dx)+(hh(born+g2,72)-.5)*.6, sp=(150+150*hh(born+g2,73))*(.6+.4*Math.min(1,dl/30)); vx[g2]=Math.cos(a)*sp; vy[g2]=Math.sin(a)*sp; }
+  for(let q=0;q<qt;q++){ const i=idx[q], g2=as[q]; LBL[i]=lob[g2]; VX[i]=vx[g2]; VY[i]=vy[g2]; QX[i]=X[i]; QY[i]=Y[i]; QVX[i]=vx[g2]; QVY[i]=vy[g2]; GW[i]=0; } born++; sel=-1; selUI(); return true; }
 function box(){ let x0=1e9, x1=-1e9, y0=1e9, y1=-1e9; for(let i=0;i<N;i++){ const a=X[i], b=Y[i], c=QX[i], d=QY[i]; if(a<x0) x0=a; if(a>x1) x1=a; if(b<y0) y0=b; if(b>y1) y1=b; if(c<x0) x0=c; if(c>x1) x1=c; if(d<y0) y0=d; if(d>y1) y1=d; }
   const m=RK+RKS+40; QB0=Math.max(0,Math.floor((x0-m)/CELL)); QB1=Math.min(gw-1,Math.ceil((x1+m)/CELL)); QC0=Math.max(0,Math.floor((y0-m)/CELL)); QC1=Math.min(gh-1,Math.ceil((y1+m)/CELL)); if(!N){ QB1=QB0; QC1=QC0; } }
 function compute(dt){ box(); splat(); march(F,BL,TH); lobes(dt); inflate(); light(dt); splat2(); march(FC,CL,TH); march(FL,HL,1.4); march(FM,H2,1.5); }
@@ -665,6 +737,11 @@ $("kAdd").addEventListener("click",more); $("kReset").addEventListener("click",r
 const pct=v=>Math.round(v*100)+"%";
 [["kSpd","speed"],["kHi","hi"],["kCo","co"],["kDyn","dyn"],["kVisc","visc"],["kWob","wob"],["kSt","st"],["kSize","size"],["kWf","wf"]].forEach(([id,k])=>{ const el=$(id); el.addEventListener("input",()=>{ G[k]=+el.value; $(id+"V").textContent=pct(G[k]); applyP(); save(); if(k==="wf" && onPlace) onPlace(); }); });
 $("kCount").addEventListener("input",()=>{ G.count=+$("kCount").value; $("kCountV").textContent=G.count+"개"; save(); });
+$("kPush").addEventListener("input",()=>{ G.push=+$("kPush").value; $("kPushV").textContent=pct(G.push); save(); });
+$("kSep").addEventListener("input",()=>{ const v=+$("kSep").value; if(!(v>=0)) return; G.sep=Math.min(60,v); save(); });
+$("kDwell").addEventListener("input",()=>{ const v=+$("kDwell").value; if(!(v>0)) return; G.dwell=Math.min(600,v); save(); });
+$("kLeave").addEventListener("click",()=>{ G.leave=G.leave?0:1; if(!G.leave) for(let l=0;l<nLobe;l++){ LLV[l]=0; LBORN[l]=simT; } save(); syncUI(); });
+$("kRefill").addEventListener("click",()=>{ G.refill=G.refill?0:1; save(); syncUI(); });
 $("kFuse").addEventListener("input",()=>{ G.fuse=+$("kFuse").value; $("kFuseV").textContent=G.fuse+"초"; save(); });
 function selUI(){ const on=sel>=0 && sel<N; $("kSel").classList.toggle("off",!on); $("kSHi").disabled=$("kSCo").disabled=!on;
   $("kSelMsg").textContent=on?"방금 누른 방울만 따로 조절합니다. 빈 곳을 누르면 선택이 풀립니다.":"방울을 누르면 그 방울만 따로 조절할 수 있습니다.";
@@ -678,14 +755,14 @@ function save(){ try{ localStorage.setItem(KEY,JSON.stringify(G)); }catch(_){} }
 function load(){ try{ const o=JSON.parse(localStorage.getItem(KEY)||"{}"); for(const k in o) if(k in G && typeof o[k]==="number") G[k]=o[k]; }catch(_){} }
 const SIDES=["kS0","kS1","kS2","kS3","kS4"];
 function syncUI(){ for(const [id,k] of [["kSpd","speed"],["kHi","hi"],["kCo","co"],["kDyn","dyn"],["kVisc","visc"],["kWob","wob"],["kSt","st"],["kSize","size"],["kWf","wf"]]){ $(id).value=G[k]; $(id+"V").textContent=pct(G[k]); }
-  $("kFuse").value=G.fuse; $("kFuseV").textContent=G.fuse+"초"; $("kCount").value=G.count; $("kCountV").textContent=G.count+"개";
+  $("kFuse").value=G.fuse; $("kFuseV").textContent=G.fuse+"초"; $("kPush").value=G.push; $("kPushV").textContent=pct(G.push); if(document.activeElement!==$("kSep")) $("kSep").value=G.sep; if(document.activeElement!==$("kDwell")) $("kDwell").value=G.dwell; $("kLeave").setAttribute("aria-pressed",G.leave?"true":"false"); $("kRefill").setAttribute("aria-pressed",G.refill?"true":"false"); $("kCount").value=G.count; $("kCountV").textContent=G.count+"개";
   SIDES.forEach((id,i)=>$(id).setAttribute("aria-pressed",G.side===i?"true":"false")); $("kWf").disabled=G.side===4; $("bdBox").classList.toggle("dim",!G.on); }
 SIDES.forEach((id,i)=>$(id).addEventListener("click",()=>{ G.side=i; save(); syncUI(); if(onPlace) onPlace(); if(started) reset(); }));   // 자리를 바꾸면 그 자리에서 새로 시작
 load(); applyP(); syncUI();
 
 let started=false;
 function inReg(){ return true; }   // 벽 없음: 화면 어디서든 잡힌다
-return { G, setView, syncUI, setZone(a,b,c,d){ ZX0=a; ZY0=b; ZX1=c; ZY1=d; },
+return { G, setView, syncUI, setZone(a,b,c,d){ ZX0=a; ZY0=b; ZX1=c; ZY1=d; }, center(x,y){ CXs=x; CYs=y; }, burst(x,y){ return G.on && burst(x-OXp,y-OYp); },
   start(){ if(!started){ started=true; reset(); } },
   on(){ return !!G.on; },
   setOn(v){ G.on=v?1:0; save(); syncUI(); if(!G.on){ ptrs.clear(); if(own){ g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,W,Hh); } } },
@@ -729,14 +806,17 @@ function bolts(){ g.lineJoin="miter"; g.miterLimit=6; for(let b=0;b<4;b++){ cons
     g.beginPath(); g.moveTo(BX[0],BY[0]); for(let k=1;k<2*nn;k++) g.lineTo(BX[k],BY[k]); g.closePath(); g.fillStyle="#FEF102"; g.fill(); g.strokeStyle="#F29113"; g.lineWidth=1.8; g.stroke(); } g.lineJoin="round"; }
 function sparkles(fill,line){ g.fillStyle=fill; g.lineJoin="miter"; for(let k=0;k<9;k++){ const x=hh(8000+k,1)*WW, y=hh(8000+k,2)*WH, t=.55+.45*Math.sin(T*(.8+1.4*hh(8000+k,6))+hh(8000+k,5)*TAU), r=(9+20*hh(8000+k,3)*hh(8000+k,4))*(.35+.65*t*t), w=r*.13;
     g.beginPath(); g.moveTo(x,y-r*1.25); g.quadraticCurveTo(x+w,y-w,x+r,y); g.quadraticCurveTo(x+w,y+w,x,y+r*1.25); g.quadraticCurveTo(x-w,y+w,x-r,y); g.quadraticCurveTo(x-w,y-w,x,y-r*1.25); g.fill(); if(line){ g.strokeStyle=line; g.lineWidth=1.6; g.stroke(); } } g.lineJoin="round"; }
-/* 프레임 사이 메우기: 물리는 1/30초마다 한 박자지만, 그 사이 프레임에서는 잉크를 지금의 물 흐름대로 조금 밀어서 그린다 → 초당 60장으로 부드럽게 */
-function src(l,c,a){ const sl=l*NC+c, D=DYE[l][c], t=l===0?(simT-backT)+a*DT:a*DT; if(t<.004 || !TCN[sl]) return D; if(RDF[sl]===frameNo) return RD[l][c];
-  FRAY=0; advect(D,RD[l][c],t,l===0?FLW.back:1,TLS[sl],TCN[sl]); RDF[sl]=frameNo; return RD[l][c]; }
+/* 프레임 사이 잇기: 물리는 1/30초마다 한 박자지만, 화면은 한 박자 전 모습과 지금 모습 사이를 매 프레임 이어서 그린다 → 툭 튀지 않고 초당 60장으로 흐른다 (속도를 늦춰도 마찬가지) */
+function src(l,c,a){ const sl=l*NC+c, D=DYE[l][c], P=PV[l][c]; if(!TCN[sl]) return D; if(RDF[sl]===frameNo) return RD[l][c];
+  let f=a; if(l===0){ const now=simT-DT+a*DT, sp=backT-backPT; f=sp>1e-6?(now-backPT)/sp:1; } f=f<0?0:f>1?1:f;
+  const R=RD[l][c], L=TLS[sl], m=TCN[sl]; R.fill(0); for(let i=0;i<m;i++){ tb(L[i]); for(let y=TB[2];y<TB[3];y++){ let k=y*gw+TB[0]; for(let x=TB[0];x<TB[1];x++,k++){ const p=P[k]; R[k]=p+(D[k]-p)*f; } } }
+  RDF[sl]=frameNo; return R; }
 function render(dt,a){ frameNo++; T=simT; dt=dt||1/60; a=a||0;
   g.setTransform(1,0,0,1,0,0); g.fillStyle=SC.bg; g.fillRect(0,0,W,Hh); g.setTransform(scale,0,0,scale,0,0); g.lineJoin="round"; g.lineCap="round";
   for(let l=0;l<NL;l++){ g.save(); if(l===0){ g.translate(CX,CY); g.scale(SC.bscale,SC.bscale); g.translate(-CX,-CY); }
-    for(let c=0;c<NC;c++){ const M=SC.mats[c], both=l===NL-1 && c!==1 && c!==2, sh=M.shaded && l===NL-1 && !both; if(!LIVE[l*NC+c]) continue; prepare(src(l,c,a),M,sh,EMA[c],dt); paint(M,SC.fade[l],SC.bg,sh); }   // 뒤쪽 층은 명암 없이 옅게
-    if(l===NL-1 && (LIVE[l*NC] || LIVE[l*NC+3])){ const D0=LIVE[l*NC]?src(l,0,a):DYE[l][0], D3=LIVE[l*NC+3]?src(l,3,a):DYE[l][3]; for(let k=0;k<n;k++) UNI[k]=D0[k]>D3[k]?D0[k]:D3[k]; prepare(UNI,SC.mats[0],true,EMA[0],dt); paint(SC.mats[0],0,SC.bg,true,true); }   // 분홍 두 무리의 명암은 한 번에 (닿은 자리도 한 몸으로 빛난다)
+    const SL=!!G.mat[3].sl;   // 분홍 B가 분홍 A와 같은 빛을 쓰면 두 분홍을 한 몸으로 명암을 넣는다
+    for(let c=0;c<NC;c++){ const M=SC.mats[c], both=SL && l===NL-1 && c!==1 && c!==2, sh=M.shaded && l===NL-1 && !both; if(!LIVE[l*NC+c]) continue; prepare(src(l,c,a),M,sh,EMA[c],dt); paint(M,SC.fade[l],SC.bg,sh); }   // 뒤쪽 층은 명암 없이 옅게
+    if(SL && l===NL-1 && (LIVE[l*NC] || LIVE[l*NC+3])){ const D0=LIVE[l*NC]?src(l,0,a):DYE[l][0], D3=LIVE[l*NC+3]?src(l,3,a):DYE[l][3]; for(let k=0;k<n;k++) UNI[k]=D0[k]>D3[k]?D0[k]:D3[k]; prepare(UNI,SC.mats[0],true,EMA[0],dt); paint(SC.mats[0],0,SC.bg,true,true); }   // 분홍 두 무리의 명암은 한 번에 (닿은 자리도 한 몸으로 빛난다)
     g.restore();
     if(l===0){ if(SC.sparks) sparkles(SC.sparks[0],SC.sparks[1]); if(SC.bolts) bolts(); if(SC.burst) burst(CX,CY,40,7000); } } }
 function advance(k){ for(let s=0;s<k;s++) step(); }
@@ -744,10 +824,10 @@ let last=performance.now(), acc=0, rdt=0, aspect=0, bdT=0, fno=0, work=0, lite=f
 const SLOW=(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
 let fAvg=1/60, qT=0, qGood=0;
 function autoQ(dt){ fAvg+=(dt-fAvg)*.05; qT+=dt; if(fAvg>.0195 && qT>1.5 && QF>.36){ QF=Math.max(.35,QF*.8); qT=0; qGood=0; } else if(fAvg<.0175 && QF<1){ qGood+=dt; if(qGood>4){ QF=Math.min(1,QF*1.12); qGood=0; qT=0; } } else qGood=0; }   // 화면이 커서 프레임이 밀리면 그리는 해상도를 조금 낮추고, 넉넉해지면 되돌린다
-function frame(now){ const dt=Math.min(.1,(now-last)/1000); last=now; if(!document.hidden) autoQ(dt); fit(); const a=WW>WH?1:2; if(a!==aspect){ aspect=a; RMX=Math.hypot(WW,WH)*.5; placeCenter(); }   // 화면 방향이 바뀌어도 처음부터 다시 하지 않는다
+function frame(now){ const dt=Math.min(.1,(now-last)/1000); last=now; if(!document.hidden){ autoQ(dt); fpsTick(now); } fit(); const a=WW>WH?1:2; if(a!==aspect){ aspect=a; RMX=Math.hypot(WW,WH)*.5; placeCenter(); }   // 화면 방향이 바뀌어도 처음부터 다시 하지 않는다
   if(!document.hidden){ const w0=performance.now(); acc+=dt*(SLOW?.4:1)*G.speed; rdt+=dt; let k=0; if(acc>=DT){ k=1; acc-=DT; if(acc>DT) acc=0; }   // 한 프레임에 한 박자까지만: 느린 기기에서는 따라잡으려 몰아 계산하지 않고 조금 느리게 흐른다 (끊김 대신 슬로모션)   // 소용돌이 속도: 박자 사이가 길어질 뿐, 그리기는 매 프레임
     advance(k); if(k===0 && backDue) backStep(); STEPPED=k>0; render(rdt*G.speed,acc/DT); rdt=0;   // 소용돌이는 매 프레임 그린다 (박자 사이는 흐름대로 밀어 메운다)
-    if(BD.on()){ const r=bdRect(); BD.setView(W,Hh,scale,0,0,WW,WH); BD.setZone(r[0],r[1],r[0]+r[2],r[1]+r[3]); BD.start(); bdT+=Math.min(dt,.05); BD.advance(Math.min(dt,.05)*(SLOW?.4:1)); if(!lite || (fno&1)){ BD.compute(bdT*BD.G.speed); bdT=0; } BD.draw(); }   // 핏방울도 화면 전체를 쓴다 (자리는 처음 놓이는 곳일 뿐). 바쁠 때는 핏방울을 두 프레임에 한 번 그린다
+    if(BD.on()){ const r=bdRect(); BD.setView(W,Hh,scale,0,0,WW,WH); BD.center(CX,CY); BD.setZone(r[0],r[1],r[0]+r[2],r[1]+r[3]); BD.start(); bdT+=Math.min(dt,.05); BD.advance(Math.min(dt,.05)*(SLOW?.4:1)); if(!lite || (fno&1)){ BD.compute(bdT*BD.G.speed); bdT=0; } BD.draw(); }   // 핏방울도 화면 전체를 쓴다 (자리는 처음 놓이는 곳일 뿐). 바쁠 때는 핏방울을 두 프레임에 한 번 그린다
     fno++; const wk=performance.now()-w0; work+=(wk-work)*.05; if(!lite && work>20) lite=true; else if(lite && work<9) lite=false; } 
   requestAnimationFrame(frame); }
 const tabsEl=$("tabs"); SCENES.forEach((s,i)=>{ const b=document.createElement("button"); b.type="button"; b.id="st"+i; b.role="tab"; b.textContent=s.name; b.addEventListener("click",()=>setScene(i)); tabsEl.appendChild(b); });
@@ -769,7 +849,7 @@ function loadG(){ try{ const o=JSON.parse(localStorage.getItem(KEY)||"{}"); for(
 loadG();
 function syncUI(){ $("dCW").setAttribute("aria-pressed",G.dir>0?"true":"false"); $("dCCW").setAttribute("aria-pressed",G.dir>0?"false":"true");
   $("gSep").value=G.sep; $("gSepV").textContent=pct(G.sep); $("gMerge").value=G.merge; $("gMergeV").textContent=pct(G.merge);
-  $("gHead").value=G.head; $("gHeadV").textContent=pct(G.head); $("gTail").value=G.tail; $("gTailV").textContent=pct(G.tail); $("gStr").value=G.strands; $("gStrV").textContent=pct(G.strands); $("gRnd").value=G.round; $("gRndV").textContent=pct(G.round); $("gInit").value=G.init; $("gInitV").textContent=G.init+"개"; $("gAdd").value=G.add; $("gAddV").textContent=G.add+"개"; $("gPer").value=G.per; $("gPerV").textContent=G.per+"초"; $("gSpin").value=G.spin; $("gSpinV").textContent=pct(G.spin); $("gCalm").value=G.calm; $("gCalmV").textContent=pct(G.calm); $("gOut").value=G.out; $("gOutV").textContent=pct(G.out); $("gTD").value=G.tailDry; $("gTDV").textContent=pct(G.tailDry); $("gSpd").value=G.speed; $("gSpdV").textContent=pct(G.speed); $("gCirc").value=G.circ; $("gCircV").textContent=pct(G.circ); $("gLs").value=G.lspd; $("gLsV").textContent=pct(G.lspd); }
+  $("gHead").value=G.head; $("gHeadV").textContent=pct(G.head); $("gTail").value=G.tail; $("gTailV").textContent=pct(G.tail); $("gStr").value=G.strands; $("gStrV").textContent=pct(G.strands); $("gRnd").value=G.round; $("gRndV").textContent=pct(G.round); $("gInit").value=G.init; $("gInitV").textContent=G.init+"개"; $("gAdd").value=G.add; $("gAddV").textContent=G.add+"개"; $("gPer").value=G.per; $("gPerV").textContent=G.per+"초"; $("gSpin").value=G.spin; $("gSpinV").textContent=pct(G.spin); $("gCalm").value=G.calm; $("gCalmV").textContent=pct(G.calm); $("gOut").value=G.out; $("gOutV").textContent=pct(G.out); $("gTD").value=G.tailDry; $("gTDV").textContent=pct(G.tailDry); $("gCarry").value=G.carry; $("gCarryV").textContent=pct(G.carry); $("gDry").value=G.dry; $("gDryV").textContent=pct(G.dry); $("gSpd").value=G.speed; $("gSpdV").textContent=pct(G.speed); $("gCirc").value=G.circ; $("gCircV").textContent=pct(G.circ); $("gLs").value=G.lspd; $("gLsV").textContent=pct(G.lspd); }
 syncUI();
 $("gHead").addEventListener("input",()=>{ G.head=+$("gHead").value; $("gHeadV").textContent=pct(G.head); saveG(); });
 $("gTail").addEventListener("input",()=>{ G.tail=+$("gTail").value; $("gTailV").textContent=pct(G.tail); saveG(); });
@@ -793,10 +873,20 @@ const OS=[["oSize","size",v=>pct(v)],["oShare","share",v=>pct(v)],["oKsz","ksz",
 const otabs=$("otabs"); OBJ.forEach((nm,i)=>{ const b=document.createElement("button"); b.type="button"; b.id="ot"+i; b.role="tab"; b.textContent=nm; b.addEventListener("click",()=>{ curO=i; syncO(); }); otabs.appendChild(b); });
 function syncO(){ const m=G.mat[OIDX[curO]]; [...otabs.children].forEach((b,i)=>b.setAttribute("aria-selected",i===curO?"true":"false"));
   for(const [id,k,f] of OS){ const el=$(id); if(!el) continue; el.value=m[k]; $(id+"V").textContent=f(m[k]); }
-  const shared=OIDX[curO]===3; $("oNote").textContent=shared?"분홍 B는 분홍 A와 같은 액체라 빛 설정을 함께 씁니다. 크기만 따로 둘 수 있고, 솟는 비율은 '따로 놀기'로 정합니다.":"";
-  for(const [id,k] of OS){ const el=$(id); if(!el) continue; el.disabled=shared && k!=="size"; } }
-for(const [id,k,f] of OS){ const el=$(id); if(!el) continue; el.addEventListener("input",()=>{ const m=G.mat[OIDX[curO]]; m[k]=+el.value; $(id+"V").textContent=f(m[k]); saveG(); }); }
+  const isB=OIDX[curO]===3, sl=isB && G.mat[3].sl, lightK=new Set(["ksz","brk","hth","hmin","bsz","td","nA","dth"]);
+  $("oNote").textContent=isB?(sl?"분홍 B는 지금 분홍 A와 같은 빛을 씁니다 (닿은 자리가 한 몸으로 빛남). 빛 손잡이를 움직이면 B만의 빛으로 바뀝니다.":"분홍 B는 자기만의 빛을 씁니다. '분홍 A와 같은 빛'을 누르면 다시 합쳐집니다.")+" 분홍 B가 솟는 비율은 위의 '따로 놀기'로 정합니다.":"";
+  const sv=isB && sl?G.mat[0]:m; for(const [id,k,f] of OS){ const el=$(id); if(!el || !lightK.has(k)) continue; el.value=sv[k]; $(id+"V").textContent=f(sv[k]); }
+  for(const [id,k] of OS){ const el=$(id); if(el) el.disabled=isB && k==="share"; }
+  const d=m.dir||0; $("oD0").setAttribute("aria-pressed",d===0?"true":"false"); $("oD1").setAttribute("aria-pressed",d===1?"true":"false"); $("oD2").setAttribute("aria-pressed",d===-1?"true":"false");
+  $("oExit").value=Math.round((m.exitR??.3)*100); $("oSLrow").hidden=!isB; $("oSL").setAttribute("aria-pressed",sl?"true":"false"); }
+[["oD0",0],["oD1",1],["oD2",-1]].forEach(([id,v])=>$(id).addEventListener("click",()=>{ G.mat[OIDX[curO]].dir=v; saveG(); syncO(); }));
+$("oExit").addEventListener("input",()=>{ const v=Math.max(0,Math.min(100,+$("oExit").value||0)); G.mat[OIDX[curO]].exitR=v/100; saveG(); });
+$("oSL").addEventListener("click",()=>{ const B=G.mat[3]; B.sl=B.sl?0:1; if(!B.sl) for(const k of ["ksz","brk","hth","hmin","bsz","td","nA","dth"]) B[k]=G.mat[0][k]; saveG(); syncO(); });
+for(const [id,k,f] of OS){ const el=$(id); if(!el) continue; el.addEventListener("input",()=>{ const m=G.mat[OIDX[curO]]; if(OIDX[curO]===3 && m.sl && ["ksz","brk","hth","hmin","bsz","td","nA","dth"].includes(k)){ m.sl=0; for(const q of ["ksz","brk","hth","hmin","bsz","td","nA","dth"]) m[q]=G.mat[0][q]; }   // B의 빛을 만지면 B만의 빛으로
+    m[k]=+el.value; $(id+"V").textContent=f(m[k]); saveG(); syncO(); }); }
 syncO();
+$("gCarry").addEventListener("input",()=>{ G.carry=+$("gCarry").value; $("gCarryV").textContent=pct(G.carry); saveG(); });
+$("gDry").addEventListener("input",()=>{ G.dry=+$("gDry").value; $("gDryV").textContent=pct(G.dry); saveG(); });
 $("gSpd").addEventListener("input",()=>{ G.speed=+$("gSpd").value; $("gSpdV").textContent=pct(G.speed); saveG(); });
 $("gCirc").addEventListener("input",()=>{ G.circ=+$("gCirc").value; $("gCircV").textContent=pct(G.circ); saveG(); });
 $("gLs").addEventListener("input",()=>{ G.lspd=+$("gLs").value; $("gLsV").textContent=pct(G.lspd); saveG(); });
@@ -828,16 +918,60 @@ $("bSave").addEventListener("click",savePNG);
 if(window.NF_VIEW==="stage"){
   let bc=null; try{ bc=new BroadcastChannel("nu-flow"); }catch(_){}
   const snap=()=>{ const o={}; document.querySelectorAll(".ctl [id], #tabs [id], #bdBox").forEach(el=>{ const r={}, t=el.tagName;
-      if(t==="INPUT"){ r.v=el.value; r.d=el.disabled?1:0; } else if(t==="OUTPUT"||t==="P") r.x=el.textContent; else if(t==="BUTTON"){ r.p=el.getAttribute("aria-pressed"); r.s=el.getAttribute("aria-selected"); r.d=el.disabled?1:0; } else r.c=el.className; o[el.id]=r; }); return o; };
+      if(t==="INPUT"){ r.v=el.value; r.d=el.disabled?1:0; } else if(t==="OUTPUT"||t==="P") r.x=el.textContent; else if(t==="BUTTON"){ r.p=el.getAttribute("aria-pressed"); r.s=el.getAttribute("aria-selected"); r.d=el.disabled?1:0; } else r.c=el.className; r.h=el.hidden?1:0; o[el.id]=r; }); return o; };
   const send=()=>{ if(bc) bc.postMessage({t:"snap",s:snap()}); };
-  if(bc){ bc.onmessage=e=>{ const m=e.data||{}; if(m.t==="ev"){ const el=$(m.id); if(el){ if(m.k==="input"){ el.value=m.v; el.dispatchEvent(new Event("input")); } else el.click(); } } send(); }; setInterval(send,600); }
+  if(bc){ bc.onmessage=e=>{ const m=e.data||{}; if(m.t==="reload"){ location.reload(); return; } if(m.t==="ev"){ const el=$(m.id); if(el){ if(m.k==="input"){ el.value=m.v; el.dispatchEvent(new Event("input")); } else el.click(); } } send(); }; setInterval(send,600); }
   const openPanel=()=>{ const w=window.open(location.pathname+"?view=panel","nuflow-panel","popup,width=500,height=980,left=30,top=30"); if(w) w.focus(); };
   $("fbPanel").addEventListener("click",openPanel); $("fbSave").addEventListener("click",savePNG);
   const full=()=>{ if(document.fullscreenElement) document.exitFullscreen(); else { const r=document.documentElement.requestFullscreen; if(r) r.call(document.documentElement).catch(()=>{}); } };
   $("fbFull").addEventListener("click",full); addEventListener("keydown",e=>{ if(e.key==="f"||e.key==="F") full(); });
   const fb=$("fbar"); let idle=0; const wake=()=>{ fb.classList.remove("idle"); clearTimeout(idle); idle=setTimeout(()=>fb.classList.add("idle"),2500); }; addEventListener("pointermove",wake); wake();
 }
+
+/* fps 표시: 지금 화면이 실제로 초당 몇 장 그려지는지 (끊김이 프레임 탓인지 모양 탓인지 가늠용) */
+let showFps=false; try{ showFps=localStorage.getItem("nu-flow-fps")==="1"; }catch(_){}
+const fpsEl=$("fpsM"); let fpsN=0, fpsT0=performance.now();
+function fpsTick(now){ if(!showFps){ fpsEl.hidden=true; return; } fpsN++; if(now-fpsT0>=500){ fpsEl.textContent=Math.round(fpsN*1000/(now-fpsT0))+" fps · 화질 "+Math.round(QF*100)+"%"; fpsN=0; fpsT0=now; } fpsEl.hidden=false; }
+function syncFps(){ $("fpsT").setAttribute("aria-pressed",showFps?"true":"false"); }
+$("fpsT").addEventListener("click",()=>{ showFps=!showFps; try{ localStorage.setItem("nu-flow-fps",showFps?"1":"0"); }catch(_){} syncFps(); });
+syncFps();
+/* 핏방울 두 번 누르기: 가장 작은 방울들로 펑 하고 흩어진다 */
+cv.addEventListener("dblclick",e=>{ if(!BD.on()) return; const p=wpos(e); BD.burst(p[0],p[1]); });
 requestAnimationFrame(frame);
+})();
+</script>
+<script>
+/* 메뉴 편집과 설정 옮기기 (한 화면 보기·조절 창에서 돈다. 이미지 화면에서는 쉬고) */
+(function(){ const V=window.NF_VIEW||"both"; if(V==="stage") return; const $=id=>document.getElementById(id);
+  const HK="nu-flow-hidden", KEYS=["swirl-flow-g","swirl-flow-bd","nu-flow-q","nu-flow-hidden","nu-flow-fps"];
+  let hidden=[]; try{ hidden=JSON.parse(localStorage.getItem(HK)||"[]"); if(!Array.isArray(hidden)) hidden=[]; }catch(_){ hidden=[]; }
+  const its=()=>[...document.querySelectorAll(".ctl .it[data-k]")];
+  const save=()=>{ try{ localStorage.setItem(HK,JSON.stringify(hidden)); }catch(_){} };
+  function render(){ const ed=document.body.classList.contains("editing");
+    its().forEach(el=>{ const k=el.dataset.k, h=hidden.includes(k); el.classList.toggle("hid",h && !ed); el.style.opacity=(h && ed)?".45":""; let b=el.querySelector(":scope>.hx");
+      if(ed && k!=="bSave"){ if(!b){ b=document.createElement("button"); b.type="button"; b.className="hx";
+          b.addEventListener("click",ev=>{ ev.preventDefault(); ev.stopPropagation(); const i=hidden.indexOf(k); if(i>=0) hidden.splice(i,1); else hidden.push(k); save(); render(); }); el.appendChild(b); }
+        b.textContent=h?"↺":"✕"; b.title=h?"다시 보이기":"이 메뉴 숨기기"; b.setAttribute("aria-label",b.title); } else if(b) b.remove(); });
+    $("mEdit").setAttribute("aria-pressed",ed?"true":"false"); $("mEdit").textContent=ed?"편집 끝내기":"메뉴 편집";
+    $("mRestore").textContent="숨긴 메뉴 되돌리기"+(hidden.length?" ("+hidden.length+")":""); $("mRestore").disabled=!hidden.length; }
+  $("mEdit").addEventListener("click",()=>{ document.body.classList.toggle("editing"); render(); });
+  $("mRestore").addEventListener("click",()=>{ hidden=[]; save(); render(); });
+  addEventListener("storage",e=>{ if(e.key===HK){ try{ hidden=JSON.parse(e.newValue||"[]")||[]; }catch(_){ hidden=[]; } render(); } });   // 다른 창에서 숨긴 것도 따라간다
+  render();
+  // 설정 내보내기·불러오기: 지금 값을 파일 하나로 옮긴다
+  const DLP=(window.claude && typeof window.claude.use==="function")?window.claude.use("downloads").catch(()=>null):null;
+  const tip=(msg)=>{ const d=$("bSave").closest(".it").querySelector(".desc"); if(!d) return; const o=d.dataset.o||d.textContent; d.dataset.o=o; d.textContent=msg; clearTimeout(tip.t); tip.t=setTimeout(()=>{ d.textContent=o; },4000); };
+  $("sExp").addEventListener("click",async()=>{ const data={}; for(const k of KEYS){ try{ const v=localStorage.getItem(k); if(v!=null) data[k]=v; }catch(_){} }
+    const txt=JSON.stringify({app:"nu-flow",version:1,saved:new Date().toISOString(),data},null,1), nm="nu-flow-settings.json", dl=DLP?await DLP:null;
+    if(dl){ try{ await dl.save({filename:nm,data:txt}); tip("설정을 파일로 내보냈습니다."); }catch(_){} return; }
+    const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([txt],{type:"application/json"})); a.download=nm; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),5000); tip("설정을 파일로 내보냈습니다 ("+nm+").");
+  });
+  $("sImp").addEventListener("click",()=>$("sFile").click());
+  $("sFile").addEventListener("change",async()=>{ const f=$("sFile").files[0]; $("sFile").value=""; if(!f) return;
+    try{ const o=JSON.parse(await f.text()); if(!o || o.app!=="nu-flow" || !o.data) throw 0; for(const k of KEYS) if(typeof o.data[k]==="string") localStorage.setItem(k,o.data[k]); }
+    catch(_){ tip("이 파일은 NU FLOW 설정 파일이 아닙니다."); return; }
+    tip("설정을 불러왔습니다 — 새 값으로 다시 시작합니다."); try{ const bc=new BroadcastChannel("nu-flow"); bc.postMessage({t:"reload"}); }catch(_){} setTimeout(()=>location.reload(),300);
+  });
 })();
 </script>
 <script>
@@ -847,7 +981,7 @@ if(window.NF_VIEW==="panel")(function(){
   if(!bc){ $("pStatus").textContent="이 브라우저는 두 창 잇기를 지원하지 않습니다 — 한 화면 보기로 여세요."; return; }
   ["분홍 소용돌이"].forEach((n,i)=>{ const b=document.createElement("button"); b.type="button"; b.id="st"+i; b.setAttribute("role","tab"); b.textContent=n; $("tabs").appendChild(b); });
   ["분홍 A","분홍 B","보라","붉은"].forEach((n,i)=>{ const b=document.createElement("button"); b.type="button"; b.id="ot"+i; b.setAttribute("role","tab"); b.textContent=n; $("otabs").appendChild(b); });
-  const LOCAL=new Set(["pOpen"]);
+  const LOCAL=new Set(["pOpen","mEdit","mRestore","sExp","sImp","sFile"]);   // 이 창에서만 하는 일 (메뉴 편집·설정 옮기기)
   document.addEventListener("input",e=>{ const el=e.target; if(!el.id || LOCAL.has(el.id)) return; bc.postMessage({t:"ev",id:el.id,k:"input",v:el.value}); });
   document.addEventListener("click",e=>{ const b=e.target.closest("button[id]"); if(!b || LOCAL.has(b.id)) return; bc.postMessage({t:"ev",id:b.id,k:"click"}); });
   let last=0;
@@ -855,7 +989,7 @@ if(window.NF_VIEW==="panel")(function(){
     for(const id in m.s){ const el=$(id); if(!el) continue; const r=m.s[id];
       if("v" in r && document.activeElement!==el) el.value=r.v; if("x" in r) el.textContent=r.x;
       if("p" in r){ if(r.p===null) el.removeAttribute("aria-pressed"); else el.setAttribute("aria-pressed",r.p); } if("s" in r && r.s!==null) el.setAttribute("aria-selected",r.s);
-      if("d" in r) el.disabled=!!r.d; if("c" in r) el.className=r.c; } };
+      if("d" in r) el.disabled=!!r.d; if("c" in r && !el.classList.contains("it")) el.className=r.c; if("h" in r) el.hidden=!!r.h; } };
   const status=()=>{ const on=Date.now()-last<2000; $("pStatus").textContent=on?"화면 창과 이어져 있습니다 — 여기서 바꾸면 화면 창에 바로 반영됩니다.":"화면 창이 없습니다 — '화면 창 열기'를 누르세요."; $("pOpen").hidden=on; };
   setInterval(status,700); status();
   $("pOpen").addEventListener("click",()=>{ const w=window.open(location.pathname+"?view=stage","nuflow-stage","popup,width=1400,height=860"); if(w) w.focus(); });
