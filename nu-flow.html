@@ -105,14 +105,15 @@ canvas.hold{cursor:grabbing}
     <label class="it" data-k="stBody"><span>몸통 크기</span><input id="stBody" type="range" min="0.01" max="0.3" step="0.01" value="0.05"><output id="stBodyV">5%</output><small class="desc">팔이 만나는 가운데 몸통의 크기. 낮을수록 몸통은 작게 줄고 팔만 바늘처럼 가늘고 길게 뻗습니다.</small></label>
     <label class="it" data-k="stTw"><span>반짝임</span><input id="stTw" type="range" min="0" max="3" step="0.05" value="1"><output id="stTwV">100%</output><small class="desc">십자별이 커졌다 작아지며 반짝이는 빠르기. 0이면 멈춰 있습니다.</small></label>
   </div>
-  <h2 class="sect">찢긴 끝</h2>
+  <h2 class="sect">찢긴 결</h2>
   <div class="ctl">
-    <label class="it" data-k="tear"><span>찢김 길이</span><input id="tear" type="range" min="0" max="160" step="1" value="60"><output id="tearV">60px</output><small class="desc">'삐죽 소용돌이' 장면에서 쓰입니다 (분홍 하이라이트도 같은 결로 찢깁니다). 흐르는 방향과 나란한 옆면은 매끈하게 쭉 늘어나고, 흐름을 마주 보는 앞뒤 끝면만 흐르는 쪽으로 길게 찢어집니다. 그 찢긴 조각의 최대 길이. 0이면 매끈한 끝.</small></label>
-    <label class="it" data-k="tearLong"><span>긴 갈래 비율</span><input id="tearLong" type="range" min="0" max="1" step="0.05" value="0.3"><output id="tearLongV">30%</output><small class="desc">찢긴 갈래 가운데 쭉 길게 늘어나는 갈래의 비율. 높을수록 긴 갈래가 자주 나옵니다 (긴 갈래는 보통 갈래의 2.4~5배).</small></label>
-    <label class="it" data-k="tearCap"><span>꼬리 비율</span><input id="tearCap" type="range" min="0.1" max="2.5" step="0.05" value="0.75"><output id="tearCapV">75%</output><small class="desc">찢긴 꼬리가 그 덩어리 크기에 비해 얼마나 길게 뻗을 수 있는지. 낮으면 짧고 잘게 찢기고, 높으면 덩어리보다 길게 쭉 끌립니다.</small></label>
-    <label class="it" data-k="tearRate"><span>꼬리 변화 속도</span><input id="tearRate" type="range" min="0.005" max="0.5" step="0.005" value="0.05"><output id="tearRateV">5%</output><small class="desc">찢긴 꼬리가 생기고 사라지는 빠르기. 낮을수록 꼬리가 천천히 자라고 천천히 사그라들어, 갑자기 바뀌지 않고 자연스럽게 돕니다.</small></label>
-    <label class="it" data-k="tearPer"><span>찢긴 조각 폭</span><input id="tearPer" type="range" min="6" max="50" step="1" value="15"><output id="tearPerV">15px</output><small class="desc">갈라진 조각 하나의 폭. 작을수록 가는 결로 잘게, 클수록 굵게 갈라집니다.</small></label>
-    <label class="it" data-k="tearRnd"><span>들쭉날쭉</span><input id="tearRnd" type="range" min="0" max="1" step="0.05" value="0.75"><output id="tearRndV">75%</output><small class="desc">조각 길이가 서로 다른 정도. 높을수록 아주 긴 조각과 짧은 조각이 섞입니다.</small></label>
+    <label class="it" data-k="tear"><span>삐져나옴</span><input id="tear" type="range" min="0" max="160" step="1" value="60"><output id="tearV">60px</output><small class="desc">'삐죽 소용돌이' 장면에서 쓰입니다. 액체가 처음부터 나란한 가닥 다발(붓 자국)로 나와, 물을 타고 쭉 늘어나다 가늘어져 사라집니다. 바깥 가닥이 몸통 밖으로 삐져나올 수 있는 거리.</small></label>
+    <label class="it" data-k="tearLong"><span>긴 갈래 비율</span><input id="tearLong" type="range" min="0" max="1" step="0.05" value="0.3"><output id="tearLongV">30%</output><small class="desc">바깥 가닥 가운데 끝까지 쭉 이어지는 가닥의 비율. 높을수록 길게 이어진 갈래가 많습니다.</small></label>
+    <label class="it" data-k="tearCap"><span>꼬리 비율</span><input id="tearCap" type="range" min="0.1" max="2.5" step="0.05" value="0.75"><output id="tearCapV">75%</output><small class="desc">줄기 꼬리 쪽에서 가닥들이 제각각 끝나는 구간의 길이. 높을수록 꼬리가 길게 여러 갈래로 갈라집니다.</small></label>
+    <label class="it" data-k="tipLen"><span>끝 갈래 길이</span><input id="tipLen" type="range" min="0" max="160" step="1" value="50"><output id="tipLenV">50px</output><small class="desc">덩어리 끝(흐름을 마주 보는 앞뒤)이 흐르는 쪽으로 뾰족하게 갈라지는 길이. 0이면 끝은 가닥 결만 남습니다.</small></label>
+    <label class="it" data-k="tearRate"><span>끝 변화 속도</span><input id="tearRate" type="range" min="0.005" max="0.5" step="0.005" value="0.05"><output id="tearRateV">5%</output><small class="desc">끝 갈래가 생기고 사라지는 빠르기. 낮을수록 천천히 자라고 천천히 사그라들어 떨리지 않습니다.</small></label>
+    <label class="it" data-k="tearPer"><span>가닥 폭</span><input id="tearPer" type="range" min="6" max="50" step="1" value="15"><output id="tearPerV">15px</output><small class="desc">가닥 하나의 폭. 작을수록 가는 결로 잘게, 클수록 굵게 갈라집니다.</small></label>
+    <label class="it" data-k="tearRnd"><span>들쭉날쭉</span><input id="tearRnd" type="range" min="0" max="1" step="0.05" value="0.75"><output id="tearRndV">75%</output><small class="desc">가닥마다 길이와 끝나는 자리가 다른 정도. 높을수록 거칠게 찢긴 결, 낮으면 고르게 정돈된 결.</small></label>
   </div>
   <h2 class="sect">소용돌이</h2>
   <div class="ctl">
@@ -221,7 +222,7 @@ const hh=(a,b)=>h(SEED,a,b);
 /* ── 격자 유체: 화면 전체가 한 통의 물이다. 격자마다 물의 속도와 잉크(분홍·보라·붉은) 농도가 있다.
    폭발을 축으로 도는 기류가 물을 천천히 밀고, 잉크는 물을 따라 늘어나고 감기며, 응축 항이 잉크를 또렷한 덩이로 뭉치고 가는 줄기를 구슬로 끊는다 ── */
 const AREA=540000, CELL=5, CV=10, PAD=60, DT=1/30, NC=4, NL=2;
-const G={vis:[1,1,1,1], smooth:.45, stOn:1, stN:9, stSize:1, stLen:4, stHV:.75, stBody:.05, stTw:1, tear:60, tearPer:15, tearSpd:.4, tearRnd:.75, tearLong:.3, tearCap:.75, tearRate:.05, d3:1, d3Tilt:22, d3Depth:.5, d3Drift:.4, d3Mouse:.5, spread:1, rim:0, rimW:130, visc:1, lightA:225, sp:1, spShow:0, spDen:1, spW:34, spPull:1, spStr:1, spBg:.35, spArms:1, spRot:1, spWob:1, speed:1, carry:1, dry:1, circ:.9, lspd:.5, dir:1, sep:.5, merge:1, head:1.3, tail:.9, strands:1.5, round:1, init:6, add:3, per:3.4, spin:1, calm:1, out:1, tailDry:1.5,
+const G={vis:[1,1,1,1], smooth:.45, stOn:1, stN:9, stSize:1, stLen:4, stHV:.75, stBody:.05, stTw:1, tear:60, tearPer:15, tearSpd:.4, tearRnd:.75, tearLong:.3, tearCap:.75, tearRate:.05, tipLen:50, d3:1, d3Tilt:22, d3Depth:.5, d3Drift:.4, d3Mouse:.5, spread:1, rim:0, rimW:130, visc:1, lightA:225, sp:1, spShow:0, spDen:1, spW:34, spPull:1, spStr:1, spBg:.35, spArms:1, spRot:1, spWob:1, speed:1, carry:1, dry:1, circ:.9, lspd:.5, dir:1, sep:.5, merge:1, head:1.3, tail:.9, strands:1.5, round:1, init:6, add:3, per:3.4, spin:1, calm:1, out:1, tailDry:1.5,
   mat:[{carry:1,dir:0,exitR:.3,sl:1,size:1,share:1,ksz:.42,brk:.55,hth:.36,hmin:40,bsz:.17,td:.5,nA:.16,dth:.5},{carry:.6,dir:0,exitR:.3,sl:1,size:1,share:.25,ksz:.42,brk:0,hth:.36,hmin:40,bsz:0,td:.62,nA:.3,dth:.5},{carry:.5,dir:0,exitR:.3,sl:1,size:1,share:.4,ksz:.4,brk:0,hth:.36,hmin:40,bsz:.17,td:.6,nA:.3,dth:.5},{carry:1,dir:0,exitR:.3,sl:1,size:1,share:1,ksz:.42,brk:.55,hth:.36,hmin:40,bsz:.17,td:.5,nA:.16,dth:.5}]};   // 오브젝트마다: 크기, 솟는 비율, 하이라이트·어두운 면 세부   // out: 밖으로 밀려나는 힘   // spin: 도는 힘, calm: 물이 제 흐름으로 돌아오는 빠르기   // init: 처음 개수, add: 한 번에 더 솟는 개수, per: 간격(초)   // head: 머리 뭉침, tail: 꼬리 늘어짐, strands: 떨어지는 가닥 수
 let RIM, rimKey='';
 const LIVE=[]; let UNI, THK, NSF, MX, MY, TMP2, RD=[], RDF, PV=[], backT=0, backPT=0, STEPPED=false, FLIP=false;   // PV: 한 박자 전의 잉크 (그리기는 PV→지금 사이를 이어서 그린다), FLIP: 이 채널은 반대로 돈다
@@ -312,7 +313,7 @@ function project(){ for(let y=1;y<vh-1;y++){ let k=y*vw+1; for(let x=1;x<vw-1;x+
   for(let y=1;y<vh-1;y++){ let k=y*vw+1; for(let x=1;x<vw-1;x++,k++){ U[k]-=(PR[k+1]-PR[k-1])*.5; V[k]-=(PR[k+vw]-PR[k-vw])*.5; } } }
 /* 응축: 잉크가 반쯤 섞인 곳은 있거나 없거나로 갈라지고, 가장자리는 둥글어지며, 가는 목은 끊긴다 (Allen–Cahn) */
 function mkDry(){ dryX=CX; dryY=CY; for(let y=0;y<gh;y++){ let k=y*gw; for(let x=0;x<gw;x++,k++){ const wx=x*CELL-PAD-CX, wy=y*CELL-PAD-CY; DRY[k]=Math.exp(-(wx*wx+wy*wy)/11000); } } }   // 가운데 가까울수록 빨리 마른다 (미리 계산)
-function condense(D,dt,ew,L,cnt){ const a=FLW.cond*G.merge*dt, e=FLW.lap*dt*(.7+.35*G.visc), fs=FRAY*dt*.04/(.5+.5*G.visc), dk=FLW.decay*G.dry*dt, td=G.tailDry; let mx=0, lost=0, wsum=0;   // 흩어짐: 가는 줄기는 군데군데 삭아서 방울로 끊긴다 (깎인 양은 조각 테두리로 되돌려 양을 지킨다)
+function condense(D,dt,ew,L,cnt){ const a=FLW.cond*G.merge*dt, e=FLW.lap*dt*(.7+.35*G.visc)*(SC.lapK??1), fs=FRAY*dt*.04/(.5+.5*G.visc), dk=FLW.decay*G.dry*dt, td=G.tailDry; let mx=0, lost=0, wsum=0;   // 흩어짐: 가는 줄기는 군데군데 삭아서 방울로 끊긴다 (깎인 양은 조각 테두리로 되돌려 양을 지킨다)
   for(let i=0;i<cnt;i++){ tb(L[i]); const x0=TB[0], x1=TB[1], y1=TB[3];
     for(let y=TB[2];y<y1;y++){ let k=y*gw+x0; for(let x=x0;x<x1;x++,k++){ const d=D[k], lap=D[k-1]+D[k+1]+D[k-gw]+D[k+gw]-4*d; let v=d+e*lap+a*d*(1-d)*(d-.5)*4-dk*(1+td*DRY[k])*(1-RIM[k]);
       if(fs>0 && d>0){ const th=THK[k]; if(th>0){ const q=e*lap*FLW.rnd*th; v+=fs*th*NSF[k]*d+q; lost-=q; const w=d*(1-d)*th; TMP2[k]=w; wsum+=w; } else TMP2[k]=0; } else TMP2[k]=0;
@@ -323,6 +324,18 @@ function condense(D,dt,ew,L,cnt){ const a=FLW.cond*G.merge*dt, e=FLW.lap*dt*(.7+
 /* 잉크 넣기: 폭발에서 푸슉, 혀 모양으로 */
 function blob(l,c,x,y,r,amt){ LIVE[l*NC+c]=true; const D=DYE[l][c], x0=Math.max(1,Math.floor(gx(x-r))), x1=Math.min(gw-2,Math.ceil(gx(x+r))), y0=Math.max(1,Math.floor(gy(y-r))), y1=Math.min(gh-2,Math.ceil(gy(y+r))), ir=1/(r*r);
   for(let yy=y0;yy<=y1;yy++) for(let xx=x0;xx<=x1;xx++){ const dx=xx*CELL-PAD-x, dy=yy*CELL-PAD-y, d2=dx*dx+dy*dy; if(d2<r*r){ const k=yy*gw+xx, w=amt*(1-d2*ir); D[k]=Math.min(1,D[k]+w); for(let q=0;q<NC;q++) if(q!==c) DYE[l][q][k]*=1-w; } } }
+/* 삐죽 장면: 줄기를 나란한 가닥 다발로 찍는다 (붓으로 끈 자국). 가운데 가닥은 늘 이어져 몸통이 되고, 바깥 가닥은 시작과 끝이 제각각이라
+   끝이 여러 갈래로 삐죽하게 갈라진다. 결은 잉크 자체라서 물을 타고 그대로 늘어나다 가늘어져 사라진다 (매 프레임 다시 그리는 장식이 아니라 떨리지 않는다) */
+let STRANDS=false;
+function strandBlob(l,c,x,y,r,amt,tx,ty,key,u){ LIVE[l*NC+c]=true; const D=DYE[l][c], R=r+G.tear*.5, sw=Math.max(6,G.tearPer), nx=-ty, ny=tx, core=r*.42, th=Math.max(CELL*1.2,r*.35);
+  const x0=Math.max(1,Math.floor(gx(x-R))), x1=Math.min(gw-2,Math.ceil(gx(x+R))), y0=Math.max(1,Math.floor(gy(y-R))), y1=Math.min(gh-2,Math.ceil(gy(y+R)));
+  for(let yy=y0;yy<=y1;yy++) for(let xx=x0;xx<=x1;xx++){ const dx=xx*CELL-PAD-x, dy=yy*CELL-PAD-y, al=dx*tx+dy*ty, s=dx*nx+dy*ny, as=Math.abs(s); if(as>R || Math.abs(al)>th) continue;
+    const fa=1-(al*al)/(th*th); let w;
+    if(as<core) w=amt*fa*(1-.3*as/core)*Math.min(1,.35+u*4);   // 가운데: 늘 이어지는 몸통
+    else { const j=Math.floor(s/sw), f=s/sw-j, hk=key*131+j*17, reach=r*(.75+.25*hh(hk,1))+G.tear*.5*Math.pow(hh(hk,2),1.5)*(1-G.tearRnd*.5); if(as>reach) continue;
+      const st=hh(hk,3)*G.tearCap*.6*(.4+.6*G.tearRnd), en=hh(hk,4)<G.tearLong?1:1-(.15+.6*hh(hk,5))*G.tearRnd*(as/R); if(u<st || u>en) continue;   // 가닥마다 시작·끝이 다르다 → 끝이 갈래로 갈라진다
+      const tp=Math.min(1,(u-st)/.12,en>=1?1:(en-u)/.12), tri=1-Math.abs(2*f-1); w=amt*fa*Math.min(1,Math.max(0,tri*2.2-.35-(1-tp)*1.9)); }   // 가닥 끝으로 갈수록 가늘어져 뾰족하게 끝난다   // 가닥 사이는 비워 둔다
+    if(w<=0) continue; const k=yy*gw+xx; D[k]=Math.min(1,D[k]+w); for(let q=0;q<NC;q++) if(q!==c) DYE[l][q][k]*=1-w; } }
 function push(x,y,r,vx,vy){ const x0=Math.max(1,Math.floor((x-r+PAD)/CV)), x1=Math.min(vw-2,Math.ceil((x+r+PAD)/CV)), y0=Math.max(1,Math.floor((y-r+PAD)/CV)), y1=Math.min(vh-2,Math.ceil((y+r+PAD)/CV)), ir=1/(r*r);
   for(let yy=y0;yy<=y1;yy++) for(let xx=x0;xx<=x1;xx++){ const dx=xx*CV-PAD-x, dy=yy*CV-PAD-y, d2=dx*dx+dy*dy; if(d2<r*r){ const k=yy*vw+xx, w=1-d2*ir; U[k]+=(vx-U[k])*w; V[k]+=(vy-V[k])*w; } } }
 let puffNo=0; const POURS=[];
@@ -343,7 +356,7 @@ function emit(){ const k=Math.floor(simT/Math.max(G.per,.5)); if(k!==puffNo){ pu
     const u0=P.s/P.len, ds=P.spd*(P.strand?.8:(.45+.55*Math.pow(1-u0,.7)))*DT; P.s+=ds; const u=P.s/P.len;   // 머리는 빠르고 힘 있게, 꼬리로 갈수록 힘이 빠진다
     if(u>=1){ P.s=P.len; continue; }   // 다 흘린 뒤에는 나르는 머리가 되어 몸통을 끌고 간다 (다음 박자부터)
     // 한 줄기로 흘린다: 앞서가는 머리가 두껍고 뒤로 끌리는 꼬리는 가늘며 끝은 둥근 방울. 가닥으로 흩어지는 것은 나중에 흐름 속에서 일어난다
-    const hf=1+(G.head-1)*sm((u-.5)/.35), tb=Math.min(.8,Math.max(.08,.38+(.9-G.tail)*.35)), r=P.w0*((tb+(1-tb)*Math.pow(u,1.3))*hf+.2*Math.exp(-Math.pow(u/.06,2)))*(1+.08*Math.sin(u*9+P.key)); blob(P.l,P.c,P.x,P.y,Math.max(r,4),1.1);
+    const hf=1+(G.head-1)*sm((u-.5)/.35), tb=Math.min(.8,Math.max(.08,.38+(.9-G.tail)*.35)), r=P.w0*((tb+(1-tb)*Math.pow(u,1.3))*hf+.2*Math.exp(-Math.pow(u/.06,2)))*(1+.08*Math.sin(u*9+P.key)); if(STRANDS) strandBlob(P.l,P.c,P.x,P.y,Math.max(r,4),1.1,P.dx||1,P.dy||0,P.key,u); else blob(P.l,P.c,P.x,P.y,Math.max(r,4),1.1);
     const tf=flowAt(P.x,P.y,P.c), tl=Math.hypot(tf[0],tf[1])+1e-6, rx=P.x-CX, ry=P.y-CY, rl=Math.hypot(rx,ry)+1e-6;   // 머리의 방향: 기류의 접선 쪽으로 점점 더 기울어 둥글게 휜다
     const rb=(.9-.75*u)*(1-.85*G.circ)*(G.sp?.12+.12*G.spread:1); let tx=tf[0]/tl+rx/rl*rb, ty=tf[1]/tl+ry/rl*rb; const nn=Math.hypot(tx,ty); tx/=nn; ty/=nn; P.dx=tx; P.dy=ty; P.x+=tx*ds; P.y+=ty*ds;   // 머리는 기류를 따라 둥글게 (원형 유지가 높을수록 곧장 밖으로 나가지 않는다)
     push(P.x,P.y,P.w0*(.6+.8*u),tx*P.spd*.45*(.3+.7*u),ty*P.spd*.45*(.3+.7*u)); } }   // 미는 힘은 머리에 실린다   // 머리가 물을 미는 힘은 약하게: 물결이 쌓여 흐름이 흐트러지지 않도록
@@ -398,7 +411,7 @@ function stepB(){ for(let c=0;c<NC;c++) PV[NL-1][c].set(DYE[NL-1][c]);   // 한 
     if(l===NL-1 && c!==2){ FRAY=G.strands*40; if(FRAY>0) thin(D,THK); advect(D,TMP,dt,vs,L,m); advect(TMP,F2,-dt,vs,L,m); F.fill(0);   // 앞쪽 잉크는 되돌려 보정(BFECC)해서 번지지 않게 나른다
       for(let i=0;i<m;i++){ tb(L[i]); for(let y=TB[2];y<TB[3];y++){ let k=y*gw+TB[0]; for(let x=TB[0];x<TB[1];x++,k++){ const v=D[k]+(D[k]-F2[k])*.5; F[k]=v<0?0:v>1?1:v; } } }
       advect(F,TMP,dt,vs,L,m); } else { FRAY=0; advect(D,TMP,dt,vs,L,m); }
-    D.set(TMP); condense(D,dt,l===0?26:8,L,m); if(FRAY>0 && G.round>0 && (bdF%3)===(c%3)){ bead(D); TR.bead++; } FRAY=0; FLIP=false; if(condense.mx<.02){ LIVE[sl]=false; D.fill(0); PV[l][c].fill(0); } }
+    D.set(TMP); condense(D,dt,l===0?26:8,L,m); if(FRAY>0 && G.round>0 && !SC.noBead && (bdF%3)===(c%3)){ bead(D); TR.bead++; } FRAY=0; FLIP=false; if(condense.mx<.02){ LIVE[sl]=false; D.fill(0); PV[l][c].fill(0); } }
   emit(); simT+=DT; }
 
 /* ── 겉모양: 잉크 농도의 경계선을 따서 셀 셰이딩 (핏방울과 같은 순서: 테두리 → 높낮이 → 빛 → 어두운 면·하이라이트 덩이) ── */
@@ -515,7 +528,7 @@ function jagOff(x,y,nx,ny,amp0,ks){ JOUT[0]=x; JOUT[1]=y; const sp=velN(x,y); if
   if(o<=.3) return; let cx=x, cy=y, rem=o, dx=VN[0]*sd, dy=VN[1]*sd;
   while(rem>0){ const st=rem<7?rem:7; if(velN(cx,cy)>0){ const ex=VN[0]*sd, ey=VN[1]*sd; dx=dx*.4+ex*.6; dy=dy*.4+ey*.6; const dl=Math.hypot(dx,dy)||1; dx/=dl; dy/=dl; } cx+=dx*st; cy+=dy*st; rem-=st; }   // 물이 흐르는 길을 따라 휘어 나간다
   JOUT[0]=cx+nx*o*.1; JOUT[1]=cy+ny*o*.1; }
-function jagLoop(L,l,ks){ const s=L.S[l], n=L.N[l], B=L.B; if(n<3) return; const sg=L.sign, A=L.A[l], hole=A*sg<0, amp0=G.tear*(ks||1)*Math.min(1,Math.sqrt(Math.abs(A))/90)*(hole?.4:1);
+function jagLoop(L,l,ks){ const s=L.S[l], n=L.N[l], B=L.B; if(n<3) return; const sg=L.sign, A=L.A[l], hole=A*sg<0, amp0=G.tipLen*(ks||1)*Math.min(1,Math.sqrt(Math.abs(A))/90)*(hole?.4:1);
   if(amp0<.5){ loopPath(L,l); return; }
   JCAP=Math.sqrt(Math.abs(A))*G.tearCap;   // 갈래는 그 덩어리 크기보다 길게 뻗지 않는다 (막대처럼 튀어나가지 않게)
   if(JNX.length<n){ JNX=new Float32Array(n*2); JNY=new Float32Array(n*2); JPH=new Float32Array(n*2); }
@@ -951,7 +964,7 @@ const SCENES=[
 ];
 SCENES[0].mats.forEach((M,i)=>{ M.idx=i; });
 { const PK={td:.5,ksz:.42,kel:.6,csz:.25,caz:1.15,bsz:.17,nA:.16,brk:.55};
-  SCENES.push(Object.assign({},SCENES[0],{name:"삐죽 소용돌이", jag:true, bg:"#16101D", fade:[0,0], backM:mat({base:"#5C2C98",core:"#5C2C98",hi:"#7A45B8",line:null,lw:0,shaded:false}), sparks:["#FFFFFF",null], sparkS:2.2,
+  SCENES.push(Object.assign({},SCENES[0],{name:"삐죽 소용돌이", jag:true, lapK:.1, noBead:true, bg:"#16101D", fade:[0,0], backM:mat({base:"#5C2C98",core:"#5C2C98",hi:"#7A45B8",line:null,lw:0,shaded:false}), sparks:["#FFFFFF",null], sparkS:2.2,
    mats:[mat({base:"#E8407E",core:"#B42066",hi:"#F8A8CA",line:"#7A0F47",lw:2.2,lt:PK}),
          mat({base:"#6A33A5",core:"#4B2182",hi:"#9566CF",line:null,lw:0,lt:{td:.62,ksz:.42,kel:.6,csz:.22,caz:1.2,bsz:0}}),
          mat({base:"#E5336D",core:"#AE154D",hi:"#FBC0D5",line:"#7A0F47",lw:2.4}),
@@ -986,7 +999,7 @@ function src(l,c,a){ const sl=l*NC+c, D=DYE[l][c], P=PV[l][c]; if(!TCN[sl]) retu
   let f=a; if(l===0){ const now=simT-DT+a*DT, sp=backT-backPT; f=sp>1e-6?(now-backT+.5*DT)/sp:1; } f=f<0?0:f>1?1:f;   // 뒤쪽 층: 계산은 두 박자에 한 번이고 그 순간 화면 시간은 반 박자 뒤에 있다 → 그 순간을 0으로 두고 다음 계산까지 0→1로 잇는다 (멈췄다 건너뛰지 않게)
   const R=RD[l][c], L=TLS[sl], m=TCN[sl]; R.fill(0); for(let i=0;i<m;i++){ tb(L[i]); for(let y=TB[2];y<TB[3];y++){ let k=y*gw+TB[0]; for(let x=TB[0];x<TB[1];x++,k++){ const p=P[k]; R[k]=p+(D[k]-p)*f; } } }
   RDF[sl]=frameNo; if(!G.smooth) return R; const SMB=SMO[sl]&&SMO[sl].length===R.length?SMO[sl]:(SMO[sl]=new Float32Array(R.length)), q=G.smooth; for(let k=0;k<R.length;k++){ const v=SMB[k]+(R[k]-SMB[k])*q; SMB[k]=v<1e-4?0:v; R[k]=SMB[k]; } return R; }   // 아주 짧은 시간 평활: 한 프레임만 튀었다 돌아오는 변화(떨림)를 걸러낸다
-function render(dt,a){ JAGON=!!SC.jag && G.tear>0; frameNo++; T=simT; dt=dt||1/60; a=a||0; RT=simT-DT+a*DT;
+function render(dt,a){ STRANDS=!!SC.jag; JAGON=!!SC.jag && G.tipLen>0; frameNo++; T=simT; dt=dt||1/60; a=a||0; RT=simT-DT+a*DT;
   const sp3=D3.split; g=gMain; if(sp3){ if(cvB.width!==W||cvB.height!==Hh){ cvB.width=W; cvB.height=Hh; } gB.setTransform(1,0,0,1,0,0); gB.clearRect(0,0,W,Hh); gB.setTransform(scale,0,0,scale,0,0); gB.lineJoin="round"; gB.lineCap="round"; }   // 3D: 뒤쪽 물은 뒤 판에 따로
   g.setTransform(1,0,0,1,0,0); if(sp3) g.clearRect(0,0,W,Hh); else { g.fillStyle=SC.bg; g.fillRect(0,0,W,Hh); } g.setTransform(scale,0,0,scale,0,0); g.lineJoin="round"; g.lineCap="round";
   for(let l=0;l<NL;l++){ g=(sp3 && l===0)?gB:gMain; g.save(); if(l===0){ g.translate(CX,CY); g.scale(SC.bscale,SC.bscale); g.translate(-CX,-CY); }
@@ -1161,7 +1174,7 @@ for(const [id,k,f] of D3S) $(id).addEventListener("input",()=>{ G[k]=+$(id).valu
 function syncD3(){ for(const [id,k,f] of D3S){ $(id).value=G[k]; $(id+"V").textContent=f(G[k]); } $("d3On").setAttribute("aria-pressed",G.d3?"true":"false"); $("d3On").textContent=G.d3?"3D 켜짐":"3D 꺼짐"; }
 $("d3On").addEventListener("click",()=>{ G.d3=G.d3?0:1; saveG(); syncD3(); });
 syncD3();
-const JGS=[["tear","tear",v=>Math.round(v)+"px"],["tearLong","tearLong",v=>pct(v)],["tearCap","tearCap",v=>pct(v)],["tearRate","tearRate",v=>pct(v)],["tearPer","tearPer",v=>Math.round(v)+"px"],["tearRnd","tearRnd",v=>pct(v)]];
+const JGS=[["tear","tear",v=>Math.round(v)+"px"],["tearLong","tearLong",v=>pct(v)],["tearCap","tearCap",v=>pct(v)],["tipLen","tipLen",v=>Math.round(v)+"px"],["tearRate","tearRate",v=>pct(v)],["tearPer","tearPer",v=>Math.round(v)+"px"],["tearRnd","tearRnd",v=>pct(v)]];
 for(const [id,k,f] of JGS) $(id).addEventListener("input",()=>{ G[k]=+$(id).value; $(id+"V").textContent=f(G[k]); saveG(); });
 function syncJag(){ for(const [id,k,f] of JGS){ $(id).value=G[k]; $(id+"V").textContent=f(G[k]); } }
 syncJag();
