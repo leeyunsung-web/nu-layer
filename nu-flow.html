@@ -1440,7 +1440,8 @@ stEl.addEventListener("pointerdown",e=>{ if(e.pointerType==="touch"){ TCH.set(e.
 stEl.addEventListener("pointermove",e=>{ if(PINCH && TCH.has(e.pointerId)){ TCH.set(e.pointerId,relS(e)); if(TCH.size>=2){ const [a,b]=[...TCH.values()], d=Math.hypot(a[0]-b[0],a[1]-b[1])||1, m=[(a[0]+b[0])/2,(a[1]+b[1])/2], sw=stEl.clientWidth, sh=stEl.clientHeight, z=clamp(PINCH.z*d/PINCH.d,camLim().zmin,3.5);
     G.camZ=z; G.camX=(m[0]-(PINCH.m[0]-PINCH.x*sw)*z/PINCH.z)/sw; G.camY=(m[1]-(PINCH.m[1]-PINCH.y*sh)*z/PINCH.z)/sh; camSave(); } e.stopPropagation(); return; }
   if(PAN && e.pointerId===PAN.id){ const s=relS(e); G.camX=PAN.x+(s[0]-PAN.s[0])/stEl.clientWidth; G.camY=PAN.y+(s[1]-PAN.s[1])/stEl.clientHeight; camSave(); e.stopPropagation(); } },true);
-const camUp=e=>{ TCH.delete(e.pointerId); if(PINCH && TCH.size<2){ PINCH=null; } if(PAN && e.pointerId===PAN.id){ PAN=null; e.stopPropagation(); } };
+const camUp=e=>{ if(!e.isTrusted) return; TCH.delete(e.pointerId);   // 두 손가락 줌을 시작하며 보낸 취소 신호는 무시 (그래야 줌이 이어진다)
+  if(PINCH && TCH.size<2){ PINCH=null; } if(PAN && e.pointerId===PAN.id){ PAN=null; e.stopPropagation(); } };
 stEl.addEventListener("pointerup",camUp,true); stEl.addEventListener("pointercancel",camUp,true); stEl.addEventListener("contextmenu",e=>e.preventDefault());
 const CAMS=[["camZ",v=>Math.round(v*100)+"%"],["camX",v=>Math.round(v*100)+""],["camY",v=>Math.round(v*100)+""]];
 function syncCam(){ const L=camFix(); if($("camZ")) $("camZ").min=L.zmin.toFixed(3); for(const [k,f] of CAMS){ const el=$(k); if(el){ el.value=G[k]; $(k+"V").textContent=f(G[k]); } } const bs=$("bgSw"); if(bs) for(const b of bs.children) b.setAttribute("aria-pressed",(+b.dataset.i)===(G.bgI|0)?"true":"false"); }
