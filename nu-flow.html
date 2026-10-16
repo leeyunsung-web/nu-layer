@@ -500,18 +500,28 @@ let JAGON=false, JSET=0, JO=[], JOn=0; const VN=[0,0];   // JO: 층·색마다 �
 function velN(x,y){ let px=(x+PAD)/CV, py=(y+PAD)/CV; px=px<0?0:px>vw-1.001?vw-1.001:px; py=py<0?0:py>vh-1.001?vh-1.001:py; const ix=px|0, iy=py|0, fx=px-ix, fy=py-iy, k=iy*vw+ix;
   const u=(SU[k]*(1-fx)+SU[k+1]*fx)*(1-fy)+(SU[k+vw]*(1-fx)+SU[k+vw+1]*fx)*fy, v=(SV[k]*(1-fx)+SV[k+1]*fx)*(1-fy)+(SV[k+vw]*(1-fx)+SV[k+vw+1]*fx)*fy, l=Math.hypot(u,v);
   if(l<1e-4){ VN[0]=0; VN[1]=0; return 0; } VN[0]=u/l; VN[1]=v/l; return l; }
+/* 찢긴 갈래 하나는 폭이 테두리 점 서너 개뿐이라, 점이 갈래 끝에 걸렸다 안 걸렸다 하면 끝 길이가 프레임마다 출렁인다(떨림).
+   그래서 갈래의 뾰족한 끝과 뿌리 자리에 점을 정확히 끼워 넣는다 → 갈래 길이가 점 위치와 상관없이 늘 같다 */
+let JNX=new Float32Array(0), JNY=JNX, JPH=JNX; const JOUT=[0,0];
+function jagOff(x,y,nx,ny,amp0,ks){ JOUT[0]=x; JOUT[1]=y; const sp=velN(x,y); if(!(sp>0)) return; const dn=nx*VN[0]+ny*VN[1], w=Math.pow(Math.abs(dn),2.6)*Math.min(1,sp*40); if(w<.002) return;   // 흐름을 마주 보는 끝면일수록 많이 찢긴다 (늘어난 옆면은 매끈)
+  const per=G.tearPer, rnd=G.tearRnd, ph=Math.hypot(x-CX,y-CY)/per+(ks?.5:0), k=Math.floor(ph), f=ph-k, kk=((k%4096)+4096)%4096, h1=hh(9400+kk*7,1), h2=hh(9400+kk*7,2);
+  const len=amp0*(1-rnd+rnd*(h2<.25?.12:Math.pow(h1,.8)*1.6))*(hh(9400+kk*7,3)<G.tearLong*(ks?.5:1)?1.8+1.6*hh(9400+kk*7,4):1), tri=1-Math.abs(2*f-1), sm=tri*tri*(3-2*tri), sd=dn>=0?1:-1, o=len*w*(.35*tri+.65*sm)*(sd>0?.28:1);   // 앞쪽 머리는 짧게, 긴 결은 뒤로 끌린다
+  if(o<=.3) return; let cx=x, cy=y, rem=o, dx=VN[0]*sd, dy=VN[1]*sd;
+  while(rem>0){ const st=rem<7?rem:7; if(velN(cx,cy)>0){ const ex=VN[0]*sd, ey=VN[1]*sd; dx=dx*.4+ex*.6; dy=dy*.4+ey*.6; const dl=Math.hypot(dx,dy)||1; dx/=dl; dy/=dl; } cx+=dx*st; cy+=dy*st; rem-=st; }   // 물이 흐르는 길을 따라 휘어 나간다
+  JOUT[0]=cx+nx*o*.1; JOUT[1]=cy+ny*o*.1; }
 function jagLoop(L,l,ks){ const s=L.S[l], n=L.N[l], B=L.B; if(n<3) return; const sg=L.sign, A=L.A[l], hole=A*sg<0, amp0=G.tear*(ks||1)*Math.min(1,Math.sqrt(Math.abs(A))/90)*(hole?.4:1);
   if(amp0<.5){ loopPath(L,l); return; }
-  const per=G.tearPer, rnd=G.tearRnd;
-  for(let i=0;i<n;i++){ const x=B[s+2*i], y=B[s+2*i+1], ip=(i-6+n)%n, inx=(i+6)%n, tx=B[s+2*inx]-B[s+2*ip], ty=B[s+2*inx+1]-B[s+2*ip+1], tl=Math.hypot(tx,ty)||1, nx=ty/tl*sg, ny=-tx/tl*sg;
-    let X=x, Y=y; const sp=velN(x,y);
-    if(sp>0){ const dn=nx*VN[0]+ny*VN[1], w=Math.pow(Math.abs(dn),2.6)*Math.min(1,sp*40);   // 흐름을 마주 보는 끝면일수록 많이 찢긴다 (늘어난 옆면은 매끈)
-      if(w>.02){ const ph=((x-CX)*-VN[1]+(y-CY)*VN[0])/per+(ks?.5:0), k=Math.floor(ph), f=ph-k, kk=((k%4096)+4096)%4096, h1=hh(9400+kk*7,1), h2=hh(9400+kk*7,2), len=amp0*(1-rnd+rnd*(h2<.25?.12:Math.pow(h1,.8)*1.6))*(hh(9400+kk*7,3)<G.tearLong*(ks?.5:1)?1.8+1.6*hh(9400+kk*7,4):1), tri=1-Math.abs(2*f-1), sm=tri*tri*(3-2*tri), sd=dn>=0?1:-1, o=len*w*(.35*tri+.65*sm)*(sd>0?.28:1);   // 앞쪽 머리는 짧게 둥글게, 길게 찢긴 결은 지나온 뒤쪽으로 끌린다
-        if(o>.5){ let cx=x, cy=y, rem=o, dx=VN[0]*sd, dy=VN[1]*sd; while(rem>0){ const st=rem<7?rem:7; if(velN(cx,cy)>0){ const ex=VN[0]*sd, ey=VN[1]*sd; dx=dx*.4+ex*.6; dy=dy*.4+ey*.6; const dl=Math.hypot(dx,dy)||1; dx/=dl; dy/=dl; } cx+=dx*st; cy+=dy*st; rem-=st; }
-          X=cx+nx*o*.1; Y=cy+ny*o*.1; } } }   // 갈래는 곧게 뻗지 않고 물이 흐르는 길을 따라 한 걸음씩 휘어 나간다 (둥글게 도는 줄기에서는 갈래도 둥글게)   // 갈래는 흐르는 쪽으로 뻗고, 자리는 공간에 고정돼 늘어난 결처럼 보인다
-    { const gn=gw*gh; if(JOn!==gn){ JO=[]; JOn=gn; } const J=JO[JSET]||(JO[JSET]={x:new Float32Array(gn),y:new Float32Array(gn),t:new Int32Array(gn).fill(-99)}); let gx=Math.round((x+PAD)/CELL), gy=Math.round((y+PAD)/CELL); gx=gx<0?0:gx>=gw?gw-1:gx; gy=gy<0?0:gy>=gh?gh-1:gy; const k=gy*gw+gx, dX=X-x, dY=Y-y;
-      if(frameNo-J.t[k]>8){ J.x[k]=dX; J.y[k]=dY; } else if(J.t[k]!==frameNo){ J.x[k]+=(dX-J.x[k])*.06; J.y[k]+=(dY-J.y[k])*.06; } J.t[k]=frameNo; X=x+J.x[k]; Y=y+J.y[k]; }   // 같은 자리에서는 찢긴 모양이 천천히만 바뀐다 (파르르 떨지 않게)
-    if(i===0) g.moveTo(X,Y); else g.lineTo(X,Y); } g.closePath(); }
+  if(JNX.length<n){ JNX=new Float32Array(n*2); JNY=new Float32Array(n*2); JPH=new Float32Array(n*2); }
+  const per=G.tearPer;
+  for(let i=0;i<n;i++){ const x=B[s+2*i], y=B[s+2*i+1], ip=(i-6+n)%n, inx=(i+6)%n, tx=B[s+2*inx]-B[s+2*ip], ty=B[s+2*inx+1]-B[s+2*ip+1], tl=Math.hypot(tx,ty)||1; JNX[i]=ty/tl*sg; JNY[i]=-tx/tl*sg;
+    JPH[i]=Math.hypot(x-CX,y-CY)/per+(ks?.5:0); }   // 갈래 자리는 소용돌이 축에서의 거리로 정한다 (흐름 방향이 조금 흔들려도 갈래가 바뀌지 않게)
+  let first=true; const put=(X,Y)=>{ if(first){ g.moveTo(X,Y); first=false; } else g.lineTo(X,Y); };
+  for(let i=0;i<n;i++){ const j=(i+1)%n, x=B[s+2*i], y=B[s+2*i+1]; jagOff(x,y,JNX[i],JNY[i],amp0,ks); put(JOUT[0],JOUT[1]);
+    const a=JPH[i], b=JPH[j]; if(a!==a || b!==b || a===b || Math.abs(b-a)>3) continue;
+    const up=b>a, lo=up?Math.floor(a*2)+1:Math.ceil(a*2)-1, x2=B[s+2*j], y2=B[s+2*j+1];   // 이 구간에서 갈래 끝(.5)과 뿌리(.0)를 지나는 자리마다 점을 끼운다
+    for(let m=lo; up?m/2<b:m/2>b; m+=up?1:-1){ const t=(m/2-a)/(b-a); if(t<=0 || t>=1) continue; let nx=JNX[i]+(JNX[j]-JNX[i])*t, ny=JNY[i]+(JNY[j]-JNY[i])*t; const nl=Math.hypot(nx,ny)||1; nx/=nl; ny/=nl;
+      jagOff(x+(x2-x)*t,y+(y2-y)*t,nx,ny,amp0,ks); put(JOUT[0],JOUT[1]); } }
+  g.closePath(); }
 const bPath=L=>{ if(!JAGON){ allPath(L); return; } g.beginPath(); for(let l=0;l<L.n;l++) jagLoop(L,l); };
 /* 먼 층은 바탕색 쪽으로 옅어진다 (공기 원근) */
 
