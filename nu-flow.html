@@ -34,6 +34,7 @@ canvas.hold{cursor:grabbing}
 .ctl.obj{border:2px solid var(--line);border-radius:12px;padding:10px 12px}
 .mtabs{margin-top:10px;position:sticky;top:0;z-index:5;background:var(--bg,#F5F5EF);padding-top:6px}
 .mtabs button{border-radius:10px;min-height:34px;font-size:12.5px;padding:5px 14px}.mtabs button[aria-selected="true"]{background:#9C2F86;color:#fff;border-color:#9C2F86}
+.sw{display:flex;flex-wrap:wrap;gap:4px;max-width:330px}.sw .swb{width:22px;height:22px;min-height:22px;padding:0;border-radius:50%;border:2px solid rgba(0,0,0,.25)}.sw .swb[aria-pressed="true"]{outline:3px solid #9C2F86;outline-offset:1px}.it.wide{grid-column:span 2}
 .mpanel[hidden]{display:none!important}.mpanel{display:flex;flex-direction:column;gap:10px}
 .msub{font-size:13px;font-weight:900;color:var(--soft);margin:8px 0 0;letter-spacing:.04em}
 .tabs.sub{width:100%;padding:0}.tabs.sub button{min-height:34px;font-size:12.5px}
@@ -85,7 +86,7 @@ canvas.hold{cursor:grabbing}
   </header>
   <div class="tabs" id="tabs" role="tablist" aria-label="배경 요소"></div>
   <div class="stage"><canvas id="cvB" aria-hidden="true"></canvas><canvas id="cvS" aria-hidden="true"></canvas><canvas id="cv" aria-label="기류를 타고 도는 액체 화면. 끌면 물이 저어지고, 핏방울을 잡아 끌면 늘어납니다."></canvas><canvas id="cv2" aria-hidden="true"></canvas><div id="fpsM" class="fpsm" hidden></div></div>
-  <div class="tabs mtabs" id="mtabs" role="tablist" aria-label="설정 묶음"><button id="mt0" type="button" role="tab" aria-selected="true" aria-controls="mp0">화면·3D</button><button id="mt1" type="button" role="tab" aria-selected="false" aria-controls="mp1">소용돌이</button><button id="mt2" type="button" role="tab" aria-selected="false" aria-controls="mp2">액체 줄기</button><button id="mt3" type="button" role="tab" aria-selected="false" aria-controls="mp3">찢긴 결</button><button id="mt4" type="button" role="tab" aria-selected="false" aria-controls="mp4">십자별</button><button id="mt6" type="button" role="tab" aria-selected="false" aria-controls="mp6">노란 스파크</button></div>
+  <div class="tabs mtabs" id="mtabs" role="tablist" aria-label="설정 묶음"><button id="mt0" type="button" role="tab" aria-selected="true" aria-controls="mp0">화면·3D</button><button id="mt1" type="button" role="tab" aria-selected="false" aria-controls="mp1">소용돌이</button><button id="mt2" type="button" role="tab" aria-selected="false" aria-controls="mp2">액체 줄기</button><button id="mt3" type="button" role="tab" aria-selected="false" aria-controls="mp3">찢긴 결</button><button id="mt4" type="button" role="tab" aria-selected="false" aria-controls="mp4">십자별</button><button id="mt5" type="button" role="tab" aria-selected="false" aria-controls="mp5">핏방울</button><button id="mt6" type="button" role="tab" aria-selected="false" aria-controls="mp6">노란 스파크</button></div>
   <div class="mpanel" id="mp0" role="tabpanel">
   <div class="ctl vis">
     <div class="it row" data-k="vA"><span>보이기</span><button id="vA" type="button" aria-pressed="true">분홍 A</button><button id="vB" type="button" aria-pressed="true">분홍 B</button><button id="vP" type="button" aria-pressed="true">보라</button><button id="vR" type="button" aria-pressed="true">붉은</button><button id="vD" type="button" aria-pressed="true">핏방울</button><small class="desc">오브젝트를 하나씩 켜고 끕니다. 끄면 그 액체는 지워지고 더 생기지 않으며 계산도 쉽니다.</small></div>
@@ -183,6 +184,7 @@ canvas.hold{cursor:grabbing}
   <p class="hint">'삐죽 소용돌이' 장면의 하얀 네 갈래 반짝이.</p>
   <div class="ctl">
     <div class="it row" data-k="stOn"><span>십자별</span><button id="stOn" type="button" aria-pressed="true">십자별 켜짐</button><small class="desc">'삐죽 소용돌이' 장면에 떠 있는 하얀 네 갈래 반짝이. 끄면 보이지 않습니다.</small></div>
+    <div class="it row wide" data-k="stCol"><span>색</span><div class="sw" id="stCols"></div><button id="stMix" type="button" aria-pressed="false">여러 색 섞기</button><small class="desc">십자별 색 (그림에서 뽑은 팔레트). '여러 색 섞기'를 켜면 그림 속처럼 파랑·보라·주황 등 여러 색 십자별이 섞입니다.</small></div>
     <label class="it" data-k="stN"><span>개수</span><input id="stN" type="range" min="1" max="30" step="1" value="9"><output id="stNV">9개</output><small class="desc">화면에 떠 있는 십자별의 수.</small></label>
     <label class="it" data-k="stSize"><span>크기</span><input id="stSize" type="range" min="0.3" max="3" step="0.05" value="1"><output id="stSizeV">100%</output><small class="desc">십자별 전체 크기.</small></label>
     <label class="it" data-k="stLen"><span>팔 길이</span><input id="stLen" type="range" min="1" max="8" step="0.1" value="4"><output id="stLenV">4.0배</output><small class="desc">몸통은 그대로 두고 팔만 뻗는 길이. 높을수록 가로세로로 길게 뻗은 날렵한 별이 됩니다.</small></label>
@@ -226,6 +228,9 @@ canvas.hold{cursor:grabbing}
   <div class="ctl">
     <div class="it row" data-k="skOn"><span>스파크</span><button id="skOn" type="button" aria-pressed="true">스파크 켜짐</button><button id="skLink" type="button" aria-pressed="true">줄기와 같이 터지기</button><button id="skTest" type="button">지금 팡</button><small class="desc">'줄기와 같이 터지기': 분홍 줄기가 새로 터져 나올 때 그 자리에서 터지는 별·광선·번개가 같은 방향으로 함께 터집니다. '지금 팡': 켜 둔 종류를 화면 가운데에서 한 번씩 터뜨려 봅니다.</small></div>
     <div class="it row" data-k="skT0"><span>종류</span><button id="skT0" type="button" aria-pressed="true">터지는 별</button><button id="skT1" type="button" aria-pressed="true">번개 갈래</button><button id="skT2" type="button" aria-pressed="true">뻗는 광선</button><button id="skT3" type="button" aria-pressed="true">오각별</button><button id="skT4" type="button" aria-pressed="true">작은 반짝이</button><small class="desc">나타날 스파크 종류를 켜고 끕니다.</small></div>
+    <div class="it row wide" data-k="skCF"><span>면 색</span><div class="sw" id="skCFs"></div><button id="skMix" type="button" aria-pressed="false">여러 색 섞기</button><small class="desc">스파크의 면 색 (그림에서 뽑은 팔레트). '여러 색 섞기'를 켜면 그림 속처럼 노랑·초록·파랑·보라·주황·분홍 스파크가 섞여 나옵니다.</small></div>
+    <div class="it row wide" data-k="skCL"><span>테두리 색</span><div class="sw" id="skCLs"></div><small class="desc">스파크 테두리 색. 그늘 색은 면 색과 테두리 색 사이로 정해집니다.</small></div>
+    <div class="it row wide" data-k="skCH"><span>하이라이트 색</span><div class="sw" id="skCHs"></div><small class="desc">오각별의 하이라이트 색.</small></div>
     <label class="it" data-k="skRate"><span>나타나는 빈도</span><input id="skRate" type="range" min="0" max="6" step="0.1" value="0.8"><output id="skRateV">0.8개/초</output><small class="desc">화면 여기저기서 1초에 몇 개씩 팡 하고 나타나는지. 0이면 줄기와 같이 터질 때만 나타납니다.</small></label>
     <label class="it" data-k="skSize"><span>크기</span><input id="skSize" type="range" min="0.3" max="3" step="0.05" value="1"><output id="skSizeV">100%</output><small class="desc">스파크 전체 크기.</small></label>
     <label class="it" data-k="skLife"><span>머무는 시간</span><input id="skLife" type="range" min="0.4" max="5" step="0.1" value="1.6"><output id="skLifeV">1.6초</output><small class="desc">팡 나타나서 사라질 때까지의 시간.</small></label>
@@ -233,6 +238,10 @@ canvas.hold{cursor:grabbing}
     <label class="it" data-k="skSpikes"><span>가시 수</span><input id="skSpikes" type="range" min="5" max="16" step="1" value="9"><output id="skSpikesV">9개</output><small class="desc">터지는 별의 가시 개수(별마다 조금씩 다릅니다).</small></label>
     <label class="it" data-k="skJag"><span>들쭉날쭉</span><input id="skJag" type="range" min="0" max="1.5" step="0.05" value="0.6"><output id="skJagV">60%</output><small class="desc">가시 길이와 광선 가장자리가 제각각인 정도.</small></label>
     <label class="it" data-k="skLine"><span>테두리 굵기</span><input id="skLine" type="range" min="0" max="6" step="0.1" value="2.2"><output id="skLineV">2.2px</output><small class="desc">주황 테두리의 굵기. 0이면 테두리 없이 노랑만.</small></label>
+    <div class="it row" data-k="skFloat"><span>떠다니기</span><button id="skFloat" type="button" aria-pressed="true">떠다니기</button><small class="desc">켜면 모든 스파크가 핏방울처럼 물 흐름을 타고 둥둥 떠다닙니다. 오각별은 (팡 하고 나타나 오래 머물다 사라지고, 정한 개수만큼 늘 떠 있음). 끄면 다른 스파크처럼 잠깐 팡 하고 사라집니다.</small></div>
+    <label class="it" data-k="skStarN"><span>떠다니는 별 수</span><input id="skStarN" type="range" min="0" max="20" step="1" value="6"><output id="skStarNV">6개</output><small class="desc">화면에 늘 떠 있는 오각별 수.</small></label>
+    <label class="it" data-k="skStarLife"><span>별이 머무는 시간</span><input id="skStarLife" type="range" min="3" max="40" step="1" value="12"><output id="skStarLifeV">12초</output><small class="desc">떠다니는 별 하나가 사라질 때까지의 시간 (조금씩 다름).</small></label>
+    <label class="it" data-k="skFlow"><span>물 따라가기</span><input id="skFlow" type="range" min="0" max="2" step="0.05" value="1"><output id="skFlowV">100%</output><small class="desc">떠다니는 별이 소용돌이 물 흐름을 따라가는 정도. 0이면 제자리에서 둥실거리기만 합니다.</small></label>
     <label class="it" data-k="skBoil"><span>번개 지직거림</span><input id="skBoil" type="range" min="0" max="1.5" step="0.05" value="0.6"><output id="skBoilV">60%</output><small class="desc">번개가 머무는 동안 0.07초마다 꺾이는 자리·각도가 미세하게 다른 모양으로 갈아 끼워져 전기가 지직 흐르는 느낌. 0이면 모양이 고정됩니다. (번개는 가는 흰 선이 먼저 번쩍 → 한 번에 꽝 나타나 하얗게 타오름 → 깜빡이며 꺼짐 순서로 움직입니다.)</small></label>
     <label class="it" data-k="skSpin"><span>회전</span><input id="skSpin" type="range" min="0" max="3" step="0.05" value="0.5"><output id="skSpinV">50%</output><small class="desc">스파크가 머무는 동안 천천히 도는 정도.</small></label>
   </div>
@@ -262,7 +271,7 @@ const hh=(a,b)=>h(SEED,a,b);
 /* ── 격자 유체: 화면 전체가 한 통의 물이다. 격자마다 물의 속도와 잉크(분홍·보라·붉은) 농도가 있다.
    폭발을 축으로 도는 기류가 물을 천천히 밀고, 잉크는 물을 따라 늘어나고 감기며, 응축 항이 잉크를 또렷한 덩이로 뭉치고 가는 줄기를 구슬로 끊는다 ── */
 const AREA=540000, CELL=5, CV=10, PAD=60, DT=1/30, NC=4, NL=2;
-const G={vis:[1,1,1,1], d3kB:1, d3kF:1, d3kD:.4, d3kS:.3, smooth:.45, stOn:1, stN:9, stSize:1, stLen:4, stHV:.75, stBody:.3, stArmW:.55, skOn:1, skT0:1, skT1:1, skT2:1, skT3:1, skT4:1, skLink:1, skRate:.8, skSize:1, skLife:1.6, skPop:1, skSpikes:9, skJag:.6, skLine:2.2, skSpin:.5, skBoil:.6, stTw:1, tear:60, tearPer:15, tearSpd:.4, tearRnd:.75, tearLong:.3, tearCap:.75, tearRate:.05, tipLen:50, d3:1, d3Tilt:22, d3Depth:.5, d3Drift:.4, d3Mouse:.5, spread:1, rim:0, rimW:130, visc:1, lightA:225, sp:1, spShow:0, spDen:1, spW:34, spPull:1, spStr:1, spBg:.35, spArms:1, spRot:1, spWob:1, speed:1, carry:1, dry:1, circ:.9, lspd:.5, dir:1, sep:.5, merge:1, head:1.3, tail:.9, strands:1.5, round:1, init:6, add:3, per:3.4, spin:1, calm:1, out:1, tailDry:1.5,
+const G={vis:[1,1,1,1], d3kB:1, d3kF:1, d3kD:.4, d3kS:.3, smooth:.45, stOn:1, stN:9, stSize:1, stLen:4, stHV:.75, stBody:.3, stArmW:.55, skOn:1, skT0:1, skT1:1, skT2:1, skT3:1, skT4:1, skLink:1, skRate:.8, skSize:1, skLife:1.6, skPop:1, skSpikes:9, skJag:.6, skLine:2.2, skSpin:.5, skBoil:.6, skFloat:1, skCF:0, skCL:3, skCH:2, skMix:0, stCol:19, stMix:0, skStarN:6, skStarLife:12, skFlow:1, stTw:1, tear:60, tearPer:15, tearSpd:.4, tearRnd:.75, tearLong:.3, tearCap:.75, tearRate:.05, tipLen:50, d3:1, d3Tilt:22, d3Depth:.5, d3Drift:.4, d3Mouse:.5, spread:1, rim:0, rimW:130, visc:1, lightA:225, sp:1, spShow:0, spDen:1, spW:34, spPull:1, spStr:1, spBg:.35, spArms:1, spRot:1, spWob:1, speed:1, carry:1, dry:1, circ:.9, lspd:.5, dir:1, sep:.5, merge:1, head:1.3, tail:.9, strands:1.5, round:1, init:6, add:3, per:3.4, spin:1, calm:1, out:1, tailDry:1.5,
   mat:[{carry:1,dir:0,exitR:.3,sl:1,size:1,share:1,ksz:.42,brk:.55,hth:.36,hmin:40,bsz:.17,td:.5,nA:.16,dth:.5},{carry:.6,dir:0,exitR:.3,sl:1,size:1,share:.25,ksz:.42,brk:0,hth:.36,hmin:40,bsz:0,td:.62,nA:.3,dth:.5},{carry:.5,dir:0,exitR:.3,sl:1,size:1,share:.4,ksz:.4,brk:0,hth:.36,hmin:40,bsz:.17,td:.6,nA:.3,dth:.5},{carry:1,dir:0,exitR:.3,sl:1,size:1,share:1,ksz:.42,brk:.55,hth:.36,hmin:40,bsz:.17,td:.5,nA:.16,dth:.5}]};   // 오브젝트마다: 크기, 솟는 비율, 하이라이트·어두운 면 세부   // out: 밖으로 밀려나는 힘   // spin: 도는 힘, calm: 물이 제 흐름으로 돌아오는 빠르기   // init: 처음 개수, add: 한 번에 더 솟는 개수, per: 간격(초)   // head: 머리 뭉침, tail: 꼬리 늘어짐, strands: 떨어지는 가닥 수
 let RIM, rimKey='';
 const LIVE=[]; let UNI, THK, NSF, MX, MY, TMP2, RD=[], RDF, PV=[], backT=0, backPT=0, STEPPED=false, FLIP=false;   // PV: 한 박자 전의 잉크 (그리기는 PV→지금 사이를 이어서 그린다), FLIP: 이 채널은 반대로 돈다
@@ -1023,8 +1032,8 @@ let SC=SCENES[0], scene=0, T=0;
 function bdSide(){ let sd=BD.G.side; if(WH>WW*1.05){ if(sd===0) sd=3; else if(sd===1) sd=2; } return sd; }
 function bdRect(){ const sd=bdSide(), f=BD.G.wf; return sd===0?[WW*(1-f),0,WW*f,WH]:sd===1?[0,0,WW*f,WH]:sd===2?[0,0,WW,WH*f]:sd===3?[0,WH*(1-f),WW,WH*f]:[0,0,WW,WH]; }
 function placeCenter(){ CX=WW*.46; CY=WH*.5; }
-BD.useCtx(g); const WTR=[0,0]; BD.setWater((x,y)=>{ let px=(x+PAD)/CV, py=(y+PAD)/CV; px=px<0?0:px>vw-1.001?vw-1.001:px; py=py<0?0:py>vh-1.001?vh-1.001:py; const ix=px|0, iy=py|0, fx=px-ix, fy=py-iy, k=iy*vw+ix;
-  WTR[0]=(U[k]*(1-fx)+U[k+1]*fx)*(1-fy)+(U[k+vw]*(1-fx)+U[k+vw+1]*fx)*fy; WTR[1]=(V[k]*(1-fx)+V[k+1]*fx)*(1-fy)+(V[k+vw]*(1-fx)+V[k+vw+1]*fx)*fy; return WTR; });   // 핏방울이 읽는 물 흐름   // 핏방울을 소용돌이와 같은 화면에 그린다: 겹 화면이 없어 큰 창에서도 가볍다
+BD.useCtx(g); const WTR=[0,0]; const waterAt=(x,y)=>{ let px=(x+PAD)/CV, py=(y+PAD)/CV; px=px<0?0:px>vw-1.001?vw-1.001:px; py=py<0?0:py>vh-1.001?vh-1.001:py; const ix=px|0, iy=py|0, fx=px-ix, fy=py-iy, k=iy*vw+ix;
+  WTR[0]=(U[k]*(1-fx)+U[k+1]*fx)*(1-fy)+(U[k+vw]*(1-fx)+U[k+vw+1]*fx)*fy; WTR[1]=(V[k]*(1-fx)+V[k+1]*fx)*(1-fy)+(V[k+vw]*(1-fx)+V[k+vw+1]*fx)*fy; return WTR; }; BD.setWater(waterAt);   // 핏방울이 읽는 물 흐름   // 핏방울을 소용돌이와 같은 화면에 그린다: 겹 화면이 없어 큰 창에서도 가볍다
 BD.onPlace=()=>{ const r=bdRect(); BD.setZone(r[0],r[1],r[0]+r[2],r[1]+r[3]); };
 function setScene(i){ tphInit=false; scene=i; try{ localStorage.setItem("nu-flow-scene",String(i)); }catch(_){} SC=SCENES[i]; simT=0; puffNo=0; POURS.length=0; RMX=Math.hypot(WW,WH)*.5; placeCenter(); backT=0; U.fill(0); V.fill(0); for(let y=0;y<gh;y++) for(let x=0;x<gw;x++){ const k=y*gw+x; MX[k]=x*CELL; MY[k]=y*CELL; NSF[k]=pat(x*CELL,y*CELL,0); } for(const L of DYE) for(const D of L) D.fill(0);
   SC.seed(1000+i*400); for(let y=1;y<vh-1;y++){ let k=y*vw+1; for(let x=1;x<vw-1;x++,k++){ const f=target(x*CV-PAD,y*CV-PAD,0); U[k]=f[0]; V[k]=f[1]; } } for(const E of EMA) for(const A of E) A.fill(0); LIVE.length=0;
@@ -1036,9 +1045,9 @@ const BX=new Float32Array(40), BY=new Float32Array(40);
 function bolts(){ g.lineJoin="miter"; g.miterLimit=6; for(let b=0;b<4;b++){ const th=b*TAU/4+hh(7100+b,1)*.9+T*.03, nn=7, seg=(30+22*hh(7100+b,2))*(1+.1*Math.sin(T*2.3+b*2)), wd=24+10*hh(7100+b,3); let x=CX+Math.cos(th)*40, y=CY+Math.sin(th)*40;
     for(let k=0;k<nn;k++){ const f=target(x,y,T), l=Math.hypot(f[0],f[1])+1e-6, dx=-f[0]/l, dy=-f[1]/l, u=k/(nn-1), o=(k%2?1:-1)*(k===0?0:1)*(13+9*hh(7100+b,10+k))*(1-.4*u), w=wd*Math.pow(1-u,.8)*.5, px=x-dy*o, py=y+dx*o; BX[k]=px-dy*w+dx*w*.8; BY[k]=py+dx*w+dy*w*.8; BX[2*nn-1-k]=px+dy*w-dx*w*.8; BY[2*nn-1-k]=py-dx*w-dy*w*.8; const rx=x-CX, ry=y-CY, rl=Math.hypot(rx,ry)+1e-6; x+=(dx*.5+rx/rl*.85)*seg; y+=(dy*.5+ry/rl*.85)*seg; }
     g.beginPath(); g.moveTo(BX[0],BY[0]); for(let k=1;k<2*nn;k++) g.lineTo(BX[k],BY[k]); g.closePath(); g.fillStyle="#FEF102"; g.fill(); g.strokeStyle="#F29113"; g.lineWidth=1.8; g.stroke(); } g.lineJoin="round"; }
-function sparkles(fill,line){ if(!G.stOn) return; g.fillStyle=fill; g.lineJoin="miter"; const N=Math.round(G.stN), A=G.stLen, HV=G.stHV;   // 십자별: 둥근 몸통 + 네 개의 바늘 팔. 팔 길이·몸통 크기·팔 굵기를 따로 정한다
+function sparkles(fill,line){ if(!G.stOn) return; g.fillStyle=PAL[G.stCol]||fill; g.lineJoin="miter"; const N=Math.round(G.stN), A=G.stLen, HV=G.stHV;   // 십자별: 둥근 몸통 + 네 개의 바늘 팔. 팔 길이·몸통 크기·팔 굵기를 따로 정한다
   for(let k=0;k<N;k++){ const x=hh(8000+k,1)*WW, y=hh(8000+k,2)*WH, t=.55+.45*Math.sin(T*G.stTw*(.8+1.4*hh(8000+k,6))+hh(8000+k,5)*TAU), r=(9+20*hh(8000+k,3)*hh(8000+k,4))*(.35+.65*t*t)*(SC.sparkS||1)*G.stSize*.5;
-    const b=r*G.stBody, aw=Math.max(.6,r*G.stArmW*.35), v=b+r*A, h=b+r*A*HV;   // 몸통 반지름 b, 팔 뿌리 반폭 aw, 세로·가로 팔 끝
+    if(G.stMix) g.fillStyle=PAL[MIXS[Math.floor(hh(8000+k,9)*MIXS.length)]]; const b=r*G.stBody, aw=Math.max(.6,r*G.stArmW*.35), v=b+r*A, h=b+r*A*HV;   // 몸통 반지름 b, 팔 뿌리 반폭 aw, 세로·가로 팔 끝
     g.beginPath(); g.arc(x,y,b,0,TAU); g.fill(); g.beginPath();   // 몸통은 따로 칠한다 (팔과 겹쳐 구멍이 나지 않게)
     for(let q=0;q<4;q++){ const L=q%2?h:v, ca=[0,1,0,-1][q], sa=[-1,0,1,0][q], px=-sa, py=ca, b0=b*.55;   // 팔 방향 (위·오른쪽·아래·왼쪽)
       const bx=x+ca*b0, by=y+sa*b0, tx=x+ca*L, ty=y+sa*L, m=b0+(L-b0)*.3;
@@ -1047,9 +1056,19 @@ function sparkles(fill,line){ if(!G.stOn) return; g.fillStyle=fill; g.lineJoin="
 /* ── 노란 스파크 (토르소 그림): 터지는 별 · 번개 갈래 · 뻗는 광선 · 오각별 · 작은 반짝이. 모두 면과 테두리뿐인 벡터 모양.
    움직임: 팡 — 0.16초 만에 살짝 넘치게 커졌다 제 크기로 돌아오고(오버슈트), 잠시 머문 뒤 작아지며 사라진다.
    터지는 별은 가시가 짧은 시차로 하나씩 튀어나오고 첫 순간 하얀 섬광, 번개는 한 획씩 그려지듯, 광선은 쏘아 나간 뒤 꼬리부터 빨려 들어간다 ── */
+/* 팔레트: 토르소 연작 17점에서 뽑은 색 (살색·회색 제외) */
+const PAL=["#FAD805","#F4D642","#F1E485","#EDA40E","#C57718","#E94D78","#E72B57","#BB1846","#E87799","#F2ABCD","#A7449D","#593997","#5D3251","#26123A","#159FDD","#70CCE8","#B3DCE5","#22720E","#F8F8F6","#FFFFFF"];
+const PALN=["노랑","진노랑","연노랑","주황","진주황","분홍","진분홍","다홍","장미","연분홍","자주","보라","자두","밤하늘","파랑","하늘","연하늘","초록","크림","흰색"];
+const MIXS=[0,17,14,11,3,5,15,10];   // 여러 색 섞기: 노랑·초록·파랑·보라·주황·분홍·하늘·자주 (그림 속 색깔 별들)
+function swatches(id,key,after){ const box=$(id); if(!box) return; box.innerHTML=""; PAL.forEach((c,i)=>{ const b=document.createElement("button"); b.type="button"; b.id=id+"_"+i; b.className="swb"; b.style.background=c; b.title=PALN[i]; b.setAttribute("aria-label",PALN[i]); b.setAttribute("aria-pressed",(G[key]|0)===i?"true":"false");
+    b.addEventListener("click",()=>{ G[key]=i; saveG(); box.querySelectorAll("button").forEach((x,j)=>x.setAttribute("aria-pressed",j===i?"true":"false")); if(after) after(); }); box.appendChild(b); }); }
 const SPK=[], SKC={f:"#FFE11C",l:"#F2941A",h:"#FFF6AE"}; let skAcc=0, skSeed=0;
-function skSpawn(type,x,y,size,dir){ skSeed++; SPK.push({type,x,y,size,dir:dir??hh(skSeed,1)*TAU,rot:(hh(skSeed,2)-.5)*.8,t:0,life:G.skLife*(.7+.6*hh(skSeed,3))*(type===2?.75:1),sd:skSeed}); if(SPK.length>150) SPK.shift(); }
-function skTick(dt){ if(!G.skOn){ SPK.length=0; return; } const ts=[0,1,2,3,4].filter(i=>G["skT"+i]);
+function skSpawn(type,x,y,size,dir){ skSeed++; SPK.push({cf:G.skMix?MIXS[Math.floor(hh(skSeed,15)*MIXS.length)]:undefined,type,x,y,size,dir:dir??hh(skSeed,1)*TAU,rot:(hh(skSeed,2)-.5)*.8,t:0,life:G.skLife*(.7+.6*hh(skSeed,3))*(type===2?.75:1),sd:skSeed}); if(SPK.length>150) SPK.shift(); }
+function skTick(dt){ if(!G.skOn){ SPK.length=0; return; } const fl=G.skFloat && G.skT3, ts=[0,1,2,3,4].filter(i=>G["skT"+i] && !(fl && i===3));
+  if(fl){ let nf=0; for(const s of SPK) if(s.fl) nf++; if(nf<Math.round(G.skStarN) && Math.random()<dt*1.5){ skSpawn(3,(.08+.84*Math.random())*WW,(.08+.84*Math.random())*WH,.6+.8*Math.random()); const s=SPK[SPK.length-1]; s.fl=1; s.life=G.skStarLife*(.7+.6*Math.random()); s.vx=0; s.vy=0; } }   // 떠다니는 별: 정한 개수만큼 늘 떠 있다
+  for(const s of SPK){ if(!s.fl && !G.skFloat) continue; if(s.vx===undefined){ s.vx=0; s.vy=0; } const w=waterAt(s.x,s.y), k=Math.min(1,dt*1.2), ph=s.sd*1.7;   // 물 흐름을 따라 천천히, 제자리에서 둥실둥실
+    s.vx+=(w[0]*.35*G.skFlow+Math.sin(s.t*.5+ph)*6-s.vx)*k; s.vy+=(w[1]*.35*G.skFlow+Math.cos(s.t*.43+ph)*6-s.vy)*k; s.x+=s.vx*dt; s.y+=s.vy*dt; s.rot+=Math.sin(s.t*.6+ph)*.25*dt;
+    if(s.x<-80 || s.x>WW+80 || s.y<-80 || s.y>WH+80) s.t=s.life; }
   skAcc+=dt*G.skRate; while(skAcc>=1){ skAcc-=1; if(!ts.length) break; skSeed++; const ty=ts[Math.floor(hh(skSeed,9)*ts.length)]; skSpawn(ty,(.05+.9*hh(skSeed,11))*WW,(.05+.9*hh(skSeed,12))*WH,(ty===4?.45:1)*(.55+.9*hh(skSeed,13))); }   // 화면 여기저기서 이따금 팡
   if(G.skLink) for(const P of POURS){ if(P.skd || P.delay>0 || P.s<=0) continue; P.skd=1; if(P.c===1 && hh(P.key,77)<.6) continue; const d=Math.atan2(P.dy||0,P.dx||1);   // 분홍 줄기가 새로 터져 나올 때 같은 방향으로 같이 터진다
     if(G.skT0) skSpawn(0,P.x,P.y,1+.3*hh(P.key,78),d); if(G.skT2) skSpawn(2,P.x,P.y,1,d); if(G.skT1) skSpawn(1,P.x+Math.cos(d)*30,P.y+Math.sin(d)*30,.8,d+(hh(P.key,79)-.5)); }
@@ -1074,11 +1093,11 @@ function balloon(t,life){ const k=Math.max(0,t); let s=1-Math.exp(-k*9)*Math.cos
   const wob=.12*G.skPop*Math.exp(-k*5)*Math.sin(k*24); return [s*(1+wob), s*(1-wob)]; }
 /* 핏방울·소용돌이 같은 명암: 그늘진 쪽은 진한 노랑 초승달, 빛 쪽에는 흰빛 하이라이트 덩이와 작은 점 */
 function shade(path,x,y,R){ const la=G.lightA*Math.PI/180, lx=Math.cos(la), ly=Math.sin(la); g.save(); path(); g.clip();
-  g.beginPath(); g.arc(x+lx*R*.3,y+ly*R*.3,R*.86,0,TAU); g.rect(x-R*3,y-R*3,R*6,R*6); g.fillStyle="#F7B21A"; g.fill("evenodd");   // 그늘
+  g.beginPath(); g.arc(x+lx*R*.3,y+ly*R*.3,R*.86,0,TAU); g.rect(x-R*3,y-R*3,R*6,R*6); g.fillStyle=mixc(SKC.f,SKC.l,.45); g.fill("evenodd");   // 그늘 (면색과 테두리색 사이)
   g.beginPath(); g.ellipse(x+lx*R*.32,y+ly*R*.32,R*.3,R*.17,la+Math.PI/2,0,TAU); g.fillStyle=SKC.h; g.fill();   // 하이라이트 덩이
   g.beginPath(); g.arc(x+lx*R*.62-ly*R*.18,y+ly*R*.62+lx*R*.18,R*.065,0,TAU); g.fill(); g.restore(); }   // 작은 점
 function skDraw(){ if(!G.skOn || !SPK.length) return; g.lineJoin="miter"; g.miterLimit=8; g.lineWidth=G.skLine;
-  for(const s of SPK){ const R=46*G.skSize*s.size, h=n=>hh(s.sd*31+n,5), sp=s.rot+s.t*G.skSpin*.4*(h(1)<.5?-1:1);
+  for(const s of SPK){ SKC.f=PAL[s.cf??G.skCF]||PAL[0]; SKC.l=PAL[G.skCL]||PAL[3]; SKC.h=PAL[G.skCH]||PAL[2]; const R=46*G.skSize*s.size, h=n=>hh(s.sd*31+n,5), sp=s.rot+s.t*G.skSpin*.4*(h(1)<.5?-1:1);
     if(s.type===0){ const n=Math.round(G.skSpikes+(h(2)-.5)*3), lg=Math.floor(h(3)*n); g.beginPath();   // 터지는 별
       for(let k=0;k<n*2;k++){ const tip=!(k&1), q=k>>1, a=sp+k*Math.PI/n+(tip?(h(10+q)-.5)*G.skJag*.6:0), pk=skPop(s.t,s.life,(tip?q:q+.5)*.014), base=R*.36*skPop(s.t,s.life);
         const rr=tip?R*(.55+.55*G.skJag*h(30+q)+(q===lg?.65:0))*pk:base; const x=s.x+Math.cos(a)*rr, y=s.y+Math.sin(a)*rr; if(k) g.lineTo(x,y); else g.moveTo(x,y); }
@@ -1094,12 +1113,11 @@ function skDraw(){ if(!G.skOn || !SPK.length) return; g.lineJoin="miter"; g.mite
       const nx=-Math.sin(s.dir), ny=Math.cos(s.dir);
       for(let j=0;j<m;j++){ const off=(j-(m-1)/2)*R*.55*(1+.3*h(30+j)), a=s.dir+(j-(m-1)/2)*.07+(h(20+j)-.5)*.06, L=R*(3.5+3*h(25+j)), W=R*(.32+.22*h(27+j));
         notchSpike(s.x+nx*off,s.y+ny*off,a,L,W,h(29+j)<.5?[.42]:[.32,.62],h(28+j)<.5?1:-1,false,rt*rt,gr); } }
-    else if(s.type===3){ const [bx,by]=balloon(s.t,s.life), a0=sp-Math.PI/2, Ro=R*.95, Ri=Ro*.56;   // 오각별: 둥글게 볼록한 별이 풍선처럼 부푼다
+    else if(s.type===3){ const [bx,by]=balloon(s.t,s.life), a0=sp-Math.PI/2, Ro=R*.95, Ri=Ro*.47;   // 오각별: 기본 별 모양에 변만 살짝 볼록하고 꼭짓점은 조금만 둥글게
       if(Ro*bx<.5) continue; const path=()=>{ g.beginPath(); const pts=[]; for(let k=0;k<10;k++){ const rr=k&1?Ri:Ro, a=a0+k*Math.PI/5; pts.push([Math.cos(a)*rr,Math.sin(a)*rr]); }
-        for(let k=0;k<10;k++){ const p=pts[k], q=pts[(k+1)%10], mx=(p[0]+q[0])/2, my=(p[1]+q[1])/2, ml=Math.hypot(mx,my)||1, bulge=k&1?.10:.10, cx=mx+mx/ml*Ro*bulge, cy=my+my/ml*Ro*bulge;
-          const sx=v=>s.x+v[0]*bx, sy=v=>s.y+v[1]*by; if(k===0) g.moveTo(sx([(p[0]+q[0]*.0),0])*0+s.x+(p[0]*.85+q[0]*.15)*bx, s.y+(p[1]*.85+q[1]*.15)*by);
-          const e=[(p[0]*.15+q[0]*.85),(p[1]*.15+q[1]*.85)], n=pts[(k+2)%10], f=[(q[0]*.85+n[0]*.15),(q[1]*.85+n[1]*.15)];
-          g.quadraticCurveTo(s.x+cx*bx,s.y+cy*by,s.x+e[0]*bx,s.y+e[1]*by); g.quadraticCurveTo(s.x+q[0]*bx,s.y+q[1]*by,s.x+f[0]*bx,s.y+f[1]*by); } g.closePath(); };   // 변은 볼록하게, 꼭짓점은 둥글게
+        const X=v=>s.x+v[0]*bx, Y=v=>s.y+v[1]*by, mix=(p,q,t)=>[p[0]+(q[0]-p[0])*t,p[1]+(q[1]-p[1])*t];
+        for(let k=0;k<10;k++){ const p=pts[k], q=pts[(k+1)%10], n=pts[(k+2)%10], a1=mix(p,q,.06), b1=mix(p,q,.94), c2=mix(q,n,.06), mx=(p[0]+q[0])/2, my=(p[1]+q[1])/2, ml=Math.hypot(mx,my)||1, cx=mx+mx/ml*Ro*.045, cy=my+my/ml*Ro*.045;
+          if(k===0) g.moveTo(X(a1),Y(a1)); g.quadraticCurveTo(s.x+cx*bx,s.y+cy*by,X(b1),Y(b1)); g.quadraticCurveTo(X(q),Y(q),X(c2),Y(c2)); } g.closePath(); };   // 변은 아주 살짝 곡선, 꼭짓점은 살짝만 둥글게
       g.lineJoin="round"; path(); g.fillStyle=SKC.f; g.fill(); shade(path,s.x,s.y,Ro*Math.max(bx,by)); path(); g.strokeStyle=SKC.l; g.stroke(); g.lineJoin="miter"; }
     else { const sc=skPop(s.t,s.life)*(1+.15*Math.sin(s.t*14)), r=R*.7*sc, w=r*.16;   // 작은 반짝이
       if(r<.5) continue; g.beginPath(); g.moveTo(s.x,s.y-r); g.quadraticCurveTo(s.x+w,s.y-w,s.x+r*.8,s.y); g.quadraticCurveTo(s.x+w,s.y+w,s.x,s.y+r); g.quadraticCurveTo(s.x-w,s.y+w,s.x-r*.8,s.y); g.quadraticCurveTo(s.x-w,s.y-w,s.x,s.y-r); g.fillStyle=h(3)<.5?SKC.f:SKC.l; g.fill(); } }
@@ -1304,6 +1322,10 @@ for(let i=0;i<5;i++) $("skT"+i).addEventListener("click",()=>{ G["skT"+i]=G["skT
 $("skTest").addEventListener("click",()=>{ const ts=[0,1,2,3,4].filter(i=>G["skT"+i]); const x=WW*.5, y=WH*.45; ts.forEach((t,i)=>skSpawn(t,x+(i-(ts.length-1)/2)*WW*.14,y,1.2,-Math.PI/4)); });
 syncSk();
 $("skBoil").addEventListener("input",()=>{ G.skBoil=+$("skBoil").value; $("skBoilV").textContent=pct(G.skBoil); saveG(); }); $("skBoil").value=G.skBoil; $("skBoilV").textContent=pct(G.skBoil);
+for(const [id,k,f] of [["skStarN","skStarN",v=>Math.round(v)+"개"],["skStarLife","skStarLife",v=>Math.round(v)+"초"],["skFlow","skFlow",v=>pct(v)]]){ $(id).addEventListener("input",()=>{ G[k]=+$(id).value; $(id+"V").textContent=f(G[k]); saveG(); }); $(id).value=G[k]; $(id+"V").textContent=f(G[k]); }
+$("skFloat").addEventListener("click",()=>{ G.skFloat=G.skFloat?0:1; saveG(); $("skFloat").setAttribute("aria-pressed",G.skFloat?"true":"false"); }); $("skFloat").setAttribute("aria-pressed",G.skFloat?"true":"false");
+swatches("skCFs","skCF"); swatches("skCLs","skCL"); swatches("skCHs","skCH"); swatches("stCols","stCol");
+for(const [id,k] of [["skMix","skMix"],["stMix","stMix"]]){ $(id).setAttribute("aria-pressed",G[k]?"true":"false"); $(id).addEventListener("click",()=>{ G[k]=G[k]?0:1; saveG(); $(id).setAttribute("aria-pressed",G[k]?"true":"false"); }); }
 requestAnimationFrame(frame);
 })();
 </script>
@@ -1312,7 +1334,7 @@ requestAnimationFrame(frame);
 (function(){ const V=window.NF_VIEW||"both"; if(V==="stage") return; const $=id=>document.getElementById(id);
   const HK="nu-flow-hidden", KEYS=["swirl-flow-g","swirl-flow-bd","nu-flow-q","nu-flow-hidden","nu-flow-fps","nu-flow-aq"];
   { const MT=[...document.querySelectorAll("#mtabs button")]; let cur=0; try{ cur=+localStorage.getItem("nu-flow-mtab")||0; }catch(_){}
-    const showT=i=>{ MT.forEach((b,j)=>{ b.setAttribute("aria-selected",j===i?"true":"false"); const p=$("mp"+j); if(p) p.hidden=j!==i; }); try{ localStorage.setItem("nu-flow-mtab",String(i)); }catch(_){} };
+    const showT=i=>{ MT.forEach((b,j)=>{ b.setAttribute("aria-selected",j===i?"true":"false"); const p=$(b.getAttribute("aria-controls")); if(p) p.hidden=j!==i; }); try{ localStorage.setItem("nu-flow-mtab",String(i)); }catch(_){} };   // 탭과 내용은 이름(aria-controls)으로 짝짓는다
     MT.forEach((b,i)=>b.addEventListener("click",()=>showT(i))); showT(cur>=0 && cur<MT.length?cur:0); }   // 설정 탭: 마지막에 본 탭으로 연다
   let hidden=[]; try{ hidden=JSON.parse(localStorage.getItem(HK)||"[]"); if(!Array.isArray(hidden)) hidden=[]; }catch(_){ hidden=[]; }
   const its=()=>[...document.querySelectorAll(".ctl .it[data-k]")];
