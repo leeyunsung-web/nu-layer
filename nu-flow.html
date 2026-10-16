@@ -20,6 +20,8 @@ header p{margin:0;color:var(--soft);font-size:13px}
 .tabs button:focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
 .tabs .sep{flex:none;width:2px;background:var(--line);opacity:.35;margin:6px 2px;border-radius:2px}
 .stage{position:relative;border:3px solid var(--line);border-radius:14px;overflow:hidden;background:#FDFAF6;line-height:0}
+#cv{position:relative}
+#cvB{position:absolute;left:0;top:0;width:100%;height:100%;aspect-ratio:auto;pointer-events:none;display:none}
 #cv2{position:absolute;left:0;top:0;width:100%;height:100%;aspect-ratio:auto;pointer-events:none}
 canvas{display:block;width:100%;max-width:100%;aspect-ratio:16/10;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}
 canvas.hold{cursor:grabbing}
@@ -78,12 +80,20 @@ canvas.hold{cursor:grabbing}
     <p>배경 액체를 기류에 태우는 연구. 화면 전체가 한 통의 물이고, 폭발을 축으로 도는 기류가 그 물을 천천히 밀면 잉크 같은 액체가 흐름을 타고 늘어나고 감기고 응축합니다. 뒤쪽 물은 느리고 작고 옅습니다.</p>
   </header>
   <div class="tabs" id="tabs" role="tablist" aria-label="배경 요소"></div>
-  <div class="stage"><canvas id="cv" aria-label="기류를 타고 도는 액체 화면. 끌면 물이 저어지고, 핏방울을 잡아 끌면 늘어납니다."></canvas><canvas id="cv2" aria-hidden="true"></canvas><div id="fpsM" class="fpsm" hidden></div></div>
+  <div class="stage"><canvas id="cvB" aria-hidden="true"></canvas><canvas id="cv" aria-label="기류를 타고 도는 액체 화면. 끌면 물이 저어지고, 핏방울을 잡아 끌면 늘어납니다."></canvas><canvas id="cv2" aria-hidden="true"></canvas><div id="fpsM" class="fpsm" hidden></div></div>
   <div class="ctl vis">
     <div class="it row" data-k="vA"><span>보이기</span><button id="vA" type="button" aria-pressed="true">분홍 A</button><button id="vB" type="button" aria-pressed="true">분홍 B</button><button id="vP" type="button" aria-pressed="true">보라</button><button id="vR" type="button" aria-pressed="true">붉은</button><button id="vD" type="button" aria-pressed="true">핏방울</button><small class="desc">오브젝트를 하나씩 켜고 끕니다. 끄면 그 액체는 지워지고 더 생기지 않으며 계산도 쉽니다.</small></div>
     <div class="it row" data-k="q1"><span>화질</span><button id="q1" type="button" aria-pressed="false">가볍게</button><button id="q2" type="button" aria-pressed="true">보통</button><button id="q3" type="button" aria-pressed="false">선명</button><button id="qA" type="button" aria-pressed="false">자동 낮추기</button><small class="desc">큰 창에서 그리는 해상도의 상한(가볍게 1080p · 보통 1440p · 선명 4K). '자동 낮추기'를 켜면 버벅일 때 저절로 낮췄다가 넉넉해지면 되돌립니다(바뀌는 순간 선명도가 툭 바뀌어 보여 기본은 꺼짐).</small></div>
     <div class="it row" data-k="bSave"><span>도구</span><button id="bSave" type="button">⤓ 이미지 저장</button><button id="fpsT" type="button" aria-pressed="false">fps 표시</button><button id="sExp" type="button">설정 내보내기</button><button id="sImp" type="button">설정 불러오기</button><button id="sReset" type="button">초기 설정</button><button id="mEdit" type="button" aria-pressed="false">메뉴 편집</button><button id="mRestore" type="button">숨긴 메뉴 되돌리기</button><small class="desc">이미지 저장: 지금 화면을 PNG로. fps 표시: 화면이 실제로 초당 몇 장 그려지는지. 설정 내보내기·불러오기: 지금 값을 파일로 옮겨 다른 곳(깃허브 NU FLOW·내려받은 파일)에서도 그대로 씁니다. 초기 설정: 모든 조절값을 처음 값으로 되돌립니다(두 번 눌러야 실행, 숨긴 메뉴는 그대로). 메뉴 편집: 필요 없는 메뉴를 ✕로 숨깁니다(되돌리기 가능).</small></div>
     <input id="sFile" type="file" accept=".json,application/json" hidden>
+  </div>
+  <h2 class="sect">3D 공간</h2>
+  <div class="ctl">
+    <div class="it row" data-k="d3On"><span>3D</span><button id="d3On" type="button" aria-pressed="true">3D 켜짐</button><small class="desc">켜면 뒤쪽 물·앞쪽 물·핏방울이 서로 다른 깊이의 판에 놓이고, 소용돌이가 기울어진 원반처럼 보입니다. 끄면 원래의 평면 화면입니다.</small></div>
+    <label class="it" data-k="d3Tilt"><span>원반 기울기</span><input id="d3Tilt" type="range" min="0" max="55" step="1" value="22"><output id="d3TiltV">22°</output><small class="desc">소용돌이 판을 뒤로 눕히는 각도. 높을수록 나선이 납작한 타원이 되고 화면 위쪽이 멀어집니다.</small></label>
+    <label class="it" data-k="d3Depth"><span>깊이감</span><input id="d3Depth" type="range" min="0" max="1" step="0.05" value="0.5"><output id="d3DepthV">50%</output><small class="desc">뒤쪽 물과 앞쪽 핏방울 사이의 거리. 높을수록 시점이 움직일 때 층마다 다르게 움직여 공간이 깊어 보입니다.</small></label>
+    <label class="it" data-k="d3Drift"><span>시점 흔들림</span><input id="d3Drift" type="range" min="0" max="1" step="0.05" value="0.4"><output id="d3DriftV">40%</output><small class="desc">카메라가 저절로 천천히 떠도는 정도. 0이면 시점이 멈춰 있습니다.</small></label>
+    <label class="it" data-k="d3Mouse"><span>마우스 시점</span><input id="d3Mouse" type="range" min="0" max="1" step="0.05" value="0.5"><output id="d3MouseV">50%</output><small class="desc">마우스(손가락)가 있는 쪽으로 화면이 살짝 기우는 정도. 0이면 꺼집니다.</small></label>
   </div>
   <h2 class="sect">소용돌이</h2>
   <div class="ctl">
@@ -181,7 +191,7 @@ if(window.NF_VIEW==='stage') document.title+=' · 화면'; else if(window.NF_VIE
 "use strict";
 if(window.NF_VIEW==="panel") return;   // 조절 창에서는 물리를 돌리지 않는다 (화면 창이 돌린다)
 const $=id=>document.getElementById(id);
-const cv=$("cv"), g=cv.getContext("2d");
+const cv=$("cv"); let g=cv.getContext("2d"); const gMain=g;
 const TAU=Math.PI*2, clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), sm=x=>x<=0?0:x>=1?1:x*x*(3-2*x);
 function h(seed,a,b){ let x=(seed^Math.imul(a+1,0x9E3779B1)^Math.imul(b+1,0x85EBCA77))>>>0;
   x^=x>>>16; x=Math.imul(x,0x7FEB352D); x^=x>>>15; x=Math.imul(x,0x846CA68B); x^=x>>>16; return (x>>>0)/4294967296; }
@@ -191,7 +201,7 @@ const hh=(a,b)=>h(SEED,a,b);
 /* ── 격자 유체: 화면 전체가 한 통의 물이다. 격자마다 물의 속도와 잉크(분홍·보라·붉은) 농도가 있다.
    폭발을 축으로 도는 기류가 물을 천천히 밀고, 잉크는 물을 따라 늘어나고 감기며, 응축 항이 잉크를 또렷한 덩이로 뭉치고 가는 줄기를 구슬로 끊는다 ── */
 const AREA=540000, CELL=5, CV=10, PAD=60, DT=1/30, NC=4, NL=2;
-const G={vis:[1,1,1,1], spread:1, rim:0, rimW:130, visc:1, lightA:225, sp:1, spShow:0, spDen:1, spW:34, spPull:1, spStr:1, spBg:.35, spArms:1, spRot:1, spWob:1, speed:1, carry:1, dry:1, circ:.9, lspd:.5, dir:1, sep:.5, merge:1, head:1.3, tail:.9, strands:1.5, round:1, init:6, add:3, per:3.4, spin:1, calm:1, out:1, tailDry:1.5,
+const G={vis:[1,1,1,1], d3:1, d3Tilt:22, d3Depth:.5, d3Drift:.4, d3Mouse:.5, spread:1, rim:0, rimW:130, visc:1, lightA:225, sp:1, spShow:0, spDen:1, spW:34, spPull:1, spStr:1, spBg:.35, spArms:1, spRot:1, spWob:1, speed:1, carry:1, dry:1, circ:.9, lspd:.5, dir:1, sep:.5, merge:1, head:1.3, tail:.9, strands:1.5, round:1, init:6, add:3, per:3.4, spin:1, calm:1, out:1, tailDry:1.5,
   mat:[{carry:1,dir:0,exitR:.3,sl:1,size:1,share:1,ksz:.42,brk:.55,hth:.36,hmin:40,bsz:.17,td:.5,nA:.16,dth:.5},{carry:.6,dir:0,exitR:.3,sl:1,size:1,share:.25,ksz:.42,brk:0,hth:.36,hmin:40,bsz:0,td:.62,nA:.3,dth:.5},{carry:.5,dir:0,exitR:.3,sl:1,size:1,share:.4,ksz:.4,brk:0,hth:.36,hmin:40,bsz:.17,td:.6,nA:.3,dth:.5},{carry:1,dir:0,exitR:.3,sl:1,size:1,share:1,ksz:.42,brk:.55,hth:.36,hmin:40,bsz:.17,td:.5,nA:.16,dth:.5}]};   // 오브젝트마다: 크기, 솟는 비율, 하이라이트·어두운 면 세부   // out: 밖으로 밀려나는 힘   // spin: 도는 힘, calm: 물이 제 흐름으로 돌아오는 빠르기   // init: 처음 개수, add: 한 번에 더 솟는 개수, per: 간격(초)   // head: 머리 뭉침, tail: 꼬리 늘어짐, strands: 떨어지는 가닥 수
 let RIM, rimKey='';
 const LIVE=[]; let UNI, THK, NSF, MX, MY, TMP2, RD=[], RDF, PV=[], backT=0, backPT=0, STEPPED=false, FLIP=false;   // PV: 한 박자 전의 잉크 (그리기는 PV→지금 사이를 이어서 그린다), FLIP: 이 채널은 반대로 돈다
@@ -471,7 +481,7 @@ const allPath=L=>{ g.beginPath(); for(let l=0;l<L.n;l++) loopPath(L,l); };
 const BD=(function(){
 "use strict";
 const $=id=>document.getElementById(id);
-const cv=$("cv2"); let g=cv.getContext("2d"), own=true;   // own 이 꺼지면 소용돌이 화면에 바로 그린다 (겹 화면 없이)
+const cv=$("cv2"); let g=cv.getContext("2d"), own=true; const gOwn=g;   // own 이 꺼지면 소용돌이 화면에 바로 그린다 (겹 화면 없이)
 const TAU=Math.PI*2, clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 /* 씨앗값: 순서 없는 해시. 날짜가 씨앗이라 그날의 배치는 언제나 같다 */
 function h(seed,a,b){ let x=(seed^Math.imul(a+1,0x9E3779B1)^Math.imul(b+1,0x85EBCA77))>>>0;
@@ -836,7 +846,7 @@ return { G, setView, syncUI, setZone(a,b,c,d){ ZX0=a; ZY0=b; ZX1=c; ZY1=d; }, ce
   start(){ if(!started){ started=true; reset(); } },
   on(){ return !!G.on; },
   setOn(v){ G.on=v?1:0; save(); syncUI(); if(!G.on){ ptrs.clear(); if(own){ g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,W,Hh); } } },
-  useCtx(ctx){ g=ctx; own=false; cv.style.display="none"; }, compute(dt){ compute(dt); }, draw(){ draw(); },
+  useCtx(ctx){ g=ctx; own=false; cv.style.display="none"; }, useOwn(){ if(own) return; g=gOwn; own=true; cv.style.display=""; }, compute(dt){ compute(dt); }, draw(){ draw(); },
   set onPlace(f){ onPlace=f; },
   advance(dt){ advance(dt); }, render(dt){ render(dt); },
   grab(id,x,y){ return inReg(x,y) && grab(id,x-OXp,y-OYp); }, moveTo(id,x,y){ moveTo(id,x-OXp,y-OYp); }, release(id){ release(id); }, held(id){ return ptrs.has(id); } };
@@ -883,23 +893,26 @@ function src(l,c,a){ const sl=l*NC+c, D=DYE[l][c], P=PV[l][c]; if(!TCN[sl]) retu
   const R=RD[l][c], L=TLS[sl], m=TCN[sl]; R.fill(0); for(let i=0;i<m;i++){ tb(L[i]); for(let y=TB[2];y<TB[3];y++){ let k=y*gw+TB[0]; for(let x=TB[0];x<TB[1];x++,k++){ const p=P[k]; R[k]=p+(D[k]-p)*f; } } }
   RDF[sl]=frameNo; return R; }
 function render(dt,a){ frameNo++; T=simT; dt=dt||1/60; a=a||0; RT=simT-DT+a*DT;
-  g.setTransform(1,0,0,1,0,0); g.fillStyle=SC.bg; g.fillRect(0,0,W,Hh); g.setTransform(scale,0,0,scale,0,0); g.lineJoin="round"; g.lineCap="round";
-  for(let l=0;l<NL;l++){ g.save(); if(l===0){ g.translate(CX,CY); g.scale(SC.bscale,SC.bscale); g.translate(-CX,-CY); }
+  const sp3=D3.split; g=gMain; if(sp3){ if(cvB.width!==W||cvB.height!==Hh){ cvB.width=W; cvB.height=Hh; } gB.setTransform(1,0,0,1,0,0); gB.clearRect(0,0,W,Hh); gB.setTransform(scale,0,0,scale,0,0); gB.lineJoin="round"; gB.lineCap="round"; }   // 3D: 뒤쪽 물은 뒤 판에 따로
+  g.setTransform(1,0,0,1,0,0); if(sp3) g.clearRect(0,0,W,Hh); else { g.fillStyle=SC.bg; g.fillRect(0,0,W,Hh); } g.setTransform(scale,0,0,scale,0,0); g.lineJoin="round"; g.lineCap="round";
+  for(let l=0;l<NL;l++){ g=(sp3 && l===0)?gB:gMain; g.save(); if(l===0){ g.translate(CX,CY); g.scale(SC.bscale,SC.bscale); g.translate(-CX,-CY); }
     const SL=!!G.mat[3].sl;   // 분홍 B가 분홍 A와 같은 빛을 쓰면 두 분홍을 한 몸으로 명암을 넣는다
     for(let c=0;c<NC;c++){ const M=SC.mats[c], both=SL && l===NL-1 && c!==1 && c!==2, sh=M.shaded && l===NL-1 && !both; if(!LIVE[l*NC+c]) continue; prepare(src(l,c,a),M,sh,EMA[c],dt); paint(M,SC.fade[l],SC.bg,sh); }   // 뒤쪽 층은 명암 없이 옅게
     if(SL && l===NL-1 && (LIVE[l*NC] || LIVE[l*NC+3])){ const D0=LIVE[l*NC]?src(l,0,a):DYE[l][0], D3=LIVE[l*NC+3]?src(l,3,a):DYE[l][3]; for(let k=0;k<n;k++) UNI[k]=D0[k]>D3[k]?D0[k]:D3[k]; prepare(UNI,SC.mats[0],true,EMA[0],dt); paint(SC.mats[0],0,SC.bg,true,true); }   // 분홍 두 무리의 명암은 한 번에 (닿은 자리도 한 몸으로 빛난다)
     g.restore();
     if(l===0){ if(SC.sparks) sparkles(SC.sparks[0],SC.sparks[1]); if(SC.bolts) bolts(); if(SC.burst) burst(CX,CY,40,7000); } }
+  g=gMain;
   if(G.sp && (G.spShow || performance.now()<spPeek)){ const m=spM(), Rm=Math.hypot(WW,WH)*.75, tt=simT-DT+a*DT;   // 라인 보기: 나선을 옅은 띠와 점선으로
     for(let k=0;k<m;k++){ g.beginPath(); for(let r=SPR0;r<Rm;r+=3){ const an=spLine(r,tt)+k*TAU/m, x=CX+Math.cos(an)*r, y=CY+Math.sin(an)*r; if(r===SPR0) g.moveTo(x,y); else g.lineTo(x,y); }
-      g.setLineDash([]); g.strokeStyle="rgba(156,47,134,.07)"; g.lineWidth=G.spW*2; g.stroke(); g.setLineDash([7,7]); g.strokeStyle="rgba(156,47,134,.5)"; g.lineWidth=1.6; g.stroke(); } g.setLineDash([]); } }
+      g.setLineDash([]); g.strokeStyle="rgba(156,47,134,.07)"; g.lineWidth=G.spW*2; g.stroke(); g.setLineDash([7,7]); g.strokeStyle="rgba(156,47,134,.5)"; g.lineWidth=1.6; g.stroke(); } g.setLineDash([]); }
+  if(sp3){ fogEdge(gB,0); fogEdge(gMain,1); } }
 function advance(k){ for(let s=0;s<k;s++) step(); }
 let halfA=false, last=performance.now(), acc=0, rdt=0, aspect=0, bdT=0, fno=0, work=0, lite=false, needR=false;
 const SLOW=(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
 let fAvg=1/60, qT=0, qGood=0;
 let AQ=false; try{ AQ=localStorage.getItem("nu-flow-aq")==="1"; }catch(_){}   // 자동 화질: 기본은 꺼 둔다 (해상도가 바뀌는 순간 화면이 툭 바뀌어 보이므로)
 function autoQ(dt){ if(!AQ){ if(QF!==1) QF=1; return; } fAvg+=(dt-fAvg)*.05; qT+=dt; if(fAvg>.0195 && qT>1.5 && QF>.36){ QF=Math.max(.35,QF*.8); qT=0; qGood=0; } else if(fAvg<.0175 && QF<1){ qGood+=dt; if(qGood>4){ QF=Math.min(1,QF*1.12); qGood=0; qT=0; } } else qGood=0; }   // 화면이 커서 프레임이 밀리면 그리는 해상도를 조금 낮추고, 넉넉해지면 되돌린다
-function frame(now){ const dt=Math.min(.1,(now-last)/1000); last=now; if(!document.hidden){ autoQ(dt); fpsTick(now); } fit(); const a=WW>WH?1:2; if(a!==aspect){ aspect=a; RMX=Math.hypot(WW,WH)*.5; placeCenter(); }   // 화면 방향이 바뀌어도 처음부터 다시 하지 않는다
+function frame(now){ const dt=Math.min(.1,(now-last)/1000); last=now; if(!document.hidden){ autoQ(dt); fpsTick(now); } fit(); d3Tick(dt); const a=WW>WH?1:2; if(a!==aspect){ aspect=a; RMX=Math.hypot(WW,WH)*.5; placeCenter(); }   // 화면 방향이 바뀌어도 처음부터 다시 하지 않는다
   if(!document.hidden){ const w0=performance.now(); acc+=dt*(SLOW?.4:1)*G.speed; rdt+=dt; let k=0; if(!halfA && acc>=DT*.5){ stepA(); halfA=true; } if(acc>=DT){ if(!halfA) stepA(); stepB(); halfA=false; k=1; acc-=DT; if(acc>DT) acc=0; }   // 반 박자마다 반씩   // 한 프레임에 한 박자까지만: 느린 기기에서는 따라잡으려 몰아 계산하지 않고 조금 느리게 흐른다 (끊김 대신 슬로모션)   // 소용돌이 속도: 박자 사이가 길어질 뿐, 그리기는 매 프레임
     const t1=performance.now(); TR.bead=0; TR.tgt=0; const t2=performance.now(), t3=t2; STEPPED=true; render(rdt*G.speed,acc/DT); rdt=0; const t4=performance.now();   // 소용돌이는 매 프레임 그린다 (박자 사이는 흐름대로 밀어 메운다)
     if(BD.on()){ const r=bdRect(); BD.setView(W,Hh,scale,0,0,WW,WH); BD.center(CX,CY); BD.light(G.lightA*Math.PI/180); BD.setZone(r[0],r[1],r[0]+r[2],r[1]+r[3]); BD.start(); bdT+=Math.min(dt,.05); BD.advance(Math.min(dt,.05)*(SLOW?.4:1)); if(!lite || (fno&1)){ BD.compute(bdT*BD.G.speed); bdT=0; } BD.draw(); }   // 핏방울도 화면 전체를 쓴다 (자리는 처음 놓이는 곳일 뿐). 바쁠 때는 핏방울을 두 프레임에 한 번 그린다
@@ -907,12 +920,35 @@ function frame(now){ const dt=Math.min(.1,(now-last)/1000); last=now; if(!docume
     fno++; const wk=performance.now()-w0; work+=(wk-work)*.05; if(!lite && work>20) lite=true; else if(lite && work<9) lite=false; } 
   requestAnimationFrame(frame); }
 const tabsEl=$("tabs"); SCENES.forEach((s,i)=>{ const b=document.createElement("button"); b.type="button"; b.id="st"+i; b.role="tab"; b.textContent=s.name; b.addEventListener("click",()=>setScene(i)); tabsEl.appendChild(b); });
-function wpos(e){ const r=cv.getBoundingClientRect(); return [(e.clientX-r.left)/r.width*WW,(e.clientY-r.top)/r.height*WH]; }
+/* 3D 공간: 뒤쪽 물·앞쪽 물·핏방울을 서로 다른 깊이의 판에 놓고 원반처럼 기울인다. 판을 겹쳐 그리는 일은 그래픽 처리 장치가 맡아 가볍다 */
+const cvB=$("cvB"), gB=cvB.getContext("2d"), cvBD=$("cv2"), stEl=cv.parentElement, PLS=[cvB,cv,cvBD];
+const D3={split:false, mx:0, my:0, tmx:0, tmy:0, key:"", S:[1,1,1], Hi:[null,null,null], bg:""};
+function d3Pt(ax,ay,P,tx,ty,z,x,y){ const ca=Math.cos(ax), sa=Math.sin(ax), cb=Math.cos(ay), sb=Math.sin(ay), X=x*cb; let Z=-x*sb; const Y=y*ca-Z*sa; Z=y*sa+Z*ca; return [X+tx,Y+ty,1-(Z+z)/P]; }   // 판 위의 점 → 화면 (원근 나누기 전)
+function d3H(ax,ay,P,tx,ty,z,s){ const o=d3Pt(ax,ay,P,tx,ty,z,0,0), a=d3Pt(ax,ay,P,tx,ty,z,s,0), b=d3Pt(ax,ay,P,tx,ty,z,0,s); return [a[0]-o[0],b[0]-o[0],o[0], a[1]-o[1],b[1]-o[1],o[1], a[2]-o[2],b[2]-o[2],o[2]]; }
+function inv3(m){ const [a,b,c,d,e,f,g2,h,i]=m, A=e*i-f*h, B=-(d*i-f*g2), C=d*h-e*g2, det=a*A+b*B+c*C; if(Math.abs(det)<1e-12) return null; const r=1/det; return [A*r,-(b*i-c*h)*r,(b*f-c*e)*r, B*r,(a*i-c*g2)*r,-(a*f-c*d)*r, C*r,-(a*h-b*g2)*r,(a*e-b*d)*r]; }
+function unpr(M,sx,sy){ const w=M[6]*sx+M[7]*sy+M[8]; if(w<=1e-6) return null; return [(M[0]*sx+M[1]*sy+M[2])/w,(M[3]*sx+M[4]*sy+M[5])/w]; }
+function d3Z(i,Dm){ return i===0?-G.d3Depth*.45*Dm:i===2?G.d3Depth*.12*Dm:0; }
+const FGC=[{k:""},{k:""}];
+function fogEdge(c,j){ const C=FGC[j], key=W+"x"+Hh; if(C.k!==key){ C.k=key; const fx=W*.07, fy=Hh*.07, mk=(x0,y0,x1,y1)=>{ const gr=c.createLinearGradient(x0,y0,x1,y1); gr.addColorStop(0,"rgba(0,0,0,1)"); gr.addColorStop(1,"rgba(0,0,0,0)"); return gr; };
+    C.r=[[mk(0,0,fx,0),0,0,fx,Hh],[mk(W,0,W-fx,0),W-fx,0,fx,Hh],[mk(0,0,0,fy),0,0,W,fy],[mk(0,Hh,0,Hh-fy),0,Hh-fy,W,fy]]; }
+  c.save(); c.setTransform(1,0,0,1,0,0); c.globalCompositeOperation="destination-out"; for(const r of C.r){ c.fillStyle=r[0]; c.fillRect(r[1],r[2],r[3],r[4]); } c.restore(); }   // 판 가장자리는 안개처럼 지운다 (판 끝이 잘려 보이지 않게)
+function d3Mode(on){ cvB.style.display=on?"block":"none"; if(on) BD.useOwn(); else { BD.useCtx(gMain); for(const el of PLS) el.style.transform=""; stEl.style.background=""; D3.bg=""; } D3.key=""; }
+function d3Tick(dt){ const on=!!G.d3; if(on!==D3.split){ D3.split=on; d3Mode(on); } if(!on) return;
+  if(D3.bg!==SC.bg){ D3.bg=SC.bg; stEl.style.background=SC.bg; }
+  const cw=cv.clientWidth, ch=cv.clientHeight; if(!cw || !ch) return; const Dm=Math.max(cw,ch), P=2.2*Dm, dg=Math.PI/180, t=performance.now()/1000, k=Math.min(1,dt*2.5);
+  const key=[cw,ch,G.d3Tilt,G.d3Depth,G.d3Drift,G.d3Mouse].join(); if(key!==D3.key){ D3.key=key; D3.S.fill(1+.6*(1/Math.cos(G.d3Tilt*dg)-1)); }   // 많이 눕힐수록 판을 조금 키워 빈 곳을 줄인다
+  D3.mx+=(D3.tmx-D3.mx)*k; D3.my+=(D3.tmy-D3.my)*k;   // 마우스를 따라 부드럽게
+  const dax=(G.d3Drift*4*Math.sin(t*.21)-G.d3Mouse*7*D3.my)*dg, ay=(G.d3Drift*6*Math.sin(t*.13+1.3)+G.d3Mouse*9*D3.mx)*dg, ax=G.d3Tilt*dg+dax;   // 시점이 움직인 만큼 깊이가 다른 판끼리 엇갈린다
+  for(let i=0;i<3;i++){ const z=d3Z(i,Dm), s=D3.S[i]; const tx=z*Math.sin(ay), ty=-z*Math.sin(dax); PLS[i].style.transform="perspective("+P.toFixed(1)+"px) translate3d("+tx.toFixed(2)+"px,"+ty.toFixed(2)+"px,"+z.toFixed(1)+"px) rotateX("+ax.toFixed(5)+"rad) rotateY("+ay.toFixed(5)+"rad) scale("+s.toFixed(4)+")"; if(i) D3.Hi[i]=inv3(d3H(ax,ay,P,tx,ty,z,s)); } }
+addEventListener("pointermove",e=>{ const r=stEl.getBoundingClientRect(); if(!r.width) return; D3.tmx=clamp((e.clientX-r.left)/r.width*2-1,-1,1); D3.tmy=clamp((e.clientY-r.top)/r.height*2-1,-1,1); });
+function wposP(e,i){ const r=stEl.getBoundingClientRect(), cw=cv.clientWidth, ch=cv.clientHeight; let x=e.clientX-(r.left+stEl.clientLeft)-cw/2, y=e.clientY-(r.top+stEl.clientTop)-ch/2;   // 기울어진 판 위의 자리로 되돌려 읽는다
+  if(D3.split && D3.Hi[i]){ const q=unpr(D3.Hi[i],x,y); if(q){ x=q[0]; y=q[1]; } } return [(x+cw/2)/cw*WW,(y+ch/2)/ch*WH]; }
+function wpos(e){ return wposP(e,1); }
 const ptrs=new Map(); let boom=-1;
-cv.addEventListener("pointerdown",e=>{ if(e.button>0) return; const p=wpos(e); e.preventDefault(); try{cv.setPointerCapture(e.pointerId);}catch(_){}
-  if(BD.on() && BD.grab(e.pointerId,p[0],p[1])){ cv.classList.add("hold"); return; }   // 핏방울을 잡으면 물은 젓지 않는다
+cv.addEventListener("pointerdown",e=>{ if(e.button>0) return; const p=wpos(e), pb=wposP(e,2); e.preventDefault(); try{cv.setPointerCapture(e.pointerId);}catch(_){}
+  if(BD.on() && BD.grab(e.pointerId,pb[0],pb[1])){ cv.classList.add("hold"); return; }   // 핏방울을 잡으면 물은 젓지 않는다
   if(Math.hypot(p[0]-CX,p[1]-CY)<30){ boom=e.pointerId; } else ptrs.set(e.pointerId,{x:p[0],y:p[1],t:performance.now()}); cv.classList.add("hold"); });
-cv.addEventListener("pointermove",e=>{ const p=wpos(e); if(BD.held(e.pointerId)){ BD.moveTo(e.pointerId,p[0],p[1]); return; } if(e.pointerId===boom){ CX=clamp(p[0],30,WW-30); CY=clamp(p[1],30,WH-30); return; } const q=ptrs.get(e.pointerId); if(!q) return;
+cv.addEventListener("pointermove",e=>{ const p=wpos(e); if(BD.held(e.pointerId)){ const pb=wposP(e,2); BD.moveTo(e.pointerId,pb[0],pb[1]); return; } if(e.pointerId===boom){ CX=clamp(p[0],30,WW-30); CY=clamp(p[1],30,WH-30); return; } const q=ptrs.get(e.pointerId); if(!q) return;
   const now=performance.now(), dt=Math.max(.008,(now-q.t)/1000); let vx=(p[0]-q.x)/dt, vy=(p[1]-q.y)/dt; const l=Math.hypot(vx,vy); if(l>600){ vx*=600/l; vy*=600/l; }   // 젓기: 손가락 속도로 물을 민다
   stirs.push([p[0],p[1],vx,vy]); q.x=p[0]; q.y=p[1]; q.t=now; });
 const pup=e=>{ BD.release(e.pointerId); if(e.pointerId===boom) boom=-1; ptrs.delete(e.pointerId); if(!ptrs.size && boom<0) cv.classList.remove("hold"); };
@@ -995,7 +1031,7 @@ $("qA").addEventListener("click",()=>{ AQ=!AQ; try{ localStorage.setItem("nu-flo
 for(const [id,q] of QS) $(id).addEventListener("click",()=>{ QMAX=q; try{ localStorage.setItem("nu-flow-q",String(q)); }catch(_){} syncQ(); });
 syncQ();
 const DLP=(window.claude && typeof window.claude.use==="function")?window.claude.use("downloads").catch(()=>null):null;   // 일반 웹(깃허브 페이지)에서는 그냥 내려받기
-function savePNG(){ const c=document.createElement("canvas"); c.width=cv.width; c.height=cv.height; const x=c.getContext("2d"); x.drawImage(cv,0,0);   // 핏방울도 같은 화면에 그려져 있다
+function savePNG(){ const c=document.createElement("canvas"); c.width=cv.width; c.height=cv.height; const x=c.getContext("2d"); if(D3.split){ x.fillStyle=SC.bg; x.fillRect(0,0,c.width,c.height); x.drawImage(cvB,0,0); } x.drawImage(cv,0,0); if(D3.split && BD.on()) x.drawImage(cvBD,0,0,c.width,c.height);   // 핏방울도 같은 화면에 그려져 있다
  
   const d=new Date(), p=v=>String(v).padStart(2,"0"), nm="nu-flow_"+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+"_"+p(d.getHours())+p(d.getMinutes())+p(d.getSeconds())+".png";
   c.toBlob(async b=>{ if(!b) return; const dl=DLP?await DLP:null; if(dl){ try{ await dl.save({filename:nm,data:b}); }catch(_){} return; }   // claude.ai 안에서는 저장 확인 창을 거친다
@@ -1024,7 +1060,12 @@ function syncFps(){ $("fpsT").setAttribute("aria-pressed",showFps?"true":"false"
 $("fpsT").addEventListener("click",()=>{ showFps=!showFps; try{ localStorage.setItem("nu-flow-fps",showFps?"1":"0"); }catch(_){} syncFps(); });
 syncFps();
 /* 핏방울 두 번 누르기: 가장 작은 방울들로 펑 하고 흩어진다 */
-cv.addEventListener("dblclick",e=>{ if(!BD.on()) return; const p=wpos(e); BD.burst(p[0],p[1]); });
+cv.addEventListener("dblclick",e=>{ if(!BD.on()) return; const p=wposP(e,2); BD.burst(p[0],p[1]); });
+const D3S=[["d3Tilt","d3Tilt",v=>Math.round(v)+"°"],["d3Depth","d3Depth",v=>pct(v)],["d3Drift","d3Drift",v=>pct(v)],["d3Mouse","d3Mouse",v=>pct(v)]];
+for(const [id,k,f] of D3S) $(id).addEventListener("input",()=>{ G[k]=+$(id).value; $(id+"V").textContent=f(G[k]); saveG(); });
+function syncD3(){ for(const [id,k,f] of D3S){ $(id).value=G[k]; $(id+"V").textContent=f(G[k]); } $("d3On").setAttribute("aria-pressed",G.d3?"true":"false"); $("d3On").textContent=G.d3?"3D 켜짐":"3D 꺼짐"; }
+$("d3On").addEventListener("click",()=>{ G.d3=G.d3?0:1; saveG(); syncD3(); });
+syncD3();
 requestAnimationFrame(frame);
 })();
 </script>
