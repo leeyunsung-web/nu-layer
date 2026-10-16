@@ -36,6 +36,7 @@ canvas.hold{cursor:grabbing}
 .mtabs button{border-radius:10px;min-height:34px;font-size:12.5px;padding:5px 14px}.mtabs button[aria-selected="true"]{background:#9C2F86;color:#fff;border-color:#9C2F86}
 .sw{display:flex;flex-wrap:wrap;gap:4px;max-width:330px}.sw .swb{width:22px;height:22px;min-height:22px;padding:0;border-radius:50%;border:2px solid rgba(0,0,0,.25)}.sw .swb[aria-pressed="true"]{outline:3px solid #9C2F86;outline-offset:1px}.it.wide{grid-column:span 2}
 .mpanel[hidden]{display:none!important}.mpanel{display:flex;flex-direction:column;gap:10px}
+.ctl .msub{grid-column:1/-1}.mprev canvas{width:120px;height:120px;background:#f4f1ea;border-radius:10px;border:1px solid rgba(0,0,0,.12)}.muser{display:contents}.mdel{min-width:0;padding:0 6px;opacity:.6}.it.row input[type=text]{flex:1;min-width:90px;padding:4px 6px}
 .msub{font-size:13px;font-weight:900;color:var(--soft);margin:8px 0 0;letter-spacing:.04em}
 .tabs.sub{width:100%;padding:0}.tabs.sub button{min-height:34px;font-size:12.5px}
 .ctl .hint{width:100%;margin:-2px 0 2px}
@@ -207,6 +208,27 @@ canvas.hold{cursor:grabbing}
     <label class="it" data-k="kSize"><span>방울 크기</span><input id="kSize" type="range" min="0.4" max="1.5" step="0.05" value="0.8"><output id="kSizeV">80%</output><small class="desc">처음 놓이는 방울 크기.</small></label>
     <div class="it row" data-k="kLeave"><span>밀려나가기</span><button id="kLeave" type="button" aria-pressed="true">밀려나가기</button><button id="kRefill" type="button" aria-pressed="true">다시 채우기</button><button id="kWall" type="button" aria-pressed="false">가장자리 벽</button><small class="desc">밀려나가기: 방울마다 머무는 시간이 지나면 제멋대로 고른 방향으로 서서히 화면 밖으로 나갑니다. 다시 채우기: 나간 만큼 소용돌이 가운데에서 새 방울이 생깁니다. 가장자리 벽: 켜면 방울이 화면 밖으로 못 나갑니다(꺼 두면 바깥으로 밀려 나가고 가운데에서 다시 생기며 돌고 돕니다).</small></div>
     <label class="it" data-k="kDwell"><span>머무는 시간</span><span class="numw"><input id="kDwell" type="number" min="1" max="600" step="1" value="12" inputmode="decimal"> 초</span><small class="desc">밀려나가기 전에 떠 있는 시간. 방울마다 이 값의 60~140%로 조금씩 다릅니다.</small></label>
+    <h3 class="msub">모양 다듬기 (하트·별)</h3>
+    <div class="it row wide mprev"><canvas id="mhCv" width="120" height="120" aria-label="하트 틀 미리보기"></canvas><canvas id="msCv" width="120" height="120" aria-label="별 틀 미리보기"></canvas><small class="desc">조절하면 화면 속 하트·별 방울이 바로 새 틀을 따라 말랑하게 바뀝니다.</small></div>
+    <div class="it row wide" data-k="mhP"><span>하트 모양 고르기</span><button id="mhP_0" type="button">기본</button><button id="mhP_1" type="button">통통</button><button id="mhP_2" type="button">뾰족</button><button id="mhP_3" type="button">로코로코</button><button id="mhP_4" type="button">넓적</button><button id="mhP_5" type="button">갸웃</button><span id="mhUser" class="muser"></span></div>
+    <label class="it" data-k="mhR"><span>하트 꼭지 크기</span><input id="mhR" type="range" min="0.2" max="0.6" step="0.005" value="0.354"><output id="mhRV">35</output><small class="desc">하트 위쪽 두 덩이의 크기.</small></label>
+    <label class="it" data-k="mhA"><span>하트 꼭지 간격</span><input id="mhA" type="range" min="0.05" max="0.5" step="0.005" value="0.25"><output id="mhAV">25</output><small class="desc">두 덩이 사이 거리. 넓으면 가운데가 깊게 패입니다.</small></label>
+    <label class="it" data-k="mhH"><span>하트 길이</span><input id="mhH" type="range" min="0.4" max="1.2" step="0.01" value="0.75"><output id="mhHV">75</output><small class="desc">아래 끝까지의 길이. 길면 뾰족하고 날씬해집니다.</small></label>
+    <label class="it" data-k="mhW"><span>하트 너비</span><input id="mhW" type="range" min="0.7" max="1.4" step="0.01" value="1"><output id="mhWV">100</output><small class="desc">옆으로 넓히거나 좁히기.</small></label>
+    <label class="it" data-k="mhTip"><span>하트 끝 둥글기</span><input id="mhTip" type="range" min="0" max="0.35" step="0.005" value="0"><output id="mhTipV">0</output><small class="desc">아래 끝을 동글게. 로코로코 느낌은 높게.</small></label>
+    <label class="it" data-k="mhCl"><span>하트 가운데 메움</span><input id="mhCl" type="range" min="0" max="0.35" step="0.005" value="0"><output id="mhClV">0</output><small class="desc">위쪽 가운데 패인 곳을 부드럽게 메웁니다.</small></label>
+    <label class="it" data-k="mhInf"><span>하트 통통함</span><input id="mhInf" type="range" min="0" max="0.2" step="0.005" value="0"><output id="mhInfV">0</output><small class="desc">전체를 고르게 부풀립니다.</small></label>
+    <label class="it" data-k="mhTilt"><span>하트 기울기</span><input id="mhTilt" type="range" min="-30" max="30" step="1" value="0"><output id="mhTiltV">0°</output><small class="desc">하트를 살짝 갸웃하게.</small></label>
+    <div class="it row wide" data-k="mhSave"><span>하트 모양 저장</span><input id="mhName" type="text" maxlength="16" placeholder="이름 (비워도 됨)" aria-label="하트 모양 이름"><button id="mhSave" type="button">지금 모양 저장</button></div>
+    <div class="it row wide" data-k="msP"><span>별 모양 고르기</span><button id="msP_0" type="button">기본</button><button id="msP_1" type="button">통통</button><button id="msP_2" type="button">뾰족</button><button id="msP_3" type="button">젤리</button><button id="msP_4" type="button">네 꼭지</button><button id="msP_5" type="button">여섯 꼭지</button><span id="msUser" class="muser"></span></div>
+    <label class="it" data-k="msN"><span>별 꼭짓점 수</span><input id="msN" type="range" min="3" max="8" step="1" value="5"><output id="msNV">5개</output><small class="desc">별 팔 개수.</small></label>
+    <label class="it" data-k="msRi"><span>별 팔 굵기</span><input id="msRi" type="range" min="0.25" max="0.9" step="0.01" value="0.62"><output id="msRiV">62</output><small class="desc">낮으면 팔이 가늘고 뾰족, 높으면 통통한 별.</small></label>
+    <label class="it" data-k="msInf"><span>별 통통함</span><input id="msInf" type="range" min="0" max="0.3" step="0.005" value="0.07"><output id="msInfV">7</output><small class="desc">전체를 고르게 부풀립니다.</small></label>
+    <label class="it" data-k="msTip"><span>별 끝 둥글기</span><input id="msTip" type="range" min="0" max="0.35" step="0.005" value="0"><output id="msTipV">0</output><small class="desc">팔 끝을 동글게.</small></label>
+    <label class="it" data-k="msIn"><span>별 안쪽 둥글기</span><input id="msIn" type="range" min="0" max="0.35" step="0.005" value="0"><output id="msInV">0</output><small class="desc">팔 사이 오목한 곳을 부드럽게.</small></label>
+    <label class="it" data-k="msW"><span>별 너비</span><input id="msW" type="range" min="0.7" max="1.4" step="0.01" value="1"><output id="msWV">100</output><small class="desc">옆으로 넓히거나 좁히기.</small></label>
+    <label class="it" data-k="msTilt"><span>별 기울기</span><input id="msTilt" type="range" min="-36" max="36" step="1" value="0"><output id="msTiltV">0°</output><small class="desc">별을 살짝 돌려 놓기.</small></label>
+    <div class="it row wide" data-k="msSave"><span>별 모양 저장</span><input id="msName" type="text" maxlength="16" placeholder="이름 (비워도 됨)" aria-label="별 모양 이름"><button id="msSave" type="button">지금 모양 저장</button></div>
     <h3 class="msub">터지면 바뀌기 (더블클릭)</h3>
     <div class="it row wide" data-k="tfR"><span>빨간 방울 → </span><button id="tfR_0" type="button" aria-pressed="false">조각</button><button id="tfR_1" type="button" aria-pressed="true">조각+번개</button><button id="tfR_2" type="button" aria-pressed="false">하트</button><button id="tfR_3" type="button" aria-pressed="false">별</button><button id="tfR_4" type="button" aria-pressed="false">파란 방울들</button><button id="tfR_5" type="button" aria-pressed="false">빨간 방울들</button><small class="desc">이 방울을 더블클릭하면 팡 터지며 무엇으로 다시 태어나는지.</small></div>
     <div class="it row wide" data-k="tfH"><span>하트 방울 → </span><button id="tfH_0" type="button" aria-pressed="false">조각</button><button id="tfH_1" type="button" aria-pressed="false">조각+번개</button><button id="tfH_2" type="button" aria-pressed="false">하트</button><button id="tfH_3" type="button" aria-pressed="false">별</button><button id="tfH_4" type="button" aria-pressed="true">파란 방울들</button><button id="tfH_5" type="button" aria-pressed="false">빨간 방울들</button><small class="desc">이 방울을 더블클릭하면 팡 터지며 무엇으로 다시 태어나는지.</small></div>
@@ -720,7 +742,7 @@ function step(){ const DS=DT*G.speed, DMP=Math.pow(P.DAMP,G.speed), VS=P.VISC*Ma
     const lv=LLV[lb]; if(lv>0){ const f=G.push*110*Math.min(1,(t-lv)/2.5); ax+=LDX[lb]*f; ay+=LDY[lb]*f; }   // 밀려나는 방울: 벽 없이 서서히 빨라지며 화면 밖으로
     else if(G.walls){ if(x<m) ax+=(m-x)*140; else if(x>WW-m) ax-=(x-(WW-m))*140; if(y<m) ay+=(m-y)*140; else if(y>WH-m) ay-=(y-(WH-m))*140; }
     if(anyG && LGRP[lb]>=0){ const k=LGRP[lb]%LMAX, n=GCN[k]; if(n>1){ ax+=(GCX[k]/n+LOX[lb]-LCX[lb])*30; ay+=(GCY[k]/n+LOY[lb]-LCY[lb])*30; } }   // 구름: 방울마다 무리 속 제자리로
-    let hpx=0, hpy=0; if(LHRT[lb] && G.hShape>0 && LCNT[lb]>6){ const MD=LHRT[lb]===1?{f:sdHeart,area:HRT.area,cy:HRT.cy}:MOLDS[LHRT[lb]], sdf=MD.f, s=Math.sqrt(LCNT[lb]*SP0*SP0*.866/MD.area), a=LHA[lb]+.08*Math.sin(t*.9+lb), ca=Math.cos(a), sa=Math.sin(a), qx=(rx*ca+ry*sa)/s, qy=MD.cy-(-rx*sa+ry*ca)/s, d=sdf(qx,qy)+.03;   // 모양 틀: 하트·별   // 하트 틀 (화면 아래쪽이 하트 끝)
+    let hpx=0, hpy=0; if(LHRT[lb] && G.hShape>0 && LCNT[lb]>6){ const MD=MOLDS[LHRT[lb]], sdf=MD.f, s=Math.sqrt(LCNT[lb]*SP0*SP0*.866/MD.area), a=LHA[lb]+.08*Math.sin(t*.9+lb), ca=Math.cos(a), sa=Math.sin(a), qx=(rx*ca+ry*sa)/s, qy=MD.cy-(-rx*sa+ry*ca)/s, d=sdf(qx,qy)+.03;   // 모양 틀: 하트·별   // 하트 틀 (화면 아래쪽이 하트 끝)
       if(d>0){ const e=.01, gx=(sdf(qx+e,qy)-sdf(qx-e,qy))/(2*e), gy=(sdf(qx,qy+e)-sdf(qx,qy-e))/(2*e), f=d*s*G.hShape*1400, wx=gx, wy=-gy, ux=wx*ca-wy*sa, uy=wx*sa+wy*ca; ax-=ux*f; ay-=uy*f; hpx=-ux*d*s*.3*Math.min(1,G.hShape); hpy=-uy*d*s*.3*Math.min(1,G.hShape); } }   // 틀 밖으로 삐져나간 만큼 안쪽으로 (말랑하게)
     if(G.outP>0){ const ox=LCX[lb]-CXs, oy=LCY[lb]-CYs, ol=Math.hypot(ox,oy)+1; ax+=ox/ol*G.outP*22; ay+=oy/ol*G.outP*22; }   // 나선 가운데에서 바깥으로 천천히 밀려난다
     let vx=(VX[i]+ax*DS)*DMP, vy=(VY[i]+ay*DS)*DMP;
@@ -766,7 +788,7 @@ function towFrom(seeds,vx,vy,lam){ const qt=linked(seeds);
 /* ── 판 차리기 ── */
 const AREA=540000, SIZES=[60,46,38,31,25,20,16];
 let W=0, Hh=0, dpr=1, scale=1, extra=0;
-const G={on:1,dep:.6,heart:1,heartR:.3,hShape:1,tfR:1,tfH:4,tfS:2,tfB:3,hHi:.8,hCo:.9,star:1,starR:.15,blue:1,blueR:.2,cloud:1,cloudN:3,cloudS:1,flowInf:.3,fmax:120,outP:.5,walls:0,speed:1,sep:3,leave:1,dwell:12,push:1,refill:1,hi:1,co:1,dyn:1,fuse:3,size:.8,count:5,side:0,wf:.42,visc:1,wob:1,st:1};   // side: 0 오른쪽 1 왼쪽 2 위 3 아래 4 화면 전체   // 전체 조절값: 하이라이트 크기, 어두운 부분 크기, 출렁임
+const G={on:1,dep:.6,heart:1,heartR:.3,hShape:1,tfR:1,tfH:4,tfS:2,tfB:3,mhR:.354,mhA:.25,mhH:.75,mhW:1,mhTip:0,mhCl:0,mhInf:0,mhTilt:0,msN:5,msRi:.62,msInf:.07,msTip:0,msIn:0,msW:1,msTilt:0,hHi:.8,hCo:.9,star:1,starR:.15,blue:1,blueR:.2,cloud:1,cloudN:3,cloudS:1,flowInf:.3,fmax:120,outP:.5,walls:0,speed:1,sep:3,leave:1,dwell:12,push:1,refill:1,hi:1,co:1,dyn:1,fuse:3,size:.8,count:5,side:0,wf:.42,visc:1,wob:1,st:1};   // side: 0 오른쪽 1 왼쪽 2 위 3 아래 4 화면 전체   // 전체 조절값: 하이라이트 크기, 어두운 부분 크기, 출렁임
 let sel=-1;                  // 선택한 방울에 속한 알갱이 하나 (방울이 합쳐지면 합쳐진 덩어리가 선택된다)
 let ZX0=0, ZY0=0, ZX1=930, ZY1=580;   // 처음 놓이는 자리 (화면은 소용돌이와 함께 쓴다)
 function place(R,key){ // 다른 방울과 겹치지 않는 빈자리를 고른다
@@ -785,7 +807,25 @@ function sdStar5(x,y){ const k1x=.809016994375, k1y=-.587785252292, k2x=-k1x, k2
   const bax=rf*(-k1y), bay=rf*k1x-1, h=Math.min(Math.max((x*bax+y*bay)/(bax*bax+bay*bay),0),1), px=x-bax*h, py=y-bay*h; return Math.hypot(px,py)*Math.sign(y*bax-x*bay)-.07; }   // 위로 뾰족한 오각별 (꼭짓점은 살짝 둥글게)
 const MOLD=(f)=>{ let n=0, cy=0; for(let y=-1.3;y<1.3;y+=.01) for(let x=-1.3;x<1.3;x+=.01) if(f(x,y)<0){ n++; cy+=y; } return {f, area:n*1e-4, cy:cy/n}; };
 const HRT=(()=>{ let a=0, cy=0, n=0; for(let y=-.2;y<1.3;y+=.01) for(let x=-.8;x<.8;x+=.01) if(sdHeart(x,y)<0){ n++; cy+=y; } return {area:n*1e-4, cy:cy/n}; })();
-const MOLDS=[null,null,MOLD(sdStar5)]; let grpNo=0;
+const MG=112, MB=1.7, MC=2*MB/MG;   // 모양 다듬기: 하트·별 틀을 격자 위 거리값으로 만들어 두고 읽는다 (조절값을 바꾸면 다시 만든다)
+function redist(F,L){ const P=[]; for(let y=0;y<MG;y++) for(let x=0;x<MG;x++){ const i=y*MG+x, a=F[i]-L; if(x<MG-1){ const b=F[i+1]-L; if((a<0)!==(b<0)) P.push(x+a/(a-b),y); } if(y<MG-1){ const b=F[i+MG]-L; if((a<0)!==(b<0)) P.push(x,y+a/(a-b)); } }
+  const np=P.length, O=new Float32Array(MG*MG); if(!np){ for(let i=0;i<O.length;i++) O[i]=F[i]-L; return O; }
+  for(let y=0;y<MG;y++) for(let x=0;x<MG;x++){ let m=1e9; for(let k=0;k<np;k+=2){ const dx=P[k]-x, dy=P[k+1]-y, d=dx*dx+dy*dy; if(d<m) m=d; } const i=y*MG+x; O[i]=Math.sqrt(m)*MC*(F[i]<L?-1:1); } return O; }   // 정해진 높이의 경계선까지 거리 (안쪽은 음수)
+function sdPoly(pts,x,y){ const n=pts.length/2; let d=1e9, s=1; for(let i=0,j=n-1;i<n;j=i++){ const ax=pts[2*i], ay=pts[2*i+1], ex=pts[2*j]-ax, ey=pts[2*j+1]-ay, wx=x-ax, wy=y-ay, h=Math.min(Math.max((wx*ex+wy*ey)/(ex*ex+ey*ey),0),1), qx=wx-ex*h, qy=wy-ey*h; d=Math.min(d,qx*qx+qy*qy); const c1=y>=ay, c2=y<ay+ey, c3=ex*wy>ey*wx; if((c1&&c2&&c3)||(!c1&&!c2&&!c3)) s=-s; } return s*Math.sqrt(d); }
+function sdUC(px,py,ax,ay,bx,by,r1,r2){ const bax=bx-ax, bay=by-ay, l2=bax*bax+bay*bay, rr=r1-r2, a2=l2-rr*rr, il2=1/l2, pax=px-ax, pay=py-ay, y=pax*bax+pay*bay, z=y-l2, xx=pax*l2-bax*y, xy=pay*l2-bay*y, x2=xx*xx+xy*xy, y2=y*y*l2, z2=z*z*l2, k=Math.sign(rr)*rr*rr*x2;
+  if(Math.sign(z)*a2*z2>k) return Math.sqrt(x2+z2)*il2-r2; if(Math.sign(y)*a2*y2<k) return Math.sqrt(x2+y2)*il2-r1; return (Math.sqrt(x2*a2*il2)+y*rr)*il2-r1; }   // 점에서 원으로 벌어지는 꼴 (하트 한쪽)
+function tsamp(T,x,y){ const px=(x+MB)/MC, py=(y+MB)/MC, cx=px<0?0:px>MG-1.001?MG-1.001:px, cy=py<0?0:py>MG-1.001?MG-1.001:py, ix=cx|0, iy=cy|0, fx=cx-ix, fy=cy-iy, k=iy*MG+ix;
+  return (T[k]*(1-fx)+T[k+1]*fx)*(1-fy)+(T[k+MG]*(1-fx)+T[k+MG+1]*fx)*fy+Math.hypot(px-cx,py-cy)*MC; }
+function mkMold(g,close,open){ let F=new Float32Array(MG*MG); for(let y=0;y<MG;y++) for(let x=0;x<MG;x++) F[y*MG+x]=g(-MB+x*MC,-MB+y*MC); F=redist(F,0);
+  if(close>.004){ F=redist(redist(F,close),-close); } if(open>.004){ F=redist(redist(F,-open),open); }   // 오목한 곳 메우기(닫기) → 뾰족한 곳 둥글리기(열기)
+  let n=0, cy=0; for(let y=0;y<MG;y++) for(let x=0;x<MG;x++) if(F[y*MG+x]<0){ n++; cy+=-MB+y*MC; } const T=F; return {f:(x,y)=>tsamp(T,x,y), area:Math.max(n,1)*MC*MC, cy:n?cy/n:0, T}; }
+function heartG(){ const r=G.mhR, a=G.mhA, h=G.mhH, w=G.mhW, k=Math.min(1,1.3/Math.max((a+r)*w,(h+r)*.5+.1)), oy=(h+r-r*.5)*.5, t=G.mhTilt*Math.PI/180, c=Math.cos(t), s=Math.sin(t);
+  return (x,y)=>{ x/=k; y/=k; y+=oy; const X=x*c+(y-oy)*s, Y=-x*s+(y-oy)*c+oy, xs=X/w; return (Math.min(sdUC(xs,Y,0,0,a,h,0,r),sdUC(-xs,Y,0,0,a,h,0,r))*Math.min(1,w)-G.mhInf)*k; }; }
+function starG(){ const n=Math.round(G.msN), ri=G.msRi, w=G.msW, k=1/Math.max(1,w), t=G.msTilt*Math.PI/180, P=[]; for(let i=0;i<2*n;i++){ const a=Math.PI/2+i*Math.PI/n, rr=i&1?ri:1; P.push(Math.cos(a)*rr*w*k, Math.sin(a)*rr*k); }
+  const c=Math.cos(t), s=Math.sin(t); return (x,y)=>sdPoly(P,x*c+y*s,-x*s+y*c)-G.msInf; }
+const MOLDS=[null,null,null]; let moldVer=0, onMold=null;
+function buildMolds(which){ if(which!==2) MOLDS[1]=mkMold(heartG(),G.mhCl,G.mhTip); if(which!==1) MOLDS[2]=mkMold(starG(),G.msIn,G.msTip); moldVer++; if(onMold) onMold(); }
+buildMolds(); let grpNo=0;
 /* 거품 구름: 핏방울과 같은 말랑한 방울 4~6개를 한 무리로 묶는다. 무리 안 방울은 정해진 자리로 서로 끌려 붙은 채 출렁인다 */
 function addCloud(cx,cy){ const gid=(grpNo++)%30000, n=4+Math.floor(Math.random()*3), S=G.cloudS*G.size*1.25; let k=0;
   for(let q=0;q<n;q++){ const u=(q-(n-1)/2)/((n-1)/2||1), r=(16+12*(1-Math.abs(u))+6*Math.random())*S, ox=u*(n-1)*17*S, oy=-(1-u*u)*15*S+(Math.random()-.5)*8*S;
@@ -1080,6 +1120,22 @@ $("kCloudNow").addEventListener("click",()=>{ if(!G.on) return; const p=placeNea
 for(const [id,k] of [["kHHi","hHi"],["kHCo","hCo"]]) $(id).addEventListener("input",()=>{ G[k]=+$(id).value; $(id+"V").textContent=pct(G[k]); save(); });
 for(const k of ["tfR","tfH","tfS","tfB"]) for(let i=0;i<6;i++){ const b=$(k+"_"+i); if(b) b.addEventListener("click",()=>{ G[k]=i; save(); syncUI(); }); }
 $("kHeart").addEventListener("click",()=>{ G.heart=G.heart?0:1; save(); syncUI(); });
+const MSL={mhR:[.2,.6],mhA:[.05,.5],mhH:[.4,1.2],mhW:[.7,1.4],mhTip:[0,.35],mhCl:[0,.35],mhInf:[0,.2],mhTilt:[-30,30],msN:[3,8],msRi:[.25,.9],msInf:[0,.3],msTip:[0,.35],msIn:[0,.35],msW:[.7,1.4],msTilt:[-36,36]};   // 모양 다듬기 조절값
+const mFmt=(k,v)=>/Tilt/.test(k)?Math.round(v)+"°":k==="msN"?Math.round(v)+"개":Math.round(v*100)+"";
+const MPRE={h:[["기본",[.354,.25,.75,1,0,0,0,0]],["통통",[.42,.24,.62,1.1,.08,.05,.03,0]],["뾰족",[.33,.26,.95,.95,0,0,0,0]],["로코로코",[.4,.24,.58,1.05,.12,.04,.03,0]],["넓적",[.36,.32,.6,1.25,.05,0,0,0]],["갸웃",[.38,.25,.7,1,.05,.03,.02,14]]],
+  s:[["기본",[5,.62,.07,0,0,1,0]],["통통",[5,.7,.14,.05,.06,1,0]],["뾰족",[5,.45,.02,0,0,1,0]],["젤리",[5,.66,.12,.12,.12,1,0]],["네 꼭지",[4,.5,.06,.03,.04,1,0]],["여섯 꼭지",[6,.66,.08,.03,.03,1,0]]]};
+const MKEYS={h:["mhR","mhA","mhH","mhW","mhTip","mhCl","mhInf","mhTilt"],s:["msN","msRi","msInf","msTip","msIn","msW","msTilt"]};
+let mT=0, mWhich=0; function mSoon(w){ mWhich=mWhich&&mWhich!==w?3:w; if(mT) return; mT=setTimeout(()=>{ const w2=mWhich; mT=0; mWhich=0; buildMolds(w2===3?0:w2); save(); },60); }
+for(const k in MSL){ const el=$(k); if(!el) continue; el.addEventListener("input",()=>{ G[k]=+el.value; $(k+"V").textContent=mFmt(k,G[k]); mSoon(k[1]==="h"?1:2); }); }
+const MUK="swirl-flow-molds"; function mUser(){ try{ const o=JSON.parse(localStorage.getItem(MUK)||"{}"); return {h:o.h||[],s:o.s||[]}; }catch(_){ return {h:[],s:[]}; } }
+function mApply(t,v){ MKEYS[t].forEach((k,i)=>{ if(v[i]!==undefined) G[k]=v[i]; }); buildMolds(t==="h"?1:2); save(); syncUI(); }
+function mUserUI(){ const U=mUser(); for(const t of ["h","s"]){ const box=$("m"+t+"User"); if(!box) continue; box.textContent=""; U[t].forEach((p,i)=>{ const b=document.createElement("button"); b.type="button"; b.textContent=p.n; b.addEventListener("click",()=>mApply(t,p.v)); const x=document.createElement("button"); x.type="button"; x.className="mdel"; x.textContent="×"; x.title=p.n+" 지우기"; x.addEventListener("click",()=>{ const U2=mUser(); U2[t].splice(i,1); try{ localStorage.setItem(MUK,JSON.stringify(U2)); }catch(_){} mUserUI(); }); box.append(b,x); }); } }
+for(const t of ["h","s"]){ MPRE[t].forEach((p,i)=>{ const b=$("m"+t+"P_"+i); if(b) b.addEventListener("click",()=>mApply(t,p[1])); });
+  const sv=$("m"+t+"Save"); if(sv) sv.addEventListener("click",()=>{ const nm=($("m"+t+"Name").value||"").trim()||("내 모양 "+(mUser()[t].length+1)); const U=mUser(); U[t].push({n:nm.slice(0,16),v:MKEYS[t].map(k=>G[k])}); try{ localStorage.setItem(MUK,JSON.stringify(U)); }catch(_){} $("m"+t+"Name").value=""; mUserUI(); }); }
+function mPrev(){ for(const [t,id,col] of [[1,"mhCv",[226,60,96]],[2,"msCv",[246,196,40]]]){ const cv=$(id); if(!cv || !MOLDS[t]) continue; const c=cv.getContext("2d"), W=cv.width, im=c.createImageData(W,W), T=MOLDS[t].T, s=1.25;
+  for(let py=0;py<W;py++) for(let px=0;px<W;px++){ const x=(px/W*2-1)*s, y=(1-py/W*2)*s+MOLDS[t].cy, d=tsamp(T,x,y), o=(py*W+px)*4, e=Math.min(1,Math.max(0,.5-d/(2*s/W))), b=Math.abs(d)<s*2.2/W;
+    im.data[o]=b?120:col[0]; im.data[o+1]=b?30:col[1]; im.data[o+2]=b?70:col[2]; im.data[o+3]=b?255:e*255; } c.putImageData(im,0,0); } }
+onMold=mPrev; mUserUI();
 $("kHeartR").addEventListener("input",()=>{ G.heartR=+$("kHeartR").value; $("kHeartRV").textContent=pct(G.heartR); save(); });
 $("kHShape").addEventListener("input",()=>{ G.hShape=+$("kHShape").value; $("kHShapeV").textContent=pct(G.hShape); save(); });
 $("kHeartNow").addEventListener("click",()=>{ if(!G.on) return; const r=Math.max(50,Math.sqrt(170*SP0*SP0*.866/Math.PI)*G.size*1.2), p=placeNear(CXs+(Math.random()-.5)*160,CYs+(Math.random()-.5)*120,r*1.3); addDrop(p[0],p[1],r,0,0); const l=nLobe-1; heartStyle(l); LHA[l]=(Math.random()-.5)*.5; });
@@ -1105,9 +1161,10 @@ function load(){ try{ const o=JSON.parse(localStorage.getItem(KEY)||"{}"); for(c
 const SIDES=["kS0","kS1","kS2","kS3","kS4"];
 function syncUI(){ for(const [id,k] of [["kFmax","fmax"],["kOut","outP"],["kFlow","flowInf"],["kSpd","speed"],["kHi","hi"],["kCo","co"],["kDyn","dyn"],["kVisc","visc"],["kWob","wob"],["kSt","st"],["kSize","size"],["kWf","wf"]]){ $(id).value=G[k]; $(id+"V").textContent=fmK(k,G[k]); }
   $("kFuse").value=G.fuse; $("kFuseV").textContent=G.fuse+"초"; $("kPush").value=G.push; $("kPushV").textContent=pct(G.push); $("kDep").value=G.dep; $("kDepV").textContent=pct(G.dep); $("kHeart").setAttribute("aria-pressed",G.heart?"true":"false"); for(const k of ["tfR","tfH","tfS","tfB"]) for(let i=0;i<6;i++){ const b=$(k+"_"+i); if(b) b.setAttribute("aria-pressed",(G[k]|0)===i?"true":"false"); } $("kHHi").value=G.hHi; $("kHHiV").textContent=pct(G.hHi); $("kHCo").value=G.hCo; $("kHCoV").textContent=pct(G.hCo); $("kCloud").setAttribute("aria-pressed",G.cloud?"true":"false"); $("kCloudN").value=G.cloudN; $("kCloudNV").textContent=Math.round(G.cloudN)+"개"; $("kCloudS").value=G.cloudS; $("kCloudSV").textContent=pct(G.cloudS); $("kStar").setAttribute("aria-pressed",G.star?"true":"false"); $("kBlue").setAttribute("aria-pressed",G.blue?"true":"false"); $("kStarR").value=G.starR; $("kStarRV").textContent=pct(G.starR); $("kBlueR").value=G.blueR; $("kBlueRV").textContent=pct(G.blueR); $("kHeartR").value=G.heartR; $("kHeartRV").textContent=pct(G.heartR); $("kHShape").value=G.hShape; $("kHShapeV").textContent=pct(G.hShape); if(document.activeElement!==$("kSep")) $("kSep").value=G.sep; if(document.activeElement!==$("kDwell")) $("kDwell").value=G.dwell; $("kLeave").setAttribute("aria-pressed",G.leave?"true":"false"); $("kRefill").setAttribute("aria-pressed",G.refill?"true":"false"); $("kWall").setAttribute("aria-pressed",G.walls?"true":"false"); $("kCount").value=G.count; $("kCountV").textContent=G.count+"개";
+  for(const k in MSL){ const el=$(k); if(el){ el.value=G[k]; $(k+"V").textContent=mFmt(k,G[k]); } } mPrev();
   SIDES.forEach((id,i)=>$(id).setAttribute("aria-pressed",G.side===i?"true":"false")); $("kWf").disabled=G.side===4; $("bdBox").classList.toggle("dim",!G.on); }
 SIDES.forEach((id,i)=>$(id).addEventListener("click",()=>{ G.side=i; save(); syncUI(); if(onPlace) onPlace(); if(started) reset(); }));   // 자리를 바꾸면 그 자리에서 새로 시작
-load(); applyP(); syncUI();
+load(); buildMolds(); applyP(); syncUI();
 
 let started=false;
 function inReg(){ return true; }   // 벽 없음: 화면 어디서든 잡힌다
@@ -1116,7 +1173,7 @@ return { G, setView, syncUI, setZone(a,b,c,d){ ZX0=a; ZY0=b; ZX1=c; ZY1=d; }, ce
   on(){ return !!G.on; },
   setOn(v){ G.on=v?1:0; save(); syncUI(); if(!G.on){ ptrs.clear(); if(own){ g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,W,Hh); } } },
   useCtx(ctx){ g=ctx; own=false; cv.style.display="none"; }, cam(x,y){ camX=x; camY=y; }, bgc(c){ BGC=c; }, useOwn(){ if(own) return; g=gOwn; own=true; cv.style.display=""; }, compute(dt){ compute(dt); }, draw(){ draw(); },
-  set onPlace(f){ onPlace=f; }, set onPop(f){ onPop=f; },
+  set onPlace(f){ onPlace=f; }, set onPop(f){ onPop=f; }, molds:()=>MOLDS, MG, MB, MC,
   advance(dt){ advance(dt); }, render(dt){ render(dt); },
   grab(id,x,y){ return inReg(x,y) && grab(id,x-OXp,y-OYp); }, moveTo(id,x,y){ moveTo(id,x-OXp,y-OYp); }, release(id){ release(id); }, held(id){ return ptrs.has(id); } };
 })();
