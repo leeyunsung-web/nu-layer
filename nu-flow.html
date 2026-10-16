@@ -209,6 +209,8 @@ canvas.hold{cursor:grabbing}
     <label class="it" data-k="kDwell"><span>머무는 시간</span><span class="numw"><input id="kDwell" type="number" min="1" max="600" step="1" value="12" inputmode="decimal"> 초</span><small class="desc">밀려나가기 전에 떠 있는 시간. 방울마다 이 값의 60~140%로 조금씩 다릅니다.</small></label>
     <div class="it row" data-k="kHeart"><span>하트 방울</span><button id="kHeart" type="button" aria-pressed="true">하트 방울</button><button id="kHeartNow" type="button">하트 하나 더하기</button><small class="desc">로코로코처럼 지금 핏방울을 하트 모양 틀 안에 머물게 해 하트로 잡습니다. 출렁임·명암·하이라이트·잡아 늘리기는 핏방울 그대로입니다.</small></div>
     <label class="it" data-k="kHeartR"><span>하트 비율</span><input id="kHeartR" type="range" min="0" max="1" step="0.05" value="0.3"><output id="kHeartRV">30%</output><small class="desc">새로 생기는 방울 가운데 하트로 나오는 비율.</small></label>
+    <label class="it" data-k="kHHi"><span>하트 하이라이트</span><input id="kHHi" type="range" min="0" max="2" step="0.05" value="0.8"><output id="kHHiV">80%</output><small class="desc">하트 방울의 연분홍 하이라이트 양. 그림처럼 둥근 덩이 하나와 작은 점이 맺힙니다.</small></label>
+    <label class="it" data-k="kHCo"><span>하트 어둠</span><input id="kHCo" type="range" min="0" max="2.5" step="0.05" value="0.9"><output id="kHCoV">90%</output><small class="desc">하트 방울의 진한 다홍 어둠 양. 높을수록 그늘진 쪽이 넓어집니다.</small></label>
     <div class="it row" data-k="kStar"><span>별 방울</span><button id="kStar" type="button" aria-pressed="true">별 방울</button><button id="kStarNow" type="button">별 하나 더하기</button><small class="desc">핏방울과 같은 말랑한 방울을 오각별 틀에 머물게 해 노란 별로 잡습니다. 물을 타고, 잡아 늘리고, 터뜨릴 수 있습니다.</small></div>
     <label class="it" data-k="kStarR"><span>별 비율</span><input id="kStarR" type="range" min="0" max="1" step="0.05" value="0.15"><output id="kStarRV">15%</output><small class="desc">새로 생기는 방울 가운데 별로 나오는 비율.</small></label>
     <div class="it row" data-k="kBlue"><span>파란 물방울</span><button id="kBlue" type="button" aria-pressed="true">파란 물방울</button><button id="kBlueNow" type="button">파란 방울 더하기</button><small class="desc">핏방울과 똑같이 움직이는 하늘색·파랑 방울. 색이 다른 방울끼리는 섞이지 않습니다.</small></div>
@@ -759,7 +761,7 @@ function towFrom(seeds,vx,vy,lam){ const qt=linked(seeds);
 /* ── 판 차리기 ── */
 const AREA=540000, SIZES=[60,46,38,31,25,20,16];
 let W=0, Hh=0, dpr=1, scale=1, extra=0;
-const G={on:1,dep:.6,heart:1,heartR:.3,hShape:1,star:1,starR:.15,blue:1,blueR:.2,cloud:1,cloudN:3,cloudS:1,flowInf:.3,fmax:120,outP:.5,walls:0,speed:1,sep:3,leave:1,dwell:12,push:1,refill:1,hi:1,co:1,dyn:1,fuse:3,size:.8,count:5,side:0,wf:.42,visc:1,wob:1,st:1};   // side: 0 오른쪽 1 왼쪽 2 위 3 아래 4 화면 전체   // 전체 조절값: 하이라이트 크기, 어두운 부분 크기, 출렁임
+const G={on:1,dep:.6,heart:1,heartR:.3,hShape:1,hHi:.8,hCo:.9,star:1,starR:.15,blue:1,blueR:.2,cloud:1,cloudN:3,cloudS:1,flowInf:.3,fmax:120,outP:.5,walls:0,speed:1,sep:3,leave:1,dwell:12,push:1,refill:1,hi:1,co:1,dyn:1,fuse:3,size:.8,count:5,side:0,wf:.42,visc:1,wob:1,st:1};   // side: 0 오른쪽 1 왼쪽 2 위 3 아래 4 화면 전체   // 전체 조절값: 하이라이트 크기, 어두운 부분 크기, 출렁임
 let sel=-1;                  // 선택한 방울에 속한 알갱이 하나 (방울이 합쳐지면 합쳐진 덩어리가 선택된다)
 let ZX0=0, ZY0=0, ZX1=930, ZY1=580;   // 처음 놓이는 자리 (화면은 소용돌이와 함께 쓴다)
 function place(R,key){ // 다른 방울과 겹치지 않는 빈자리를 고른다
@@ -783,10 +785,11 @@ const MOLDS=[null,null,MOLD(sdStar5)]; let grpNo=0;
 function addCloud(cx,cy){ const gid=(grpNo++)%30000, n=4+Math.floor(Math.random()*3), S=G.cloudS*G.size*1.25; let k=0;
   for(let q=0;q<n;q++){ const u=(q-(n-1)/2)/((n-1)/2||1), r=(16+12*(1-Math.abs(u))+6*Math.random())*S, ox=u*(n-1)*17*S, oy=-(1-u*u)*15*S+(Math.random()-.5)*8*S;
     k+=addDrop(cx+ox,cy+oy,r,0,0); const l=nLobe-1; LCOL[l]=3; LKEEP[l]=1; LGRP[l]=gid; LOX[l]=ox; LOY[l]=oy; } return k; }
+function heartStyle(l){ LHRT[l]=1; LCOL[l]=5; LKEEP[l]=1; LAC[l]=1; LAS[l]=0; LEL[l]=.8; LSZ[l]=.27; const a2=1.05; L2C[l]=Math.cos(a2); L2S[l]=Math.sin(a2); L2Z[l]=.24; L3Z[l]=0; for(let q=0;q<8;q++) SB[q][l]=SE[q][l]; }   // 하트: 하이라이트는 둥근 덩이 하나 + 작은 점, 되비침 없음
 function addShape(cx,cy,base,vx,vy,key){ const u=hh(key,80);
   if(G.star && base>=12 && hh(key,93)<G.starR){ const k=addDrop(cx,cy,Math.max(base*2.4,88*G.size),vx,vy), l=nLobe-1; LHRT[l]=2; LCOL[l]=1; LKEEP[l]=1; LHA[l]=(hh(key,94)-.5)*.8; return k; }   // 별 방울: 노랑, 오각별 틀
   if(G.blue && hh(key,95)<G.blueR){ const k=addDrop(cx,cy,Math.max(base,14),vx,vy), l=nLobe-1; LCOL[l]=2; LKEEP[l]=1; return k; }   // 파란 물방울: 둥근 방울, 파랑
-  if(G.heart && base>=12 && hh(key,91)<G.heartR){ const k=addDrop(cx,cy,Math.max(base*1.7,62*G.size),vx,vy), l=nLobe-1;   /* 하트는 알갱이가 넉넉해야 오목한 윗부분과 뾰족한 끝이 산다 */ LHRT[l]=1; LKEEP[l]=1; LHA[l]=(hh(key,92)-.5)*.6; return k; }   // 하트 방울: 정한 비율만큼
+  if(G.heart && base>=12 && hh(key,91)<G.heartR){ const k=addDrop(cx,cy,Math.max(base*1.7,62*G.size),vx,vy), l=nLobe-1;   /* 하트는 알갱이가 넉넉해야 오목한 윗부분과 뾰족한 끝이 산다 */ heartStyle(l); LHA[l]=(hh(key,92)-.5)*.6; return k; }   // 하트 방울: 정한 비율만큼
   if(u<.42 || base<11) return addDrop(cx,cy,base,vx,vy);
   if(u<.58) return addDrop(cx,cy,base,vx,vy,1.3+.8*hh(key,81),hh(key,82)*TAU);
   const n=u<.85?2:3+(hh(key,83)<.4?1:0), bend=(hh(key,85)-.5)*1.4; let x=cx, y=cy, a=hh(key,84)*TAU, pr=0, k=0; const ls=[];
@@ -932,7 +935,7 @@ function light(dt){ const n=gw*gh, d=G.dyn, tt=simT, tn=tt*d, la=LBASE+d*(.1*Mat
   const X0=Math.max(1,QB0), X1=Math.min(gw-2,QB1), Y0=Math.max(1,QC0), Y1=Math.min(gh-2,QC1);
   for(let y=Y0;y<=Y1;y++){ let k=y*gw+X0; for(let x=X0;x<=X1;x++,k++){ const f=F[k]; if(f<=TH){ SD[k]=-1.2; SH[k]=-1; S2[k]=-1; continue; }
     const fi=1/f, tl=.03*d; let nx=-(HT[k+1]-HT[k-1])*i2+FLX[k]*fi*tl, ny=-(HT[k+gw]-HT[k-gw])*i2+FLY[k]*fi*tl; const il=1/Math.sqrt(nx*nx+ny*ny+1); nx*=il; ny*=il; const nzz=il;
-    const wx=x*CELL, wy=y*CELL, ac=G.co*FK[k]*fi, ah=G.hi*FH[k]*fi, l=LID[k];
+    const l=LID[k], hq=l>=0 && LHRT[l]===1, wx=x*CELL, wy=y*CELL, ac=G.co*FK[k]*fi*(hq?G.hCo:1), ah=G.hi*FH[k]*fi*(hq?G.hHi:1);   // 하트 방울은 하이라이트·어둠 양을 따로
     // 어두운 면
     // 어두운 면: 빛을 등진 비탈과 골. 경계는 안에서 흐르는 물결을 따라 일렁이고, 테두리 앞에서는 되비친 빛 때문에 바탕색 테를 남긴다 (테의 폭은 자리마다 다르고 아예 없는 곳도 있다)
     const rw=13*Math.pow(nz(wx*1.2+tn*6,wy*1.2-tn*4,tn*.8,1),2)-1.4, fl=nz(wx+13*Math.sin(wy*.05+tn*.9),wy+13*Math.cos(wx*.05-tn*.8),tn*1.4,0);
@@ -970,7 +973,7 @@ function loopPath(L,l){ const s=L.S[l], n=L.N[l], LB=L.B; if(n<3) return; let px
 /* 깊이: 방울(바깥 윤곽)마다 먼 쪽·가운데·가까운 쪽이 정해져 있다. 먼 방울은 작고 배경에 묻히며, 시점이 움직이면 깊이만큼 엇갈린다.
    어두운 면과 하이라이트는 자기를 감싼 바깥 윤곽을 따라간다 */
 let camX=0, camY=0; const DPA={n:0,cx:[],cy:[],x0:[],y0:[],x1:[],y1:[],root:[],z:[],col:[]};
-const CY={base:"#FAD805",core:"#EDA40E",hi:"#FFF6AE",line:"#C57718"}, CB={base:"#70CCE8",core:"#159FDD",hi:"#FFFFFF",line:"#1B6FA8"}, CW={base:"#FFFFFF",core:"#F9F4E6",hi:"#FFFFFF",line:"#F4C21A"};   // 거품 구름: 흰 몸, 크림 그늘, 노란 테두리   // 별 방울(노랑)·파란 물방울 색 (그림 팔레트)
+const CY={base:"#FAD805",core:"#EDA40E",hi:"#FFF6AE",line:"#C57718"}, CB={base:"#70CCE8",core:"#159FDD",hi:"#FFFFFF",line:"#1B6FA8"}, CW={base:"#FFFFFF",core:"#F9F4E6",hi:"#FFFFFF",line:"#F4C21A"}, CHT={base:"#EF4E63",core:"#C41640",hi:"#F7BCCB",line:"#9E1238"};   // 하트: 그림 속 하트처럼 산호빛 빨강·진한 다홍 어둠·연분홍 하이라이트   // 거품 구름: 흰 몸, 크림 그늘, 노란 테두리   // 별 방울(노랑)·파란 물방울 색 (그림 팔레트)
 function lavg(L,l,o){ const s=L.S[l], n=L.N[l], B=L.B; let x=0, y=0, x0=1e9, y0=1e9, x1=-1e9, y1=-1e9; for(let i=0;i<n;i++){ const a=B[s+2*i], b=B[s+2*i+1]; x+=a; y+=b; if(a<x0) x0=a; if(a>x1) x1=a; if(b<y0) y0=b; if(b>y1) y1=b; } o[0]=n?x/n:0; o[1]=n?y/n:0; o[2]=x0; o[3]=y0; o[4]=x1; o[5]=y1; }
 function inLoop(L,l,px,py){ const s=L.S[l], n=L.N[l], B=L.B; let c=false; for(let i=0,j=n-1;i<n;j=i++){ const xi=B[s+2*i], yi=B[s+2*i+1], xj=B[s+2*j], yj=B[s+2*j+1]; if((yi>py)!==(yj>py) && px<(xj-xi)*(py-yi)/(yj-yi)+xi) c=!c; } return c; }
 const LAV=[0,0,0,0,0,0];
@@ -987,7 +990,7 @@ function loopPathT(L,l,r){ const s=L.S[l], n=L.N[l], LB=L.B; if(n<3) return; con
 const mixC=(a,b,t)=>{ const p=h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)], A=p(a), B=p(b); return "rgb("+A.map((v,i)=>Math.round(v+(B[i]-v)*t)).join(",")+")"; };
 const PRC=[[],[],[],[]];
 function drawDepth(){ prepDepth(); const D=DPA; for(const [q,L] of [[1,CL],[2,HL],[3,H2]]){ const P=PRC[q]; P.length=L.n; for(let l=0;l<L.n;l++){ const p=parentOf(L,l); if(p>=0){ P[l]=D.root[p]; continue; } let b=-1, bd=1e18; for(let m=0;m<D.n;m++){ if(D.root[m]!==m) continue; const d=(D.cx[m]-LAV[0])**2+(D.cy[m]-LAV[1])**2; if(d<bd){ bd=d; b=m; } } P[l]=b; } }   // 소속을 못 찾은 조각은 가장 가까운 방울에 붙인다 (빠져서 깜빡이지 않게)
-  for(const zb of [-1,0,1]) for(const ck of [0,1,2,3]){ let any=false; for(let l=0;l<D.n;l++) if(D.z[D.root[l]]===zb && D.col[D.root[l]]===ck){ any=true; break; } if(!any) continue; const CC=ck===1?CY:ck===2?CB:ck===3?CW:C;   // 깊이별·색별로 나눠 칠한다
+  for(const zb of [-1,0,1]) for(const ck of [0,1,2,3,5]){ let any=false; for(let l=0;l<D.n;l++) if(D.z[D.root[l]]===zb && D.col[D.root[l]]===ck){ any=true; break; } if(!any) continue; const CC=ck===1?CY:ck===2?CB:ck===3?CW:ck===5?CHT:C;   // 깊이별·색별로 나눠 칠한다
     const t=zb<0?.42*G.dep:0, cb=t?mixC(CC.base,BGC,t):CC.base, cc=t?mixC(CC.core,BGC,t):CC.core, ch=t?mixC(CC.hi,BGC,t):CC.hi, cl=t?mixC(CC.line,BGC,t):CC.line, lw=3.4*(1+(zb<0?-.34:zb>0?.16:0)*G.dep);
     g.beginPath(); for(let l=0;l<D.n;l++){ const r=D.root[l]; if((D.z[r]===zb && D.col[r]===ck)) loopPathT(BL,l,r); } g.fillStyle=cb; g.fill(); g.save(); g.clip();
     g.beginPath(); for(let l=0;l<CL.n;l++){ const r=PRC[1][l]; if(r>=0 && (D.z[r]===zb && D.col[r]===ck)) loopPathT(CL,l,r); } g.fillStyle=cc; g.fill();
@@ -1056,10 +1059,11 @@ $("kBlueNow").addEventListener("click",()=>{ if(!G.on) return; const r=Math.max(
 $("kCloud").addEventListener("click",()=>{ G.cloud=G.cloud?0:1; save(); syncUI(); });
 for(const [id,k] of [["kCloudN","cloudN"],["kCloudS","cloudS"]]) $(id).addEventListener("input",()=>{ G[k]=+$(id).value; $(id+"V").textContent=k==="cloudN"?Math.round(G[k])+"개":pct(G[k]); save(); });
 $("kCloudNow").addEventListener("click",()=>{ if(!G.on) return; const p=placeNear(CXs+(Math.random()-.5)*300,CYs+(Math.random()-.5)*200,80*G.cloudS); addCloud(p[0],p[1]); });
+for(const [id,k] of [["kHHi","hHi"],["kHCo","hCo"]]) $(id).addEventListener("input",()=>{ G[k]=+$(id).value; $(id+"V").textContent=pct(G[k]); save(); });
 $("kHeart").addEventListener("click",()=>{ G.heart=G.heart?0:1; save(); syncUI(); });
 $("kHeartR").addEventListener("input",()=>{ G.heartR=+$("kHeartR").value; $("kHeartRV").textContent=pct(G.heartR); save(); });
 $("kHShape").addEventListener("input",()=>{ G.hShape=+$("kHShape").value; $("kHShapeV").textContent=pct(G.hShape); save(); });
-$("kHeartNow").addEventListener("click",()=>{ if(!G.on) return; const r=Math.max(50,Math.sqrt(170*SP0*SP0*.866/Math.PI)*G.size*1.2), p=placeNear(CXs+(Math.random()-.5)*160,CYs+(Math.random()-.5)*120,r*1.3); addDrop(p[0],p[1],r,0,0); const l=nLobe-1; LHRT[l]=1; LKEEP[l]=1; LHA[l]=(Math.random()-.5)*.5; });
+$("kHeartNow").addEventListener("click",()=>{ if(!G.on) return; const r=Math.max(50,Math.sqrt(170*SP0*SP0*.866/Math.PI)*G.size*1.2), p=placeNear(CXs+(Math.random()-.5)*160,CYs+(Math.random()-.5)*120,r*1.3); addDrop(p[0],p[1],r,0,0); const l=nLobe-1; heartStyle(l); LHA[l]=(Math.random()-.5)*.5; });
 $("kDep").addEventListener("input",()=>{ G.dep=+$("kDep").value; $("kDepV").textContent=pct(G.dep); save(); });
 $("kPush").addEventListener("input",()=>{ G.push=+$("kPush").value; $("kPushV").textContent=pct(G.push); save(); });
 $("kSep").addEventListener("input",()=>{ const v=+$("kSep").value; if(!(v>=0)) return; G.sep=Math.min(60,v); save(); });
@@ -1081,7 +1085,7 @@ function save(){ try{ localStorage.setItem(KEY,JSON.stringify(G)); }catch(_){} }
 function load(){ try{ const o=JSON.parse(localStorage.getItem(KEY)||"{}"); for(const k in o) if(k in G && typeof o[k]==="number") G[k]=o[k]; }catch(_){} }
 const SIDES=["kS0","kS1","kS2","kS3","kS4"];
 function syncUI(){ for(const [id,k] of [["kFmax","fmax"],["kOut","outP"],["kFlow","flowInf"],["kSpd","speed"],["kHi","hi"],["kCo","co"],["kDyn","dyn"],["kVisc","visc"],["kWob","wob"],["kSt","st"],["kSize","size"],["kWf","wf"]]){ $(id).value=G[k]; $(id+"V").textContent=fmK(k,G[k]); }
-  $("kFuse").value=G.fuse; $("kFuseV").textContent=G.fuse+"초"; $("kPush").value=G.push; $("kPushV").textContent=pct(G.push); $("kDep").value=G.dep; $("kDepV").textContent=pct(G.dep); $("kHeart").setAttribute("aria-pressed",G.heart?"true":"false"); $("kCloud").setAttribute("aria-pressed",G.cloud?"true":"false"); $("kCloudN").value=G.cloudN; $("kCloudNV").textContent=Math.round(G.cloudN)+"개"; $("kCloudS").value=G.cloudS; $("kCloudSV").textContent=pct(G.cloudS); $("kStar").setAttribute("aria-pressed",G.star?"true":"false"); $("kBlue").setAttribute("aria-pressed",G.blue?"true":"false"); $("kStarR").value=G.starR; $("kStarRV").textContent=pct(G.starR); $("kBlueR").value=G.blueR; $("kBlueRV").textContent=pct(G.blueR); $("kHeartR").value=G.heartR; $("kHeartRV").textContent=pct(G.heartR); $("kHShape").value=G.hShape; $("kHShapeV").textContent=pct(G.hShape); if(document.activeElement!==$("kSep")) $("kSep").value=G.sep; if(document.activeElement!==$("kDwell")) $("kDwell").value=G.dwell; $("kLeave").setAttribute("aria-pressed",G.leave?"true":"false"); $("kRefill").setAttribute("aria-pressed",G.refill?"true":"false"); $("kWall").setAttribute("aria-pressed",G.walls?"true":"false"); $("kCount").value=G.count; $("kCountV").textContent=G.count+"개";
+  $("kFuse").value=G.fuse; $("kFuseV").textContent=G.fuse+"초"; $("kPush").value=G.push; $("kPushV").textContent=pct(G.push); $("kDep").value=G.dep; $("kDepV").textContent=pct(G.dep); $("kHeart").setAttribute("aria-pressed",G.heart?"true":"false"); $("kHHi").value=G.hHi; $("kHHiV").textContent=pct(G.hHi); $("kHCo").value=G.hCo; $("kHCoV").textContent=pct(G.hCo); $("kCloud").setAttribute("aria-pressed",G.cloud?"true":"false"); $("kCloudN").value=G.cloudN; $("kCloudNV").textContent=Math.round(G.cloudN)+"개"; $("kCloudS").value=G.cloudS; $("kCloudSV").textContent=pct(G.cloudS); $("kStar").setAttribute("aria-pressed",G.star?"true":"false"); $("kBlue").setAttribute("aria-pressed",G.blue?"true":"false"); $("kStarR").value=G.starR; $("kStarRV").textContent=pct(G.starR); $("kBlueR").value=G.blueR; $("kBlueRV").textContent=pct(G.blueR); $("kHeartR").value=G.heartR; $("kHeartRV").textContent=pct(G.heartR); $("kHShape").value=G.hShape; $("kHShapeV").textContent=pct(G.hShape); if(document.activeElement!==$("kSep")) $("kSep").value=G.sep; if(document.activeElement!==$("kDwell")) $("kDwell").value=G.dwell; $("kLeave").setAttribute("aria-pressed",G.leave?"true":"false"); $("kRefill").setAttribute("aria-pressed",G.refill?"true":"false"); $("kWall").setAttribute("aria-pressed",G.walls?"true":"false"); $("kCount").value=G.count; $("kCountV").textContent=G.count+"개";
   SIDES.forEach((id,i)=>$(id).setAttribute("aria-pressed",G.side===i?"true":"false")); $("kWf").disabled=G.side===4; $("bdBox").classList.toggle("dim",!G.on); }
 SIDES.forEach((id,i)=>$(id).addEventListener("click",()=>{ G.side=i; save(); syncUI(); if(onPlace) onPlace(); if(started) reset(); }));   // 자리를 바꾸면 그 자리에서 새로 시작
 load(); applyP(); syncUI();
