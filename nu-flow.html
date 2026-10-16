@@ -816,10 +816,12 @@ const QS=[["q1",2.1e6],["q2",3.7e6],["q3",8.4e6]];
 function syncQ(){ for(const [id,q] of QS) $(id).setAttribute("aria-pressed",Math.abs(QMAX-q)<1?"true":"false"); }
 for(const [id,q] of QS) $(id).addEventListener("click",()=>{ QMAX=q; try{ localStorage.setItem("nu-flow-q",String(q)); }catch(_){} syncQ(); });
 syncQ();
+const DLP=(window.claude && typeof window.claude.use==="function")?window.claude.use("downloads").catch(()=>null):null;   // 일반 웹(깃허브 페이지)에서는 그냥 내려받기
 function savePNG(){ const c=document.createElement("canvas"); c.width=cv.width; c.height=cv.height; const x=c.getContext("2d"); x.drawImage(cv,0,0);   // 핏방울도 같은 화면에 그려져 있다
  
   const d=new Date(), p=v=>String(v).padStart(2,"0"), nm="nu-flow_"+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+"_"+p(d.getHours())+p(d.getMinutes())+p(d.getSeconds())+".png";
-  c.toBlob(b=>{ if(!b) return; const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download=nm; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),5000); },"image/png"); }
+  c.toBlob(async b=>{ if(!b) return; const dl=DLP?await DLP:null; if(dl){ try{ await dl.save({filename:nm,data:b}); }catch(_){} return; }   // claude.ai 안에서는 저장 확인 창을 거친다
+    const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download=nm; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),5000); },"image/png"); }
 $("bSave").addEventListener("click",savePNG);
 
 /* 두 창 잇기: 화면 창은 조절 창에서 온 손짓을 제 손잡이에 그대로 옮기고, 지금 상태를 조절 창에 돌려준다 (같은 출처의 BroadcastChannel) */
