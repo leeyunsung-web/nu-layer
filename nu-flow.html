@@ -786,7 +786,7 @@ function step(){ const DS=DT*G.speed, DMP=Math.pow(P.DAMP,G.speed), VS=P.VISC*Ma
     const a=1-Math.sqrt(r2)*ih, a2=a*a; RHO[i]+=a2; RHO[j]+=a2; RHN[i]+=a2*a; RHN[j]+=a2*a; if(LBL[i]!==LBL[j] && a>.35) ufU(LBL[i],LBL[j]); }
   for(let p=0;p<NP;p++){ const i=PI_[p], j=PJ_[p], dx=X[j]-X[i], dy=Y[j]-Y[i], r2=dx*dx+dy*dy; if(r2>=h2) continue;
     const r=Math.sqrt(r2)+1e-6, a=1-r*ih; let D=(P.K*((RHO[i]+RHO[j])*.5-P.RHO0)*a+P.KN*(RHN[i]+RHN[j])*.5*a*a)*.5/r, c=P.ST*a;
-    if(LBL[i]!==LBL[j]){ const li=LBL[i], lj=LBL[j], f=P.XL+(1-P.XL)*(1-(LTO[li]===lj?LFD[li]:LTO[lj]===li?LFD[lj]:1)); c*=f; if(D<0) D*=f; if(LNF[li]>simT || LNF[lj]>simT){ c=0; if(D<0) D=0; } if(G.touch===1 && (LCOL[li]!==LCOL[lj] || LHRT[li]!==LHRT[lj])){ c*=.15; D=Math.max(D,0)+.09*a; } }   // 뭉치기만: 다른 색끼리는 살짝 떨어져 붙어 있어 테두리가 따로 보인다   // 막 흩어진 방울은 정한 초 동안 서로 끌어당기지 않는다   // 서로 다른 덩이끼리는 덜 끌어당긴다: 붙기는 하지만 각자 둥글게 남아 사이가 잘록해진다
+    if(LBL[i]!==LBL[j]){ const li=LBL[i], lj=LBL[j], f=P.XL+(1-P.XL)*(1-(LTO[li]===lj?LFD[li]:LTO[lj]===li?LFD[lj]:1)); c*=f; if(D<0) D*=f; if(LNF[li]>simT || LNF[lj]>simT){ c=0; if(D<0) D=0; } if(G.touch===1 && !(LGRP[li]>=0 && LGRP[li]===LGRP[lj])){ c*=.15; D=Math.max(D,0)+.09*a; } }   // 뭉치기만: 방울끼리 살짝 떨어져 붙어 있어 각자 테두리·색이 따로 보인다   // 막 흩어진 방울은 정한 초 동안 서로 끌어당기지 않는다   // 서로 다른 덩이끼리는 덜 끌어당긴다: 붙기는 하지만 각자 둥글게 남아 사이가 잘록해진다
     if(LBL[i]!==LBL[j] && JL>0 && D>c && !(LGRP[LBL[i]]>=0 && LGRP[LBL[i]]===LGRP[LBL[j]])){ const q=(D-c)*JL, li=LBL[i], lj=LBL[j]; LJX[li]-=dx*q; LJY[li]-=dy*q; LJX[lj]+=dx*q; LJY[lj]+=dy*q; D-=q; }   // 실제로 밀어내는 만큼만 방울 전체에 나눈다 (붙어 있는 방울끼리 늘어나 지렁이처럼 되지 않게)   // 다른 방울끼리 밀 때: 일부는 닿은 알갱이만, 나머지는 방울 전체가 말랑하게 같이 밀린다
     DX[i]+=dx*(c-D); DY[i]+=dy*(c-D); DX[j]-=dx*(c-D); DY[j]-=dy*(c-D); }
   if(JL>0){ for(let l=0;l<nLobe;l++) if(LCNT[l]){ const k=1/LCNT[l]; LJX[l]*=k; LJY[l]*=k; } for(let i=0;i<N;i++){ const l=LBL[i]; DX[i]+=LJX[l]; DY[i]+=LJY[l]; } LJX.fill(0,0,nLobe); LJY.fill(0,0,nLobe); }
@@ -979,7 +979,7 @@ function lobes(dt){ FMX=Math.PI*(G.fmax/2)*(G.fmax/2)/(SP0*SP0*.866); const n=gw
     if(o>=0 && (LCNT[o]>LCNT[own] || (LCNT[o]===LCNT[own] && o<own)) && (LCAND[own]<0 || LCNT[o]>LCNT[LCAND[own]])) LCAND[own]=o; }
   // 맞닿은 지 정해 둔 시간이 지나면 작은 덩이가 큰 덩이에 녹아든다: 사이의 골이 옅어지고, 빛 성격이 큰 덩이를 닮아 가다가, 한 덩이가 된다
   let any=false;
-  for(let l=0;l<nLobe;l++){ if(!LCNT[l]) continue; let c=LCAND[l]; if(c>=0 && G.touch===1 && (LCOL[l]!==LCOL[c] || LHRT[l]!==LHRT[c])) c=-1;   // '닿아도 뭉치기만': 색이나 모양이 다른 방울끼리는 녹아들지 않는다
+  for(let l=0;l<nLobe;l++){ if(!LCNT[l]) continue; let c=LCAND[l]; if(c>=0 && G.touch===1 && !(LGRP[l]>=0 && LGRP[l]===LGRP[c])) c=-1;   // '닿아도 뭉치기만': 방울끼리 녹아들지 않는다 (같은 색이어도. 한 구름 안의 송이만 예외)
     if(c>=0){ if(LTM[l]===0){ LEV[l]+=7; LEV[c]+=5; }   // 닿는 순간 움찔한다
       LTO[l]=c; LTM[l]+=dt; const fz=LFR[l]||LFR[c]?Math.min(G.fuse,.5):G.fuse; LFD[l]=1-sm((LTM[l]-fz)/(LFR[l]||LFR[c]?.4:1.2)); if(LFD[l]<=.002){ LFUS[l]=c; any=true; LEV[c]+=6; } } else { LTO[l]=-1; LTM[l]=0; LFD[l]=1; }   // 터진 조각끼리는 다시 닿으면 금방 하나가 된다
     LEV[l]+=(-80*LEX[l]-4.6*LEV[l])*dt; LEX[l]=clamp(LEX[l]+LEV[l]*dt,-1,1); }
