@@ -81,7 +81,7 @@ canvas.hold{cursor:grabbing}
   <div class="stage"><canvas id="cv" aria-label="기류를 타고 도는 액체 화면. 끌면 물이 저어지고, 핏방울을 잡아 끌면 늘어납니다."></canvas><canvas id="cv2" aria-hidden="true"></canvas><div id="fpsM" class="fpsm" hidden></div></div>
   <div class="ctl vis">
     <div class="it row" data-k="vA"><span>보이기</span><button id="vA" type="button" aria-pressed="true">분홍 A</button><button id="vB" type="button" aria-pressed="true">분홍 B</button><button id="vP" type="button" aria-pressed="true">보라</button><button id="vR" type="button" aria-pressed="true">붉은</button><button id="vD" type="button" aria-pressed="true">핏방울</button><small class="desc">오브젝트를 하나씩 켜고 끕니다. 끄면 그 액체는 지워지고 더 생기지 않으며 계산도 쉽니다.</small></div>
-    <div class="it row" data-k="q1"><span>화질</span><button id="q1" type="button" aria-pressed="false">가볍게</button><button id="q2" type="button" aria-pressed="true">보통</button><button id="q3" type="button" aria-pressed="false">선명</button><small class="desc">큰 창에서 그리는 해상도의 상한(가볍게 1080p · 보통 1440p · 선명 4K). 버벅이면 저절로 조금 낮췄다가 넉넉해지면 되돌립니다.</small></div>
+    <div class="it row" data-k="q1"><span>화질</span><button id="q1" type="button" aria-pressed="false">가볍게</button><button id="q2" type="button" aria-pressed="true">보통</button><button id="q3" type="button" aria-pressed="false">선명</button><button id="qA" type="button" aria-pressed="false">자동 낮추기</button><small class="desc">큰 창에서 그리는 해상도의 상한(가볍게 1080p · 보통 1440p · 선명 4K). '자동 낮추기'를 켜면 버벅일 때 저절로 낮췄다가 넉넉해지면 되돌립니다(바뀌는 순간 선명도가 툭 바뀌어 보여 기본은 꺼짐).</small></div>
     <div class="it row" data-k="bSave"><span>도구</span><button id="bSave" type="button">⤓ 이미지 저장</button><button id="fpsT" type="button" aria-pressed="false">fps 표시</button><button id="sExp" type="button">설정 내보내기</button><button id="sImp" type="button">설정 불러오기</button><button id="mEdit" type="button" aria-pressed="false">메뉴 편집</button><button id="mRestore" type="button">숨긴 메뉴 되돌리기</button><small class="desc">이미지 저장: 지금 화면을 PNG로. fps 표시: 화면이 실제로 초당 몇 장 그려지는지. 설정 내보내기·불러오기: 지금 값을 파일로 옮겨 다른 곳(깃허브 NU FLOW·내려받은 파일)에서도 그대로 씁니다. 메뉴 편집: 필요 없는 메뉴를 ✕로 숨깁니다(되돌리기 가능).</small></div>
     <input id="sFile" type="file" accept=".json,application/json" hidden>
   </div>
@@ -186,7 +186,8 @@ const AREA=540000, CELL=5, CV=10, PAD=60, DT=1/30, NC=4, NL=2;
 const G={vis:[1,1,1,1], sp:1, spShow:0, spDen:1, spW:34, spPull:1, spStr:1, spBg:.35, spArms:1, spRot:1, spWob:1, speed:1, carry:1, dry:1, circ:.9, lspd:.5, dir:1, sep:.5, merge:1, head:1.3, tail:.9, strands:1.5, round:1, init:6, add:3, per:3.4, spin:1, calm:1, out:1, tailDry:1.5,
   mat:[{dir:0,exitR:.3,sl:1,size:1,share:1,ksz:.42,brk:.55,hth:.36,hmin:40,bsz:.17,td:.5,nA:.16,dth:.5},{dir:0,exitR:.3,sl:1,size:1,share:.25,ksz:.42,brk:0,hth:.36,hmin:40,bsz:0,td:.62,nA:.3,dth:.5},{dir:0,exitR:.3,sl:1,size:1,share:.4,ksz:.4,brk:0,hth:.36,hmin:40,bsz:.17,td:.6,nA:.3,dth:.5},{dir:0,exitR:.3,sl:1,size:1,share:1,ksz:.42,brk:.55,hth:.36,hmin:40,bsz:.17,td:.5,nA:.16,dth:.5}]};   // 오브젝트마다: 크기, 솟는 비율, 하이라이트·어두운 면 세부   // out: 밖으로 밀려나는 힘   // spin: 도는 힘, calm: 물이 제 흐름으로 돌아오는 빠르기   // init: 처음 개수, add: 한 번에 더 솟는 개수, per: 간격(초)   // head: 머리 뭉침, tail: 꼬리 늘어짐, strands: 떨어지는 가닥 수
 const LIVE=[]; let UNI, THK, NSF, MX, MY, TMP2, RD=[], RDF, PV=[], backT=0, backPT=0, STEPPED=false, FLIP=false;   // PV: 한 박자 전의 잉크 (그리기는 PV→지금 사이를 이어서 그린다), FLIP: 이 채널은 반대로 돈다
-const dirC=c=>G.mat[c].dir||G.dir;   // 오브젝트마다의 도는 방향 (0이면 전체를 따른다)   // RD: 그리기용으로 물을 따라 반 박자 밀어 둔 잉크 (프레임 사이를 메운다)
+const dirC=c=>G.mat[c].dir||G.dir;
+const TR={bead:0,tgt:0};   // 끊김 진단용 표시   // 오브젝트마다의 도는 방향 (0이면 전체를 따른다)   // RD: 그리기용으로 물을 따라 반 박자 밀어 둔 잉크 (프레임 사이를 메운다)
 /* 빠르게: 화면을 8×8칸 묶음으로 나눠, 잉크가 있는 묶음(과 그 둘레)만 계산한다 */
 let TU, TV, tgN=0, tgX=1e9, tgY=1e9;
 const TL=8, TB=new Int32Array(4); let tW=0, tH=0, TMK, UM, AM, ULS, ALS, UCN=0, ACN=0, TLS=[], TCN, BASEX, BASEY, WU, WV, WUF, WVF, DRY, dryX=1e9, dryY=1e9, CEL, LBL, STK;   // NSF: 물에 실려 떠다니는 '삭는 무늬' (꼬리가 군데군데 잘록해지는 자리)   // 층·채널마다 잉크가 남아 있는지   // 조절값: 도는 방향, 따로 노는 비율, 뭉치는 힘
@@ -228,7 +229,7 @@ function target(x,y,t){ const rx=x-CX, ry=y-CY, r=Math.hypot(rx,ry)+1e-3, v=FLW.
   FO[0]=vx; FO[1]=vy; return FO; }
 const stirs=[];   // 손가락이 젓는 자리: [x,y,vx,vy]
 function forces(dt){ const t=simT, kf=Math.min(1,FLW.kf*G.calm*dt);
-  if((tgN++)%3===0 || CX!==tgX || CY!==tgY){ tgX=CX; tgY=CY; for(let y=1;y<vh-1;y++){ let k=y*vw+1; for(let x=1;x<vw-1;x++,k++){ const f=target(x*CV-PAD,y*CV-PAD,t); TU[k]=f[0]; TV[k]=f[1]; } } }   // 목표 기류는 세 박자에 한 번 계산해 둔다 (천천히 바뀌므로)
+  { const ph=(tgN++)%3, full=CX!==tgX || CY!==tgY; if(full){ tgX=CX; tgY=CY; TR.tgt++; } for(let y=1;y<vh-1;y++){ if(!full && y%3!==ph) continue; let k=y*vw+1; for(let x=1;x<vw-1;x++,k++){ const f=target(x*CV-PAD,y*CV-PAD,t); TU[k]=f[0]; TV[k]=f[1]; } } }   // 목표 기류는 세 박자에 나눠 한 줄씩 건너 계산한다: 한 프레임에 몰리지 않아 툭 걸리지 않는다
   for(let y=1;y<vh-1;y++){ let k=y*vw+1; for(let x=1;x<vw-1;x++,k++){ const wx=x*CV-PAD, wy=y*CV-PAD; U[k]+=(TU[k]-U[k])*kf; V[k]+=(TV[k]-V[k])*kf;
       for(const s of stirs){ const dx=wx-s[0], dy=wy-s[1], d2=dx*dx+dy*dy; if(d2<2500){ const w=(1-d2/2500)*.5; U[k]+=(s[2]-U[k])*w; V[k]+=(s[3]-V[k])*w; } } } }
   stirs.length=0;
@@ -323,7 +324,7 @@ function bead(D){ LBL.fill(0); let id=0;
     if(cnt<3 || cnt>160) continue; const cx=sx/m, cy=sy/m, r=Math.sqrt(m/Math.PI)+.6;   // 작은 조각만 (지름 ~45px 이하)
     let ixx=0, iyy=0, ixy=0; for(let j=0;j<cnt;j++){ const k=CEL[j], dx=k%gw-cx, dy=((k/gw)|0)-cy, d=D[k]; ixx+=d*dx*dx; iyy+=d*dy*dy; ixy+=d*dx*dy; }
     const tr=ixx+iyy, det=ixx*iyy-ixy*ixy, disc=Math.sqrt(Math.max(0,tr*tr/4-det)), e1=tr/2+disc, e2=Math.max(1e-6,tr/2-disc); if(e1/e2<1.25) continue;   // 이미 둥글면 그대로
-    const lam=G.round*.25; let taken=0; for(let j=0;j<cnt;j++){ const k=CEL[j], dx=k%gw-cx, dy=((k/gw)|0)-cy; if(dx*dx+dy*dy>r*r){ const q=D[k]*lam; D[k]-=q; taken+=q; } }
+    const lam=G.round*.12; let taken=0; for(let j=0;j<cnt;j++){ const k=CEL[j], dx=k%gw-cx, dy=((k/gw)|0)-cy; if(dx*dx+dy*dy>r*r){ const q=D[k]*lam; D[k]-=q; taken+=q; } }   // 조금씩 자주: 한 번에 확 둥글어지며 툭 튀지 않게
     const x0=Math.max(1,Math.floor(cx-r)), x1=Math.min(gw-2,Math.ceil(cx+r)), y0=Math.max(1,Math.floor(cy-r)), y1=Math.min(gh-2,Math.ceil(cy+r)); let room=0;
     for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++){ const dx=x-cx, dy=y-cy; if(dx*dx+dy*dy<=r*r) room+=1-D[y*gw+x]; }
     if(room<=0) continue; const g=Math.min(1,taken/room); for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++){ const dx=x-cx, dy=y-cy; if(dx*dx+dy*dy<=r*r){ const k=y*gw+x; D[k]+=(1-D[k])*g; } } } }
@@ -334,17 +335,20 @@ function driftNoise(){ if((dnF++)&1) return; FRAY=0; if(!UCN) return;   // 물�
 let bdF=0, backDue=false;
 function backStep(){ backDue=false; const dt=simT-backT; backPT=backT; backT=simT; if(dt<=0) return;   // 뒤쪽 층: 앞쪽 박자 사이의 빈 프레임에 따로 한다 (일이 프레임마다 고르게 나뉜다)
   for(let c=0;c<NC;c++){ if(!LIVE[c]) continue; const D=DYE[0][c], m=markTiles(D,c), L=TLS[c]; PV[0][c].set(D); FRAY=0; FLIP=dirC(c)!==G.dir; advect(D,TMP,dt,FLW.back,L,m); FLIP=false; D.set(TMP); condense(D,dt,26,L,m); if(condense.mx<.02){ LIVE[c]=false; D.fill(0); PV[0][c].fill(0); } } }
-function step(){ if(backDue) backStep(); bdF++; for(let c=0;c<NC;c++) PV[NL-1][c].set(DYE[NL-1][c]); if(CX!==dryX || CY!==dryY) mkDry();   // 한 박자 전 모습을 남겨 둔다 (그리기용)
+/* 한 박자를 반으로 나눠 두 프레임에 걸쳐 한다: 앞 반(stepA)은 물의 흐름, 뒤 반(stepB)은 잉크를 나르고 다듬기. 한 프레임에 일이 몰려 툭 걸리지 않게 */
+function step(){ stepA(); stepB(); }
+function stepA(){ if(backDue) backStep(); bdF++; if(CX!==dryX || CY!==dryY) mkDry();
   UM.fill(0); AM.fill(0);
   for(let l=0;l<NL;l++) for(let c=0;c<NC;c++){ const sl=l*NC+c; if(!LIVE[sl]){ TCN[sl]=0; continue; } const L=TLS[sl], m=markTiles(DYE[l][c],sl); for(let i=0;i<m;i++){ AM[L[i]]=1; if(l===NL-1 && c!==2) UM[L[i]]=1; } }
   UCN=0; ACN=0; for(let t=0;t<tW*tH;t++){ if(UM[t]) ULS[UCN++]=t; if(AM[t]) ALS[ACN++]=t; }
   forces(DT); advectV(U,U2,DT); advectV(V,V2,DT); U.set(U2); V.set(V2); project(); FRT=simT; const wd=G.strands>0; if(wd) wind(); fineV(ALS,ACN,wd); if(wd) driftNoise();
-  if((bdF&1)===0) backDue=true;   // 뒤쪽 층은 느리고 옅으니 두 박자에 한 번 (두 배 걸음)
+  if((bdF&1)===0) backDue=true; }   // 뒤쪽 층은 느리고 옅으니 두 박자에 한 번 (두 배 걸음)
+function stepB(){ for(let c=0;c<NC;c++) PV[NL-1][c].set(DYE[NL-1][c]);   // 한 박자 전 모습을 남겨 둔다 (그리기용)
   for(let l=0;l<NL;l++) for(let c=0;c<NC;c++){ const sl=l*NC+c; if(!LIVE[sl] || l===0) continue; const D=DYE[l][c], vs=l===0?FLW.back:1, dt=l===0?DT*2:DT, L=TLS[sl], m=TCN[sl]; FLIP=dirC(c)!==G.dir;
     if(l===NL-1 && c!==2){ FRAY=G.strands*40; if(FRAY>0) thin(D,THK); advect(D,TMP,dt,vs,L,m); advect(TMP,F2,-dt,vs,L,m); F.fill(0);   // 앞쪽 잉크는 되돌려 보정(BFECC)해서 번지지 않게 나른다
       for(let i=0;i<m;i++){ tb(L[i]); for(let y=TB[2];y<TB[3];y++){ let k=y*gw+TB[0]; for(let x=TB[0];x<TB[1];x++,k++){ const v=D[k]+(D[k]-F2[k])*.5; F[k]=v<0?0:v>1?1:v; } } }
       advect(F,TMP,dt,vs,L,m); } else { FRAY=0; advect(D,TMP,dt,vs,L,m); }
-    D.set(TMP); condense(D,dt,l===0?26:8,L,m); if(FRAY>0 && G.round>0 && (bdF%6)===c) bead(D); FRAY=0; FLIP=false; if(condense.mx<.02){ LIVE[sl]=false; D.fill(0); PV[l][c].fill(0); } }
+    D.set(TMP); condense(D,dt,l===0?26:8,L,m); if(FRAY>0 && G.round>0 && (bdF%3)===(c%3)){ bead(D); TR.bead++; } FRAY=0; FLIP=false; if(condense.mx<.02){ LIVE[sl]=false; D.fill(0); PV[l][c].fill(0); } }
   emit(); simT+=DT; }
 
 /* ── 겉모양: 잉크 농도의 경계선을 따서 셀 셰이딩 (핏방울과 같은 순서: 테두리 → 높낮이 → 빛 → 어두운 면·하이라이트 덩이) ── */
@@ -848,14 +852,16 @@ function render(dt,a){ frameNo++; T=simT; dt=dt||1/60; a=a||0;
     for(let k=0;k<m;k++){ g.beginPath(); for(let r=SPR0;r<Rm;r+=3){ const an=spLine(r,tt)+k*TAU/m, x=CX+Math.cos(an)*r, y=CY+Math.sin(an)*r; if(r===SPR0) g.moveTo(x,y); else g.lineTo(x,y); }
       g.setLineDash([]); g.strokeStyle="rgba(156,47,134,.07)"; g.lineWidth=G.spW*2; g.stroke(); g.setLineDash([7,7]); g.strokeStyle="rgba(156,47,134,.5)"; g.lineWidth=1.6; g.stroke(); } g.setLineDash([]); } }
 function advance(k){ for(let s=0;s<k;s++) step(); }
-let last=performance.now(), acc=0, rdt=0, aspect=0, bdT=0, fno=0, work=0, lite=false, needR=false;
+let halfA=false, last=performance.now(), acc=0, rdt=0, aspect=0, bdT=0, fno=0, work=0, lite=false, needR=false;
 const SLOW=(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
 let fAvg=1/60, qT=0, qGood=0;
-function autoQ(dt){ fAvg+=(dt-fAvg)*.05; qT+=dt; if(fAvg>.0195 && qT>1.5 && QF>.36){ QF=Math.max(.35,QF*.8); qT=0; qGood=0; } else if(fAvg<.0175 && QF<1){ qGood+=dt; if(qGood>4){ QF=Math.min(1,QF*1.12); qGood=0; qT=0; } } else qGood=0; }   // 화면이 커서 프레임이 밀리면 그리는 해상도를 조금 낮추고, 넉넉해지면 되돌린다
+let AQ=false; try{ AQ=localStorage.getItem("nu-flow-aq")==="1"; }catch(_){}   // 자동 화질: 기본은 꺼 둔다 (해상도가 바뀌는 순간 화면이 툭 바뀌어 보이므로)
+function autoQ(dt){ if(!AQ){ if(QF!==1) QF=1; return; } fAvg+=(dt-fAvg)*.05; qT+=dt; if(fAvg>.0195 && qT>1.5 && QF>.36){ QF=Math.max(.35,QF*.8); qT=0; qGood=0; } else if(fAvg<.0175 && QF<1){ qGood+=dt; if(qGood>4){ QF=Math.min(1,QF*1.12); qGood=0; qT=0; } } else qGood=0; }   // 화면이 커서 프레임이 밀리면 그리는 해상도를 조금 낮추고, 넉넉해지면 되돌린다
 function frame(now){ const dt=Math.min(.1,(now-last)/1000); last=now; if(!document.hidden){ autoQ(dt); fpsTick(now); } fit(); const a=WW>WH?1:2; if(a!==aspect){ aspect=a; RMX=Math.hypot(WW,WH)*.5; placeCenter(); }   // 화면 방향이 바뀌어도 처음부터 다시 하지 않는다
-  if(!document.hidden){ const w0=performance.now(); acc+=dt*(SLOW?.4:1)*G.speed; rdt+=dt; let k=0; if(acc>=DT){ k=1; acc-=DT; if(acc>DT) acc=0; }   // 한 프레임에 한 박자까지만: 느린 기기에서는 따라잡으려 몰아 계산하지 않고 조금 느리게 흐른다 (끊김 대신 슬로모션)   // 소용돌이 속도: 박자 사이가 길어질 뿐, 그리기는 매 프레임
-    advance(k); if(k===0 && backDue) backStep(); STEPPED=k>0; render(rdt*G.speed,acc/DT); rdt=0;   // 소용돌이는 매 프레임 그린다 (박자 사이는 흐름대로 밀어 메운다)
+  if(!document.hidden){ const w0=performance.now(); acc+=dt*(SLOW?.4:1)*G.speed; rdt+=dt; let k=0; if(!halfA && acc>=DT*.5){ stepA(); halfA=true; } if(acc>=DT){ if(!halfA) stepA(); stepB(); halfA=false; k=1; acc-=DT; if(acc>DT) acc=0; }   // 반 박자마다 반씩   // 한 프레임에 한 박자까지만: 느린 기기에서는 따라잡으려 몰아 계산하지 않고 조금 느리게 흐른다 (끊김 대신 슬로모션)   // 소용돌이 속도: 박자 사이가 길어질 뿐, 그리기는 매 프레임
+    const t1=performance.now(); TR.bead=0; TR.tgt=0; const t2=performance.now(), t3=t2; STEPPED=true; render(rdt*G.speed,acc/DT); rdt=0; const t4=performance.now();   // 소용돌이는 매 프레임 그린다 (박자 사이는 흐름대로 밀어 메운다)
     if(BD.on()){ const r=bdRect(); BD.setView(W,Hh,scale,0,0,WW,WH); BD.center(CX,CY); BD.setZone(r[0],r[1],r[0]+r[2],r[1]+r[3]); BD.start(); bdT+=Math.min(dt,.05); BD.advance(Math.min(dt,.05)*(SLOW?.4:1)); if(!lite || (fno&1)){ BD.compute(bdT*BD.G.speed); bdT=0; } BD.draw(); }   // 핏방울도 화면 전체를 쓴다 (자리는 처음 놓이는 곳일 뿐). 바쁠 때는 핏방울을 두 프레임에 한 번 그린다
+    if(window.__nfTrace) window.__nfTrace.push([+(dt*1000).toFixed(1),k,+(t1-w0).toFixed(1),+(t3-t2).toFixed(1),+(t4-t3).toFixed(1),+(performance.now()-t4).toFixed(1),TR.bead,TR.tgt,+QF.toFixed(2)]);   // [프레임 간격, 박자, 물리, 뒤층, 그리기, 핏방울, 방울맺힘, 기류갱신, 화질]
     fno++; const wk=performance.now()-w0; work+=(wk-work)*.05; if(!lite && work>20) lite=true; else if(lite && work<9) lite=false; } 
   requestAnimationFrame(frame); }
 const tabsEl=$("tabs"); SCENES.forEach((s,i)=>{ const b=document.createElement("button"); b.type="button"; b.id="st"+i; b.role="tab"; b.textContent=s.name; b.addEventListener("click",()=>setScene(i)); tabsEl.appendChild(b); });
@@ -937,7 +943,8 @@ fit(); aspect=WW>WH?1:2; setScene(0);   // 저장된 값을 읽은 다음에 시
 
 /* 화질과 이미지 저장 */
 const QS=[["q1",2.1e6],["q2",3.7e6],["q3",8.4e6]];
-function syncQ(){ for(const [id,q] of QS) $(id).setAttribute("aria-pressed",Math.abs(QMAX-q)<1?"true":"false"); }
+function syncQ(){ for(const [id,q] of QS) $(id).setAttribute("aria-pressed",Math.abs(QMAX-q)<1?"true":"false"); $("qA").setAttribute("aria-pressed",AQ?"true":"false"); }
+$("qA").addEventListener("click",()=>{ AQ=!AQ; try{ localStorage.setItem("nu-flow-aq",AQ?"1":"0"); }catch(_){} syncQ(); });
 for(const [id,q] of QS) $(id).addEventListener("click",()=>{ QMAX=q; try{ localStorage.setItem("nu-flow-q",String(q)); }catch(_){} syncQ(); });
 syncQ();
 const DLP=(window.claude && typeof window.claude.use==="function")?window.claude.use("downloads").catch(()=>null):null;   // 일반 웹(깃허브 페이지)에서는 그냥 내려받기
@@ -977,7 +984,7 @@ requestAnimationFrame(frame);
 <script>
 /* 메뉴 편집과 설정 옮기기 (한 화면 보기·조절 창에서 돈다. 이미지 화면에서는 쉬고) */
 (function(){ const V=window.NF_VIEW||"both"; if(V==="stage") return; const $=id=>document.getElementById(id);
-  const HK="nu-flow-hidden", KEYS=["swirl-flow-g","swirl-flow-bd","nu-flow-q","nu-flow-hidden","nu-flow-fps"];
+  const HK="nu-flow-hidden", KEYS=["swirl-flow-g","swirl-flow-bd","nu-flow-q","nu-flow-hidden","nu-flow-fps","nu-flow-aq"];
   let hidden=[]; try{ hidden=JSON.parse(localStorage.getItem(HK)||"[]"); if(!Array.isArray(hidden)) hidden=[]; }catch(_){ hidden=[]; }
   const its=()=>[...document.querySelectorAll(".ctl .it[data-k]")];
   const save=()=>{ try{ localStorage.setItem(HK,JSON.stringify(hidden)); }catch(_){} };
