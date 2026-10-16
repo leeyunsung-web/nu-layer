@@ -1452,7 +1452,9 @@ if($("bgSw")) for(const b of $("bgSw").children) b.addEventListener("click",()=>
 setTimeout(syncCam,0);
 function wpos(e){ return wposP(e,1); }
 const ptrs=new Map(); let boom=-1;
-cv.addEventListener("pointerdown",e=>{ if(e.button>0) return; const p=wpos(e), pb=wposP(e,2); e.preventDefault(); try{cv.setPointerCapture(e.pointerId);}catch(_){}
+const TAP={t:0,x:0,y:0};   // 휴대폰·아이패드: 두 번 톡톡 = 터뜨리기 (터치에서는 dblclick이 오지 않는다)
+cv.addEventListener("pointerdown",e=>{ if(e.button>0) return; const p=wpos(e), pb=wposP(e,2); e.preventDefault();
+  if(e.pointerType!=="mouse"){ const now=performance.now(); if(now-TAP.t<350 && Math.hypot(e.clientX-TAP.x,e.clientY-TAP.y)<45){ TAP.t=0; if(BD.on()) BD.burst(pb[0],pb[1]); return; } TAP.t=now; TAP.x=e.clientX; TAP.y=e.clientY; } try{cv.setPointerCapture(e.pointerId);}catch(_){}
   if(BD.on() && BD.grab(e.pointerId,pb[0],pb[1])){ cv.classList.add("hold"); return; }   // 핏방울을 잡으면 물은 젓지 않는다
   if(Math.hypot(p[0]-CX,p[1]-CY)<30){ boom=e.pointerId; } else ptrs.set(e.pointerId,{x:p[0],y:p[1],t:performance.now()}); cv.classList.add("hold"); });
 cv.addEventListener("pointermove",e=>{ const p=wpos(e); if(BD.held(e.pointerId)){ const pb=wposP(e,2); BD.moveTo(e.pointerId,pb[0],pb[1]); return; } if(e.pointerId===boom){ CX=clamp(p[0],30,WW-30); CY=clamp(p[1],30,WH-30); return; } const q=ptrs.get(e.pointerId); if(!q) return;
