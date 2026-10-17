@@ -1074,8 +1074,9 @@ function place(R,key){ // 다른 방울과 겹치지 않는 빈자리를 고른�
     const s=m-R; if(s>bs){ bs=s; bx=x; by=y; } if(s>46) break; }
   return [bx,by]; }
 function reset(){ N=0; nLobe=0; ptrs.clear(); extra=0; GW.fill(0); TW.fill(0); simT=0; sel=-1;
-  for(let i=0;i<G.count;i++){ const R=Math.max(14,SIZES[i%SIZES.length]*G.size*(i>=SIZES.length?.75:1)), p=place(R,i+1); addShape(p[0],p[1],R-6,(h(SEED,i,90)-.5)*16,(h(SEED,i,91)-.5)*16,700+i*17); } btn(); selUI(); }
-function more(){ if(N>CAP-240) return; extra++; const R=Math.max(14,(17+22*h(SEED,300+extra,0))*G.size), p=place(R,400+extra); addShape(p[0],p[1],R-6,0,0,900+extra*13); btn(); }
+  const TO=[2,3,4,5,2,3,4,3,5,2,4,3].map(t=>[t,Math.random()]).sort((p,q)=>p[1]-q[1]).map(p=>p[0]); /* 처음 뜰 때 단계를 고루 섞어 큰 것부터 작은 것까지 다 나오게 */
+  for(let i=0;i<G.count;i++){ TFORCE=TO[i%TO.length]; const R=Math.max(8,tierRS(2,5)), p=place(R,i+1); TFORCE=TO[i%TO.length]; addShape(p[0],p[1],R,(h(SEED,i,90)-.5)*16,(h(SEED,i,91)-.5)*16,700+i*17); TFORCE=0; } btn(); selUI(); }
+function more(){ if(N>CAP-240) return; extra++; const R=Math.max(8,tierRS(2,5)), p=place(R,400+extra); addShape(p[0],p[1],R,0,0,900+extra*13); btn(); }
 /* 여러 모양: 그림 속 방울처럼 둥근 것, 길쭉한 것, 강낭콩·땅콩(볼록함 둘), 애벌레(볼록함 셋·넷)가 섞인다. 이어 붙은 볼록함은 서로 녹아 하나가 되지 않아 모양이 남는다 */
 /* 하트 방울 (로코로코처럼): 새로 그리지 않고, 지금 핏방울 알갱이들을 하트 모양 틀 안에 머물게 한다. 출렁임·명암·늘리기는 핏방울 그대로 */
 function sdHeart(x,y){ x=Math.abs(x); if(y+x>1){ const dx=x-.25, dy=y-.75; return Math.sqrt(dx*dx+dy*dy)-Math.SQRT2/4; } const d1=x*x+(y-1)*(y-1), m=.5*Math.max(x+y,0), d2=(x-m)*(x-m)+(y-m)*(y-m); return Math.sqrt(Math.min(d1,d2))*Math.sign(x-y); }   // 아래 끝이 (0,0), 위로 볼록한 두 덩이
@@ -1111,10 +1112,10 @@ function addCloud(cx,cy){ const gid=(grpNo++)%30000, S=G.cloudS*G.size*1.25, R=M
   for(const [x,y,r] of P){ const ox=x-mx, oy=y-my; k+=addDrop(cx+ox,cy+oy,r,0,0); const l=nLobe-1; LCOL[l]=3; LKEEP[l]=1; LGRP[l]=gid; LOX[l]=ox; LOY[l]=oy; } return k; }
 function heartStyle(l){ LHRT[l]=1; LCOL[l]=5; LKEEP[l]=1; LAC[l]=1; LAS[l]=0; LEL[l]=.8; LSZ[l]=.27; const a2=1.05; L2C[l]=Math.cos(a2); L2S[l]=Math.sin(a2); L2Z[l]=.24; L3Z[l]=0; for(let q=0;q<8;q++) SB[q][l]=SE[q][l]; }   // 하트: 하이라이트는 둥근 덩이 하나 + 작은 점, 되비침 없음
 function addShape(cx,cy,base,vx,vy,key){ const u=hh(key,80);
-  if(G.star && base>=12 && hh(key,93)<G.starR){ const k=addDrop(cx,cy,Math.max(base*2.4,88*G.size),vx,vy), l=nLobe-1; LHRT[l]=2; LCOL[l]=1; LKEEP[l]=1; LHA[l]=(hh(key,94)-.5)*.8; return k; }   // 별 방울: 노랑, 오각별 틀
-  if(G.blue && hh(key,95)<G.blueR){ const k=addDrop(cx,cy,Math.max(base,14),vx,vy), l=nLobe-1; LCOL[l]=2; LKEEP[l]=1; return k; }   // 파란 물방울: 둥근 방울, 파랑
-  if(G.heart && base>=12 && hh(key,91)<G.heartR){ const k=addDrop(cx,cy,Math.max(base*1.7,62*G.size),vx,vy), l=nLobe-1;   /* 하트는 알갱이가 넉넉해야 오목한 윗부분과 뾰족한 끝이 산다 */ heartStyle(l); LHA[l]=(hh(key,92)-.5)*.6; return k; }   // 하트 방울: 정한 비율만큼
-  if(u<.42 || base<11) return addDrop(cx,cy,base,vx,vy);
+  if(G.star && base>=12 && hh(key,93)<G.starR){ const k=addDrop(cx,cy,tierRS(4,5),vx,vy), l=nLobe-1; LHRT[l]=2; LCOL[l]=1; LKEEP[l]=1; LHA[l]=(hh(key,94)-.5)*.8; return k; }   // 별 방울: 노랑, 오각별 틀
+  if(G.blue && hh(key,95)<G.blueR){ const k=addDrop(cx,cy,tierRS(2,4),vx,vy), l=nLobe-1; LCOL[l]=2; LKEEP[l]=1; return k; }   // 파란 물방울: 둥근 방울, 파랑
+  if(G.heart && base>=12 && hh(key,91)<G.heartR){ const k=addDrop(cx,cy,tierRS(2,5),vx,vy), l=nLobe-1;   /* 하트는 알갱이가 넉넉해야 오목한 윗부분과 뾰족한 끝이 산다 */ heartStyle(l); LHA[l]=(hh(key,92)-.5)*.6; return k; }   // 하트 방울: 정한 비율만큼
+  if(u<.42 || base<11 || base*base*Math.PI/(SP0*SP0*.866)>=TIERB[3]) return u>=.42 && base>=11?addDrop(cx,cy,base,vx,vy,1.15+.4*hh(key,81),hh(key,82)*TAU):addDrop(cx,cy,base,vx,vy);   /* 큰 단계는 한 덩어리로 (여러 혹으로 나누면 작은 단계가 된다) */
   if(u<.58) return addDrop(cx,cy,base,vx,vy,1.3+.8*hh(key,81),hh(key,82)*TAU);
   const n=u<.85?2:3+(hh(key,83)<.4?1:0), bend=(hh(key,85)-.5)*1.4; let x=cx, y=cy, a=hh(key,84)*TAU, pr=0, k=0; const ls=[];
   for(let q=0;q<n;q++){ const r=Math.max(8,base*(.5+.45*hh(key,86+q))); if(q>0){ const st=(pr+r)*.8; x+=Math.cos(a)*st; y+=Math.sin(a)*st; a+=bend; } k+=addDrop(x,y,r,vx,vy); ls.push(nLobe-1); pr=r; }
@@ -1372,7 +1373,7 @@ function manage(dt){ mgT+=dt; if(mgT<.25) return; const mdt=mgT; mgT=0; tierGrow
   if(G.leave) for(let l=0;l<nLobe;l++){ if(!LCNT[l] || LLV[l]>0) continue; if(held.has(l)){ LBORN[l]=simT; continue; } if(simT-LBORN[l]>G.dwell*LDW[l]){ LLV[l]=simT; const ox=LCX[l]-CXs, oy=LCY[l]-CYs, ol=HY(ox,oy)+1, ja=(hh(l+lobeSerial,63)-.5)*1.2, ca=Math.cos(ja), sa=Math.sin(ja), ux=ox/ol, uy=oy/ol; LDX[l]=ux*ca-uy*sa; LDY[l]=ux*sa+uy*ca; } }   // 나가는 방향: 가운데에서 바깥쪽으로 (조금씩 제멋대로)
   for(let l=0;l<nLobe;l++){ if(!LCNT[l] || held.has(l)) continue; if(BX0[l]>WW+40 || BX1[l]<-40 || BY0[l]>WH+40 || BY1[l]<-40){ owed+=removeLobe(l); LCNT[l]=0; LLV[l]=0; } }
   if(!G.refill){ owed=0; return; }
-  for(let t=0;t<(owed>160?2:1) && owed>=3 && N<CAP-120;t++){ const want=Math.min(owed,Math.round(4+34*Math.pow(hh(born,74),2))), r=Math.max(8,Math.sqrt(want*SP0*SP0*.866/Math.PI)), a=hh(born,70)*TAU, d0=12+45*hh(born,72), p=placeNear(CXs+Math.cos(a)*d0,CYs+Math.sin(a)*d0,r+6), sp=40+90*hh(born,71);
+  for(let t=0;t<(owed>160?2:1) && owed>=3 && N<CAP-120;t++){ const want=Math.min(owed,Math.round(tierN(2,4))), r=Math.max(8,Math.sqrt(want*SP0*SP0*.866/Math.PI)), a=hh(born,70)*TAU, d0=12+45*hh(born,72), p=placeNear(CXs+Math.cos(a)*d0,CYs+Math.sin(a)*d0,r+6), sp=40+90*hh(born,71);
     owed-=Math.max(3,addShape(p[0],p[1],r,Math.cos(a)*sp,Math.sin(a)*sp,born*7+11)); }   // 다시 채우기: 작은 방울을 하나씩, 크기와 모양을 섞어 가운데에서 사방으로 흩뿌린다   // 가운데에서 새로 생겨 천천히 떠난다
   btn(); }
 /* 두 번 누르면 펑: 그 방울을 가장 작은 방울들로 쪼개 사방으로 튀긴다. 정한 초 동안은 서로 다시 붙지 않는다 */
@@ -1384,18 +1385,21 @@ function popTiny(ol,ck){ const n=LCNT[ol]; let cx=0, cy=0, c=0; for(let i=0;i<N;
 /* ── 크기 단계: 4 큰 · 3 중간 · 2 작은 · 1 가장 작은 (알갱이 수 기준, 한 단계마다 지름 약 절반) ──
    터지면 한 단계 아래의 진짜 오브젝트 3~6개로 갈라지고, 뭉쳐서 커지면 다시 위 단계가 된다.
    별: 3·4단계는 별, 1·2단계는 노란 동그라미 (노란 동그라미가 뭉쳐 3단계가 되면 별) · 하트: 터지면 핏방울 · 핏방울: 뭉쳐 한 단계 커질 때마다 1/5 확률로 하트 (2단계 이상) */
-const TIERB=[0,15,60,240], TIERM=[0,8,30,120]; const tierOf=n=>n>=240?4:n>=60?3:n>=15?2:1; const LTR=new Int8Array(LMAX), FSX=new Float32Array(LMAX).fill(NaN), FSY=new Float32Array(LMAX);
-function tierBurst(ol){ const n=LCNT[ol], t=tierOf(n); if(t<=1) return false; const kind=LHRT[ol]===2||LCOL[ol]===1?"y":LCOL[ol]===2?"b":"r";
+const TIERB=[0,6,20,70,250], TIERM=[0,3,11,37,132]; const tierOf=n=>n>=250?5:n>=70?4:n>=20?3:n>=6?2:1;   // 5단계: 1 아주 작은(6개 미만) · 2 작은 · 3 중간 · 4 큰 · 5 아주 큰
+const TW8=[0,0,.3,.3,.25,.15]; function tierN(a,b){ let tot=0; for(let t=a;t<=b;t++) tot+=TW8[t]; let r=Math.random()*tot, t=a; for(;t<b;t++){ r-=TW8[t]; if(r<=0) break; } if(TFORCE){ t=Math.max(a,Math.min(b,TFORCE)); TFORCE=0; } const lo=Math.max(3,TIERB[t-1]), hi=t>=5?700:TIERB[t]-1; return Math.max(lo,Math.min(hi,lo*Math.pow(hi/lo,Math.random())*TSIZE)); }   /* 크기 조절을 곱해도 고른 단계 안에 머문다 */
+let TFORCE=0, TSIZE=1; const tierRS=(a,b)=>{ TSIZE=G.size; const r=tierR(a,b); TSIZE=1; return r; };   // 고른 단계 안에서 크기를 고르게 섞어 뽑는다
+const tierR=(a,b)=>Math.sqrt(tierN(a,b)*SP0*SP0*.866/Math.PI); const LTR=new Int8Array(LMAX), FSX=new Float32Array(LMAX).fill(NaN), FSY=new Float32Array(LMAX);
+function tierBurst(ol){ let n=0; for(let i=0;i<N;i++) if(LBL[i]===ol) n++; const t=tierOf(n); if(t<=1) return false; const kind=LHRT[ol]===2||LCOL[ol]===1?"y":LCOL[ol]===2?"b":"r";
   let cx=0, cy=0, c=0; for(let i=0;i<N;i++) if(LBL[i]===ol){ cx+=X[i]; cy+=Y[i]; c++; } if(!c) return false; cx/=c; cy/=c; for(const id of [...ptrs.keys()]) release(id);
   const r=Math.sqrt(n*SP0*SP0*.866/Math.PI), ct=t-1, mid=TIERM[ct], k=Math.max(3,Math.min(6,Math.round(n*.9/mid))), lo=Math.max(3,TIERB[ct-1]), hi=TIERB[ct]-1, nc=Math.max(lo,Math.min(hi,n*.9/k)), rr=Math.sqrt(nc*SP0*SP0*.866/Math.PI)*1.04;
   removeLobe(ol); LCNT[ol]=0; if(onPop) onPop(cx+OXp,cy+OYp,"pop",r); const a0=Math.random()*TAU, ck=kind==="y"?1:kind==="b"?2:0;
   for(let q=0;q<k;q++){ const a=a0+q*TAU/k+(Math.random()-.4)*.3, d=Math.max(r*.45,rr*1.25/Math.sin(Math.PI/k)), sp=(200+160*Math.random())*G.bSpd, rq=rr*(.9+.2*Math.random()); /* 처음부터 서로 겹치지 않게 둘러 놓는다 (겹치면 알갱이를 뺏어 다시 큰 하나가 된다) */ addDrop(cx+Math.cos(a)*d,cy+Math.sin(a)*d,rq,Math.cos(a)*sp,Math.sin(a)*sp); const l=nLobe-1;
-    LCOL[l]=ck; LNF[l]=simT+G.sep; LTR[l]=ct; if(kind==="y" && ct>=3){ LHRT[l]=2; LKEEP[l]=1; LHA[l]=(Math.random()-.5)*2; } }
+    LCOL[l]=ck; LNF[l]=simT+G.sep; LTR[l]=ct; if(kind==="y" && ct>=4){ LHRT[l]=2; LKEEP[l]=1; LHA[l]=(Math.random()-.5)*2; } }
   if(G.tiny>0) for(let u=0;u<Math.round(8*G.tiny);u++){ const a=Math.random()*TAU, sp=(220+260*Math.random())*G.bSpd; sprAdd(cx,cy,Math.cos(a)*sp,Math.sin(a)*sp,1.2+3*Math.random(),ck); }
   born++; sel=-1; selUI(); return true; }
 function tierGrow(){ for(let l=0;l<nLobe;l++){ if(!LCNT[l] || LIMG[l] || LGRP[l]>=0) continue; const t=tierOf(LCNT[l]); if(!LTR[l]){ LTR[l]=t; continue; } if(t<=LTR[l]) continue; LTR[l]=t;   // 한 단계 커졌다
     if(LCOL[l]===0 && !LHRT[l] && t>=2 && Math.random()<.2){ heartStyle(l); LHA[l]=(Math.random()-.5)*.6; if(onPop) onPop(LCX[l]+OXp,LCY[l]+OYp,"pop",12); }   // 핏방울이 뭉쳐 커지면 가끔 하트로
-    else if(LCOL[l]===1 && !LHRT[l] && t>=3){ LHRT[l]=2; LKEEP[l]=1; LHA[l]=(Math.random()-.5)*.6; if(onPop) onPop(LCX[l]+OXp,LCY[l]+OYp,"pop",12); } } }   // 노란 동그라미가 3단계가 되면 별
+    else if(LCOL[l]===1 && !LHRT[l] && t>=4){ LHRT[l]=2; LKEEP[l]=1; LHA[l]=(Math.random()-.5)*.6; if(onPop) onPop(LCX[l]+OXp,LCY[l]+OYp,"pop",12); } } }   // 노란 동그라미가 3단계가 되면 별
 function morph(ol,rule){ const n=LCNT[ol]; if(n<6 || (rule===6 && n<60)) return false; const cx=LCX[ol], cy=LCY[ol], r=Math.max(14,Math.sqrt(n*SP0*SP0*.866/Math.PI)); for(const id of [...ptrs.keys()]) release(id);
   removeLobe(ol); LCNT[ol]=0; if(onPop) onPop(cx+OXp,cy+OYp,"pop",r);   // 원래 방울은 사라지고 그 자리에서 팡
   const pop=(vx,vy)=>[vx+(Math.random()-.5)*40, vy-30+(Math.random()-.5)*40];
@@ -1413,11 +1417,14 @@ function sprAdd(x,y,vx,vy,r,ck){ if(SPR.length>400) SPR.shift(); SPR.push({x,y,v
 function sprTick(dt){ for(let i=SPR.length-1;i>=0;i--){ const s=SPR[i]; s.t+=dt; if(s.t>=s.life){ SPR.splice(i,1); continue; } let wx=0, wy=0; if(waterAt){ const w=waterAt(s.x+OXp,s.y+OYp); wx=w[0]; wy=w[1]; } const k=Math.min(1,dt*2.5); s.vx+=(wx-s.vx)*k; s.vy+=(wy-s.vy)*k; s.x+=s.vx*dt; s.y+=s.vy*dt; } }
 function sprDraw(){ if(!SPR.length) return; for(const s of SPR){ const CC=s.cc?{base:s.cc,line:CIMC.line,hi:"#FFFFFF"}:s.ck===1?CY:s.ck===2?CB:s.ck===3?CW:s.ck===5?CHT:C, f=s.t/s.life, r=s.r*(f>.6?1-(f-.6)/.4:1)*Math.min(1,s.t*8); if(r<.4) continue; let x=s.x, y=s.y; if(mapF){ const m=mapF(x,y); x+=m[0]; y+=m[1]; }
   g.beginPath(); g.arc(x,y,r,0,TAU); g.fillStyle=CC.base; g.fill(); if(r>1.6){ g.lineWidth=Math.min(2.2,r*.35); g.strokeStyle=CC.line; g.stroke(); g.beginPath(); g.arc(x-r*.3,y-r*.3,r*.32,0,TAU); g.fillStyle=CC.hi; g.fill(); } } }
-function burst(x,y){ { const hk=custHit(x,y); if(hk>=0) return custPopFloat(hk); } let best=-1, bd=1e9; for(let i=0;i<N;i++){ const d=(X[i]-x)**2+(Y[i]-y)**2; if(d<bd){ bd=d; best=i; } } if(best<0 || bd>54*54) return false;
+function pickLobe(x,y){ let best=-1, bs=1e9; for(let l=0;l<nLobe;l++){ if(!LCNT[l]) continue; const z=LDZ[l], k=1+(z<0?-.34:z>0?.16:0)*G.dep; let ox=z*camX*G.dep, oy=z*camY*G.dep; if(mapF){ const m=mapF(LCX[l],LCY[l]); ox+=m[0]; oy+=m[1]; }
+    const r=Math.sqrt(LCNT[l]*SP0*SP0*.866/Math.PI)*k*1.15+14, d=Math.hypot(x-(LCX[l]+ox),y-(LCY[l]+oy))/r; if(d<1 && d<bs){ bs=d; best=l; } } return best; }   // 화면에 '보이는' 자리로 고른다 (3D로 기울이면 그려지는 자리와 계산 자리가 달라 안 터지던 문제)
+function burst(x,y){ { const hk=custHit(x,y); if(hk>=0) return custPopFloat(hk); } let best=-1, bd=1e9; const pl=pickLobe(x,y);
+  if(pl>=0){ for(let i=0;i<N;i++) if(LBL[i]===pl){ const d=(X[i]-LCX[pl])**2+(Y[i]-LCY[pl])**2; if(d<bd){ bd=d; best=i; } } bd=0; } if(best<0){ bd=1e9; for(let i=0;i<N;i++){ const d=(X[i]-x)**2+(Y[i]-y)**2; if(d<bd){ bd=d; best=i; } } } if(best<0 || bd>54*54) return false;
   const ocol=LBL[best]; let pc=-1, star=false, im=null; if(LIMG[ocol] && !LIS[ocol]){ const c=CUST[LIMG[ocol]-1], e=CIMG[LIMG[ocol]-1]; if(c && e){ const n=LCNT[ocol], r=Math.max(14,Math.sqrt(n*SP0*SP0*.866/Math.PI)); if(onPop) onPop(LCX[ocol]+OXp,LCY[ocol]+OYp,"pop",r); if(c.pop==="pop"){ for(const id of [...ptrs.keys()]) release(id); removeLobe(ocol); LCNT[ocol]=0; return true; } im={c,e,s:Math.sqrt(n*SP0*SP0*.866/e.mold.area),a:LHA[ocol],flip:LFLP[ocol]||1,va:LVAR[ocol],ph:LPH[ocol],i:LIMG[ocol],cy:e.mold.cy}; if(c.pop==="drops") pc=0; } } if(!im){ const ol=ocol, src=LHRT[ol]===1?"tfH":LHRT[ol]===2?"tfS":LCOL[ol]===2?"tfB":LCOL[ol]===3?"":"tfR", rule=src?G[src]|0:0;   // 방울 종류마다 정한 규칙
     pc=rule===4?2:rule===5?0:rule===6?1:-1; star=rule===6;   // 4 작은 물방울(파랑) · 5 핏방울(빨강) · 6 작은 별들
     if(rule===7) return tierBurst(ol); if(rule===2 || rule===3 || rule===6) return morph(ol,rule); if(onPop){ const n=LCNT[ol], r=Math.max(14,Math.sqrt(n*SP0*SP0*.866/Math.PI)); onPop(LCX[ol]+OXp,LCY[ol]+OYp,rule===1?"bolt":"pop",r); } }   // 어떤 방울이든 터질 때 팡 (번개 규칙은 번개까지)
-  for(const id of [...ptrs.keys()]) release(id); let qt=linked([best]); if(qt<8) return false; let idx=Array.from(que.subarray(0,qt)); if(im){ idx=idx.filter(i=>LBL[i]===ocol); qt=idx.length; if(qt<8) return false; } const K=star?Math.max(2,Math.round(qt/24)):Math.max(2,Math.round(qt/((8-5*G.tiny)*G.chunk)));   // 잔해 크기: 100%가 예전 그대로, 높이면 굵직한 덩어리, 낮추면 잘게   // 별은 별 모양이 보일 만큼 조각을 크게
+  for(const id of [...ptrs.keys()]) release(id); let qt=linked([best]), idx=Array.from(que.subarray(0,qt)); if(qt<8){ idx=[]; for(let i=0;i<N;i++) if(LBL[i]===ocol) idx.push(i); qt=idx.length; } if(qt<4) return false;   /* 살이 덜 이어진 방울(구름 조각 등)도 그 방울 알갱이로 터뜨린다 */ if(im){ idx=idx.filter(i=>LBL[i]===ocol); qt=idx.length; if(qt<8) return false; } const K=star?Math.max(2,Math.round(qt/24)):Math.max(2,Math.round(qt/((8-5*G.tiny)*G.chunk)));   // 잔해 크기: 100%가 예전 그대로, 높이면 굵직한 덩어리, 낮추면 잘게   // 별은 별 모양이 보일 만큼 조각을 크게
   let cx=0, cy=0; for(const i of idx){ cx+=X[i]; cy+=Y[i]; } cx/=qt; cy/=qt;
   const sx=new Float32Array(K), sy=new Float32Array(K), sw=new Float32Array(K), as=new Int32Array(qt); for(let g2=0;g2<K;g2++) sw[g2]=Math.pow(hh(born+g2,75),1.6+1.6*G.tiny)*(600+700*G.tiny); for(let g2=0;g2<K;g2++){ const i=idx[Math.floor(g2*qt/K)]; sx[g2]=X[i]; sy[g2]=Y[i]; }   // 조각마다 몫이 달라 크기가 섞인다
   for(let it=0;it<3;it++){ const ax=new Float32Array(K), ay=new Float32Array(K), an=new Int32Array(K);
