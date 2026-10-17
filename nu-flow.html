@@ -293,6 +293,7 @@ canvas.hold{cursor:grabbing}
     <div class="it row" data-k="anAdd"><span>아기천사</span><button id="anAdd1" type="button">천사 1마리 추가</button><button id="anAdd5" type="button">5마리 추가</button><button id="anClear" type="button">모두 보내기</button><output id="anCount">아직 없음</output><small class="desc">처음에는 없어요. 누를 때마다 기본형에서 조금씩 변주된 천사가 무작위 자리로 들어와요. 끌어서 던지고, 톡 누르면 출렁이며 표정이 바뀌어요.</small></div>
     <div class="it row" data-k="anStyle"><span>천사 그리기</span><button id="anPaint" type="button" aria-pressed="true">채색</button><button id="anPen" type="button" aria-pressed="false">연필</button><button id="anSpin" type="button" aria-pressed="false">빙글빙글</button></div>
     <label class="it" data-k="anSize"><span>천사 크기</span><input id="anSize" type="range" min=".4" max="2.5" step=".01" value="1"><output id="anSizeV">100%</output></label>
+    <label class="it" data-k="anFlow"><span>천사 소용돌이 영향</span><input id="anFlow" type="range" min="0" max="2" step=".01" value=".6"><output id="anFlowV">60%</output><small class="desc">0%면 소용돌이와 상관없이 제멋대로 떠다니고, 높일수록 물 흐름을 타고 함께 돌아요.</small></label>
     <label class="it" data-k="anSpeed"><span>천사 떠다니는 빠르기</span><input id="anSpeed" type="range" min="0" max="3" step=".01" value="1"><output id="anSpeedV">100%</output></label>
     <label class="it" data-k="anSoft"><span>천사 눌림 부드러움</span><input id="anSoft" type="range" min="0" max="1" step=".01" value=".7"><output id="anSoftV">70%</output></label>
     <div class="it wide" data-k="anCode"><span>천사 기본형 코드</span><textarea id="anCodeT" rows="3" placeholder="아기천사 공방에서 '코드 복사'한 NUANGEL1 코드를 붙여 넣으세요" style="width:100%;font:12px/1.4 ui-monospace,monospace"></textarea><button id="anCodeGo" type="button">이 코드로 기본형 바꾸기</button><button id="anCodeReset" type="button">처음 기본형으로</button><output id="anMsg"></output></div>
@@ -1606,7 +1607,10 @@ function soloTick(dt){ if(!SOLO) return; const jelly=JELLY.includes(SOLO)||SOLO.
   for(let l=0;l<nLobe;l++) if(LCNT[l] && (!jelly || !soloIs(l))){ removeLobe(l); LCNT[l]=0; }
   if(!jelly) return; let have=0; for(let l=0;l<nLobe;l++) if(LCNT[l]>=6) have++; if(SOLO==="cloud"){ const gs=new Set(); for(let l=0;l<nLobe;l++) if(LCNT[l] && LGRP[l]>=0) gs.add(LGRP[l]); have=gs.size; }
   const want=SOLO.startsWith("cust")?1:SOLOW[SOLO]||3; SOLOT+=dt; if(have<want && SOLOT>.5){ SOLOT=0; soloSpawn(); } }   /* 모자라면 단계를 바꿔 가며 하나씩 놓는다 (큰 것부터 작은 것까지 섞여 보이게) */
-return { setSolo(k){ SOLO=k||""; SOLOT=9; SOLON=0; }, soloSpawn(){ if(SOLO) soloSpawn(); }, soloClear(){ for(let l=0;l<nLobe;l++) if(LCNT[l]){ removeLobe(l); LCNT[l]=0; } SOLOT=9; }, noSave(){ NOSAVE=true; }, reload(){ load(); buildMolds(); }, G, setView, syncUI, setZone(a,b,c,d){ ZX0=a; ZY0=b; ZX1=c; ZY1=d; }, center(x,y){ CXs=x; CYs=y; }, light(a){ LBASE=a; }, dbg(){ let hl=0, ha=0, big=0, sm8=0; for(let l=0;l<HL.n;l++){ const a=HL.A[l]*HL.sign; if(a>24){ hl++; ha+=a; } else if(a>0) sm8++; } let lob=0; for(let l=0;l<nLobe;l++) if(LCNT[l]) lob++; let maxc=0; for(let l=0;l<nLobe;l++) if(LCNT[l]>maxc) maxc=LCNT[l]; return {N,lob,maxc,sm8,hl,ha:Math.round(ha),h2:H2.n,simT:+simT.toFixed(1)}; }, setWater(f){ waterAt=f; }, burst(x,y){ return G.on && burst(x-OXp,y-OYp); },
+/* 천사와 주고받기: 방울 목록(세계 좌표)과, 천사 자리에 들어온 알갱이를 밀어내 방울이 천사 모양대로 눌리게 */
+function lobesW(){ const o=[]; for(let l=0;l<nLobe;l++){ const c=LCNT[l]; if(c<3) continue; o.push(LCX[l]+OXp, LCY[l]+OYp, Math.sqrt(c*SP0*SP0*.866/Math.PI)+RK*.5, l); } return o; }
+function repel(x,y,r,vx,vy){ x-=OXp; y-=OYp; const r2=r*r; let hit=0; for(let i=0;i<N;i++){ const dx=X[i]-x, dy=Y[i]-y, d2=dx*dx+dy*dy; if(d2>=r2) continue; const d=Math.sqrt(d2)||1e-3, nx=dx/d, ny=dy/d, push=r-d; X[i]+=nx*push*.6; Y[i]+=ny*push*.6; VX[i]+=nx*push*6+vx*.4; VY[i]+=ny*push*6+vy*.4; LEV[LBL[i]]+=push*.02; hit++; } return hit; }
+return { lobesW, repel, setSolo(k){ SOLO=k||""; SOLOT=9; SOLON=0; }, soloSpawn(){ if(SOLO) soloSpawn(); }, soloClear(){ for(let l=0;l<nLobe;l++) if(LCNT[l]){ removeLobe(l); LCNT[l]=0; } SOLOT=9; }, noSave(){ NOSAVE=true; }, reload(){ load(); buildMolds(); }, G, setView, syncUI, setZone(a,b,c,d){ ZX0=a; ZY0=b; ZX1=c; ZY1=d; }, center(x,y){ CXs=x; CYs=y; }, light(a){ LBASE=a; }, dbg(){ let hl=0, ha=0, big=0, sm8=0; for(let l=0;l<HL.n;l++){ const a=HL.A[l]*HL.sign; if(a>24){ hl++; ha+=a; } else if(a>0) sm8++; } let lob=0; for(let l=0;l<nLobe;l++) if(LCNT[l]) lob++; let maxc=0; for(let l=0;l<nLobe;l++) if(LCNT[l]>maxc) maxc=LCNT[l]; return {N,lob,maxc,sm8,hl,ha:Math.round(ha),h2:H2.n,simT:+simT.toFixed(1)}; }, setWater(f){ waterAt=f; }, burst(x,y){ return G.on && burst(x-OXp,y-OYp); },
   start(){ if(!started){ started=true; reset(); } },
   on(){ return !!G.on; },
   setOn(v){ G.on=v?1:0; save(); syncUI(); if(!G.on){ ptrs.clear(); if(own){ g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,W,Hh); } } },
@@ -1647,7 +1651,7 @@ function bdRect(){ const r=bdRect0(), v=VR(), o=OVN; return [v[0]+r[0]/o, v[1]+r
 function bdRect0(){ const sd=bdSide(), f=BD.G.wf; return sd===0?[WW*(1-f),0,WW*f,WH]:sd===1?[0,0,WW*f,WH]:sd===2?[0,0,WW,WH*f]:sd===3?[0,WH*(1-f),WW,WH*f]:[0,0,WW,WH]; }
 function placeCenter(){ CX=WW*.46; CY=WH*.5; }
 BD.useCtx(g); const WTR=[0,0]; const waterAt=(x,y)=>{ let px=(x+PAD)/CV, py=(y+PAD)/CV; px=px<0?0:px>vw-1.001?vw-1.001:px; py=py<0?0:py>vh-1.001?vh-1.001:py; const ix=px|0, iy=py|0, fx=px-ix, fy=py-iy, k=iy*vw+ix;
-  WTR[0]=(U[k]*(1-fx)+U[k+1]*fx)*(1-fy)+(U[k+vw]*(1-fx)+U[k+vw+1]*fx)*fy; WTR[1]=(V[k]*(1-fx)+V[k+1]*fx)*(1-fy)+(V[k+vw]*(1-fx)+V[k+vw+1]*fx)*fy; return WTR; }; BD.setWater(waterAt);   // 핏방울이 읽는 물 흐름   // 핏방울을 소용돌이와 같은 화면에 그린다: 겹 화면이 없어 큰 창에서도 가볍다
+  WTR[0]=(U[k]*(1-fx)+U[k+1]*fx)*(1-fy)+(U[k+vw]*(1-fx)+U[k+vw+1]*fx)*fy; WTR[1]=(V[k]*(1-fx)+V[k+1]*fx)*(1-fy)+(V[k+vw]*(1-fx)+V[k+vw+1]*fx)*fy; return WTR; }; BD.setWater(waterAt); window.NF_MAP={ k:()=>cv.clientWidth/WW*G.camZ, w2s:(x,y)=>{ const cw=cv.clientWidth, ch=cv.clientHeight, sw=stEl.clientWidth, sh=stEl.clientHeight; return [(x/WW*cw-cw/2)*G.camZ+sw/2+G.camX*sw,(y/WH*ch-ch/2)*G.camZ+sh/2+G.camY*sh]; }, s2w:(x,y)=>{ const cw=cv.clientWidth, ch=cv.clientHeight, sw=stEl.clientWidth, sh=stEl.clientHeight; return [((x-sw/2-G.camX*sw)/G.camZ+cw/2)/cw*WW,((y-sh/2-G.camY*sh)/G.camZ+ch/2)/ch*WH]; }, BD };   /* 무대 화면 ↔ 소용돌이 판 자리 (천사가 방울과 부딪힐 때 쓴다) */ window.NF_FLOW=(cx,cy)=>{ const p=wposP({clientX:cx,clientY:cy},0), w=waterAt(p[0],p[1]), k=cv.clientWidth/WW*G.camZ; return [w[0]*k,w[1]*k]; };   /* 화면 위 한 점의 물 흐름 (천사가 읽는다) */   // 핏방울이 읽는 물 흐름   // 핏방울을 소용돌이와 같은 화면에 그린다: 겹 화면이 없어 큰 창에서도 가볍다
 BD.onPop=(x,y,kind,r)=>{ if(!G.skOn) return; skSpawn(0,x,y,Math.min(1.2,r/40)*.7,0); SPK[SPK.length-1].life=.45;   // 팡: 그 자리에서 짧게 터지는 별
   if(kind==="bolt"){ const m=3+Math.floor(Math.random()*2), a0=Math.random()*TAU; for(let q=0;q<m;q++){ const a=a0+q*TAU/m+(Math.random()-.5)*.5; skSpawn(1,x+Math.cos(a)*r*.6,y+Math.sin(a)*r*.6,.7+.4*Math.random(),a); const s=SPK[SPK.length-1]; s.life=2+1.2*Math.random(); s.fl2=1; s.vx=Math.cos(a)*90; s.vy=Math.sin(a)*90; } } };   // 번개: 그때 짠 나타나 사방으로 튀었다가 물을 타고 떠다닌다
 BD.onPlace=()=>{ const r=bdRect(); BD.setZone(r[0],r[1],r[0]+r[2],r[1]+r[3]); };
@@ -2437,7 +2441,7 @@ if(window.NF_VIEW==="panel")(function(){
       ["빛·색",["kHi","kCo","kHHi","kHCo","@kSel"]],
       ["하트 모양",["@pvH","mhP","mhR","mhA","mhH","mhW","mhTip","mhCl","mhInf","mhTilt","mhSave","kHShape","kEdgeH","kEdgeJ"]],
       ["별 모양",["@pvS","msP","msN","msRi","msInf","msTip","msIn","msW","msTilt","msSave","kEdgeS"]],
-      ["천사",["anAdd","anStyle","anSize","anSpeed","anSoft","anCode"]]]]];
+      ["천사",["anAdd","anStyle","anSize","anFlow","anSpeed","anSoft","anCode"]]]]];
   const mt=$("mtabs"); if(!mt) return; const host=mt.parentNode, old=[...document.querySelectorAll(".mpanel")];
   const item=k=>Q('.it[data-k="'+k+'"]');
   const blocks={ color:()=>{ const o=$("otabs"); return o && o.closest(".ctl"); }, kSel:()=>$("kSel"),
@@ -2701,7 +2705,7 @@ function walls(a){ const r=a.R()*1.02; for(const [nx,ny,dist] of [[-1,0,a.x],[1,
 const stage=document.querySelector(".stage"); if(!stage) return;
 const cvA=document.createElement("canvas"); cvA.id="cvA"; cvA.setAttribute("aria-hidden","true"); cvA.style.cssText="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:4"; stage.appendChild(cvA);
 const ctx=cvA.getContext("2d");
-const AK="nu-flow-angel"; let S={style:"paint",size:1,speed:1,soft:.7,spin:0};
+const AK="nu-flow-angel"; let S={style:"paint",size:1,speed:1,soft:.7,spin:0,flow:.6};
 try{ const o=JSON.parse(localStorage.getItem(AK)||"null"); if(o) Object.assign(S,o); }catch(_){}
 const saveS=()=>{ try{ localStorage.setItem(AK,JSON.stringify(S)); }catch(_){} };
 STYLE=S.style;
@@ -2716,15 +2720,22 @@ let last=performance.now(), T=0, run=false, drag=null;
 function kick(){ if(!run){ run=true; last=performance.now(); requestAnimationFrame(loop); } }
 function loop(now){ const dt=Math.min(.05,(now-last)/1000); last=now; T+=dt;
   if(!A.length){ if(dirty){ ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,cvA.width,cvA.height); dirty=false; } run=false; return; }
-  const cx=W*.5, cy=H*.5, spd=S.speed;
-  for(const a of A){ a.step(dt,T); a.pop=Math.min(1,(a.pop||0)+dt*2.5); if(a.hold) continue; const dx=a.x-cx, dy=a.y-cy, d=Math.hypot(dx,dy)||1, sw=10*spd/(.6+a.g.size);
-    a.vx+=(-dy/d*sw+nz(T*.3+a.ph,a.seed)*14*spd-a.vx*.7)*dt; a.vy+=(dx/d*sw*.6+nz(T*.3+a.ph,a.seed+5)*14*spd-6*spd*Math.sin(T*1.1+a.ph)-a.vy*.7)*dt; }
-  collide(dt); for(const a of A) walls(a);
+  const cx=W*.5, cy=H*.5, spd=S.speed, fi=S.flow||0, own=1-.7*Math.min(1,fi), sr=stage.getBoundingClientRect(), fk=Math.min(1,dt*2.4)*Math.min(1,fi);   /* 소용돌이 영향: 그 자리 물 흐름을 따라 떠밀린다 */
+  for(const a of A){ a.step(dt,T); a.pop=Math.min(1,(a.pop||0)+dt*2.5); if(a.hold) continue; if(fi>0 && window.NF_FLOW){ const w=window.NF_FLOW(sr.left+a.x,sr.top+a.y), m=fi/(.7+.3*a.g.size); a.vx+=(w[0]*m-a.vx)*fk; a.vy+=(w[1]*m-a.vy)*fk; } const dx=a.x-cx, dy=a.y-cy, d=Math.hypot(dx,dy)||1, sw=10*spd*own/(.6+a.g.size);
+    a.vx+=(-dy/d*sw+nz(T*.3+a.ph,a.seed)*14*spd*own-a.vx*.7*own)*dt; a.vy+=(dx/d*sw*.6+nz(T*.3+a.ph,a.seed+5)*14*spd*own-6*spd*Math.sin(T*1.1+a.ph)-a.vy*.7*own)*dt; }
+  collide(dt); bump(dt); for(const a of A) walls(a);
   for(const a of A){ if(!a.hold){ a.x+=a.vx*dt; a.y+=a.vy*dt; } }
   ctx.setTransform(DPR,0,0,DPR,0,0); ctx.clearRect(0,0,W,H); dirty=true;
   const order=A.slice().sort((p,q)=>p.y-q.y);
   for(const a of order){ const k=a.pop<1?1-Math.pow(1-a.pop,3)*Math.cos(a.pop*9):1; if(k!==1){ ctx.save(); ctx.translate(a.x,a.y); ctx.scale(k,k); ctx.translate(-a.x,-a.y); drawAngel(ctx,a,T,false); ctx.restore(); } else drawAngel(ctx,a,T,false); }
   requestAnimationFrame(loop); }
+/* 다른 오브젝트(핏방울·하트·별·물방울·구름·내 오브젝트)와 주고받기: 천사는 방울 모양대로 오목하게 눌리며 밀려나고,
+   방울은 천사 자리만큼 알갱이가 밀려나 천사 모양대로 움푹 눌린다 */
+function bump(dt){ const M=window.NF_MAP; if(!M || !M.BD || !M.BD.on || !M.BD.on() || !M.BD.lobesW) return; const L=M.BD.lobesW(); if(!L.length) return; const k=M.k();
+  for(const a of A){ const ra=a.R(); for(let j=0;j<L.length;j+=4){ const p=M.w2s(L[j],L[j+1]), rl=L[j+2]*k, dx=p[0]-a.x, dy=p[1]-a.y, rs=ra+rl, d2=dx*dx+dy*dy; if(d2>=rs*rs || d2<1e-3) continue;
+      const d=Math.sqrt(d2), nx=dx/d, ny=dy/d, ov=rs-d, hp=d*ra/rs; a.ct.push([nx,ny,hp,d,ra<rl*.9?(d-hp)+(rl-(d-hp))*.35:0]);
+      if(!a.hold){ a.x-=nx*ov*Math.min(1,dt*5); a.y-=ny*ov*Math.min(1,dt*5); const vn=a.vx*nx+a.vy*ny; if(vn>0){ a.vx-=nx*vn*1.2; a.vy-=ny*vn*1.2; if(vn>140) a.poke(Math.atan2(ny,nx),Math.min(.35,vn*.0015)); } } }
+    const w=M.s2w(a.x,a.y), sp=Math.hypot(a.vx,a.vy); if(sp>1 || a.hold || true) M.BD.repel(w[0],w[1],ra/k*.92,(a.vx||0)/k,(a.vy||0)/k); } }
 /* 손: 천사 위에서 누르면 무대(물·방울) 대신 천사를 잡는다 */
 const pos=e=>{ const r=stage.getBoundingClientRect(); return [e.clientX-r.left,e.clientY-r.top]; };
 function hit(x,y){ for(let i=A.length-1;i>=0;i--){ const a=A[i]; if(Math.hypot(x-a.x,y-a.y)<a.R()*1.15) return a; } return null; }
@@ -2739,7 +2750,7 @@ stage.addEventListener("dblclick",e=>{ if(!A.length) return; const [x,y]=pos(e);
 /* ---------- 천사 탭 손잡이 ---------- */
 const $$=id=>document.getElementById(id), pctT=v=>Math.round(v*100)+"%";
 function syncUI(){ const set=(id,v,t)=>{ const el=$$(id); if(el){ el.value=v; const o=$$(id+"V"); if(o) o.textContent=t; } };
-  set("anSize",S.size,pctT(S.size)); set("anSpeed",S.speed,pctT(S.speed)); set("anSoft",S.soft,pctT(S.soft));
+  set("anSize",S.size,pctT(S.size)); set("anSpeed",S.speed,pctT(S.speed)); set("anSoft",S.soft,pctT(S.soft)); set("anFlow",S.flow,pctT(S.flow));
   const b=(id,on)=>{ const el=$$(id); if(el) el.setAttribute("aria-pressed",on?"true":"false"); }; b("anPaint",S.style==="paint"); b("anPen",S.style==="pen"); b("anSpin",!!S.spin);
   const n=$$("anCount"); if(n) n.textContent=A.length?"지금 "+A.length+"마리":"아직 없음"; }
 const on=(id,ev,f)=>{ const el=$$(id); if(el) el.addEventListener(ev,f); };
@@ -2747,6 +2758,7 @@ on("anAdd1","click",()=>{ addAngels(1); syncUI(); }); on("anAdd5","click",()=>{ 
 on("anClear","click",()=>{ A=[]; drag=null; dirty=true; kick(); syncUI(); });
 on("anPaint","click",()=>{ S.style=STYLE="paint"; saveS(); syncUI(); }); on("anPen","click",()=>{ S.style=STYLE="pen"; saveS(); syncUI(); });
 on("anSize","input",()=>{ S.size=+$$("anSize").value; saveS(); fit(); syncUI(); });
+on("anFlow","input",()=>{ S.flow=+$$("anFlow").value; saveS(); syncUI(); });
 on("anSpeed","input",()=>{ S.speed=+$$("anSpeed").value; saveS(); syncUI(); });
 on("anSoft","input",()=>{ S.soft=+$$("anSoft").value; for(const a of A){ a.g.soft=a.gt.soft=a.base.soft=S.soft; } saveS(); syncUI(); });
 on("anSpin","click",()=>{ S.spin=S.spin?0:1; for(const a of A){ const sp=spinOf(S.spin); for(const o of [a.base,a.gt,a.g]){ o.spinY=sp[0]; o.spinX=sp[1]; } if(S.spin) a.poke(R0()*TAU,.2); } saveS(); syncUI(); });
