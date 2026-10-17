@@ -1091,9 +1091,9 @@ function place(R,key){ // 다른 방울과 겹치지 않는 빈자리를 고른�
     const s=m-R; if(s>bs){ bs=s; bx=x; by=y; } if(s>46) break; }
   return [bx,by]; }
 let RSN=0; function reset(){ RSN++; N=0; nLobe=0; ptrs.clear(); extra=0; GW.fill(0); TW.fill(0); simT=0; sel=-1;
-  const TO=[1,2,2,1,3,2,1,2,3,1,2,4].map(t=>[t,Math.random()]).sort((p,q)=>p[1]-q[1]).map(p=>p[0]); /* 처음 뜰 때 단계를 고루 섞어 큰 것부터 작은 것까지 다 나오게 */
-  for(let i=0;i<G.count;i++){ TFORCE=TO[i%TO.length]; const R=Math.max(6,tierRS(1,5)), p=place(R,i+1); TFORCE=TO[i%TO.length]; addShape(p[0],p[1],R,(h(SEED,i,90)-.5)*16,(h(SEED,i,91)-.5)*16,700+i*17+(RSN-1)*1013); TFORCE=0; /* 다시 놓을 때마다 하트·별 자리가 바뀐다 (첫 화면은 그날의 배치) */ } btn(); selUI(); }
-let NSOFT=1e9; function more(){ if(N>CAP-240) return; extra++; const R=Math.max(6,tierRS(1,5)), p=place(R,400+extra); addShape(p[0],p[1],R,0,0,900+extra*13); btn(); }
+  const TO=[1,2,2,1,3,2,1,2,3,1,4,2,3,5].map(t=>[t,Math.random()]).sort((p,q)=>p[1]-q[1]).map(p=>p[0]); /* 처음 뜰 때 단계를 고루 섞어 큰 것부터 작은 것까지 다 나오게 */
+  for(let i=0;i<G.count;i++){ TFORCE=TO[i%TO.length]; const R=Math.max(6,tierRS(1,6)), p=place(R,i+1); TFORCE=TO[i%TO.length]; addShape(p[0],p[1],R,(h(SEED,i,90)-.5)*16,(h(SEED,i,91)-.5)*16,700+i*17+(RSN-1)*1013); TFORCE=0; /* 다시 놓을 때마다 하트·별 자리가 바뀐다 (첫 화면은 그날의 배치) */ } btn(); selUI(); }
+let NSOFT=1e9; function more(){ if(N>CAP-240) return; extra++; const R=Math.max(6,tierRS(1,6)), p=place(R,400+extra); addShape(p[0],p[1],R,0,0,900+extra*13); btn(); }
 /* 여러 모양: 그림 속 방울처럼 둥근 것, 길쭉한 것, 강낭콩·땅콩(볼록함 둘), 애벌레(볼록함 셋·넷)가 섞인다. 이어 붙은 볼록함은 서로 녹아 하나가 되지 않아 모양이 남는다 */
 /* 하트 방울 (로코로코처럼): 새로 그리지 않고, 지금 핏방울 알갱이들을 하트 모양 틀 안에 머물게 한다. 출렁임·명암·늘리기는 핏방울 그대로 */
 function sdHeart(x,y){ x=Math.abs(x); if(y+x>1){ const dx=x-.25, dy=y-.75; return Math.sqrt(dx*dx+dy*dy)-Math.SQRT2/4; } const d1=x*x+(y-1)*(y-1), m=.5*Math.max(x+y,0), d2=(x-m)*(x-m)+(y-m)*(y-m); return Math.sqrt(Math.min(d1,d2))*Math.sign(x-y); }   // 아래 끝이 (0,0), 위로 볼록한 두 덩이
@@ -1129,10 +1129,10 @@ function addCloud(cx,cy){ const zf0=ZFORCE; if(ZFORCE===null) ZFORCE=0; const gi
   for(const [x,y,r] of P){ const ox=x-mx, oy=y-my; k+=addDrop(cx+ox,cy+oy,r,0,0); const l=nLobe-1; LCOL[l]=3; LKEEP[l]=1; LGRP[l]=gid; LOX[l]=ox; LOY[l]=oy; } ZFORCE=zf0; return k; }
 function heartStyle(l){ LHRT[l]=1; LCOL[l]=5; LKEEP[l]=1; LAC[l]=1; LAS[l]=0; LEL[l]=.8; LSZ[l]=.27; const a2=1.05; L2C[l]=Math.cos(a2); L2S[l]=Math.sin(a2); L2Z[l]=.24; L3Z[l]=0; for(let q=0;q<8;q++) SB[q][l]=SE[q][l]; }   // 하트: 하이라이트는 둥근 덩이 하나 + 작은 점, 되비침 없음
 function addShape(cx,cy,base,vx,vy,key){ const u=hh(key,80);
-  if(G.star && base>=12 && hh(key,93)<G.starR){ const k=addDrop(cx,cy,tierRS(4,5),vx,vy), l=nLobe-1; LHRT[l]=2; LCOL[l]=1; LKEEP[l]=1; LHA[l]=(hh(key,94)-.5)*.8; return k; }   // 별 방울: 노랑, 오각별 틀
-  if(G.blue && hh(key,95)<G.blueR){ const k=addDrop(cx,cy,tierRS(2,4),vx,vy), l=nLobe-1; LCOL[l]=2; LKEEP[l]=1; return k; }   // 파란 물방울: 둥근 방울, 파랑
-  if(G.heart && base>=12 && hh(key,91)<G.heartR){ const k=addDrop(cx,cy,tierRS(2,5),vx,vy), l=nLobe-1;   /* 하트는 알갱이가 넉넉해야 오목한 윗부분과 뾰족한 끝이 산다 */ heartStyle(l); LHA[l]=(hh(key,92)-.5)*.6; return k; }   // 하트 방울: 정한 비율만큼
-  if(u<.42 || base<11 || base*base*Math.PI/(SP0*SP0*.866)>=TIERB[3]) return u>=.42 && base>=11?addDrop(cx,cy,base,vx,vy,1.15+.4*hh(key,81),hh(key,82)*TAU):addDrop(cx,cy,base,vx,vy);   /* 큰 단계는 한 덩어리로 (여러 혹으로 나누면 작은 단계가 된다) */
+  if(G.star && base>=12 && hh(key,93)<G.starR){ const k=addDrop(cx,cy,tierRS(5,6),vx,vy), l=nLobe-1; LHRT[l]=2; LCOL[l]=1; LKEEP[l]=1; LHA[l]=(hh(key,94)-.5)*.8; return k; }   // 별 방울: 노랑, 오각별 틀
+  if(G.blue && hh(key,95)<G.blueR){ const k=addDrop(cx,cy,tierRS(2,5),vx,vy), l=nLobe-1; LCOL[l]=2; LKEEP[l]=1; return k; }   // 파란 물방울: 둥근 방울, 파랑
+  if(G.heart && base>=12 && hh(key,91)<G.heartR){ const k=addDrop(cx,cy,tierRS(2,6),vx,vy), l=nLobe-1;   /* 하트는 알갱이가 넉넉해야 오목한 윗부분과 뾰족한 끝이 산다 */ heartStyle(l); LHA[l]=(hh(key,92)-.5)*.6; return k; }   // 하트 방울: 정한 비율만큼
+  if(u<.42 || base<11 || base*base*Math.PI/(SP0*SP0*.866)>=TIERB[4]) return u>=.42 && base>=11?addDrop(cx,cy,base,vx,vy,1.15+.4*hh(key,81),hh(key,82)*TAU):addDrop(cx,cy,base,vx,vy);   /* 큰 단계는 한 덩어리로 (여러 혹으로 나누면 작은 단계가 된다) */
   if(u<.58) return addDrop(cx,cy,base,vx,vy,1.3+.8*hh(key,81),hh(key,82)*TAU);
   const zf1=ZFORCE; if(ZFORCE===null) ZFORCE=0; const n=u<.85?2:3+(hh(key,83)<.4?1:0), bend=(hh(key,85)-.5)*1.4; let x=cx, y=cy, a=hh(key,84)*TAU, pr=0, k=0; const ls=[];
   for(let q=0;q<n;q++){ const r=Math.max(8,base*(.5+.45*hh(key,86+q))); if(q>0){ const st=(pr+r)*.8; x+=Math.cos(a)*st; y+=Math.sin(a)*st; a+=bend; } k+=addDrop(x,y,r,vx,vy); ls.push(nLobe-1); pr=r; }
@@ -1394,7 +1394,7 @@ function manage(dt){ mgT+=dt; if(mgT<.25) return; const mdt=mgT; mgT=0; tierGrow
   if(G.leave) for(let l=0;l<nLobe;l++){ if(!LCNT[l] || LLV[l]>0) continue; if(held.has(l)){ LBORN[l]=simT; continue; } if(simT-LBORN[l]>G.dwell*LDW[l]){ LLV[l]=simT; const ox=LCX[l]-CXs, oy=LCY[l]-CYs, ol=HY(ox,oy)+1, ja=(hh(l+lobeSerial,63)-.5)*1.2, ca=Math.cos(ja), sa=Math.sin(ja), ux=ox/ol, uy=oy/ol; LDX[l]=ux*ca-uy*sa; LDY[l]=ux*sa+uy*ca; } }   // 나가는 방향: 가운데에서 바깥쪽으로 (조금씩 제멋대로)
   for(let l=0;l<nLobe;l++){ if(!LCNT[l] || held.has(l)) continue; if(BX0[l]>WW+40 || BX1[l]<-40 || BY0[l]>WH+40 || BY1[l]<-40){ owed+=removeLobe(l); LCNT[l]=0; LLV[l]=0; } }
   if(!G.refill || N>NSOFT){ owed=0; return; }   /* 60프레임 우선에서 많이 밀리면 새로 채우지 않는다 */
-  for(let t=0;t<(owed>160?2:1) && owed>=3 && N<CAP-120;t++){ const want=Math.min(owed,Math.round(tierN(1,3))), r=Math.max(8,Math.sqrt(want*SP0*SP0*.866/Math.PI)), a=hh(born,70)*TAU, d0=12+45*hh(born,72), p=placeNear(CXs+Math.cos(a)*d0,CYs+Math.sin(a)*d0,r+6), sp=40+90*hh(born,71);
+  for(let t=0;t<(owed>160?2:1) && owed>=3 && N<CAP-120;t++){ const want=Math.min(owed,Math.round(tierN(1,4))), r=Math.max(8,Math.sqrt(want*SP0*SP0*.866/Math.PI)), a=hh(born,70)*TAU, d0=12+45*hh(born,72), p=placeNear(CXs+Math.cos(a)*d0,CYs+Math.sin(a)*d0,r+6), sp=40+90*hh(born,71);
     owed-=Math.max(3,addShape(p[0],p[1],r,Math.cos(a)*sp,Math.sin(a)*sp,born*7+11)); }   // 다시 채우기: 작은 방울을 하나씩, 크기와 모양을 섞어 가운데에서 사방으로 흩뿌린다   // 가운데에서 새로 생겨 천천히 떠난다
   btn(); }
 /* 두 번 누르면 펑: 그 방울을 가장 작은 방울들로 쪼개 사방으로 튀긴다. 정한 초 동안은 서로 다시 붙지 않는다 */
@@ -1406,8 +1406,8 @@ function popTiny(ol,ck){ const n=LCNT[ol]; let cx=0, cy=0, c=0; for(let i=0;i<N;
 /* ── 크기 단계: 4 큰 · 3 중간 · 2 작은 · 1 가장 작은 (알갱이 수 기준, 한 단계마다 지름 약 절반) ──
    터지면 한 단계 아래의 진짜 오브젝트 3~6개로 갈라지고, 뭉쳐서 커지면 다시 위 단계가 된다.
    별: 3·4단계는 별, 1·2단계는 노란 동그라미 (노란 동그라미가 뭉쳐 3단계가 되면 별) · 하트: 터지면 핏방울 · 핏방울: 뭉쳐 한 단계 커질 때마다 1/5 확률로 하트 (2단계 이상) */
-const TIERB=[0,6,20,70,250], TIERM=[0,3,11,37,132]; const tierOf=n=>n>=250?5:n>=70?4:n>=20?3:n>=6?2:1;   // 5단계: 1 아주 작은(6개 미만) · 2 작은 · 3 중간 · 4 큰 · 5 아주 큰
-const TW8=[0,.32,.4,.2,.07,.01];   /* 등장 크기: 대부분 작은 것부터, 아주 큰 것은 드물게 */ function tierN(a,b){ let tot=0; for(let t=a;t<=b;t++) tot+=TW8[t]; let r=Math.random()*tot, t=a; for(;t<b;t++){ r-=TW8[t]; if(r<=0) break; } if(TFORCE){ t=Math.max(a,Math.min(b,TFORCE)); TFORCE=0; } const lo=Math.max(3,TIERB[t-1]), hi=t>=5?700:TIERB[t]-1; return Math.max(lo,Math.min(hi,lo*Math.pow(hi/lo,Math.random())*TSIZE)); }   /* 크기 조절을 곱해도 고른 단계 안에 머문다 */
+const TIERB=[0,6,15,39,98,250], TIERM=[0,3,9,24,62,156]; const tierOf=n=>n>=250?6:n>=98?5:n>=39?4:n>=15?3:n>=6?2:1;   // 6단계: 가장 작은(6개 미만)·가장 큰(250개 이상)은 그대로, 사이를 한 칸 더 촘촘히
+const TW8=[0,.3,.33,.21,.11,.04,.01];   /* 등장 크기: 대부분 작은 것부터, 아주 큰 것은 드물게 */ function tierN(a,b){ let tot=0; for(let t=a;t<=b;t++) tot+=TW8[t]; let r=Math.random()*tot, t=a; for(;t<b;t++){ r-=TW8[t]; if(r<=0) break; } if(TFORCE){ t=Math.max(a,Math.min(b,TFORCE)); TFORCE=0; } const lo=Math.max(3,TIERB[t-1]), hi=t>=6?700:TIERB[t]-1; return Math.max(lo,Math.min(hi,lo*Math.pow(hi/lo,Math.random())*TSIZE)); }   /* 크기 조절을 곱해도 고른 단계 안에 머문다 */
 let TFORCE=0, TSIZE=1; const tierRS=(a,b)=>{ TSIZE=G.size; const r=tierR(a,b); TSIZE=1; return r; };   // 고른 단계 안에서 크기를 고르게 섞어 뽑는다
 const tierR=(a,b)=>Math.sqrt(tierN(a,b)*SP0*SP0*.866/Math.PI); const LTR=new Int8Array(LMAX), FSX=new Float32Array(LMAX).fill(NaN), FSY=new Float32Array(LMAX);
 function tierBurst(ol){ let n=0; for(let i=0;i<N;i++) if(LBL[i]===ol) n++; const t=tierOf(n); if(t<=1) return false; const kind=LHRT[ol]===2||LCOL[ol]===1?"y":LCOL[ol]===2?"b":"r";
@@ -1422,12 +1422,12 @@ function tierBurst(ol){ let n=0; for(let i=0;i<N;i++) if(LBL[i]===ol) n++; const
   removeLobe(ol); LCNT[ol]=0; if(onPop) onPop(cx+OXp,cy+OYp,"pop",r); const a0=Math.random()*TAU, ck=kind==="y"?1:kind==="b"?2:0;
   for(let q=0;q<K;q++){ const nc=W8[q], rq=Math.sqrt(nc*SP0*SP0*.866/Math.PI)*1.04, small=1-Math.min(1,nc/Math.max(4,TIERM[ct])), a=a0+q*TAU/K+(Math.random()-.5)*.5, d=Math.max(r*.4,rq*1.3/Math.sin(Math.PI/Math.max(3,K)))*(.85+.3*Math.random()),
       sp=(230+200*Math.random())*(1+.9*small)*G.bSpd*boost; addDrop(cx+Math.cos(a)*d,cy+Math.sin(a)*d,rq,Math.cos(a)*sp,Math.sin(a)*sp); const l=nLobe-1;
-    LCOL[l]=ck; LNF[l]=simT+G.sep; LTR[l]=tierOf(nc); LEV[l]+=12; if(wasStar || (kind==="y" && tierOf(nc)>=4)){ LHRT[l]=2; LKEEP[l]=1; LHA[l]=(Math.random()-.5)*2; } }   /* 별에서 나온 조각은 크기와 상관없이 모두 별 */
+    LCOL[l]=ck; LNF[l]=simT+G.sep; LTR[l]=tierOf(nc); LEV[l]+=12; if(wasStar || (kind==="y" && tierOf(nc)>=5)){ LHRT[l]=2; LKEEP[l]=1; LHA[l]=(Math.random()-.5)*2; } }   /* 별에서 나온 조각은 크기와 상관없이 모두 별 */
   if(G.tiny>0) for(let u=0;u<Math.round((10+n*.04)*G.tiny);u++){ const a=Math.random()*TAU, sp=(260+340*Math.random())*G.bSpd*boost; sprAdd(cx,cy,Math.cos(a)*sp,Math.sin(a)*sp,1.2+4*Math.pow(Math.random(),1.5),ck); }   // 물보라
   born++; sel=-1; selUI(); return true; }
 function tierGrow(){ for(let l=0;l<nLobe;l++){ if(!LCNT[l] || LIMG[l] || LGRP[l]>=0) continue; const t=tierOf(LCNT[l]); if(!LTR[l]){ LTR[l]=t; continue; } if(t<=LTR[l]) continue; LTR[l]=t;   // 한 단계 커졌다
     if(LCOL[l]===0 && !LHRT[l] && t>=2 && Math.random()<.2){ heartStyle(l); LHA[l]=(Math.random()-.5)*.6; if(onPop) onPop(LCX[l]+OXp,LCY[l]+OYp,"pop",12); }   // 핏방울이 뭉쳐 커지면 가끔 하트로
-    else if(LCOL[l]===1 && !LHRT[l] && t>=4){ LHRT[l]=2; LKEEP[l]=1; LHA[l]=(Math.random()-.5)*.6; if(onPop) onPop(LCX[l]+OXp,LCY[l]+OYp,"pop",12); } } }   // 노란 동그라미가 3단계가 되면 별
+    else if(LCOL[l]===1 && !LHRT[l] && t>=5){ LHRT[l]=2; LKEEP[l]=1; LHA[l]=(Math.random()-.5)*.6; if(onPop) onPop(LCX[l]+OXp,LCY[l]+OYp,"pop",12); } } }   // 노란 동그라미가 3단계가 되면 별
 function morph(ol,rule){ const n=LCNT[ol]; if(n<6 || (rule===6 && n<60)) return false; const cx=LCX[ol], cy=LCY[ol], r=Math.max(14,Math.sqrt(n*SP0*SP0*.866/Math.PI)); for(const id of [...ptrs.keys()]) release(id);
   removeLobe(ol); LCNT[ol]=0; if(onPop) onPop(cx+OXp,cy+OYp,"pop",r);   // 원래 방울은 사라지고 그 자리에서 팡
   const pop=(vx,vy)=>[vx+(Math.random()-.5)*40, vy-30+(Math.random()-.5)*40];
@@ -1630,9 +1630,9 @@ const JELLY=["drop","heart","star","blue","cloud"];
 /* 따로 보기: 고른 종류만 남긴다. 처음부터 그 종류였던 것 + 그것이 터져 생긴 잔해(LSOK)만 산다 */
 const soloIs=l=>{ if(!LCNT[l]) return true; const k=SOLO; if(k.startsWith("cust")) return LIMG[l]===+k.slice(4)+1; if(LSOK[l]) return true; if(LIMG[l]) return false;
   if(k==="heart") return LHRT[l]===1; if(k==="star") return LHRT[l]===2; if(k==="drop") return !LHRT[l] && (LCOL[l]===0||LCOL[l]===5) && LGRP[l]<0; if(k==="blue") return !LHRT[l] && LCOL[l]===2 && LGRP[l]<0; if(k==="cloud") return LGRP[l]>=0; return false; };
-const SOLOW={drop:5,heart:3,star:3,blue:5,cloud:2}, SOLOTR={drop:[3,4,5,2],heart:[4,3,5,2],star:[5,4],blue:[3,4,2],cloud:[0]}; let SOLON=0;
+const SOLOW={drop:5,heart:3,star:3,blue:5,cloud:2}, SOLOTR={drop:[3,4,5,6,2],heart:[4,3,5,6,2],star:[6,5],blue:[3,4,5,2],cloud:[0]}; let SOLON=0;
 function soloSpawn(){ const k=SOLO; SOLOB=1; try{ if(k==="cloud"){ const p=placeNear(CXs+(Math.random()-.5)*260,CYs+(Math.random()-.5)*160,90*G.cloudS); addCloud(p[0],p[1]); return; } if(k.startsWith("cust")){ custSpawn(+k.slice(4),true); return; }
-    const T=SOLOTR[k]; if(!T) return; TFORCE=T[SOLON++%T.length]; const R=Math.max(10,k==="star"?tierRS(4,5):k==="blue"?tierRS(2,4):tierRS(2,5)), p=placeNear(CXs+(Math.random()-.5)*300,CYs+(Math.random()-.5)*200,R*1.25);
+    const T=SOLOTR[k]; if(!T) return; TFORCE=T[SOLON++%T.length]; const R=Math.max(10,k==="star"?tierRS(5,6):k==="blue"?tierRS(2,5):tierRS(2,6)), p=placeNear(CXs+(Math.random()-.5)*300,CYs+(Math.random()-.5)*200,R*1.25);
     addDrop(p[0],p[1],R,(Math.random()-.5)*20,(Math.random()-.5)*20); const l=nLobe-1; LKEEP[l]=1; LHA[l]=(Math.random()-.5)*.6;
     if(k==="heart") heartStyle(l); else if(k==="star"){ LHRT[l]=2; LCOL[l]=1; } else if(k==="blue") LCOL[l]=2; } finally{ SOLOB=0; TFORCE=0; } }
 function soloTick(dt){ if(!SOLO) return; const jelly=JELLY.includes(SOLO)||SOLO.startsWith("cust");
