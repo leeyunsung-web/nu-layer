@@ -227,7 +227,7 @@ canvas.hold{cursor:grabbing}
     <div class="it row" data-k="kLeave"><span>밀려나가기</span><button id="kLeave" type="button" aria-pressed="true">밀려나가기</button><button id="kRefill" type="button" aria-pressed="true">다시 채우기</button><button id="kWall" type="button" aria-pressed="false">가장자리 벽</button><small class="desc">밀려나가기: 방울마다 머무는 시간이 지나면 제멋대로 고른 방향으로 서서히 화면 밖으로 나갑니다. 다시 채우기: 나간 만큼 소용돌이 가운데에서 새 방울이 생깁니다. 가장자리 벽: 켜면 방울이 화면 밖으로 못 나갑니다(꺼 두면 바깥으로 밀려 나가고 가운데에서 다시 생기며 돌고 돕니다).</small></div>
     <label class="it" data-k="kDwell"><span>머무는 시간</span><span class="numw"><input id="kDwell" type="number" min="1" max="600" step="1" value="12" inputmode="decimal"> 초</span><small class="desc">밀려나가기 전에 떠 있는 시간. 방울마다 이 값의 60~140%로 조금씩 다릅니다.</small></label>
     <h3 class="msub">모양 다듬기 (하트·별)</h3>
-    <div class="it row wide mprev"><canvas id="mhCv" width="120" height="120" aria-label="하트 틀 미리보기"></canvas><canvas id="msCv" width="120" height="120" aria-label="별 틀 미리보기"></canvas><small class="desc">조절하면 화면 속 하트·별 방울이 바로 새 틀을 따라 말랑하게 바뀝니다.</small></div>
+    <div class="it row wide mprev"><canvas id="mhCv" width="200" height="200" aria-label="하트 틀 미리보기"></canvas><canvas id="msCv" width="200" height="200" aria-label="별 틀 미리보기"></canvas><small class="desc">조절하면 화면 속 하트·별 방울이 바로 새 틀을 따라 말랑하게 바뀝니다.</small></div>
     <div class="it row wide" data-k="mhP"><span>하트 모양 고르기</span><button id="mhP_0" type="button">기본</button><button id="mhP_1" type="button">통통</button><button id="mhP_2" type="button">뾰족</button><button id="mhP_3" type="button">로코로코</button><button id="mhP_4" type="button">넓적</button><button id="mhP_5" type="button">갸웃</button><span id="mhUser" class="muser"></span></div>
     <label class="it" data-k="mhR"><span>하트 꼭지 크기</span><input id="mhR" type="range" min="0.2" max="0.6" step="0.005" value="0.354"><output id="mhRV">35</output><small class="desc">하트 위쪽 두 덩이의 크기.</small></label>
     <label class="it" data-k="mhA"><span>하트 꼭지 간격</span><input id="mhA" type="range" min="0.05" max="0.5" step="0.005" value="0.25"><output id="mhAV">25</output><small class="desc">두 덩이 사이 거리. 넓으면 가운데가 깊게 패입니다.</small></label>
@@ -275,6 +275,7 @@ canvas.hold{cursor:grabbing}
     <label class="it" data-k="kCo"><span>어두운 부분</span><input id="kCo" type="range" min="0" max="2" step="0.01" value="1"><output id="kCoV">100%</output><small class="desc">방울 속 어두운 덩어리 크기.</small></label>
     <label class="it" data-k="kDyn"><span>출렁임</span><input id="kDyn" type="range" min="0" max="2" step="0.01" value="1"><output id="kDynV">100%</output><small class="desc">방울 안의 흐름과 빛이 출렁이는 정도 (빛이 움직이는 빠르기도 이것을 따름).</small></label>
     <label class="it" data-k="kFuse"><span>하나 되기까지</span><input id="kFuse" type="range" min="0" max="12" step="0.5" value="3"><output id="kFuseV">3초</output><small class="desc">닿은 방울이 한 방울로 합쳐지기까지 걸리는 시간.</small></label>
+    <label class="it" data-k="kBSpd"><span>터질 때 퍼지는 거리</span><input id="kBSpd" type="range" min="0.5" max="4" step="0.1" value="1.8"><output id="kBSpdV">180%</output><small class="desc">두 번 눌러 펑 터뜨렸을 때 조각이 날아가는 세기. 높을수록 멀리 퍼집니다.</small></label>
     <label class="it" data-k="kXAtt"><span>서로 끌림</span><input id="kXAtt" type="range" min="0" max="1" step="0.05" value="0.45"><output id="kXAttV">45%</output><small class="desc">다른 오브젝트끼리 가까이 오면 당기는 힘. 높으면 자석처럼 확 달라붙고, 낮으면 닿아도 살짝만 붙습니다.</small></label>
     <label class="it" data-k="kFRamp"><span>스며드는 시간</span><input id="kFRamp" type="range" min="0.5" max="8" step="0.1" value="1.8"><output id="kFRampV">1.8초</output><small class="desc">합쳐지기 시작해서 완전히 한 몸이 될 때까지. 길수록 천천히 녹아듭니다.</small></label>
     <label class="it" data-k="kVisc"><span>끈기</span><input id="kVisc" type="range" min="0.3" max="2.5" step="0.05" value="1"><output id="kViscV">100%</output><small class="desc">꿀처럼 뭉근하게 따라오는 정도.</small></label>
@@ -1005,7 +1006,7 @@ function step(){ const DS=DT*G.speed, DMP=Math.pow(P.DAMP,G.speed), VS=P.VISC*Ma
   ufInit();
   const JL=Math.min(.9,G.jelly);
   for(let p=0;p<NP;p++){ const i=PI_[p], j=PJ_[p], dx=X[j]-X[i], dy=Y[j]-Y[i], r2=dx*dx+dy*dy; if(r2>=h2) continue;
-    const a=1-Math.sqrt(r2)*ih, a2=a*a; RHO[i]+=a2; RHO[j]+=a2; RHN[i]+=a2*a; RHN[j]+=a2*a; if(LBL[i]!==LBL[j] && a>.35) ufU(LBL[i],LBL[j]); }
+    const a=1-Math.sqrt(r2)*ih, a2=a*a; RHO[i]+=a2; RHO[j]+=a2; RHN[i]+=a2*a; RHN[j]+=a2*a; if(LBL[i]!==LBL[j] && a>.35 && LNF[LBL[i]]<=simT && LNF[LBL[j]]<=simT) ufU(LBL[i],LBL[j]); }
   for(let p=0;p<NP;p++){ const i=PI_[p], j=PJ_[p], dx=X[j]-X[i], dy=Y[j]-Y[i], r2=dx*dx+dy*dy; if(r2>=h2) continue;
     const r=Math.sqrt(r2)+1e-6, a=1-r*ih; let D=(P.K*((RHO[i]+RHO[j])*.5-P.RHO0)*a+P.KN*(RHN[i]+RHN[j])*.5*a*a)*.5/r, c=P.ST*a;
     if(LBL[i]!==LBL[j]){ const li=LBL[i], lj=LBL[j], f=G.xAtt+(1-G.xAtt)*(1-(LTO[li]===lj?LFD[li]:LTO[lj]===li?LFD[lj]:1)); c*=f*a;   /* 다른 덩이끼리는 약하게, 가까울수록만 당긴다 (툭 끌려와 자석처럼 붙지 않게) */ if(D<0) D*=f; if(LNF[li]>simT || LNF[lj]>simT){ c=0; if(D<0) D=0; } if(G.touch===1 && !(LGRP[li]>=0 && LGRP[li]===LGRP[lj])){ c*=.15; D=Math.max(D,0)+.09*a; } }   // 뭉치기만: 방울끼리 살짝 떨어져 붙어 있어 각자 테두리·색이 따로 보인다   // 막 흩어진 방울은 정한 초 동안 서로 끌어당기지 않는다   // 서로 다른 덩이끼리는 덜 끌어당긴다: 붙기는 하지만 각자 둥글게 남아 사이가 잘록해진다
@@ -1043,7 +1044,7 @@ function towFrom(seeds,vx,vy,lam){ const qt=linked(seeds);
 /* ── 판 차리기 ── */
 const AREA=540000, SIZES=[60,46,38,31,25,20,16];
 let W=0, Hh=0, dpr=1, scale=1, extra=0;
-const G={on:1,dep:.6,heart:1,heartR:.3,hShape:1,touch:0,jelly:.55,rot:10,tiny:.7,cFree:.6,tfR:1,tfH:5,tfS:6,tfB:4,tfv:1,xAtt:.45,fRamp:1.8,mhR:.354,mhA:.25,mhH:.75,mhW:1,mhTip:0,mhCl:0,mhInf:0,mhTilt:0,msN:5,msRi:.62,msInf:.07,msTip:0,msIn:0,msW:1,msTilt:0,hHi:.8,hCo:.9,star:1,starR:.15,blue:1,blueR:.2,cloud:1,cloudN:3,cloudS:1,flowInf:.3,fmax:120,outP:.5,walls:0,speed:1,sep:3,leave:1,dwell:12,push:1,refill:1,hi:1,co:1,dyn:1,fuse:3,size:.8,count:5,side:0,wf:.42,visc:1,wob:1,st:1};   // side: 0 오른쪽 1 왼쪽 2 위 3 아래 4 화면 전체   // 전체 조절값: 하이라이트 크기, 어두운 부분 크기, 출렁임
+const G={on:1,dep:.6,heart:1,heartR:.3,hShape:1,touch:0,jelly:.55,rot:10,tiny:.7,cFree:.6,tfR:1,tfH:5,tfS:6,tfB:4,tfv:1,xAtt:.45,fRamp:1.8,bSpd:1.8,mhR:.354,mhA:.25,mhH:.75,mhW:1,mhTip:0,mhCl:0,mhInf:0,mhTilt:0,msN:5,msRi:.62,msInf:.07,msTip:0,msIn:0,msW:1,msTilt:0,hHi:.8,hCo:.9,star:1,starR:.15,blue:1,blueR:.2,cloud:1,cloudN:3,cloudS:1,flowInf:.3,fmax:120,outP:.5,walls:0,speed:1,sep:3,leave:1,dwell:12,push:1,refill:1,hi:1,co:1,dyn:1,fuse:3,size:.8,count:5,side:0,wf:.42,visc:1,wob:1,st:1};   // side: 0 오른쪽 1 왼쪽 2 위 3 아래 4 화면 전체   // 전체 조절값: 하이라이트 크기, 어두운 부분 크기, 출렁임
 let sel=-1;                  // 선택한 방울에 속한 알갱이 하나 (방울이 합쳐지면 합쳐진 덩어리가 선택된다)
 let ZX0=0, ZY0=0, ZX1=930, ZY1=580;   // 처음 놓이는 자리 (화면은 소용돌이와 함께 쓴다)
 function place(R,key){ // 다른 방울과 겹치지 않는 빈자리를 고른다
@@ -1204,7 +1205,7 @@ function lobes(dt){ FMX=Math.PI*(G.fmax/2)*(G.fmax/2)/(SP0*SP0*.866); const n=gw
     if(o>=0 && (LCNT[o]>LCNT[own] || (LCNT[o]===LCNT[own] && o<own)) && (LCAND[own]<0 || LCNT[o]>LCNT[LCAND[own]])) LCAND[own]=o; }
   // 맞닿은 지 정해 둔 시간이 지나면 작은 덩이가 큰 덩이에 녹아든다: 사이의 골이 옅어지고, 빛 성격이 큰 덩이를 닮아 가다가, 한 덩이가 된다
   let any=false;
-  for(let l=0;l<nLobe;l++){ if(!LCNT[l]) continue; let c=LCAND[l]; if(c>=0 && G.touch===1 && !(LGRP[l]>=0 && LGRP[l]===LGRP[c])) c=-1;   // '닿아도 뭉치기만': 방울끼리 녹아들지 않는다 (같은 색이어도. 한 구름 안의 송이만 예외)
+  for(let l=0;l<nLobe;l++){ if(!LCNT[l]) continue; let c=LCAND[l]; if(c>=0 && (LNF[l]>simT || LNF[c]>simT)) c=-1; /* 막 터진 조각은 정한 초 동안 서로 붙지 않는다 */ if(c>=0 && G.touch===1 && !(LGRP[l]>=0 && LGRP[l]===LGRP[c])) c=-1;   // '닿아도 뭉치기만': 방울끼리 녹아들지 않는다 (같은 색이어도. 한 구름 안의 송이만 예외)
     if(c>=0){ if(LTM[l]===0){ LEV[l]+=7; LEV[c]+=5; }   // 닿는 순간 움찔한다
       LTO[l]=c; LTM[l]+=dt; const fz=LFR[l]||LFR[c]?Math.min(G.fuse,.5):G.fuse; LFD[l]=1-sm((LTM[l]-fz)/(LFR[l]||LFR[c]?Math.max(.4,G.fRamp*.4):G.fRamp)); /* 스며드는 시간: 천천히 하나가 된다 */ if(LFD[l]<=.002){ LFUS[l]=c; any=true; LEV[c]+=6; } } else { LTO[l]=-1; LTM[l]=0; LFD[l]=1; }   // 터진 조각끼리는 다시 닿으면 금방 하나가 된다
     LEV[l]+=(-80*LEX[l]-4.6*LEV[l])*dt; LEX[l]=clamp(LEX[l]+LEV[l]*dt,-1,1); }
@@ -1349,9 +1350,9 @@ function morph(ol,rule){ const n=LCNT[ol]; if(n<6) return false; const cx=LCX[ol
   if(rule===2){ const rr=Math.max(r,50), v=pop(0,0); addDrop(cx,cy,rr,v[0],v[1]); const l=nLobe-1; heartStyle(l); LHA[l]=(Math.random()-.5)*.5; }
   else if(rule===3){ const rr=Math.max(r,62), v=pop(0,0); addDrop(cx,cy,rr,v[0],v[1]); const l=nLobe-1; LHRT[l]=2; LCOL[l]=1; LKEEP[l]=1; LHA[l]=(Math.random()-.5)*.6; }
   else if(rule===6){ const k=4+Math.floor(Math.random()*4), a0=Math.random()*TAU;   // 작은 별 여러 개가 사방으로 (크기도 조금씩 다르게)
-    for(let q=0;q<k;q++){ const a=a0+q*TAU/k+(Math.random()-.5)*.5, rr=Math.max(24,r/Math.sqrt(k)*(.9+.5*Math.random())), d=r*.55, sp=150+120*Math.random(); addDrop(cx+Math.cos(a)*d,cy+Math.sin(a)*d,rr,Math.cos(a)*sp,Math.sin(a)*sp); const l=nLobe-1; LHRT[l]=2; LCOL[l]=1; LKEEP[l]=1; LNF[l]=simT+G.sep; LHA[l]=(Math.random()-.5)*1.4; } }
+    for(let q=0;q<k;q++){ const a=a0+q*TAU/k+(Math.random()-.5)*.5, rr=Math.max(24,r/Math.sqrt(k)*(.9+.5*Math.random())), d=r*.55, sp=(150+120*Math.random())*G.bSpd; addDrop(cx+Math.cos(a)*d,cy+Math.sin(a)*d,rr,Math.cos(a)*sp,Math.sin(a)*sp); const l=nLobe-1; LHRT[l]=2; LCOL[l]=1; LKEEP[l]=1; LNF[l]=simT+G.sep; LHA[l]=(Math.random()-.5)*1.4; } }
   else { const k=3+Math.floor(Math.random()*3), rr=Math.max(10,r/Math.sqrt(k)*1.05), a0=Math.random()*TAU;   // 작은 방울 여러 개가 사방으로
-    for(let q=0;q<k;q++){ const a=a0+q*TAU/k, d=rr*1.2; addDrop(cx+Math.cos(a)*d,cy+Math.sin(a)*d,rr,Math.cos(a)*160,Math.sin(a)*160); const l=nLobe-1; LNF[l]=simT+G.sep; if(rule===4){ LCOL[l]=2; LKEEP[l]=1; } } }
+    for(let q=0;q<k;q++){ const a=a0+q*TAU/k, d=rr*1.2; addDrop(cx+Math.cos(a)*d,cy+Math.sin(a)*d,rr,Math.cos(a)*160*G.bSpd,Math.sin(a)*160*G.bSpd); const l=nLobe-1; LNF[l]=simT+G.sep; if(rule===4){ LCOL[l]=2; LKEEP[l]=1; } } }
   born++; return true; }
 const SPR=[];   // 터질 때 튀는 아주 작은 물방울 (알갱이 하나보다 작다): 물에 실려 가다 작아지며 사라진다
 function sprAdd(x,y,vx,vy,r,ck){ if(SPR.length>400) SPR.shift(); SPR.push({x,y,vx,vy,r,ck,t:0,life:1.4+2.2*Math.random()}); }
@@ -1369,12 +1370,12 @@ function burst(x,y){ let best=-1, bd=1e9; for(let i=0;i<N;i++){ const d=(X[i]-x)
     for(let q=0;q<qt;q++){ const i=idx[q]; let bb=0, bdd=1e9; for(let g2=0;g2<K;g2++){ const d=(X[i]-sx[g2])**2+(Y[i]-sy[g2])**2-sw[g2]; if(d<bdd){ bdd=d; bb=g2; } } as[q]=bb; ax[bb]+=X[i]; ay[bb]+=Y[i]; an[bb]++; }
     for(let g2=0;g2<K;g2++) if(an[g2]){ sx[g2]=ax[g2]/an[g2]; sy[g2]=ay[g2]/an[g2]; } }
   const lob=new Int32Array(K), vx=new Float32Array(K), vy=new Float32Array(K);
-  const pcol=pc>=0?pc:LCOL[ocol]; for(let g2=0;g2<K;g2++){ lob[g2]=newLobe(); LCOL[lob[g2]]=pcol; LNF[lob[g2]]=simT+G.sep; LFR[lob[g2]]=star?0:1; if(star){ LHRT[lob[g2]]=2; LKEEP[lob[g2]]=1; LHA[lob[g2]]=(Math.random()-.5)*1.2; } const dx=sx[g2]-cx, dy=sy[g2]-cy, dl=HY(dx,dy)||1, a=Math.atan2(dy,dx)+(hh(born+g2,72)-.5)*.6, sp=(150+150*hh(born+g2,73))*(.6+.4*Math.min(1,dl/30)); vx[g2]=Math.cos(a)*sp; vy[g2]=Math.sin(a)*sp; }
+  const pcol=pc>=0?pc:LCOL[ocol]; for(let g2=0;g2<K;g2++){ lob[g2]=newLobe(); LCOL[lob[g2]]=pcol; LNF[lob[g2]]=simT+G.sep; LFR[lob[g2]]=star?0:1; if(star){ LHRT[lob[g2]]=2; LKEEP[lob[g2]]=1; LHA[lob[g2]]=(Math.random()-.5)*1.2; } const dx=sx[g2]-cx, dy=sy[g2]-cy, dl=HY(dx,dy)||1, a=Math.atan2(dy,dx)+(hh(born+g2,72)-.5)*.6, sp=(150+150*hh(born+g2,73))*(.6+.4*Math.min(1,dl/30))*G.bSpd; vx[g2]=Math.cos(a)*sp; vy[g2]=Math.sin(a)*sp; }
   for(let q=0;q<qt;q++){ const i=idx[q], g2=as[q]; LBL[i]=lob[g2]; VX[i]=vx[g2]; VY[i]=vy[g2]; QX[i]=X[i]; QY[i]=Y[i]; QVX[i]=vx[g2]; QVY[i]=vy[g2]; GW[i]=0; }
   if(G.tiny>0 && qt>=16 && !star){ const ord=idx.slice().sort((a,b)=>((X[b]-cx)**2+(Y[b]-cy)**2)-((X[a]-cx)**2+(Y[a]-cy)**2)), m=Math.round(qt*.16*G.tiny); let q=0, s=0;   // 가장 작은 물방울: 바깥쪽 알갱이를 한두 개씩 떼어 더 빨리 튀긴다
-    while(q<m){ const sz=hh(born+s,76)<.6?1:2, l=newLobe(); LCOL[l]=pcol; LNF[l]=simT+G.sep; LFR[l]=1; const i0=ord[q], a=Math.atan2(Y[i0]-cy,X[i0]-cx)+(hh(born+s,77)-.5)*.8, sp=260+220*hh(born+s,78);
+    while(q<m){ const sz=hh(born+s,76)<.6?1:2, l=newLobe(); LCOL[l]=pcol; LNF[l]=simT+G.sep; LFR[l]=1; const i0=ord[q], a=Math.atan2(Y[i0]-cy,X[i0]-cx)+(hh(born+s,77)-.5)*.8, sp=(260+220*hh(born+s,78))*G.bSpd;
       for(let u=0;u<sz && q<m;u++,q++){ const i=ord[q]; LBL[i]=l; VX[i]=QVX[i]=Math.cos(a)*sp; VY[i]=QVY[i]=Math.sin(a)*sp; } s++; } }
-  if(G.tiny>0){ const m=Math.round((10+qt*.12)*G.tiny); for(let u=0;u<m;u++){ const i=idx[Math.floor(Math.random()*qt)], a=Math.atan2(Y[i]-cy,X[i]-cx)+(Math.random()-.5)*1.2, sp=180+320*Math.random(); sprAdd(X[i],Y[i],Math.cos(a)*sp,Math.sin(a)*sp,1+5*Math.pow(Math.random(),1.5),pcol); } }   // 알갱이보다 작은 물보라 방울
+  if(G.tiny>0){ const m=Math.round((10+qt*.12)*G.tiny); for(let u=0;u<m;u++){ const i=idx[Math.floor(Math.random()*qt)], a=Math.atan2(Y[i]-cy,X[i]-cx)+(Math.random()-.5)*1.2, sp=(180+320*Math.random())*G.bSpd; sprAdd(X[i],Y[i],Math.cos(a)*sp,Math.sin(a)*sp,1+5*Math.pow(Math.random(),1.5),pcol); } }   // 알갱이보다 작은 물보라 방울
   born++; sel=-1; selUI(); return true; }
 function box(){ let x0=1e9, x1=-1e9, y0=1e9, y1=-1e9; for(let i=0;i<N;i++){ const a=X[i], b=Y[i], c=QX[i], d=QY[i]; if(a<x0) x0=a; if(a>x1) x1=a; if(b<y0) y0=b; if(b>y1) y1=b; if(c<x0) x0=c; if(c>x1) x1=c; if(d<y0) y0=d; if(d>y1) y1=d; }
   const m=RK+RKS+40; QB0=Math.max(0,Math.floor((x0-m)/CELL)); QB1=Math.min(gw-1,Math.ceil((x1+m)/CELL)); QC0=Math.max(0,Math.floor((y0-m)/CELL)); QC1=Math.min(gh-1,Math.ceil((y1+m)/CELL)); if(!N){ QB1=QB0; QC1=QC0; } }
@@ -1410,9 +1411,13 @@ function mApply(t,v){ MKEYS[t].forEach((k,i)=>{ if(v[i]!==undefined) G[k]=v[i]; 
 function mUserUI(){ const U=mUser(); for(const t of ["h","s"]){ const box=$("m"+t+"User"); if(!box) continue; box.textContent=""; U[t].forEach((p,i)=>{ const b=document.createElement("button"); b.type="button"; b.textContent=p.n; b.addEventListener("click",()=>mApply(t,p.v)); const x=document.createElement("button"); x.type="button"; x.className="mdel"; x.textContent="×"; x.title=p.n+" 지우기"; x.addEventListener("click",()=>{ const U2=mUser(); U2[t].splice(i,1); try{ localStorage.setItem(MUK,JSON.stringify(U2)); }catch(_){} mUserUI(); }); box.append(b,x); }); } }
 for(const t of ["h","s"]){ MPRE[t].forEach((p,i)=>{ const b=$("m"+t+"P_"+i); if(b) b.addEventListener("click",()=>mApply(t,p[1])); });
   const sv=$("m"+t+"Save"); if(sv) sv.addEventListener("click",()=>{ const nm=($("m"+t+"Name").value||"").trim()||("내 모양 "+(mUser()[t].length+1)); const U=mUser(); U[t].push({n:nm.slice(0,16),v:MKEYS[t].map(k=>G[k])}); try{ localStorage.setItem(MUK,JSON.stringify(U)); }catch(_){} $("m"+t+"Name").value=""; mUserUI(); }); }
-function mPrev(){ for(const [t,id,col] of [[1,"mhCv",[226,60,96]],[2,"msCv",[246,196,40]]]){ const cv=$(id); if(!cv || !MOLDS[t]) continue; const c=cv.getContext("2d"), W=cv.width, im=c.createImageData(W,W), T=MOLDS[t].T, s=1.25;
-  for(let py=0;py<W;py++) for(let px=0;px<W;px++){ const x=(px/W*2-1)*s, y=(1-py/W*2)*s+MOLDS[t].cy, d=tsamp(T,x,y), o=(py*W+px)*4, e=Math.min(1,Math.max(0,.5-d/(2*s/W))), b=Math.abs(d)<s*2.2/W;
-    im.data[o]=b?120:col[0]; im.data[o+1]=b?30:col[1]; im.data[o+2]=b?70:col[2]; im.data[o+3]=b?255:e*255; } c.putImageData(im,0,0); } }
+function mPrev(){ for(const [t,id,C] of [[1,"mhCv",[[226,60,96],[176,32,74],[255,222,230],[122,22,60]]],[2,"msCv",[[246,196,40],[214,150,16],[255,248,206],[150,90,10]]]]){ const cv=$(id); if(!cv || !MOLDS[t]) continue;   // 미리보기: 틀 모양에 빛을 비춰 실제 방울처럼 (몸통·어두운 면·하이라이트·테두리)
+  const c=cv.getContext("2d"), W=cv.width, im=c.createImageData(W,W), T=MOLDS[t].T, s=1.05, px1=2*s/W, ep=px1, Lx=-.55, Ly=.55, Lz=.63, Hn=Math.hypot(Lx,Ly,Lz+1), hx=Lx/Hn, hy=Ly/Hn, hz=(Lz+1)/Hn;
+  for(let py=0;py<W;py++) for(let px=0;px<W;px++){ const x=(px/W*2-1)*s, y=(1-py/W*2)*s+MOLDS[t].cy, d=tsamp(T,x,y), o=(py*W+px)*4; if(d>px1*2){ im.data[o+3]=0; continue; }
+    const gx=(tsamp(T,x+ep,y)-tsamp(T,x-ep,y))/(2*ep), gy=(tsamp(T,x,y+ep)-tsamp(T,x,y-ep))/(2*ep), gl=Math.hypot(gx,gy)||1, f=Math.max(0,1-Math.min(1,-d/.32)), nx=gx/gl*f*.95, ny=gy/gl*f*.95, nz=Math.sqrt(Math.max(0,1-nx*nx-ny*ny));
+    const df=nx*Lx+ny*Ly+nz*Lz, sp=Math.pow(Math.max(0,nx*hx+ny*hy+nz*hz),60), ins=Math.min(1,Math.max(0,.5-d/px1)), rim=Math.min(1,Math.max(0,1-Math.abs(d+px1*1.2)/(px1*1.4)));
+    let col=C[0]; if(df<.42) col=C[1]; if(sp>.45) col=C[2]; const r=col[0]+(C[3][0]-col[0])*rim, g2=col[1]+(C[3][1]-col[1])*rim, b=col[2]+(C[3][2]-col[2])*rim;
+    im.data[o]=r; im.data[o+1]=g2; im.data[o+2]=b; im.data[o+3]=255*Math.max(ins,rim); } c.putImageData(im,0,0); } }
 onMold=mPrev; mUserUI();
 $("kHeartR").addEventListener("input",()=>{ G.heartR=+$("kHeartR").value; $("kHeartRV").textContent=pct(G.heartR); save(); });
 $("kCFree").addEventListener("input",()=>{ G.cFree=+$("kCFree").value; $("kCFreeV").textContent=pct(G.cFree); save(); });
@@ -1430,7 +1435,7 @@ $("kLeave").addEventListener("click",()=>{ G.leave=G.leave?0:1; if(!G.leave) for
 $("kRefill").addEventListener("click",()=>{ G.refill=G.refill?0:1; save(); syncUI(); });
 $("kWall").addEventListener("click",()=>{ G.walls=G.walls?0:1; save(); syncUI(); });
 $("kFuse").addEventListener("input",()=>{ G.fuse=+$("kFuse").value; $("kFuseV").textContent=G.fuse+"초"; save(); });
-$("kXAtt").addEventListener("input",()=>{ G.xAtt=+$("kXAtt").value; $("kXAttV").textContent=pct(G.xAtt); save(); }); $("kFRamp").addEventListener("input",()=>{ G.fRamp=+$("kFRamp").value; $("kFRampV").textContent=G.fRamp+"초"; save(); });
+$("kBSpd").addEventListener("input",()=>{ G.bSpd=+$("kBSpd").value; $("kBSpdV").textContent=pct(G.bSpd); save(); }); $("kXAtt").addEventListener("input",()=>{ G.xAtt=+$("kXAtt").value; $("kXAttV").textContent=pct(G.xAtt); save(); }); $("kFRamp").addEventListener("input",()=>{ G.fRamp=+$("kFRamp").value; $("kFRampV").textContent=G.fRamp+"초"; save(); });
 function selUI(){ const on=sel>=0 && sel<N; $("kSel").classList.toggle("off",!on); $("kSHi").disabled=$("kSCo").disabled=!on;
   $("kSelMsg").textContent=on?"방금 누른 방울만 따로 조절합니다. 빈 곳을 누르면 선택이 풀립니다.":"방울을 누르면 그 방울만 따로 조절할 수 있습니다.";
   if(on){ const n=linked([sel]); let a=0, b=0; for(let k=0;k<n;k++){ a+=AH[que[k]]; b+=AC[que[k]]; } a/=Math.max(n,1); b/=Math.max(n,1);
@@ -1444,7 +1449,7 @@ function save(){ try{ localStorage.setItem(KEY,JSON.stringify(G)); }catch(_){} }
 function load(){ try{ const o=JSON.parse(localStorage.getItem(KEY)||"{}"); for(const k in o) if(k in G && typeof o[k]==="number") G[k]=o[k]; if(!o.tfv){ G.tfH=5; G.tfS=6; G.tfB=4; G.tfv=1; } }catch(_){} }   // 터지는 모양 기본값이 바뀌었다: 하트→핏방울, 별→작은 별, 물방울→작은 물방울
 const SIDES=["kS0","kS1","kS2","kS3","kS4"];
 function syncUI(){ for(const [id,k] of [["kFmax","fmax"],["kOut","outP"],["kFlow","flowInf"],["kSpd","speed"],["kHi","hi"],["kCo","co"],["kDyn","dyn"],["kVisc","visc"],["kWob","wob"],["kSt","st"],["kSize","size"],["kWf","wf"]]){ $(id).value=G[k]; $(id+"V").textContent=fmK(k,G[k]); }
-  $("kFuse").value=G.fuse; $("kFuseV").textContent=G.fuse+"초"; $("kXAtt").value=G.xAtt; $("kXAttV").textContent=pct(G.xAtt); $("kFRamp").value=G.fRamp; $("kFRampV").textContent=G.fRamp+"초"; $("kPush").value=G.push; $("kPushV").textContent=pct(G.push); $("kDep").value=G.dep; $("kDepV").textContent=pct(G.dep); $("kHeart").setAttribute("aria-pressed",G.heart?"true":"false"); for(const k of ["tfR","tfH","tfS","tfB"]) for(let i=0;i<7;i++){ const b=$(k+"_"+i); if(b) b.setAttribute("aria-pressed",(G[k]|0)===i?"true":"false"); } $("kCFree").value=G.cFree; $("kCFreeV").textContent=pct(G.cFree); $("kTiny").value=G.tiny; $("kTinyV").textContent=pct(G.tiny); $("kRot").value=G.rot; $("kRotV").textContent=Math.round(G.rot)+"°/초"; G.touch=0; $("kJelly").value=G.jelly; $("kJellyV").textContent=pct(G.jelly); $("kHHi").value=G.hHi; $("kHHiV").textContent=pct(G.hHi); $("kHCo").value=G.hCo; $("kHCoV").textContent=pct(G.hCo); $("kCloud").setAttribute("aria-pressed",G.cloud?"true":"false"); $("kCloudN").value=G.cloudN; $("kCloudNV").textContent=Math.round(G.cloudN)+"개"; $("kCloudS").value=G.cloudS; $("kCloudSV").textContent=pct(G.cloudS); $("kStar").setAttribute("aria-pressed",G.star?"true":"false"); $("kBlue").setAttribute("aria-pressed",G.blue?"true":"false"); $("kStarR").value=G.starR; $("kStarRV").textContent=pct(G.starR); $("kBlueR").value=G.blueR; $("kBlueRV").textContent=pct(G.blueR); $("kHeartR").value=G.heartR; $("kHeartRV").textContent=pct(G.heartR); $("kHShape").value=G.hShape; $("kHShapeV").textContent=pct(G.hShape); if(document.activeElement!==$("kSep")) $("kSep").value=G.sep; if(document.activeElement!==$("kDwell")) $("kDwell").value=G.dwell; $("kLeave").setAttribute("aria-pressed",G.leave?"true":"false"); $("kRefill").setAttribute("aria-pressed",G.refill?"true":"false"); $("kWall").setAttribute("aria-pressed",G.walls?"true":"false"); $("kCount").value=G.count; $("kCountV").textContent=G.count+"개";
+  $("kFuse").value=G.fuse; $("kFuseV").textContent=G.fuse+"초"; $("kBSpd").value=G.bSpd; $("kBSpdV").textContent=pct(G.bSpd); $("kXAtt").value=G.xAtt; $("kXAttV").textContent=pct(G.xAtt); $("kFRamp").value=G.fRamp; $("kFRampV").textContent=G.fRamp+"초"; $("kPush").value=G.push; $("kPushV").textContent=pct(G.push); $("kDep").value=G.dep; $("kDepV").textContent=pct(G.dep); $("kHeart").setAttribute("aria-pressed",G.heart?"true":"false"); for(const k of ["tfR","tfH","tfS","tfB"]) for(let i=0;i<7;i++){ const b=$(k+"_"+i); if(b) b.setAttribute("aria-pressed",(G[k]|0)===i?"true":"false"); } $("kCFree").value=G.cFree; $("kCFreeV").textContent=pct(G.cFree); $("kTiny").value=G.tiny; $("kTinyV").textContent=pct(G.tiny); $("kRot").value=G.rot; $("kRotV").textContent=Math.round(G.rot)+"°/초"; G.touch=0; $("kJelly").value=G.jelly; $("kJellyV").textContent=pct(G.jelly); $("kHHi").value=G.hHi; $("kHHiV").textContent=pct(G.hHi); $("kHCo").value=G.hCo; $("kHCoV").textContent=pct(G.hCo); $("kCloud").setAttribute("aria-pressed",G.cloud?"true":"false"); $("kCloudN").value=G.cloudN; $("kCloudNV").textContent=Math.round(G.cloudN)+"개"; $("kCloudS").value=G.cloudS; $("kCloudSV").textContent=pct(G.cloudS); $("kStar").setAttribute("aria-pressed",G.star?"true":"false"); $("kBlue").setAttribute("aria-pressed",G.blue?"true":"false"); $("kStarR").value=G.starR; $("kStarRV").textContent=pct(G.starR); $("kBlueR").value=G.blueR; $("kBlueRV").textContent=pct(G.blueR); $("kHeartR").value=G.heartR; $("kHeartRV").textContent=pct(G.heartR); $("kHShape").value=G.hShape; $("kHShapeV").textContent=pct(G.hShape); if(document.activeElement!==$("kSep")) $("kSep").value=G.sep; if(document.activeElement!==$("kDwell")) $("kDwell").value=G.dwell; $("kLeave").setAttribute("aria-pressed",G.leave?"true":"false"); $("kRefill").setAttribute("aria-pressed",G.refill?"true":"false"); $("kWall").setAttribute("aria-pressed",G.walls?"true":"false"); $("kCount").value=G.count; $("kCountV").textContent=G.count+"개";
   for(const k in MSL){ const el=$(k); if(el){ el.value=G[k]; $(k+"V").textContent=mFmt(k,G[k]); } } mPrev();
   SIDES.forEach((id,i)=>$(id).setAttribute("aria-pressed",G.side===i?"true":"false")); $("kWf").disabled=G.side===4; $("bdBox").classList.toggle("dim",!G.on); }
 SIDES.forEach((id,i)=>$(id).addEventListener("click",()=>{ G.side=i; save(); syncUI(); if(onPlace) onPlace(); if(started) reset(); }));   // 자리를 바꾸면 그 자리에서 새로 시작
@@ -2066,3 +2071,95 @@ if(window.NF_VIEW==="panel")(function(){
   bc.postMessage({t:"hello"});
 })();
 </script>
+<script>
+/* 메뉴 정리: 화면효과 · 배경 · 오브젝트 세 갈래, 그 아래 작은 탭. 설정 칸은 그대로 두고 자리만 옮긴다.
+   메뉴 편집 중에는 칸 왼쪽 위 ⠿ 를 끌어 순서를 바꾸거나 다른 작은 탭(탭 이름 위에 잠깐 머물면 열린다)으로 옮길 수 있다. */
+(function(){ const V=window.NF_VIEW||"both"; if(V==="stage") return; const $=id=>document.getElementById(id), Q=(s,r)=>(r||document).querySelector(s);
+  const H=t=>"#"+t;   // 묶음 안 작은 제목
+  const L=[
+    ["화면효과",[
+      ["보기·저장",["vA","q1","bSave","recOn"]],
+      ["카메라",["camZ","camX","camY","camReset"]],
+      ["3D 공간",["d3On","d3Tilt","d3Depth","d3Drift","d3Mouse","d3Wide","d3kB","d3kF","d3kD","d3kS"]],
+      ["픽셀 필터",["pxS","pxDot"]],
+      ["반짝이",[H("십자별"),"stOn","stCol","stN","stSize","stLen","stHV","stBody","stArmW","stTw","stSpin",H("노란 스파크·번개"),"skOn","skT0","skCF","skCL","skCH","skRate","skSize","skMin","skMax","skLife","skPop","skSpikes","skJag","skVar","skLine","skFloat","skStarN","skStarLife","skFlow","skBI0","skBO0","skBoltN","skBoltLag","skBoil","skSpin"]],
+      ["장식 이펙트",[H("비눗방울"),"fxBubOn","fxBubN","fxBubS","fxBubC1",H("색 점"),"fxDotOn","fxDotN","fxDotS",H("물결 띠"),"fxWaveOn","fxWaveN","fxWaveSp","fxWaveC1","fxWaveC2",H("방사 집중선"),"fxRayOn","fxRayN","fxRaySp","fxRayC1","fxRayC2",H("페인트 튀김 줄"),"fxPaintOn","fxPaintN","fxPaintS","fxPaintC1","fxPaintC2",H("얼룩말 줄무늬와 잉크"),"fxZebOn","fxZebN","fxZebSp","fxZebS","fxZebC1","fxZebC2","fxInkC"]]]],
+    ["배경",[
+      ["배경색",["bgSw"]],
+      ["소용돌이 모양",["dCW","spOn","swK","bkS","spDen","spW","spArms","spRot","spWob"]],
+      ["소용돌이 힘·흐름",["gSpd","gSpin","gCirc","gOut","gSpread","gRim","gRimW","spPull","spStr","spBg","gVisc","gCalm","bReset"]],
+      ["액체 줄기",["gInit","gAdd","gPer","gCarry","gHead","gTail","gStr","gTD","gRnd","gSep","gMerge","gDry"]],
+      ["색별 세부",["@color"]],
+      ["찢긴 결",["@tearHint","tear","tearLong","tearCap","tipLen","tearRate","tearPer","tearRnd"]],
+      ["빛 방향",["gLA","gLs"]]]],
+    ["오브젝트",[
+      ["등장·종류",["kAdd","kS0","kWf","kCount","kSize","kFmax","kHeart","kHeartR","kStar","kStarR","kBlue","kBlueR","kCloud","kCloudN","kCloudS"]],
+      ["움직임",["kOut","kFlow","kSpd","kLeave","kDwell","kRot","kDep","kPush","kCFree"]],
+      ["부딪힘·합쳐짐",["kJelly","kXAtt","kFuse","kFRamp","kVisc","kWob","kSt","kDyn"]],
+      ["터짐",["tfR","tfH","tfS","tfB","kTiny","kBSpd","kSep"]],
+      ["빛·색",["kHi","kCo","kHHi","kHCo","@kSel"]],
+      ["하트 모양",["@pvH","mhP","mhR","mhA","mhH","mhW","mhTip","mhCl","mhInf","mhTilt","mhSave","kHShape"]],
+      ["별 모양",["@pvS","msP","msN","msRi","msInf","msTip","msIn","msW","msTilt","msSave"]]]]];
+  const mt=$("mtabs"); if(!mt) return; const host=mt.parentNode, old=[...document.querySelectorAll(".mpanel")];
+  const item=k=>Q('.it[data-k="'+k+'"]');
+  const blocks={ color:()=>{ const o=$("otabs"); return o && o.closest(".ctl"); }, kSel:()=>$("kSel"),
+    tearHint:()=>{ const p=document.createElement("p"); p.className="hint"; p.textContent="'삐죽 소용돌이' 장면에서 쓰입니다."; return p; },
+    pvH:()=>pv("mhCv"), pvS:()=>pv("msCv") };
+  function pv(id){ const c=$(id); if(!c) return null; const d=document.createElement("div"); d.className="pvbox"; d.appendChild(c); const s=document.createElement("small"); s.className="desc"; s.textContent="조절하면 여기와 화면 속 방울이 바로 바뀝니다."; d.appendChild(s); return d; }
+  const nav=document.createElement("div"); nav.className="navw"; const bt=document.createElement("div"); bt.className="tabs mtabs btabs"; bt.setAttribute("role","tablist"); bt.setAttribute("aria-label","설정 큰 묶음");
+  const st=document.createElement("div"); st.className="tabs stabs"; st.setAttribute("role","tablist"); st.setAttribute("aria-label","설정 작은 묶음"); nav.append(bt,st); host.insertBefore(nav,mt);
+  const P=[], SB=[];   // P[i][j] = 작은 탭 내용, SB[i] = 그 큰 탭의 작은 탭 버튼들
+  L.forEach(([bn,subs],i)=>{ const b=document.createElement("button"); b.type="button"; b.setAttribute("role","tab"); b.textContent=bn; b.addEventListener("click",()=>show(i,cur[i]||0)); bt.appendChild(b); P[i]=[]; SB[i]=[];
+    subs.forEach(([sn,keys],j)=>{ const p=document.createElement("div"); p.className="mpanel np"; p.setAttribute("role","tabpanel"); p.hidden=true; const c=document.createElement("div"); c.className="ctl"; c.dataset.g=i+"."+j; p.appendChild(c); host.insertBefore(p,old[0]||null);
+      for(const k of keys){ let el=null; if(k[0]==="#"){ el=document.createElement("div"); el.className="it hd"; el.dataset.k="h:"+k.slice(1); el.innerHTML="<span></span>"; el.firstChild.textContent=k.slice(1); } else if(k[0]==="@"){ el=blocks[k.slice(1)] && blocks[k.slice(1)](); if(el && el.classList.contains("ctl")){ el.classList.add("sub"); p.appendChild(el); continue; } if(el && (k==="@pvH"||k==="@pvS")){ p.insertBefore(el,c); continue; } } else el=item(k); if(el) c.appendChild(el); }
+      P[i][j]=p; const sb=document.createElement("button"); sb.type="button"; sb.setAttribute("role","tab"); sb.textContent=sn; sb.dataset.g=i+"."+j; sb.addEventListener("click",()=>show(i,j)); SB[i][j]=sb; }); });
+  const left=[]; old.forEach(p=>p.querySelectorAll(".it[data-k]").forEach(el=>left.push(el)));   // 빠진 칸이 있으면 오브젝트 맨 끝 '기타'에
+  if(left.length){ const i=2, j=P[i].length, p=document.createElement("div"); p.className="mpanel np"; p.hidden=true; const c=document.createElement("div"); c.className="ctl"; c.dataset.g=i+"."+j; p.appendChild(c); host.insertBefore(p,old[0]||null); left.forEach(el=>c.appendChild(el)); P[i][j]=p; const sb=document.createElement("button"); sb.type="button"; sb.textContent="기타"; sb.dataset.g=i+"."+j; sb.addEventListener("click",()=>show(i,j)); SB[i][j]=sb; if(window.console) console.warn("메뉴 정리: 자리가 정해지지 않은 칸",left.map(e=>e.dataset.k)); }
+  mt.classList.add("oldp"); old.forEach(p=>p.classList.add("oldp"));
+  /* 저장해 둔 배치 (편집에서 끌어 옮긴 것) */
+  const LK="nu-flow-layout"; function applySaved(){ let o=null; try{ o=JSON.parse(localStorage.getItem(LK)||"null"); }catch(_){} if(!o) return; for(const g in o){ const c=Q('.ctl[data-g="'+g+'"]'); if(!c) continue; for(const k of o[g]){ const el=Q('.it[data-k="'+CSS.escape(k)+'"]'); if(el) c.appendChild(el); } } }
+  function saveLay(){ const o={}; document.querySelectorAll(".np>.ctl[data-g]").forEach(c=>{ o[c.dataset.g]=[...c.children].filter(e=>e.matches(".it[data-k]")).map(e=>e.dataset.k); }); try{ localStorage.setItem(LK,JSON.stringify(o)); }catch(_){} }
+  applySaved();
+  let cur=[0,0,0], bi=0; try{ const s=(localStorage.getItem("nu-flow-tab2")||"0.0").split("."); bi=+s[0]||0; cur[bi]=+s[1]||0; }catch(_){}
+  function show(i,j){ if(!P[i]) i=0; if(!P[i][j]) j=0; bi=i; cur[i]=j; [...bt.children].forEach((b,k)=>b.setAttribute("aria-selected",k===i?"true":"false")); st.replaceChildren(...SB[i]); SB[i].forEach((b,k)=>b.setAttribute("aria-selected",k===j?"true":"false"));
+    P.forEach((r,a)=>r.forEach((p,c)=>p.hidden=!(a===i && c===j))); try{ localStorage.setItem("nu-flow-tab2",i+"."+j); }catch(_){} navH(); }
+  function navH(){ document.documentElement.style.setProperty("--navh",nav.offsetHeight+"px"); }
+  addEventListener("resize",navH); show(bi,cur[bi]);
+  /* 배치 처음대로 (편집 중에만 보인다) */
+  const rb=document.createElement("button"); rb.type="button"; rb.className="lreset"; rb.textContent="메뉴 배치 처음대로"; rb.addEventListener("click",()=>{ try{ localStorage.removeItem(LK); }catch(_){} location.reload(); }); bt.appendChild(rb);
+  /* 끌어 옮기기: 편집 중 ⠿ 손잡이 */
+  function handles(){ document.querySelectorAll(".np .ctl .it[data-k]").forEach(el=>{ if(el.querySelector(":scope>.dg")) return; const h=document.createElement("button"); h.type="button"; h.className="dg"; h.textContent="⠿"; h.title="끌어서 옮기기"; h.setAttribute("aria-label","끌어서 옮기기"); h.addEventListener("pointerdown",e=>start(e,el)); el.appendChild(h); }); }
+  handles();
+  let D=null;
+  function start(e,el){ if(!document.body.classList.contains("editing")) return; e.preventDefault(); e.stopPropagation(); const r=el.getBoundingClientRect(), ph=document.createElement("div"); ph.className="it dph"; ph.style.height=r.height+"px"; el.parentNode.insertBefore(ph,el);
+    el.classList.add("dragging"); el.style.width=r.width+"px"; el.style.left=r.left+"px"; el.style.top=r.top+"px"; document.body.appendChild(el);
+    D={el,ph,dx:e.clientX-r.left,dy:e.clientY-r.top,hov:null,ht:0}; try{ e.target.setPointerCapture(e.pointerId); }catch(_){}
+    addEventListener("pointermove",move); addEventListener("pointerup",end,{once:true}); addEventListener("pointercancel",end,{once:true}); }
+  function move(e){ if(!D) return; const {el,ph}=D; el.style.left=(e.clientX-D.dx)+"px"; el.style.top=(e.clientY-D.dy)+"px";
+    const t=document.elementFromPoint(e.clientX,e.clientY); if(!t) return; const tb=t.closest(".stabs button[data-g]");
+    if(tb){ if(D.hov!==tb){ D.hov=tb; clearTimeout(D.ht); D.ht=setTimeout(()=>{ const [i,j]=tb.dataset.g.split(".").map(Number); show(i,j); const c=Q('.ctl[data-g="'+tb.dataset.g+'"]'); if(c) c.appendChild(ph); },450); } return; }   // 작은 탭 이름 위에 잠깐 머물면 그 탭으로
+    D.hov=null; clearTimeout(D.ht);
+    const it=t.closest(".np .ctl .it"); if(it && it!==ph){ const r=it.getBoundingClientRect(), before=e.clientY<r.top+r.height/2 || (e.clientY<r.bottom && e.clientX<r.left+r.width/2 && e.clientY<r.top+r.height*.75); it.parentNode.insertBefore(ph,before?it:it.nextSibling); return; }
+    const c=t.closest(".np>.ctl[data-g]"); if(c && ph.parentNode!==c) c.appendChild(ph);
+    if(e.clientY<60) scrollBy(0,-12); else if(e.clientY>innerHeight-60) scrollBy(0,12); }   // 끝에 가까우면 화면도 따라 넘긴다
+  function end(){ if(!D) return; const {el,ph}=D; clearTimeout(D.ht); removeEventListener("pointermove",move); el.classList.remove("dragging"); el.style.width=el.style.left=el.style.top=""; ph.parentNode.insertBefore(el,ph); ph.remove(); D=null; saveLay(); }
+})();
+</script>
+<style>
+.oldp{display:none!important}
+.navw{position:sticky;top:0;z-index:6;background:var(--bg,#F5F5EF);padding:6px 0 4px;margin-top:10px}
+.navw .mtabs{position:static;margin:0;padding:0}
+.btabs button{font-weight:700}
+.stabs{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px}
+.stabs button{border-radius:999px;min-height:30px;font-size:12px;padding:4px 12px}
+.stabs button[aria-selected="true"]{background:#33123A;color:#fff;border-color:#33123A}
+.lreset{display:none;margin-left:auto}.editing .lreset{display:inline-flex}
+.ctl .it.hd{grid-column:1/-1;display:block;font-weight:700;font-size:13px;color:#9C2F86;padding-top:8px;border-bottom:1px solid rgba(156,47,134,.25)}
+.ctl.sub{border:2px solid var(--line);border-radius:12px;padding:10px 12px}
+.pvbox{position:sticky;top:calc(var(--navh,90px) + 4px);z-index:4;display:flex;align-items:center;gap:12px;background:var(--bg,#F5F5EF);padding:6px 0;border-bottom:1px solid rgba(0,0,0,.08)}
+.pvbox canvas{width:150px;height:150px;background:#f4f1ea;border-radius:12px;border:1px solid rgba(0,0,0,.12)}
+.dg{display:none!important}
+.editing .np .it>.dg{display:inline-flex!important;position:absolute;left:-10px;top:-8px;width:24px;height:24px;min-height:0!important;padding:0!important;align-items:center;justify-content:center;border-radius:6px!important;font-size:14px!important;background:#9C2F86!important;color:#fff!important;border:0!important;cursor:grab;touch-action:none;z-index:2}
+.it.dragging{position:fixed!important;z-index:1000;pointer-events:none;background:var(--bg,#F5F5EF);box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:.95}
+.it.dph{border:2px dashed #9C2F86;border-radius:8px;min-height:30px;background:rgba(156,47,134,.06)}
+</style>
