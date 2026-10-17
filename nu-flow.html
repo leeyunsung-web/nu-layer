@@ -1123,9 +1123,10 @@ const MOLDS=[null,null,null]; let moldVer=0, onMold=null;
 function buildMolds(which){ if(which!==2) MOLDS[1]=mkMold(heartG(),G.mhCl,G.mhTip); if(which!==1) MOLDS[2]=mkMold(starG(),G.msIn,G.msTip); moldVer++; if(onMold) onMold(); }
 buildMolds(); let grpNo=0;
 /* 거품 구름: 핏방울과 같은 말랑한 방울 4~6개를 한 무리로 묶는다. 무리 안 방울은 정해진 자리로 서로 끌려 붙은 채 출렁인다 */
-function addCloud(cx,cy){ const zf0=ZFORCE; if(ZFORCE===null) ZFORCE=0; const gid=(grpNo++)%30000, S=G.cloudS*G.size*1.25, R=Math.random, n=3+Math.floor(R()*5), w=(46+R()*70)*S, P=[]; let k=0;   // 구름: 매번 다른 모양 (송이 수·크기·높낮이·너비가 무작위, 바닥은 대체로 평평)
+const CTS=[.42,.58,.78,1,1.32,1.75], CTN=[[1,2],[2,3],[2,4],[3,6],[4,7],[5,8]], CTW=[.17,.22,.22,.18,.14,.07];
+function addCloud(cx,cy){ const zf0=ZFORCE; if(ZFORCE===null) ZFORCE=0; const gid=(grpNo++)%30000, R=Math.random, ct=(()=>{ let r=R()*CTW.reduce((a,b)=>a+b,0), t=0; for(;t<5;t++){ r-=CTW[t]; if(r<=0) break; } return t; })(), S=G.cloudS*G.size*1.25*CTS[ct]*(.92+.16*R()), n=CTN[ct][0]+Math.floor(R()*(CTN[ct][1]-CTN[ct][0]+1)), w=(46+R()*70)*S*Math.min(1.2,Math.max(.45,n/5)), P=[]; let k=0;   /* 구름도 6단계 크기: 아주 작은 한두 송이부터 큰 뭉게구름까지 */   // 구름: 매번 다른 모양 (송이 수·크기·높낮이·너비가 무작위, 바닥은 대체로 평평)
   for(let q=0;q<n;q++){ const x=((q+.5)/n-.5)*w+(R()-.5)*w/n*.7, e=1-Math.min(1,Math.abs(x)/(w*.5+1)), r=(11+R()*12+e*(8+R()*10))*S, y=-r*(.35+.25*R())-e*(R()*.5+.2)*r; P.push([x,y,r]); }
-  if(R()<.55){ const t=P[Math.floor(R()*P.length)]; P.push([t[0]+(R()-.5)*t[2],t[1]-t[2]*(.55+.3*R()),t[2]*(.55+.3*R())]); }   // 가끔 위에 작은 송이 하나 더
+  if(ct>=1 && R()<.55){ const t=P[Math.floor(R()*P.length)]; P.push([t[0]+(R()-.5)*t[2],t[1]-t[2]*(.55+.3*R()),t[2]*(.55+.3*R())]); }   // 가끔 위에 작은 송이 하나 더
   let mx=0, my=0; for(const p of P){ mx+=p[0]; my+=p[1]; } mx/=P.length; my/=P.length;
   for(const [x,y,r] of P){ const ox=x-mx, oy=y-my; k+=addDrop(cx+ox,cy+oy,r,0,0); const l=nLobe-1; LCOL[l]=3; LKEEP[l]=1; LGRP[l]=gid; LOX[l]=ox; LOY[l]=oy; } ZFORCE=zf0; return k; }
 function heartStyle(l){ LHRT[l]=1; LCOL[l]=5; LKEEP[l]=1; LAC[l]=1; LAS[l]=0; LEL[l]=.8; LSZ[l]=.27; const a2=1.05; L2C[l]=Math.cos(a2); L2S[l]=Math.sin(a2); L2Z[l]=.24; L3Z[l]=0; for(let q=0;q<8;q++) SB[q][l]=SE[q][l]; }   // 하트: 하이라이트는 둥근 덩이 하나 + 작은 점, 되비침 없음
