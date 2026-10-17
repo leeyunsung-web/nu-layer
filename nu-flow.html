@@ -1696,6 +1696,8 @@ const MIXS=[0,20,14,11,3,5,15,10,0,15,20];   // 여러 색 섞기: 노랑·초�
 function swatches(id,key){ const box=$(id); if(!box) return; const bs=[...box.querySelectorAll("button")];   // 색 칸 버튼은 페이지에 미리 들어 있다 (조절 창에서도 보이게)
   bs.forEach((b,i)=>{ b.setAttribute("aria-pressed",(G[key]|0)===i?"true":"false"); b.addEventListener("click",()=>{ G[key]=i; saveG(); bs.forEach((x,j)=>x.setAttribute("aria-pressed",j===i?"true":"false")); }); }); }
 const SPK=[], SKC={f:"#FFE11C",l:"#F2941A",h:"#FFF6AE"}; let skAcc=0, skSeed=0;
+/* 스파크 자리: 보이는 화면 전체(가장자리 포함)에서 무작위로 뽑되, 후보 몇 개 중 최근에 터진 곳들과 가장 먼 자리를 고른다 (한곳에 몰리지 않게) */
+const SKR=[]; function skPlace(){ let best=null, bd=-1; for(let c=0;c<5;c++){ const x=lerpV(0,.02+.96*Math.random()), y=lerpV(1,.02+.96*Math.random()); let m=1e18; for(const q of SKR){ const d=(q[0]-x)**2+(q[1]-y)**2; if(d<m) m=d; } if(m>bd){ bd=m; best=[x,y]; } } SKR.push(best); if(SKR.length>8) SKR.shift(); return best; }
 function skSpawn(type,x,y,size,dir){ skSeed++; { const a=Math.min(G.skMin,G.skMax), b=Math.max(G.skMin,G.skMax); size*=a*Math.pow(b/a,Math.random()); }   // 크기 범위: 가장 작은 ~ 가장 큰 사이에서 무작위
   SPK.push({cf:G.skMix?MIXS[Math.floor(Math.random()*MIXS.length)]:undefined,type,x,y,size,dir:dir??hh(skSeed,1)*TAU,rot:(hh(skSeed,2)-.5)*.8,t:0,life:G.skLife*(.7+.6*hh(skSeed,3))*(type===2?.75:1),sd:skSeed*7919+Math.floor(Math.random()*99991)}); if(SPK.length>150) SPK.shift(); }   // 모양 씨앗은 매번 무작위 (열 때마다·터질 때마다 다른 모양)
 function skTick(dt){ if(!G.skOn){ SPK.length=0; return; } const fl=G.skFloat && G.skT3, ts=[0,1,2,3,4].filter(i=>G["skT"+i] && !(fl && i===3));
@@ -1703,7 +1705,7 @@ function skTick(dt){ if(!G.skOn){ SPK.length=0; return; } const fl=G.skFloat && 
   for(const s of SPK){ if(!s.fl && !s.fl2 && !G.skFloat) continue; if(s.vx===undefined){ s.vx=0; s.vy=0; } const w=waterAt(s.x,s.y), k=Math.min(1,dt*2.2), ph=s.sd*1.7;   // 물 흐름을 따라 천천히, 제자리에서 둥실둥실
     s.vx+=(w[0]*.9*G.skFlow+Math.sin(s.t*.5+ph)*6-s.vx)*k; s.vy+=(w[1]*.9*G.skFlow+Math.cos(s.t*.43+ph)*6-s.vy)*k; s.x+=s.vx*dt; s.y+=s.vy*dt; s.rot+=Math.sin(s.t*.6+ph)*.25*dt;
     if(s.x<-80 || s.x>WW+80 || s.y<-80 || s.y>WH+80) s.t=s.life; }
-  skAcc+=dt*G.skRate; while(skAcc>=1){ skAcc-=1; if(!ts.length) break; skSeed++; const ty=ts[Math.floor(hh(skSeed,9)*ts.length)]; skSpawn(ty,lerpV(0,.05+.9*hh(skSeed,11)),lerpV(1,.05+.9*hh(skSeed,12)),(ty===4?.45:1)*(.55+.9*hh(skSeed,13))); }   // 화면 여기저기서 이따금 팡
+  skAcc+=dt*G.skRate; while(skAcc>=1){ skAcc-=1; if(!ts.length) break; skSeed++; const ty=ts[Math.floor(hh(skSeed,9)*ts.length)]; const pp=skPlace(); skSpawn(ty,pp[0],pp[1],(ty===4?.45:1)*(.55+.9*Math.random())); }   // 화면 여기저기서 이따금 팡
   if(G.skLink) for(const P of POURS){ if(P.skd || P.delay>0 || P.s<=0) continue; P.skd=1; if(P.c===1 && hh(P.key,77)<.6) continue; const d=Math.atan2(P.dy||0,P.dx||1);   // 분홍 줄기가 새로 터져 나올 때 같은 방향으로 같이 터진다
     if(G.skT0) skSpawn(0,P.x,P.y,1+.3*hh(P.key,78),d); if(G.skT2) skSpawn(2,P.x,P.y,1,d); if(G.skT1) skSpawn(1,P.x+Math.cos(d)*30,P.y+Math.sin(d)*30,.8,d+(hh(P.key,79)-.5)); }
   for(let i=SPK.length-1;i>=0;i--){ SPK[i].t+=dt; if(SPK[i].t>=SPK[i].life) SPK.splice(i,1); } }
