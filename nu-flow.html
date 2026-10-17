@@ -290,6 +290,12 @@ canvas.hold{cursor:grabbing}
     <label class="it" data-k="kVisc"><span>끈기</span><input id="kVisc" type="range" min="0.3" max="2.5" step="0.05" value="1"><output id="kViscV">100%</output><small class="desc">꿀처럼 뭉근하게 따라오는 정도.</small></label>
     <label class="it" data-k="kWob"><span>꿈틀거림</span><input id="kWob" type="range" min="0" max="2.5" step="0.05" value="1"><output id="kWobV">100%</output><small class="desc">제자리에서 느리게 꿈틀대는 세기.</small></label>
     <label class="it" data-k="kSt"><span>뭉치는 힘</span><input id="kSt" type="range" min="0.5" max="2" step="0.05" value="1"><output id="kStV">100%</output><small class="desc">방울이 둥글게 뭉치려는 힘 (표면장력).</small></label>
+    <div class="it row" data-k="anAdd"><span>아기천사</span><button id="anAdd1" type="button">천사 1마리 추가</button><button id="anAdd5" type="button">5마리 추가</button><button id="anClear" type="button">모두 보내기</button><output id="anCount">아직 없음</output><small class="desc">처음에는 없어요. 누를 때마다 기본형에서 조금씩 변주된 천사가 무작위 자리로 들어와요. 끌어서 던지고, 톡 누르면 출렁이며 표정이 바뀌어요.</small></div>
+    <div class="it row" data-k="anStyle"><span>천사 그리기</span><button id="anPaint" type="button" aria-pressed="true">채색</button><button id="anPen" type="button" aria-pressed="false">연필</button><button id="anSpin" type="button" aria-pressed="false">빙글빙글</button></div>
+    <label class="it" data-k="anSize"><span>천사 크기</span><input id="anSize" type="range" min=".4" max="2.5" step=".01" value="1"><output id="anSizeV">100%</output></label>
+    <label class="it" data-k="anSpeed"><span>천사 떠다니는 빠르기</span><input id="anSpeed" type="range" min="0" max="3" step=".01" value="1"><output id="anSpeedV">100%</output></label>
+    <label class="it" data-k="anSoft"><span>천사 눌림 부드러움</span><input id="anSoft" type="range" min="0" max="1" step=".01" value=".7"><output id="anSoftV">70%</output></label>
+    <div class="it wide" data-k="anCode"><span>천사 기본형 코드</span><textarea id="anCodeT" rows="3" placeholder="아기천사 공방에서 '코드 복사'한 NUANGEL1 코드를 붙여 넣으세요" style="width:100%;font:12px/1.4 ui-monospace,monospace"></textarea><button id="anCodeGo" type="button">이 코드로 기본형 바꾸기</button><button id="anCodeReset" type="button">처음 기본형으로</button><output id="anMsg"></output></div>
     <div class="it row" data-k="kAdd"><span>방울</span><button id="kAdd" type="button">방울 더하기</button><button id="kReset" type="button">핏방울 처음으로</button><small class="desc">방울 하나를 더하거나, 지금 값으로 핏방울을 새로 놓습니다. 화면에서 방울을 두 번 누르면 펑 하고 가장 작은 방울들로 흩어집니다.</small></div>
     <div id="kSel" class="sel off"><p id="kSelMsg" class="hint">방울을 누르면 그 방울만 따로 조절할 수 있습니다.</p>
       <label><span>이 방울 하이라이트</span><input id="kSHi" type="range" min="0" max="2" step="0.01" value="1" disabled><output id="kSHiV">–</output></label>
@@ -2430,7 +2436,8 @@ if(window.NF_VIEW==="panel")(function(){
       ["터짐",["tfR","tfH","tfS","tfB","kChunk","kTiny","kApart","kBSpd","kSep"]],
       ["빛·색",["kHi","kCo","kHHi","kHCo","@kSel"]],
       ["하트 모양",["@pvH","mhP","mhR","mhA","mhH","mhW","mhTip","mhCl","mhInf","mhTilt","mhSave","kHShape","kEdgeH","kEdgeJ"]],
-      ["별 모양",["@pvS","msP","msN","msRi","msInf","msTip","msIn","msW","msTilt","msSave","kEdgeS"]]]]];
+      ["별 모양",["@pvS","msP","msN","msRi","msInf","msTip","msIn","msW","msTilt","msSave","kEdgeS"]],
+      ["천사",["anAdd","anStyle","anSize","anSpeed","anSoft","anCode"]]]]];
   const mt=$("mtabs"); if(!mt) return; const host=mt.parentNode, old=[...document.querySelectorAll(".mpanel")];
   const item=k=>Q('.it[data-k="'+k+'"]');
   const blocks={ color:()=>{ const o=$("otabs"); return o && o.closest(".ctl"); }, kSel:()=>$("kSel"),
@@ -2500,7 +2507,7 @@ if(window.NF_VIEW==="panel")(function(){
    - 바꿀 때: 잠깐 쉬었다가 서버에 올린다 (내 오브젝트 그림은 그림 보관함에 따로 올리고 주소만 적어 둔다)
    - 다른 기기에서 바뀌면: 이 창이 안 보일 때는 조용히 새로 고침, 보고 있을 때는 알림 */
 (function(){ const SOLO=!!window.NF_SOLO; if(!window.claude || !window.claude.use) return;
-  const KEYS=["swirl-flow-g","swirl-flow-bd","nu-flow-q","nu-flow-hidden","nu-flow-fps","nu-flow-aq","nu-flow-scene","nu-flow-layout2","nu-flow-cust"], TK="nu-flow-sync-t";
+  const KEYS=["swirl-flow-g","swirl-flow-bd","nu-flow-q","nu-flow-hidden","nu-flow-fps","nu-flow-aq","nu-flow-scene","nu-flow-layout2","nu-flow-cust","nu-flow-angel","nu-flow-angel-base"], TK="nu-flow-sync-t";
   const ls={ get:k=>{ try{ return localStorage.getItem(k); }catch(_){ return null; } }, set:(k,v)=>{ try{ if(v==null) localStorage.removeItem(k); else localStorage.setItem(k,v); }catch(_){} } };
   let DEV=ls.get("nu-flow-dev"); if(!DEV){ DEV=Math.random().toString(36).slice(2); ls.set("nu-flow-dev",DEV); }   // 이 기기 이름 (같은 기기의 다른 창끼리는 브라우저 저장소로 이미 맞춰진다)
   let ref=null, assets=null, quiet=false, timer=0, busy=false, again=false, lastT=+(ls.get(TK)||0);
@@ -2521,5 +2528,233 @@ if(window.NF_VIEW==="panel")(function(){
     if((!d || d.t<lastT || !lastT) && !SOLO) push();   // 서버에 없거나 이 기기가 더 새 것 → 올리기
     ref.onSnapshot(s=>{ if(!s.exists) return; const x=s.data(); if(!x || x.dev===DEV || !(x.t>lastT)) return; applyDoc(x,false); if(SOLO || document.hidden) location.reload(); else notice(); }, ()=>{});
     document.addEventListener("visibilitychange",()=>{ if(!document.hidden && note) location.reload(); }); })();
+})();
+</script>
+<script>
+/* 아기천사: 아기천사 공방의 캐릭터 엔진을 그대로 옮겨 NU FLOW 무대 위 따로 된 판에 그린다.
+   처음에는 없고, 오브젝트 → 천사 탭의 '추가'로 기본형에서 변주된 천사가 무작위 자리로 들어온다. 끌고·던지고·톡 누르면 출렁, 서로·벽에 닿으면 젤리처럼 눌린다 */
+(function(){ const VIEW=window.NF_VIEW||"both"; if(VIEW==="panel" || window.NF_SOLO) return;
+let W=800, H=600, DPR=1, ONE_R=100, FLOCK_R=30, A=[];
+const $=id=>document.getElementById(id), TAU=Math.PI*2, clamp=(v,a,b)=>v<a?a:v>b?b:v, lerp=(a,b,t)=>a+(b-a)*t, R0=Math.random;
+const rr=(a,b)=>a+(b-a)*R0(), pick=a=>a[Math.floor(R0()*a.length)];
+const angD=(a,b)=>{ let d=(a-b)%TAU; if(d>Math.PI) d-=TAU; if(d<-Math.PI) d+=TAU; return d; };
+const hsh=(a,b)=>{ const s=Math.sin(a*127.1+b*311.7)*43758.5453; return s-Math.floor(s); };
+const nz=(x,s)=>{ const i=Math.floor(x), f=x-i, u=f*f*(3-2*f); return lerp(hsh(i,s),hsh(i+1,s),u)*2-1; };
+
+/* ---------- 유전자: 이 캐릭터를 이루는 값들 ---------- */
+const SWFIX=["눈 사이 가운데 고정","자유 자리"], EYES=["점","콩","감은 눈","선","찡긋"], MOUTHS=["크게 O","활짝 D","작은 o","ω","울상","물결","다문 입"], BOTTOMS=["둥글게","물방울 꼬리","작은 발"];
+const GK=[ // [키, 이름, 최소, 최대, 단계, 묶음]
+ ["size","크기",.4,1.6,.01,"몸"],["egg","달걀형",-.1,.3,.01,"몸"],["tail","꼬리 길이",0,1,.01,"몸"],["tailBend","꼬리 휨",-1,1,.01,"몸"],["feet","발 크기",0,1,.01,"몸"],
+ ["yaw","고개 좌우",-1.2,1.2,.01,"얼굴"],["pitch","고개 위아래",-.5,.5,.01,"얼굴"],["tilt","기울기",-.7,.7,.01,"얼굴"],["eyeGap","눈 사이",.12,.42,.005,"얼굴"],["eyeY","눈 높이",-.05,.4,.005,"얼굴"],["eyeSize","눈 크기",.5,1.8,.01,"얼굴"],["eyeW","눈 가로 길이",.4,5,.01,"얼굴"],["eyeH","눈 세로 길이",.4,5,.01,"얼굴"],["eyeRound","눈 끝 완만함",0,1,.01,"얼굴"],["mouthY","입 높이",-.45,.05,.005,"얼굴"],["mouthSize","입 크기",.4,3.6,.01,"얼굴"],
+ ["swirl","소용돌이",0,1,.01,"머리털"],["swirlLon","소용돌이 좌우 (자유일 때)",-1.2,1.2,.01,"머리털"],["swirlLat","소용돌이 높이",.2,.95,.01,"머리털"],
+ ["wing","날개 크기",0,1,.01,"날개"],["wingW","날개 가로 길이",.4,2.2,.01,"날개"],["wingH","날개 세로 길이",.4,2.2,.01,"날개"],["feather","깃털 수",2,4,1,"날개"],["wingY","날개 높이",-.2,.6,.01,"날개"],["wingUp","날개 들림",-.3,1.1,.01,"날개"],["spinY","빙글 좌우 (자이로)",-2,2,.01,"움직임"],["spinX","빙글 앞뒤 (자이로)",-2,2,.01,"움직임"],["flap","날갯짓 크기",0,1,.01,"날개"],["flapSpd","날갯짓 빠르기",.2,3,.01,"날개"],
+ ["jelly","말랑함",0,1,.01,"움직임"],["soft","눌림 부드러움",0,1,.01,"움직임"],["morph","모양 변화",0,1,.01,"움직임"],["line","선 굵기",.5,2.2,.01,"선"],["wob","연필 떨림",0,1.5,.01,"선"]];
+/* 기본형: 윤성이 고른 천사 (콩 눈 세로로 길게, 활짝 D 입 크게, 가로로 긴 날개, 굵고 떨리는 연필 선, 아주 말랑) */
+const BASE0={soft:.7,eyeRound:.6,spinY:0,spinX:0,eyeW:1,eyeH:2.6,wingW:2.2,wingH:1,swirlFix:0,size:1,egg:.08,bottom:0,tail:.55,tailBend:.35,feet:.6,yaw:-.15,pitch:.05,tilt:-.08,eye:1,eyeGap:.28,eyeY:.16,eyeSize:1,mouth:1,mouthY:-.295,mouthSize:1.8,swirl:1,swirlLon:-.5,swirlLat:.65,wing:.55,feather:3,wingY:.18,wingUp:.35,flap:.5,flapSpd:1,jelly:.98,morph:.93,line:2,wob:1.5};
+let BASE=(()=>{ try{ const o=JSON.parse(localStorage.getItem("nu-flow-angel-base")||"null"); if(o && typeof o==="object") return Object.assign({},BASE0,o); }catch(_){} return Object.assign({},BASE0); })();
+const clone=o=>JSON.parse(JSON.stringify(o));
+/* 드로잉 속 분포대로 뽑는다: 대부분 둥근 몸·O 입·두 날개, 가끔 꼬리나 발, 고개는 이리저리 */
+/* 변주: 기본형의 얼굴 성격(눈·입·날개 비율·선)은 지키고, 자세·크기·표정·아래쪽만 드로잉처럼 넓게 바꾼다 */
+function randGene(base){ const b=base||BASE, g=clone(b), j=(v,a,mn,mx)=>clamp(v*(1+(R0()-.5)*2*a),mn,mx), jd=(v,a,mn,mx)=>clamp(v+(R0()-.5)*2*a,mn,mx);
+  g.size=rr(.5,1.45); g.egg=jd(b.egg,.06,-.1,.3); g.bottom=R0()<.6?b.bottom:pick([0,1,1,2]); g.tail=rr(.35,.9); g.tailBend=rr(-.8,.8); g.feet=rr(.4,.9);
+  g.yaw=rr(-1,1)*(R0()<.7?.55:1.1); g.pitch=rr(-.25,.3); g.tilt=rr(-.45,.45);
+  g.eye=R0()<.8?b.eye:pick([0,1,2,4]); g.eyeW=j(b.eyeW,.15,.4,5); g.eyeH=j(b.eyeH,.18,.4,5); g.eyeGap=jd(b.eyeGap,.035,.12,.42); g.eyeY=jd(b.eyeY,.04,-.05,.4); g.eyeSize=j(b.eyeSize,.12,.5,1.8);
+  g.mouth=R0()<.55?b.mouth:pick([0,0,1,2,4]); g.mouthY=jd(b.mouthY,.04,-.45,.05); g.mouthSize=j(b.mouthSize,.15,.4,3.6);
+  g.swirl=R0()<.85?b.swirl:1-b.swirl; g.swirlLat=jd(b.swirlLat,.06,.2,.95);
+  g.wing=j(b.wing,.15,0,1); g.wingW=j(b.wingW,.15,.4,2.2); g.wingH=j(b.wingH,.15,.4,2.2); g.wingY=jd(b.wingY,.08,-.2,.6); g.wingUp=rr(0,.9); g.flapSpd=j(b.flapSpd,.25,.2,3); g.feather=R0()<.75?b.feather:pick([2,3,4]); return g; }
+function mutate(g0,a){ const g=clone(g0); for(const [k,,mn,mx] of GK){ if(k==="feather"||k==="line"||k==="wob"||k==="jelly"||k==="morph") continue; g[k]=clamp(g[k]+(R0()-.5)*(mx-mn)*.18*a,mn,mx); } if(R0()<.35*a) g.mouth=pick([0,0,1,2,3,4,5,6]); if(R0()<.2*a) g.eye=pick([0,0,1,1,2,3,4]); return g; }
+
+/* ---------- 천사 하나: 말랑한 몸(용수철 고리) + 공 위 얼굴 + 날개 ---------- */
+const NV=56;
+function Angel(g,x,y,isOne){ this.g=clone(g); this.base=clone(g); this.gt=clone(g); this.x=x; this.y=y; this.vx=0; this.vy=0; this.d=new Float32Array(NV); this.dv=new Float32Array(NV);
+  this.sq=0; this.sqv=0; this.sqa=0; this.ct=[]; this.ry=0; this.rx=0; this.ryv=0; this.rxv=0; this.shx=0; this.shy=0; this.shvx=0; this.shvy=0; this.ph=R0()*100; this.seed=Math.floor(R0()*9999); this.blink=0; this.nextBlink=rr(1,4); this.nextMorph=rr(2,5); this.one=!!isOne; this.mouthNow=g.mouth; this.eyeNow=g.eye; this.hold=false; }
+Angel.prototype.R=function(){ return (this.one?ONE_R:(this.cell||FLOCK_R))*this.g.size; };
+Angel.prototype.poke=function(dir,amp){ const k=.6+this.g.jelly; this.shvx+=Math.cos(dir)*amp*.8; this.shvy+=Math.sin(dir)*amp*.8; for(let i=0;i<NV;i++){ const th=i/NV*TAU; this.dv[i]+=amp*k*Math.cos(2*(th-dir))*.9; } this.sqv+=amp*k*.6; this.sqa=dir; };
+Angel.prototype.step=function(dt,t){ const g=this.g, gt=this.gt, k=40+50*(1-g.jelly), c=4+5*(1-g.jelly);
+  { const tx=clamp(-this.vx*.00035,-.12,.12)+.025*Math.sin(t*1.7+this.ph), ty=clamp(-this.vy*.00035,-.12,.12)+.025*Math.cos(t*1.3+this.ph*1.3); this.shvx+=((tx-this.shx)*26-this.shvx*2.2)*dt; this.shvy+=((ty-this.shy)*26-this.shvy*2.2)*dt; this.shx=clamp(this.shx+this.shvx*dt,-.2,.2); this.shy=clamp(this.shy+this.shvy*dt,-.2,.2); }   /* 그늘이 젤리처럼 늦게 따라오며 출렁인다 */
+  for(let i=0;i<NV;i++){ const a=this.d[(i+NV-1)%NV], b=this.d[(i+1)%NV], d=this.d[i]; this.dv[i]+=(-k*d-c*this.dv[i]+18*(a+b-2*d))*dt; }
+  for(let i=0;i<NV;i++) this.d[i]=clamp(this.d[i]+this.dv[i]*dt,-.45,.45);
+  this.sqv+=(-60*this.sq-6*this.sqv)*dt; this.sq=clamp(this.sq+this.sqv*dt,-.4,.4);
+  /* 자이로처럼 빙글: 정한 빠르기로 계속 돌고, 던져서 생긴 회전은 서서히 잦아든 뒤 얼굴이 앞으로 돌아온다 */
+  this.ry+=(this.ryv+g.spinY*TAU)*dt; this.rx+=(this.rxv+g.spinX*TAU)*dt; const fr=Math.exp(-dt*.7); this.ryv*=fr; this.rxv*=fr;
+  if(Math.abs(g.spinY)<.02 && Math.abs(this.ryv)<1.5) this.ry+=(Math.round(this.ry/TAU)*TAU-this.ry)*(1-Math.exp(-dt*2.2));
+  if(Math.abs(g.spinX)<.02 && Math.abs(this.rxv)<1.5) this.rx+=(Math.round(this.rx/TAU)*TAU-this.rx)*(1-Math.exp(-dt*2.2));
+  g._ry=this.ry; g._rx=this.rx;
+  /* 모양이 조금씩 변한다: 값이 정해 둔 목표로 천천히 흘러가고, 목표는 몇 초마다 기본형 근처에서 새로 뽑힌다 */
+  for(const [kk] of GK){ if(kk==="feather") continue; g[kk]=lerp(g[kk],gt[kk],1-Math.exp(-dt*.9)); } g.bottom=gt.bottom; g.feather=gt.feather;
+  if(g.morph>0.01 && !this.hold){ this.nextMorph-=dt; if(this.nextMorph<=0){ this.nextMorph=rr(2.5,6)/(.4+g.morph); const m=mutate(this.base,g.morph); for(const kk of ["yaw","pitch","tilt","eyeGap","eyeY","eyeSize","mouthY","mouthSize","egg","wingUp","wingY","tail","tailBend","swirlLon"]) gt[kk]=m[kk]; if(R0()<.3*g.morph){ gt.mouth=m.mouth; } if(R0()<.15*g.morph){ gt.eye=m.eye; } } }
+  this.blink-=dt; if(this.blink<-0){ this.nextBlink-=dt; if(this.nextBlink<=0){ this.blink=.14; this.nextBlink=rr(1.5,5); } } if(this.blink>0 && this.blink<.08){ this.mouthNow=gt.mouth; this.eyeNow=gt.eye; } if(this.blink<=0){ this.mouthNow=gt.mouth; this.eyeNow=gt.eye; } };
+
+/* 몸 윤곽: 달걀형 원 + 물방울 꼬리 또는 작은 발 + 말랑 출렁 */
+const PX=new Float32Array(NV), PY=new Float32Array(NV), DXS=new Float32Array(NV), DYS=new Float32Array(NV), TXS=new Float32Array(NV), TYS=new Float32Array(NV);
+function outline(a,R,t){ const g=a.g, yawS=-Math.sin(g.yaw+(g._ry||0))*.25;
+  for(let i=0;i<NV;i++){ const th=i/NV*TAU, s=Math.sin(th), c=-Math.cos(th); let r=1+a.d[i]+.012*Math.sin(t*2.2+th*3+a.ph);
+    if(g.bottom===2){ for(const f of [-1,1]){ const dd=angD(th,Math.PI+f*.48+yawS); r+=.15*g.feet*Math.exp(-((dd/.15)**2)); } }
+    let x=s*r*(1-g.egg*.12)*(1+g.egg*.22*(-c>0?0:0)), y=c*r*(1+g.egg*.3);
+    if(c>0) x*=1+g.egg*.25*c;   // 아래가 조금 더 넓은 달걀
+    if(g.bottom===1){ const tip=Math.PI+g.tailBend*.35+yawS, dd=angD(th,tip), b=Math.max(0,1-Math.abs(dd)/.62); const w=Math.pow(b,2.3)*g.tail*.95; x+=Math.sin(tip)*w+g.tailBend*w*.45; y+=-Math.cos(tip)*w; }
+    PX[i]=x*R; PY[i]=y*R; }
+  if(a.ct && a.ct.length){ const rot=a._rot||0, cr=Math.cos(rot), sr=Math.sin(rot), soft=g.soft==null?.7:g.soft; let pen=0; for(const c of a.ct) pen+=Math.max(0,1-c[2]/R); const bul=1+(.18+.3*soft)*Math.min(.6,pen);   // 눌린 만큼 옆으로 불룩
+    DXS.fill(0); DYS.fill(0);
+    for(const c of a.ct){ const nx=c[0]*cr+c[1]*sr, ny=-c[0]*sr+c[1]*cr, h=c[2];
+      if(c[4]>0){ const ox=nx*c[3], oy=ny*c[3], rho=c[4]; for(let i=0;i<NV;i++){ const vx=PX[i]*bul+DXS[i]-ox, vy=PY[i]*bul+DYS[i]-oy, l=Math.hypot(vx,vy)||1; if(l<rho){ DXS[i]+=vx/l*(rho-l); DYS[i]+=vy/l*(rho-l); } } }   // 상대의 둥근 면을 따라 오목하게
+      else for(let i=0;i<NV;i++){ const dd=(PX[i]*bul+DXS[i])*nx+(PY[i]*bul+DYS[i])*ny; if(dd>h){ DXS[i]-=nx*(dd-h); DYS[i]-=ny*(dd-h); } } }   // 비슷한 크기끼리는 맞닿은 면이 평평하게
+    const pass=1+Math.round(soft*6); for(let k=0;k<pass;k++){ for(let i=0;i<NV;i++){ TXS[i]=(DXS[(i+NV-1)%NV]+2*DXS[i]+DXS[(i+1)%NV])*.25; TYS[i]=(DYS[(i+NV-1)%NV]+2*DYS[i]+DYS[(i+1)%NV])*.25; } DXS.set(TXS); DYS.set(TYS); }   // 눌린 자국을 이웃에 번지게 해 모서리 없이 말랑하게
+    for(let i=0;i<NV;i++){ PX[i]=PX[i]*bul+DXS[i]; PY[i]=PY[i]*bul+DYS[i]; } } }
+function smoothPath(ctx,xs,ys,n,jit){ ctx.beginPath(); const P=i=>{ const k=(i+n)%n; return [xs[k]+(jit?jit(k,0):0), ys[k]+(jit?jit(k,1):0)]; };
+  let p0=P(0), p1=P(1); ctx.moveTo((p0[0]+p1[0])/2,(p0[1]+p1[1])/2); for(let i=1;i<=n;i++){ const a=P(i), b=P(i+1); ctx.quadraticCurveTo(a[0],a[1],(a[0]+b[0])/2,(a[1]+b[1])/2); } ctx.closePath(); }
+
+/* 공 위의 점 → 화면: 경도(좌우)·위도(위아래)를 고개 방향만큼 돌려 붙인다 */
+function proj(lon,lat,g,R){ const Y=g.yaw+(g._ry||0), X=g.pitch+(g._rx||0), cl=Math.cos(lat), px=Math.sin(lon)*cl, py=Math.sin(lat), pz=Math.cos(lon)*cl;   /* 공을 진짜로 돌린다: 좌우(세로축) → 앞뒤(가로축) 순서. 한 바퀴 돌아도 얼굴이 뒤로 갔다 반대편에서 나온다 */
+  const cy=Math.cos(Y), sy=Math.sin(Y), x1=px*cy+pz*sy, z1=-px*sy+pz*cy, cx=Math.cos(X), sx=Math.sin(X), y2=py*cx+z1*sx, z2=-py*sx+z1*cx;
+  return {x:R*.9*x1, y:-R*.92*y2*(1+g.egg*.3), z:z2, nx:x1, fx:Math.max(.08,Math.sqrt(Math.max(0,1-x1*x1))), fy:Math.max(.12,Math.sqrt(Math.max(0,1-y2*y2)))}; }
+
+/* ---------- 그리기 ---------- */
+let STYLE="pen";
+const INK="#2B2529", RED="#E3263E", REDD="#A5122A", SKY="#A9D9F3", SKYL="#D7EFFB";   /* 채색 그늘: 하늘색 두 단 */
+function penStroke(ctx,w,alpha){ ctx.lineJoin="round"; ctx.lineCap="round"; ctx.strokeStyle=INK; ctx.globalAlpha=alpha; ctx.lineWidth=w; ctx.stroke(); ctx.globalAlpha=1; }
+function strokeIt(ctx,a,R,draw){ const g=a.g, w=(STYLE==="pen"?1.25:2.2)*g.line*Math.max(.75,Math.sqrt(R/60));
+  if(STYLE==="pen"){ draw(0); penStroke(ctx,w,.85); if(g.wob>.05){ draw(1); penStroke(ctx,w*.6,.35); } } else { draw(0); ctx.lineJoin="round"; ctx.lineCap="round"; ctx.strokeStyle=INK; ctx.lineWidth=w; ctx.stroke(); } }
+
+/* 날개: 머리 옆에 붙은 납작한 판을 3D로 돌려 그린다. 머리가 돌면 날개도 같이 돌며 자연스럽게 얇아졌다 넓어지고(끊김 없음),
+   앞뒤 순서는 날개 가운데의 깊이로 정한다 */
+function rotH(x,y,z,g){ const Y=g.yaw+(g._ry||0), X=g.pitch+(g._rx||0), cy=Math.cos(Y), sy=Math.sin(Y), x1=x*cy+z*sy, z1=-x*sy+z*cy, cx=Math.cos(X), sx=Math.sin(X); return [x1, y*cx+z1*sx, -y*sx+z1*cx]; }
+function drawWing(ctx,a,R,side,t,front){ const g=a.g; if(g.wing<.03) return;
+  const L=R*(.28+.5*g.wing)*g.wingW, H=R*(.28+.5*g.wing)*.78*g.wingH, ph=t*TAU*g.flapSpd*1.4+a.ph+(side>0?0:.35), fl=g.flap*.55*Math.sin(ph);
+  const lon=side*(Math.PI/2-.12), lat=g.wingY*.8, Ax=Math.sin(lon)*Math.cos(lat), Ay=Math.sin(lat), Az=Math.cos(lon)*Math.cos(lat);
+  let ox=Ax, oz=Az-.35; { const l=Math.hypot(ox,oz)||1; ox/=l; oz/=l; }   // 날개가 뻗는 쪽: 옆으로, 살짝 뒤로
+  const pnx=-oz, pnz=ox, f2=g.flap*.45*Math.sin(ph-.6), cf=Math.cos(f2), sf=Math.sin(f2), Ox=ox*cf+pnx*sf, Oz=oz*cf+pnz*sf;   // 날갯짓은 판 밖으로도 살짝 (앞뒤로 퍼덕)
+  const rho=g.wingUp*.7+fl, cr=Math.cos(rho), sr=Math.sin(rho), Rs=R*.9*.92, ey=1+g.egg*.3;
+  const T=(u,v)=>{ const up=-v, u2=u*cr-up*sr*side*side, w2=u*sr+up*cr; const P=rotH(Ax*Rs+Ox*u2, Ay*Rs+w2, Az*Rs+Oz*u2, g); return [P[0], -P[1]*ey, P[2]]; };
+  const zc=T(L*.5,-H*.3)[2]; if(front!==(zc>0)) return;
+  const nf=Math.round(g.feather), jit=STYLE==="pen"?(k,j)=>g.wob*R*.01*nz(k*1.7+j*9+t*.6,a.seed+side*3):null, J=(k,j)=>jit?jit(k,j):0;
+  const root=[-L*.08,H*.05], top=[L*.35,-H*.95], tip=[L*1.0,-H*.62], E=[]; for(let f=0;f<=nf;f++){ const u=f/nf, ang=-.62+u*(Math.PI*.5+.15); E.push([L*(.08+.92*Math.cos(ang*.9)*(1-u*.55)), -H*.62*(1-u)+H*(.42*u)+H*.16*Math.sin(u*Math.PI)]); }
+  E[0]=tip; E[nf]=[L*.05,H*.38];
+  const S=(u,v,k)=>{ const q=T(u,v); return [q[0]+(k>=0?J(k,0):0), q[1]+(k>=0?J(k,1):0)]; };
+  const WP=new Path2D(); let q=S(root[0],root[1],0); WP.moveTo(q[0],q[1]);
+  { const c1=S(-L*.02,-H*.55,-1), c2=S(top[0]-L*.12,top[1],-1), e=S(top[0],top[1],1); WP.bezierCurveTo(c1[0],c1[1],c2[0],c2[1],e[0],e[1]); }
+  { const c=S(L*.82,-H*1.02,-1), e=S(tip[0],tip[1],2); WP.quadraticCurveTo(c[0],c[1],e[0],e[1]); }
+  const cx0=L*.42, cy0=-H*.1; for(let f=0;f<nf;f++){ const p0=E[f], p1=E[f+1], mx=(p0[0]+p1[0])/2, my=(p0[1]+p1[1])/2, vx=mx-cx0, vy=my-cy0, nl=Math.hypot(vx,vy)||1, bl=Math.hypot(p1[0]-p0[0],p1[1]-p0[1])*.55;
+    const c=S(mx+vx/nl*bl,my+vy/nl*bl,3+f), e=S(p1[0],p1[1],9+f); WP.quadraticCurveTo(c[0],c[1],e[0],e[1]); }
+  { const c=S(-L*.02,H*.34,-1), e=S(root[0],root[1],0); WP.quadraticCurveTo(c[0],c[1],e[0],e[1]); } WP.closePath();
+  ctx.fillStyle="#FFFFFF"; ctx.fill(WP);
+  if(STYLE==="paint"){ const o0=T(0,0), ex=T(1,0), eyv=T(0,1), wx=L*(-.05+a.shx*.4), wy=H*(-.2+a.shy*.6)+H*.04*Math.sin(t*2+a.ph+side);   /* 날개 그늘: 날개 판을 따라 위쪽으로 민 모양을 겹쳐 아랫자락에 하늘색 */
+    ctx.save(); ctx.clip(WP); ctx.fillStyle=SKY; ctx.fill(WP); ctx.translate((ex[0]-o0[0])*wx+(eyv[0]-o0[0])*wy,(ex[1]-o0[1])*wx+(eyv[1]-o0[1])*wy); ctx.fillStyle="#FFFFFF"; ctx.fill(WP); ctx.restore(); }
+  ctx.lineJoin="round"; ctx.lineCap="round"; ctx.strokeStyle=INK; if(STYLE==="pen"){ ctx.globalAlpha=.8; ctx.lineWidth=1.15*g.line*Math.max(.75,Math.sqrt(R/60)); } else ctx.lineWidth=2*g.line*Math.max(.75,Math.sqrt(R/60)); ctx.stroke(WP); ctx.globalAlpha=1; }
+
+function drawEye(ctx,a,R,lon,type){ const g=a.g, p=proj(lon,g.eyeY,g,R); if(p.z<.12) return; const s=R*.066*g.eyeSize; ctx.save(); ctx.translate(p.x,p.y); const fill=(a.blink>0?2:type)<=1; ctx.scale(p.fx*(fill?1:g.eyeW),p.fy*(fill?1:g.eyeH)); ctx.fillStyle=INK; ctx.strokeStyle=INK; ctx.lineCap="round"; ctx.lineWidth=Math.max(1,s*.55)/(fill?1:Math.sqrt(g.eyeW*g.eyeH));
+  /* 늘인 눈: 타원을 잡아 늘이면 끝이 뾰족해지므로, 끝을 둥글게 막는 '슈퍼타원'으로 그린다 (완만함 0=타원, 1=알약처럼 둥근 끝) */
+  const blob=(rw,rh)=>{ const n=2+3.5*(g.eyeRound||0), N=48; ctx.beginPath(); for(let i=0;i<N;i++){ const t=i/N*TAU, c=Math.cos(t), sn=Math.sin(t); const x=rw*Math.sign(c)*Math.pow(Math.abs(c),2/n), y=rh*Math.sign(sn)*Math.pow(Math.abs(sn),2/n); if(!i) ctx.moveTo(x,y); else ctx.lineTo(x,y); } ctx.closePath(); ctx.fill(); };
+  const bl=a.blink>0?1:0, ty=bl?2:type;
+  if(ty===0){ blob(s*.75*g.eyeW,s*.75*g.eyeH); }
+  else if(ty===1){ blob(s*.6*g.eyeW,s*1.15*g.eyeH); }
+  else if(ty===2){ ctx.beginPath(); ctx.arc(0,s*.35,s*.95,Math.PI*1.15,Math.PI*1.85); ctx.stroke(); }
+  else if(ty===3){ ctx.beginPath(); ctx.moveTo(-s*.9,0); ctx.lineTo(s*.9,0); ctx.stroke(); }
+  else { const d=lon<0?1:-1; ctx.beginPath(); ctx.moveTo(-s*.9*d,-s*.7); ctx.lineTo(s*.8*d,0); ctx.lineTo(-s*.9*d,s*.7); ctx.stroke(); }
+  ctx.restore(); }
+
+function drawMouth(ctx,a,R,type){ const g=a.g, p=proj(0,g.mouthY,g,R); if(p.z<.1) return; const m=R*.24*g.mouthSize, lw=(STYLE==="pen"?1.2:1.9)*g.line*Math.max(.75,Math.sqrt(R/60));
+  ctx.save(); ctx.translate(p.x,p.y); ctx.scale(p.fx,p.fy); ctx.lineJoin="round"; ctx.lineCap="round"; ctx.strokeStyle=INK; ctx.lineWidth=lw;
+  const P=new Path2D(); let open=true;   /* 입 모양을 따로 담아 두고 칠·선을 모두 이 모양으로 (안쪽 그늘이 선으로 남던 문제) */
+  if(type===0){ P.ellipse(0,0,m*.42,m*.58,0,0,TAU); }
+  else if(type===1){ P.moveTo(-m*.62,-m*.28); P.quadraticCurveTo(0,-m*.42,m*.62,-m*.28); P.quadraticCurveTo(m*.55,m*.75,0,m*.72); P.quadraticCurveTo(-m*.55,m*.75,-m*.62,-m*.28); P.closePath(); }
+  else if(type===2){ P.ellipse(0,0,m*.22,m*.27,0,0,TAU); }
+  else if(type===4){ P.moveTo(-m*.48,m*.3); P.quadraticCurveTo(-m*.45,-m*.45,0,-m*.42); P.quadraticCurveTo(m*.45,-m*.45,m*.48,m*.3); P.quadraticCurveTo(0,m*.18,-m*.48,m*.3); P.closePath(); }
+  else { open=false; if(type===3){ P.moveTo(-m*.42,-m*.08); P.quadraticCurveTo(-m*.21,m*.32,0,-m*.02); P.quadraticCurveTo(m*.21,m*.32,m*.42,-m*.08); } else if(type===5){ P.moveTo(-m*.45,0); P.bezierCurveTo(-m*.25,-m*.25,-m*.1,m*.25,0,0); P.bezierCurveTo(m*.1,-m*.25,m*.25,m*.25,m*.45,0); } else { P.moveTo(-m*.25,0); P.quadraticCurveTo(0,m*.12,m*.25,0); } }
+  if(open){ if(STYLE==="paint"){ ctx.fillStyle=RED; ctx.fill(P);   /* 입은 빨강 한 톤 */ } else { ctx.fillStyle="#fff"; ctx.fill(P); } }
+  ctx.globalAlpha=STYLE==="pen"?.85:1; ctx.stroke(P); ctx.globalAlpha=1;
+  ctx.restore(); }
+
+function drawSwirl(ctx,a,R,t){ const g=a.g; if(g.swirl<.5) return; const lon=g.swirlFix?g.swirlLon:0, p=proj(lon,g.swirlLat,g,R); if(p.z<.05) return; const s=R*.2;   /* 기본: 두 눈 사이 가운데 위 */
+  ctx.save(); ctx.translate(p.x,p.y); ctx.scale(p.fx,p.fy); ctx.rotate(-lon*.4); ctx.beginPath(); const turns=2.1, n=40;
+  for(let i=0;i<=n;i++){ const u=i/n, ang=u*turns*TAU, r=s*(.08+.92*u); const x=Math.cos(ang)*r, y=Math.sin(ang)*r*.85; if(!i) ctx.moveTo(x,y); else ctx.lineTo(x,y); }
+  ctx.strokeStyle=STYLE==="pen"?INK:"#9A8FA6"; ctx.globalAlpha=STYLE==="pen"?.8:.8; ctx.lineWidth=(STYLE==="pen"?1.1:1.5)*g.line; ctx.lineCap="round"; ctx.stroke(); ctx.globalAlpha=1; ctx.restore(); }
+
+function drawAngel(ctx,a,t,sel){ const g=a.g, R=a.R();
+  a._rot=g.tilt+.04*Math.sin(t*.8+a.ph); ctx.save(); ctx.translate(a.x,a.y); ctx.rotate(a._rot);
+  const s=a.sq, ca=Math.cos(a.sqa), sa=Math.sin(a.sqa); ctx.rotate(a.sqa); ctx.scale(1+s,1-s*.85); ctx.rotate(-a.sqa);   // 눌리면 납작해졌다 늘어난다
+  drawWing(ctx,a,R,-1,t,false); drawWing(ctx,a,R,1,t,false);
+  outline(a,R,t); const jit=STYLE==="pen"?(k,j)=>g.wob*R*.01*nz(k*.9+j*13+t*.5,a.seed):null;
+  smoothPath(ctx,PX,PY,NV,null); ctx.fillStyle="#FFFFFF"; ctx.fill();
+  if(STYLE==="paint"){ ctx.save(); smoothPath(ctx,PX,PY,NV,null); ctx.clip(); ctx.fillStyle=SKY; ctx.fill(); const ox=-.13+g.yaw*.05+a.shx, oy=-.16+a.shy;   /* 몸 윤곽을 빛 쪽으로 밀어 겹치면 끊기지 않는 초승달 그늘이 된다 */
+    for(const [col,k2] of [["#FFFFFF",1]]){ ctx.save(); ctx.translate(R*ox*k2,R*oy*k2); ctx.scale(1-.03*k2,1-.03*k2); smoothPath(ctx,PX,PY,NV,null); ctx.fillStyle=col; ctx.fill(); ctx.restore(); } ctx.restore(); }
+  strokeIt(ctx,a,R,pass=>smoothPath(ctx,PX,PY,NV,jit?(k,j)=>jit(k+pass*31,j)+(pass?g.wob*R*.008*nz(k*2.1+j,a.seed+77):0):null));
+  ctx.save(); smoothPath(ctx,PX,PY,NV,null); ctx.clip();   /* 돌다가 가장자리로 간 눈·입은 몸 안에서만 보인다 */
+  drawSwirl(ctx,a,R,t);
+  drawEye(ctx,a,R,-g.eyeGap,a.eyeNow); drawEye(ctx,a,R,g.eyeGap,a.eyeNow); drawMouth(ctx,a,R,a.mouthNow); ctx.restore();
+  drawWing(ctx,a,R,-1,t,true); drawWing(ctx,a,R,1,t,true);
+  if(sel){ ctx.setLineDash([5,6]); ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue("--accent"); ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(0,0,R*1.45,0,TAU); ctx.stroke(); ctx.setLineDash([]); }
+  ctx.restore(); }
+
+/* 부딪힘: 서로 겹치면 맞닿은 면이 젤리처럼 납작하게 눌리고(그 대신 옆으로 살짝 불룩), 천천히 밀려나며 출렁인다 */
+function collide(dt){ for(const a of A) a.ct.length=0;
+  for(let i=0;i<A.length;i++) for(let j=i+1;j<A.length;j++){ const p=A[i], q=A[j], rp=p.R(), rq=q.R(), dx=q.x-p.x, dy=q.y-p.y, d2=dx*dx+dy*dy, rs=rp+rq; if(d2>=rs*rs || d2<1e-3) continue;
+    const d=Math.sqrt(d2), nx=dx/d, ny=dy/d, hp=d*rp/rs, hq=d-hp, big=rp>rq?p:q;   /* 작은 쪽은 큰 쪽의 둥근 모양대로 오목하게, 큰 쪽은 살짝만 납작하게 */
+    p.ct.push([nx,ny,hp,d,rp<rq*.9?hq+(rq-hq)*.35:0]); q.ct.push([-nx,-ny,hq,d,rq<rp*.9?hp+(rp-hp)*.35:0]);
+    const tgt=rs*.8; if(d<tgt){ const o=(tgt-d)*Math.min(1,dt*9), wp=p.hold?0:q.hold?1:.5, wq=1-wp; p.x-=nx*o*wp; p.y-=ny*o*wp; q.x+=nx*o*wq; q.y+=ny*o*wq; }
+    const rv=(q.vx-p.vx)*nx+(q.vy-p.vy)*ny; if(rv<0){ const im=-rv*.6; if(!p.hold){ p.vx-=nx*im*.5; p.vy-=ny*im*.5; } if(!q.hold){ q.vx+=nx*im*.5; q.vy+=ny*im*.5; } if(im>25){ const ang=Math.atan2(ny,nx); p.poke(ang,Math.min(.3,im*.003)); q.poke(ang,Math.min(.3,im*.003)); } } } }
+/* 무대 벽: 던져서 벽에 닿으면 그 면이 납작하게 눌렸다가 튕겨 나온다 */
+function walls(a){ const r=a.R()*1.02; for(const [nx,ny,dist] of [[-1,0,a.x],[1,0,W-a.x],[0,-1,a.y],[0,1,H-a.y]]){ if(dist>=r) continue; a.ct.push([nx,ny,Math.max(r*.45,dist)]);
+    const vn=a.vx*nx+a.vy*ny; if(vn>0){ a.vx-=nx*vn*1.6; a.vy-=ny*vn*1.6; if(vn>120) a.poke(Math.atan2(ny,nx),Math.min(.4,vn*.0015)); } if(dist<r*.45 && !a.hold){ a.x-=nx*(r*.45-dist); a.y-=ny*(r*.45-dist); } } }
+
+/* ---------- NU FLOW에 붙이기 ---------- */
+const stage=document.querySelector(".stage"); if(!stage) return;
+const cvA=document.createElement("canvas"); cvA.id="cvA"; cvA.setAttribute("aria-hidden","true"); cvA.style.cssText="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:4"; stage.appendChild(cvA);
+const ctx=cvA.getContext("2d");
+const AK="nu-flow-angel"; let S={style:"paint",size:1,speed:1,soft:.7,spin:0};
+try{ const o=JSON.parse(localStorage.getItem(AK)||"null"); if(o) Object.assign(S,o); }catch(_){}
+const saveS=()=>{ try{ localStorage.setItem(AK,JSON.stringify(S)); }catch(_){} };
+STYLE=S.style;
+function fit(){ const r=stage.getBoundingClientRect(); DPR=Math.min(1.5,devicePixelRatio||1); W=Math.max(100,r.width); H=Math.max(100,r.height); cvA.width=Math.round(W*DPR); cvA.height=Math.round(H*DPR); FLOCK_R=Math.max(16,Math.min(W,H)*.065)*S.size; dirty=true; }
+let dirty=true; new ResizeObserver(fit).observe(stage);
+function spinOf(on){ return on?[(R0()<.5?-1:1)*rr(.35,.9),(R0()<.5?-1:1)*rr(.12,.45)]:[0,0]; }
+function addAngels(n){ for(let i=0;i<n;i++){ const g=randGene(BASE); g.soft=S.soft; const sp=spinOf(S.spin); g.spinY=sp[0]; g.spinX=sp[1];
+    const r=FLOCK_R*g.size, x=rr(r+10,W-r-10), y=rr(r+10,H-r-10), a=new Angel(g,x,y,false); a.vx=rr(-120,120); a.vy=rr(-120,60); a.pop=0; a.poke(R0()*TAU,.4); A.push(a); }
+  kick(); }
+/* 무대 위 움직임: 소용돌이 가운데를 천천히 돌며 둥실, 서로·벽에 닿으면 눌린다 */
+let last=performance.now(), T=0, run=false, drag=null;
+function kick(){ if(!run){ run=true; last=performance.now(); requestAnimationFrame(loop); } }
+function loop(now){ const dt=Math.min(.05,(now-last)/1000); last=now; T+=dt;
+  if(!A.length){ if(dirty){ ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,cvA.width,cvA.height); dirty=false; } run=false; return; }
+  const cx=W*.5, cy=H*.5, spd=S.speed;
+  for(const a of A){ a.step(dt,T); a.pop=Math.min(1,(a.pop||0)+dt*2.5); if(a.hold) continue; const dx=a.x-cx, dy=a.y-cy, d=Math.hypot(dx,dy)||1, sw=10*spd/(.6+a.g.size);
+    a.vx+=(-dy/d*sw+nz(T*.3+a.ph,a.seed)*14*spd-a.vx*.7)*dt; a.vy+=(dx/d*sw*.6+nz(T*.3+a.ph,a.seed+5)*14*spd-6*spd*Math.sin(T*1.1+a.ph)-a.vy*.7)*dt; }
+  collide(dt); for(const a of A) walls(a);
+  for(const a of A){ if(!a.hold){ a.x+=a.vx*dt; a.y+=a.vy*dt; } }
+  ctx.setTransform(DPR,0,0,DPR,0,0); ctx.clearRect(0,0,W,H); dirty=true;
+  const order=A.slice().sort((p,q)=>p.y-q.y);
+  for(const a of order){ const k=a.pop<1?1-Math.pow(1-a.pop,3)*Math.cos(a.pop*9):1; if(k!==1){ ctx.save(); ctx.translate(a.x,a.y); ctx.scale(k,k); ctx.translate(-a.x,-a.y); drawAngel(ctx,a,T,false); ctx.restore(); } else drawAngel(ctx,a,T,false); }
+  requestAnimationFrame(loop); }
+/* 손: 천사 위에서 누르면 무대(물·방울) 대신 천사를 잡는다 */
+const pos=e=>{ const r=stage.getBoundingClientRect(); return [e.clientX-r.left,e.clientY-r.top]; };
+function hit(x,y){ for(let i=A.length-1;i>=0;i--){ const a=A[i]; if(Math.hypot(x-a.x,y-a.y)<a.R()*1.15) return a; } return null; }
+stage.addEventListener("pointerdown",e=>{ if(!A.length) return; const [x,y]=pos(e), a=hit(x,y); if(!a) return; e.stopPropagation(); e.preventDefault(); try{ stage.setPointerCapture(e.pointerId); }catch(_){} drag={a,id:e.pointerId,ox:a.x-x,oy:a.y-y,lx:x,ly:y,moved:0,vx:0,vy:0}; a.hold=true; a.poke(0,.12); },true);
+stage.addEventListener("pointermove",e=>{ if(!drag || e.pointerId!==drag.id) return; e.stopPropagation(); const [x,y]=pos(e), a=drag.a, dx=x-drag.lx, dy=y-drag.ly; drag.moved+=Math.hypot(dx,dy); a.x=x+drag.ox; a.y=y+drag.oy; drag.vx=dx*60; drag.vy=dy*60; drag.lx=x; drag.ly=y; const sp=Math.hypot(dx,dy); if(sp>2){ a.sq=clamp(sp*.012,0,.3); a.sqa=Math.atan2(dy,dx); } },true);
+const up=e=>{ if(!drag || (e && e.pointerId!==drag.id)) return; if(e) e.stopPropagation(); const a=drag.a; a.hold=false; try{ stage.releasePointerCapture(drag.id); }catch(_){}
+  if(drag.moved<6){ a.poke(R0()*TAU,.35); a.gt.mouth=pick([0,0,1,1,2,3,4,5]); if(R0()<.4) a.gt.eye=pick([0,1,2,4]); }
+  else { a.vx=clamp(drag.vx,-900,900); a.vy=clamp(drag.vy,-900,900); a.ryv+=clamp(drag.vx*.012,-24,24); a.rxv+=clamp(-drag.vy*.012,-24,24); a.poke(Math.atan2(a.vy,a.vx),.25); } drag=null; };
+stage.addEventListener("pointerup",up,true); stage.addEventListener("pointercancel",up,true);
+stage.addEventListener("dblclick",e=>{ if(!A.length) return; const [x,y]=pos(e); if(hit(x,y)) e.stopPropagation(); },true);   // 천사를 두 번 눌러도 뒤의 방울은 터지지 않게
+
+/* ---------- 천사 탭 손잡이 ---------- */
+const $$=id=>document.getElementById(id), pctT=v=>Math.round(v*100)+"%";
+function syncUI(){ const set=(id,v,t)=>{ const el=$$(id); if(el){ el.value=v; const o=$$(id+"V"); if(o) o.textContent=t; } };
+  set("anSize",S.size,pctT(S.size)); set("anSpeed",S.speed,pctT(S.speed)); set("anSoft",S.soft,pctT(S.soft));
+  const b=(id,on)=>{ const el=$$(id); if(el) el.setAttribute("aria-pressed",on?"true":"false"); }; b("anPaint",S.style==="paint"); b("anPen",S.style==="pen"); b("anSpin",!!S.spin);
+  const n=$$("anCount"); if(n) n.textContent=A.length?"지금 "+A.length+"마리":"아직 없음"; }
+const on=(id,ev,f)=>{ const el=$$(id); if(el) el.addEventListener(ev,f); };
+on("anAdd1","click",()=>{ addAngels(1); syncUI(); }); on("anAdd5","click",()=>{ addAngels(5); syncUI(); });
+on("anClear","click",()=>{ A=[]; drag=null; dirty=true; kick(); syncUI(); });
+on("anPaint","click",()=>{ S.style=STYLE="paint"; saveS(); syncUI(); }); on("anPen","click",()=>{ S.style=STYLE="pen"; saveS(); syncUI(); });
+on("anSize","input",()=>{ S.size=+$$("anSize").value; saveS(); fit(); syncUI(); });
+on("anSpeed","input",()=>{ S.speed=+$$("anSpeed").value; saveS(); syncUI(); });
+on("anSoft","input",()=>{ S.soft=+$$("anSoft").value; for(const a of A){ a.g.soft=a.gt.soft=a.base.soft=S.soft; } saveS(); syncUI(); });
+on("anSpin","click",()=>{ S.spin=S.spin?0:1; for(const a of A){ const sp=spinOf(S.spin); for(const o of [a.base,a.gt,a.g]){ o.spinY=sp[0]; o.spinX=sp[1]; } if(S.spin) a.poke(R0()*TAU,.2); } saveS(); syncUI(); });
+function msgA(t){ const m=$$("anMsg"); if(m){ m.textContent=t; setTimeout(()=>{ if(m.textContent===t) m.textContent=""; },4000); } }
+on("anCodeGo","click",()=>{ const t=($$("anCodeT")||{}).value||"", s=t.trim(), i=s.indexOf(":"); try{ const j=JSON.parse(s.startsWith("NUANGEL")?s.slice(i+1):s), v=j["값"]||j; BASE=Object.assign({},BASE0,v); try{ localStorage.setItem("nu-flow-angel-base",JSON.stringify(BASE)); }catch(_){} msgA("기본형을 바꿨어요. 이제 추가하는 천사는 이 천사에서 변주돼요"); }catch(_){ msgA("코드를 읽지 못했어요. 공방의 '코드 복사'로 만든 코드를 통째로 붙여 넣어 주세요"); } });
+on("anCodeReset","click",()=>{ BASE=Object.assign({},BASE0); try{ localStorage.removeItem("nu-flow-angel-base"); }catch(_){} msgA("처음 기본형으로 돌렸어요"); });
+addEventListener("storage",e=>{ if(e.key===AK){ try{ Object.assign(S,JSON.parse(e.newValue||"{}")); }catch(_){} STYLE=S.style; fit(); syncUI(); } if(e.key==="nu-flow-angel-base"){ try{ BASE=Object.assign({},BASE0,JSON.parse(e.newValue||"{}")); }catch(_){} } });
+fit(); syncUI();
+window.__angels={get A(){return A},add:addAngels};
 })();
 </script>
