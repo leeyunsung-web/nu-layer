@@ -39,7 +39,7 @@ canvas.hold{cursor:grabbing}
 .mtabs{margin-top:10px;position:sticky;top:0;z-index:5;background:var(--bg,#F5F5EF);padding-top:6px}
 .mtabs button{border-radius:10px;min-height:34px;font-size:12.5px;padding:5px 14px}.mtabs button[aria-selected="true"]{background:#9C2F86;color:#fff;border-color:#9C2F86}
 .sw{display:flex;flex-wrap:wrap;gap:4px;max-width:330px}.sw .swb{width:22px;height:22px;min-height:22px;padding:0;border-radius:50%;border:2px solid rgba(0,0,0,.25)}.sw .swb[aria-pressed="true"]{outline:3px solid #9C2F86;outline-offset:1px}.it.wide{grid-column:span 2}
-.mpanel[hidden]{display:none!important}.mpanel{display:flex;flex-direction:column;gap:10px}
+.mpanel[hidden]{display:none!important}.mpanel{display:flex;flex-direction:column;gap:10px;contain:content}
 .tabrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.tabrow .tabs{margin:0}.tmode{white-space:nowrap}
 .ctl .msub{grid-column:1/-1}.mprev canvas{width:120px;height:120px;background:#f4f1ea;border-radius:10px;border:1px solid rgba(0,0,0,.12)}.muser{display:contents}.mdel{min-width:0;padding:0 6px;opacity:.6}.it.row input[type=text]{flex:1;min-width:90px;padding:4px 6px}
 .msub{font-size:13px;font-weight:900;color:var(--soft);margin:8px 0 0;letter-spacing:.04em}
@@ -416,7 +416,8 @@ const mkL=(minHole)=>({B:new Float32Array(0),S:[],N:[],A:[],n:0,len:0,sign:1,min
 const FLW={S:46, R0:150, v0:4, outK:.03, kf:1.2, per:3.4, puff:80, sub:3, vort:1.2, lap:.4, cond:1.2, decay:.03, back:.55, lobe:.1, rnd:0};
 let QF=1, QMAX=3.7e6;   // QF: 버벅이면 저절로 낮추는 화질 배율 (0.35~1)
  try{ QMAX=+localStorage.getItem("nu-flow-q")||3e6; }catch(_){}   // 화질 상한 (그리는 픽셀 수): 창을 크게 키워도 이 이상은 그리지 않아 끊기지 않는다
-function fit(){ const cw=cv.clientWidth, ch=cv.clientHeight, d0=Math.min(window.devicePixelRatio||1,1.5), dpr=G.pix?1/G.pxS:d0*Math.min(1,Math.sqrt(QMAX*QF/Math.max(1,cw*ch*d0*d0))),   /* 픽셀 필터: 한 칸이 pxS 화면 픽셀이 되게 작게 그리고 크게 늘려 보인다 */ w=Math.round(cw*dpr), h2=Math.round(ch*dpr);
+const CSZ={cw:0,ch:0,ok:false}; try{ new ResizeObserver(()=>{ CSZ.cw=cv.clientWidth; CSZ.ch=cv.clientHeight; CSZ.ok=true; }).observe(cv); }catch(_){}   // 크기는 바뀔 때만 잰다 (매 프레임 재면 메뉴가 많은 페이지에서 화면 배치를 다시 계산하느라 느려진다)
+function fit(){ if(!CSZ.ok){ CSZ.cw=cv.clientWidth; CSZ.ch=cv.clientHeight; } const cw=CSZ.cw, ch=CSZ.ch, d0=Math.min(window.devicePixelRatio||1,1.5), dpr=G.pix?1/G.pxS:d0*Math.min(1,Math.sqrt(QMAX*QF/Math.max(1,cw*ch*d0*d0))),   /* 픽셀 필터: 한 칸이 pxS 화면 픽셀이 되게 작게 그리고 크게 늘려 보인다 */ w=Math.round(cw*dpr), h2=Math.round(ch*dpr);
   if(w>0 && h2>0 && (cv.width!==w||cv.height!==h2)){ cv.width=w; cv.height=h2; } W=cv.width; Hh=cv.height; scale=Math.sqrt(W*Hh/(AREA*OVN*OVN)); { const pW=WW, pH=WH; WW=W/scale; WH=Hh/scale; if(pW>0 && pH>0 && (Math.abs(WW-pW)>.5 || Math.abs(WH-pH)>.5)){ CX*=WW/pW; CY*=WH/pH; RMX=HY(WW,WH)*.5; } }   /* 세상 크기가 바뀌면 소용돌이 중심·크기도 같이 따라간다 (예전 크기에 머물러 한쪽에 몰리던 문제) */
   const ngw=Math.ceil((WW+2*PAD)/CELL)+2, ngh=Math.ceil((WH+2*PAD)/CELL)+2; if(ngw===gw && ngh===gh) return; const og=gw?{gw,gh,vw,vh,U,V,DYE}:null; gw=ngw; gh=ngh; n=gw*gh; const A=()=>new Float32Array(n);   // 크기가 바뀌어도 처음부터 다시 하지 않는다: 아래에서 물과 잉크를 새 격자로 옮겨 담는다
   vw=Math.ceil((WW+2*PAD)/CV)+2; vh=Math.ceil((WH+2*PAD)/CV)+2; vn=vw*vh; const B=()=>new Float32Array(vn);
@@ -1756,7 +1757,7 @@ const tabsEl=$("tabs"); SCENES.forEach((s,i)=>{ const b=document.createElement("
 const cvB=$("cvB"), gB=cvB.getContext("2d"), cvS=$("cvS"), gS=cvS.getContext("2d"), cvBD=$("cv2"), stEl=cv.parentElement, PLS=[cvB,cv,cvBD,cvS];   // 판: 뒤쪽 물 · 앞쪽 물 · 핏방울 · 별빛
 const CAM={str:""}; function camLim(){ const o=OVN*(G.d3?.9:1); return {zmin:Math.min(1,1/o), o}; }   // 가장 멀리 봐도 세상(판)이 화면을 꽉 채우는 데까지만 (3D는 기울어진 먼 쪽 여유 10%)
 function camFix(){ const L=camLim(); G.camZ=clamp(G.camZ,L.zmin,3.5); const m=Math.max(0,(G.camZ*L.o-1)/2); G.camX=clamp(G.camX,-m,m); G.camY=clamp(G.camY,-m,m); return L; }
-function camS(){ camFix(); const sw=stEl.clientWidth, sh=stEl.clientHeight; return "translate("+(G.camX*sw).toFixed(1)+"px,"+(G.camY*sh).toFixed(1)+"px) scale("+G.camZ.toFixed(4)+") "; }   // 화면 카메라: 옮기기·줌 (모든 판에 똑같이 → 판끼리 어긋나지 않는다)
+function camS(){ camFix(); if(!SZ.ok) szUp(); const sw=SZ.sw, sh=SZ.sh; return "translate("+(G.camX*sw).toFixed(1)+"px,"+(G.camY*sh).toFixed(1)+"px) scale("+G.camZ.toFixed(4)+") "; }   // 화면 카메라: 옮기기·줌 (모든 판에 똑같이 → 판끼리 어긋나지 않는다)
 const D3={Hf:[null,null,null,null], TS:["","","",""], split:false, mx:0, my:0, tmx:0, tmy:0, key:"", S:[1,1,1,1], Hi:[null,null,null,null], bg:""};
 const lerpV=(ax,t)=>{ const v=VR(); return ax?v[1]+(v[3]-v[1])*t:v[0]+(v[2]-v[0])*t; };
 function d3Pt(ax,ay,P,tx,ty,z,x,y){ const ca=Math.cos(ax), sa=Math.sin(ax), cb=Math.cos(ay), sb=Math.sin(ay), X=x*cb; let Z=-x*sb; const Y=y*ca-Z*sa; Z=y*sa+Z*ca; return [X+tx,Y+ty,1-(Z+z)/P]; }   // 판 위의 점 → 화면 (원근 나누기 전)
@@ -1769,11 +1770,11 @@ function fogEdge(c,j){ const C=FGC[j], key=W+"x"+Hh; if(C.k!==key){ C.k=key; con
     C.r=[[mk(0,0,fx,0),0,0,fx,Hh],[mk(W,0,W-fx,0),W-fx,0,fx,Hh],[mk(0,0,0,fy),0,0,W,fy],[mk(0,Hh,0,Hh-fy),0,Hh-fy,W,fy]]; }
   c.save(); c.setTransform(1,0,0,1,0,0); c.globalCompositeOperation="destination-out"; for(const r of C.r){ c.fillStyle=r[0]; c.fillRect(r[1],r[2],r[3],r[4]); } c.restore(); }   // 판 가장자리는 안개처럼 지운다 (판 끝이 잘려 보이지 않게)
 function d3Ov(on){ const o=on?Math.max(1,G.d3Wide||1):1; if(o===OVN && stEl.classList.contains("ovs")===(o>1)) return; OVN=o; stEl.classList.toggle("ovs",o>1); stEl.style.setProperty("--ovp",((o-1)/2*100).toFixed(2)+"%"); D3.key=""; }   // 판을 화면보다 크게: 가장자리(안개·벽·사라지는 곳)가 화면 밖으로 나간다
-function d3Map(x,y){ const H1=D3.Hf[1], I2=D3.Hi[2]; if(!H1 || !I2 || G.d3kD>=.999) return [0,0]; const pw=cv.clientWidth, ph=cv.clientHeight, s=unpr(H1,x/WW*pw-pw/2,y/WH*ph-ph/2); if(!s) return [0,0]; const q=unpr(I2,s[0],s[1]); if(!q) return [0,0]; return [(q[0]+pw/2)/pw*WW-x,(q[1]+ph/2)/ph*WH-y]; }   // 소용돌이 판에서 이 자리가 보이는 곳 → 방울 판의 어느 자리인지
+function d3Map(x,y){ const H1=D3.Hf[1], I2=D3.Hi[2]; if(!H1 || !I2 || G.d3kD>=.999) return [0,0]; const pw=SZ.cw||cv.clientWidth, ph=SZ.ch||cv.clientHeight, s=unpr(H1,x/WW*pw-pw/2,y/WH*ph-ph/2); if(!s) return [0,0]; const q=unpr(I2,s[0],s[1]); if(!q) return [0,0]; return [(q[0]+pw/2)/pw*WW-x,(q[1]+ph/2)/ph*WH-y]; }   // 소용돌이 판에서 이 자리가 보이는 곳 → 방울 판의 어느 자리인지
 function d3Mode(on){ d3Ov(true); D3.TS.fill(""); CAM.str=""; if(!on) BD.setMap(null); cvB.style.display=on?"block":"none"; cvS.style.display=on?"block":"none"; if(on) BD.useOwn(); else { BD.cam(0,0); BD.useCtx(gMain); for(const el of PLS) el.style.transform=""; stEl.style.background=""; D3.bg=""; } D3.key=""; }
 function d3Tick(dt){ const on=!!G.d3; if(on!==D3.split){ D3.split=on; d3Mode(on); } if(!on) return; d3Ov(true);
   if(D3.bg!==BGN()){ D3.bg=BGN(); stEl.style.background=BGN(); }
-  const cw=stEl.clientWidth, ch=stEl.clientHeight; if(!cw || !ch) return; const Dm=Math.max(cw,ch), P=2.2*Dm, dg=Math.PI/180, t=performance.now()/1000, k=Math.min(1,dt*2.5);
+  if(!SZ.ok) szUp(); const cw=SZ.sw, ch=SZ.sh; if(!cw || !ch) return; const Dm=Math.max(cw,ch), P=2.2*Dm, dg=Math.PI/180, t=performance.now()/1000, k=Math.min(1,dt*2.5);
   const key=[cw,ch,G.d3Tilt,G.d3Depth,G.d3Drift,G.d3Mouse].join(); if(key!==D3.key){ D3.key=key; D3.S.fill(1+.6*(1/Math.cos(G.d3Tilt*dg)-1)); }   // 많이 눕힐수록 판을 조금 키워 빈 곳을 줄인다
   D3.mx+=(D3.tmx-D3.mx)*k; D3.my+=(D3.tmy-D3.my)*k;   // 마우스를 따라 부드럽게
   const dax=(G.d3Drift*4*Math.sin(t*.21)-G.d3Mouse*7*D3.my)*dg, ay=(G.d3Drift*6*Math.sin(t*.13+1.3)+G.d3Mouse*9*D3.mx)*dg, ax=G.d3Tilt*dg+dax;   // 시점이 움직인 만큼 깊이가 다른 판끼리 엇갈린다
@@ -2214,10 +2215,10 @@ if(window.NF_VIEW==="panel")(function(){
       r.addEventListener("input",()=>{ c[key]=+r.value; o.textContent=f(c[key]); clearTimeout(r._t); r._t=setTimeout(save,120); }); w.append(r,o); g.appendChild(w); }
     const ol=mk("div","it row"); ol.appendChild(mk("span","","테두리")); const ob=mk("button","",c.outline?"켜짐":"꺼짐"); ob.type="button"; ob.setAttribute("aria-pressed",c.outline?"true":"false"); ob.addEventListener("click",()=>{ c.outline=c.outline?0:1; save(); drawCust(); }); const oc=mk("input"); oc.type="color"; oc.value=c.line; oc.addEventListener("input",()=>{ c.line=oc.value; save(); }); ol.append(ob,oc); g.appendChild(ol);
     box.appendChild(g); const im=new Image(); im.src=c.src; th._im=im; th._c=c; return box; }
-  let custWrap=null;
+  let custWrap=null, CWV=false;   // CWV: 내 오브젝트 칸이 지금 보이는지 (보일 때만 미리보기를 움직인다)
   function drawCust(){ if(!custWrap) return; load(); custWrap.replaceChildren(); if(!CU.length){ custWrap.appendChild(mk("p","hint","아직 불러온 그림이 없어요. 뉴레이어에서 SVG나 PNG로 내보낸 파일을 위 버튼으로 불러오세요.")); return; } CU.forEach((c,i)=>{ Object.keys(DEF).forEach(k=>{ if(c[k]===undefined) c[k]=DEF[k]; }); custWrap.appendChild(editor(c,i)); }); }   // 편집한 값이 CU[i]에 바로 들어간다
   /* 미리보기: 고른 움직임으로 작은 칸에서 살아 움직인다 */
-  function tick(t){ requestAnimationFrame(tick); if(!custWrap || !custWrap.offsetParent) return; custWrap.querySelectorAll("canvas.cthumb").forEach(cv=>{ const c=cv._c, im=cv._im; if(!c || !im || !im.complete) return; const x=cv.getContext("2d"), W=cv.width, tt=t/1000*c.aspd*Math.PI*2;
+  function tick(t){ requestAnimationFrame(tick); if(!custWrap || !CWV) return; custWrap.querySelectorAll("canvas.cthumb").forEach(cv=>{ const c=cv._c, im=cv._im; if(!c || !im || !im.complete) return; const x=cv.getContext("2d"), W=cv.width, tt=t/1000*c.aspd*Math.PI*2;
       const dy=-c.bob*6*Math.sin(tt*.45), rot=c.sway*.35*Math.sin(tt*.6), sc=1+c.breath*.12*Math.sin(tt*.8), sq=1+c.squash*.16*Math.sin(tt*1.1), sp=c.spin*Math.PI/180*t/1000; x.clearRect(0,0,W,W); x.save(); x.translate(W/2,W/2+dy); x.rotate(rot+sp); x.scale(sc*sq,sc/sq);
       const k=W*.78/Math.max(im.naturalWidth||1,im.naturalHeight||1); x.drawImage(im,-im.naturalWidth*k/2,-im.naturalHeight*k/2,im.naturalWidth*k,im.naturalHeight*k); x.restore(); }); }
   requestAnimationFrame(tick);
@@ -2241,12 +2242,12 @@ if(window.NF_VIEW==="panel")(function(){
     rf.addEventListener("click",()=>go(true)); go(false); }
   window.NF_OBJLIST=function(){ const root=mk("div","olist"); root.appendChild(mk("h3","msub","화면에 나오는 오브젝트"));
     const t=mk("div","otbl"); for(const [nm,kind,ctr,rule] of BASE){ const row=mk("div","orow"); const h=mk("div","oname"); h.appendChild(mk("b","",nm)); h.appendChild(mk("small","",kind)); row.appendChild(h); const cs=mk("div","octl"); for(const [lab,id] of ctr){ const e=proxy(lab,id); if(e) cs.appendChild(e); } if(rule){ const e=ruleSel(rule); if(e) cs.appendChild(e); } row.appendChild(cs); t.appendChild(row); }
-    root.appendChild(t); setInterval(()=>{ if(root.offsetParent) syncs.forEach(f=>f()); },700);
+    root.appendChild(t); let RV=false; try{ new IntersectionObserver(es=>{ RV=es.some(e=>e.isIntersecting); }).observe(t); }catch(_){ RV=true; } setInterval(()=>{ if(RV) syncs.forEach(f=>f()); },700);
     root.appendChild(mk("h3","msub","내 오브젝트 (뉴레이어에서 불러오기)"));
     const bar=mk("div","cbar"); const fi=mk("input"); fi.type="file"; fi.accept=".svg,.png,.jpg,.jpeg,.webp,image/*"; fi.multiple=true; fi.hidden=true; fi.addEventListener("change",()=>{ addFiles([...fi.files]); fi.value=""; });
     const fb=mk("button","","＋ 그림 불러오기 (SVG·PNG)"); fb.type="button"; fb.addEventListener("click",()=>fi.click()); const ab=mk("button","","＋ 뉴레이어 아카이브에서 가져오기"); ab.type="button"; ab.addEventListener("click",()=>{ const o=root.querySelector(".arch"); if(o){ o.remove(); return; } archPanel(bar); }); msgEl=mk("span","hint",""); bar.append(ab,fb,fi,msgEl); root.appendChild(bar);
     const drop=mk("div","cdrop","또는 여기에 파일을 끌어다 놓으세요"); drop.addEventListener("dragover",e=>{ e.preventDefault(); drop.classList.add("on"); }); drop.addEventListener("dragleave",()=>drop.classList.remove("on")); drop.addEventListener("drop",e=>{ e.preventDefault(); drop.classList.remove("on"); addFiles([...e.dataTransfer.files].filter(f=>/image|svg/.test(f.type)||/\.(svg|png|jpe?g|webp)$/i.test(f.name))); }); root.appendChild(drop);
-    custWrap=mk("div","cwrap"); root.appendChild(custWrap); drawCust(); return root; };
+    custWrap=mk("div","cwrap"); root.appendChild(custWrap); drawCust(); try{ new IntersectionObserver(es=>{ CWV=es.some(e=>e.isIntersecting); }).observe(custWrap); }catch(_){ CWV=true; } return root; };
 })();
 </script>
 <style>
