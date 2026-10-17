@@ -1783,7 +1783,7 @@ $("qA").addEventListener("click",()=>{ AQ=!AQ; try{ localStorage.setItem("nu-flo
 for(const [id,q] of QS) $(id).addEventListener("click",()=>{ QMAX=q; try{ localStorage.setItem("nu-flow-q",String(q)); }catch(_){} syncQ(); });
 syncQ();
 const DLP=(window.claude && typeof window.claude.use==="function")?window.claude.use("downloads").catch(()=>null):null;   // 일반 웹(깃허브 페이지)에서는 그냥 내려받기
-function savePNG(){ const c=document.createElement("canvas"); c.width=cv.width; c.height=cv.height; const x=c.getContext("2d"); if(D3.split){ x.fillStyle=BGN(); x.fillRect(0,0,c.width,c.height); x.drawImage(cvB,0,0); x.drawImage(cvS,0,0); } x.drawImage(cv,0,0); if(D3.split && BD.on()) x.drawImage(cvBD,0,0,c.width,c.height);   // 핏방울도 같은 화면에 그려져 있다
+function savePNG(){ const c=document.createElement("canvas"), pk=G.pix?G.pxS:1; c.width=cv.width*pk; c.height=cv.height*pk; const x=c.getContext("2d"); x.imageSmoothingEnabled=!G.pix; x.scale(pk,pk);   /* 픽셀 모드는 도트 크기 그대로 키워 저장 */ if(D3.split){ x.fillStyle=BGN(); x.fillRect(0,0,cv.width,cv.height); x.drawImage(cvB,0,0); x.drawImage(cvS,0,0); } x.drawImage(cv,0,0); if(D3.split && BD.on()) x.drawImage(cvBD,0,0,cv.width,cv.height);   // 핏방울도 같은 화면에 그려져 있다
  
   const d=new Date(), p=v=>String(v).padStart(2,"0"), nm="nu-flow_"+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+"_"+p(d.getHours())+p(d.getMinutes())+p(d.getSeconds())+".png";
   c.toBlob(async b=>{ if(!b) return; const dl=DLP?await DLP:null; if(dl){ try{ await dl.save({filename:nm,data:b}); }catch(_){} return; }   // claude.ai 안에서는 저장 확인 창을 거친다
@@ -1940,7 +1940,7 @@ function recPlane(i,el,H){ const gl=REC.gl; if(!el.width || !el.height) return; 
   const vw=sw/sh>RW/RH?sh*RW/RH:sw, vh=vw*RH/RW, z=G.camZ, tx=G.camX*sw, ty=G.camY*sh, V=[];   // 16:9로 가운데를 잘라 담는다
   for(const [u,v,a,b] of [[-1,-1,0,0],[1,-1,1,0],[-1,1,0,1],[1,1,1,1]]){ const x=u*pw/2, y=v*ph/2, X=H[0]*x+H[1]*y+H[2], Y=H[3]*x+H[4]*y+H[5], W=H[6]*x+H[7]*y+H[8];
     V.push((z*X+tx*W)/(vw/2), -(z*Y+ty*W)/(vh/2), 0, W, a, b); }   // 동차 좌표 그대로 넘겨 원근이 맞게 펴진다
-  gl.bindTexture(gl.TEXTURE_2D,REC.tex[i]); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,el);
+  gl.bindTexture(gl.TEXTURE_2D,REC.tex[i]); { const f=G.pix?gl.NEAREST:gl.LINEAR; gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,f); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,f); } gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,el);   // 픽셀 모드는 녹화도 각진 칸 그대로
   gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(V),gl.STREAM_DRAW); gl.drawArrays(gl.TRIANGLE_STRIP,0,4); }
 function recDraw(){ const gl=REC.gl, bg=BGN(), v=parseInt((bg[0]==="#"?bg.slice(1,7):"F5F5EF"),16); gl.viewport(0,0,RW,RH); gl.clearColor((v>>16&255)/255,(v>>8&255)/255,(v&255)/255,1); gl.clear(gl.COLOR_BUFFER_BIT);
   if(D3.split){ const P=[cvB,cvS,cv,cvBD]; for(let i=0;i<4;i++){ const el=P[i], H=D3.Hf[i]; if(!H || el.style.display==="none") continue; if(i===2 && !BD.on()) continue; recPlane(i,el,H); } }   // 화면에 놓인 순서대로 (뒤쪽 물 · 별빛 · 앞쪽 물 · 핏방울)
