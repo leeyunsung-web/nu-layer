@@ -2554,6 +2554,20 @@ if(window.NF_VIEW==="panel")(function(){
     P.forEach((r,a)=>r.forEach((p,c)=>p.hidden=!(a===i && c===j))); if(P[i][j].dataset.sw!=null) swShow(P[i][j]); try{ localStorage.setItem("nu-flow-tab2",i+"."+j); }catch(_){} navH(); }
   function navH(){ document.documentElement.style.setProperty("--navh",nav.offsetHeight+"px"); }
   addEventListener("resize",navH); show(bi,cur[bi]);
+
+  /* 스파크 크기 범위: '가장 작은 크기'·'가장 큰 크기'를 손잡이 두 개짜리 한 줄로 */
+  (function(){ const a=$("skMin"), b=$("skMax"), la=item("skMin"), lb=item("skMax"); if(!a || !b || !la || !lb) return; const oa=$("skMinV"), ob=$("skMaxV");
+    a.min=b.min="0.1"; a.max=b.max="4"; const box=document.createElement("div"); box.className="dual"; const trk=document.createElement("div"); trk.className="dtrk"; const fill=document.createElement("div"); fill.className="dfill"; trk.appendChild(fill); box.append(trk,a,b);
+    const out=document.createElement("span"); out.className="dout"; out.append(oa," ~ ",ob);
+    la.querySelector("span").textContent="크기 범위"; la.insertBefore(box,la.querySelector("small")); la.insertBefore(out,la.querySelector("small")); la.classList.add("dualit");
+    const d=la.querySelector("small.desc"); if(d) d.textContent="왼쪽 손잡이는 가장 작은 크기, 오른쪽 손잡이는 가장 큰 크기. 스파크 하나하나는 이 사이에서 정해지고, 큰 쪽이 얼마나 자주 나올지는 아래 '큰 스파크 비율'로 정한다.";
+    lb.classList.add("oldp");
+    const G0=.05, upd=()=>{ const lo=+a.min, hi=+a.max, x=(+a.value-lo)/(hi-lo)*100, y=(+b.value-lo)/(hi-lo)*100; fill.style.left=Math.min(x,y)+"%"; fill.style.width=Math.abs(y-x)+"%"; a.style.zIndex=(+a.value>hi-.3)?3:2; };
+    a.addEventListener("input",()=>{ if(+a.value>+b.value-G0) a.value=Math.max(+a.min,+b.value-G0); upd(); },true);
+    b.addEventListener("input",()=>{ if(+b.value<+a.value+G0) b.value=Math.min(+b.max,+a.value+G0); upd(); },true);
+    box.addEventListener("pointerdown",e=>{ if(e.target===a || e.target===b) return; e.preventDefault(); const r=box.getBoundingClientRect(), lo=+a.min, hi=+a.max, val=x=>lo+Math.min(1,Math.max(0,(x-r.left-8)/(r.width-16)))*(hi-lo), v0=val(e.clientX), t=Math.abs(v0-a.value)<=Math.abs(v0-b.value)?a:b;   /* 줄 아무 데나 눌러도 가까운 손잡이가 따라온다 */
+      const set=x=>{ t.value=val(x); t.dispatchEvent(new Event("input",{bubbles:true})); }; set(e.clientX); const mv=ev=>set(ev.clientX), up=()=>{ removeEventListener("pointermove",mv); t.dispatchEvent(new Event("change",{bubbles:true})); }; addEventListener("pointermove",mv); addEventListener("pointerup",up,{once:true}); });
+    upd(); setInterval(()=>{ if(la.offsetParent) upd(); },500); })();
   /* 배치 처음대로 (편집 중에만 보인다) */
   const rb=document.createElement("button"); rb.type="button"; rb.className="lreset"; rb.textContent="메뉴 배치 처음대로"; rb.addEventListener("click",()=>{ try{ localStorage.removeItem(LK); }catch(_){} location.reload(); }); bt.appendChild(rb);
   /* 끌어 옮기기: 편집 중 ⠿ 손잡이 */
@@ -2599,6 +2613,16 @@ if(window.NF_VIEW==="panel")(function(){
 .colrow{display:flex;flex-wrap:wrap;gap:14px}.colpick{display:flex;align-items:center;gap:8px;font-size:13px}
 .colpick input[type=color]{width:44px;height:32px;padding:0;border:1px solid rgba(0,0,0,.2);border-radius:8px;background:none}
 .colreset{align-self:flex-start}
+.ctl .it.dualit{grid-template-columns:auto 1fr auto}
+.dual{position:relative;height:28px;min-width:160px}
+.dual .dtrk{position:absolute;left:8px;right:8px;top:12px;height:4px;border-radius:2px;background:#3a2a3e}
+.dual .dfill{position:absolute;top:0;bottom:0;background:#F9618D;border-radius:2px}
+.dual input[type=range]{position:absolute;left:0;top:0;width:100%!important;height:28px;margin:0;background:transparent;-webkit-appearance:none;appearance:none;pointer-events:none;z-index:2}
+.dual input[type=range]::-webkit-slider-runnable-track{background:transparent;height:28px}
+.dual input[type=range]::-moz-range-track{background:transparent}
+.dual input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;pointer-events:auto;width:18px;height:18px;margin-top:5px;border-radius:50%;background:#F9618D;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.35);cursor:pointer}
+.dual input[type=range]::-moz-range-thumb{pointer-events:auto;width:16px;height:16px;border-radius:50%;background:#F9618D;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.35);cursor:pointer}
+.dout{white-space:nowrap;font-variant-numeric:tabular-nums}
 .dg{display:none!important}
 .editing .np .it>.dg{display:inline-flex!important;position:absolute;left:-10px;top:-8px;width:24px;height:24px;min-height:0!important;padding:0!important;align-items:center;justify-content:center;border-radius:6px!important;font-size:14px!important;background:#9C2F86!important;color:#fff!important;border:0!important;cursor:grab;touch-action:none;z-index:2}
 .it.dragging{position:fixed!important;z-index:1000;pointer-events:none;background:var(--bg,#F5F5EF);box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:.95}
