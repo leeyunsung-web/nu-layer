@@ -1676,7 +1676,7 @@ function sparkles(fill,line){ if(!G.stOn) return; g.fillStyle=PAL[G.stCol]||fill
     for(let q=0;q<4;q++){ const L=q%2?h:v, c0=[0,1,0,-1][q], s0=[-1,0,1,0][q], ca=c0*cr-s0*sr, sa=c0*sr+s0*cr, px=-sa, py=ca, b0=b*.55;   // 팔 방향 (위·오른쪽·아래·왼쪽)
       const bx=x+ca*b0, by=y+sa*b0, tx=x+ca*L, ty=y+sa*L, m=b0+(L-b0)*.3;
       AP.moveTo(bx+px*aw,by+py*aw); AP.quadraticCurveTo(x+ca*m+px*aw*.22,y+sa*m+py*aw*.22,tx,ty); AP.quadraticCurveTo(x+ca*m-px*aw*.22,y+sa*m-py*aw*.22,bx-px*aw,by-py*aw); AP.closePath(); }   // 팔: 뿌리에서 끝으로 오목하게 가늘어지는 바늘
-    const BP=new Path2D(); BP.arc(x,y,b,0,TAU); if(line && r>5){ g.strokeStyle=line; g.lineWidth=Math.min(3.2,r*.16); g.lineJoin="round"; g.stroke(BP); g.stroke(AP); g.lineJoin="miter"; } g.fill(BP); g.fill(AP,"nonzero"); } g.lineJoin="round"; }   // 작은 별은 테두리를 가늘게·생략 (선만 보이지 않게)
+    const BP=new Path2D(); BP.arc(x,y,b,0,TAU); if(line && r>5 && G.stLine){ g.strokeStyle=line; g.lineWidth=Math.min(3.2,r*.16);   /* 십자별 테두리: 지금은 끔 (G.stLine=1이면 다시 그린다) */ g.lineJoin="round"; g.stroke(BP); g.stroke(AP); g.lineJoin="miter"; } g.fill(BP); g.fill(AP,"nonzero"); } g.lineJoin="round"; }   // 작은 별은 테두리를 가늘게·생략 (선만 보이지 않게)
 /* ── 노란 스파크 (토르소 그림): 터지는 별 · 번개 갈래 · 뻗는 광선 · 오각별 · 작은 반짝이. 모두 면과 테두리뿐인 벡터 모양.
    움직임: 팡 — 0.16초 만에 살짝 넘치게 커졌다 제 크기로 돌아오고(오버슈트), 잠시 머문 뒤 작아지며 사라진다.
    터지는 별은 가시가 짧은 시차로 하나씩 튀어나오고 첫 순간 하얀 섬광, 번개는 한 획씩 그려지듯, 광선은 쏘아 나간 뒤 꼬리부터 빨려 들어간다 ── */
