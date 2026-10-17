@@ -293,6 +293,10 @@ canvas.hold{cursor:grabbing}
     <label class="it" data-k="kWob"><span>꿈틀거림</span><input id="kWob" type="range" min="0" max="2.5" step="0.05" value="1"><output id="kWobV">100%</output><small class="desc">제자리에서 느리게 꿈틀대는 세기.</small></label>
     <label class="it" data-k="kSt"><span>뭉치는 힘</span><input id="kSt" type="range" min="0.5" max="2" step="0.05" value="1"><output id="kStV">100%</output><small class="desc">방울이 둥글게 뭉치려는 힘 (표면장력).</small></label>
     <div class="it row" data-k="anAdd"><span>아기천사</span><button id="anAdd1" type="button">천사 1마리 추가</button><button id="anAdd5" type="button">5마리 추가</button><button id="anClear" type="button">모두 보내기</button><output id="anCount">아직 없음</output><small class="desc">처음에는 없어요. 누를 때마다 기본형에서 조금씩 변주된 천사가 무작위 자리로 들어와요. 끌어서 던지고, 톡 누르면 출렁이며 표정이 바뀌어요.</small></div>
+    <div class="it row" data-k="anAuto"><span>천사 자동 등장</span><button id="anAuto" type="button" aria-pressed="true">켜짐</button><small class="desc">정한 간격마다 정한 수만큼 무리 지어 들어오고, 머무는 시간이 지나면 위로 날아가 사라져요. 손으로 추가한 천사는 사라지지 않아요.</small></div>
+    <label class="it" data-k="anWaveN"><span>한 번에 등장</span><input id="anWaveN" type="range" min="1" max="20" step="1" value="10"><output id="anWaveNV">10마리</output></label>
+    <label class="it" data-k="anWaveT"><span>등장 간격</span><input id="anWaveT" type="range" min="5" max="120" step="1" value="30"><output id="anWaveTV">30초마다</output></label>
+    <label class="it" data-k="anLife"><span>머무는 시간</span><input id="anLife" type="range" min="10" max="300" step="5" value="70"><output id="anLifeV">70초</output></label>
     <div class="it row" data-k="anStyle"><span>천사 그리기</span><button id="anPaint" type="button" aria-pressed="true">채색</button><button id="anPen" type="button" aria-pressed="false">연필</button><button id="anSpin" type="button" aria-pressed="true">빙글빙글</button></div>
     <label class="it" data-k="anSize"><span>천사 크기</span><input id="anSize" type="range" min=".4" max="2.5" step=".01" value="1"><output id="anSizeV">100%</output></label>
     <label class="it" data-k="anFlow"><span>천사 소용돌이 영향</span><input id="anFlow" type="range" min="0" max="2" step=".01" value=".6"><output id="anFlowV">60%</output><small class="desc">0%면 소용돌이와 상관없이 제멋대로 떠다니고, 높일수록 물 흐름을 타고 함께 돌아요.</small></label>
@@ -1083,9 +1087,9 @@ function place(R,key){ // 다른 방울과 겹치지 않는 빈자리를 고른�
     const s=m-R; if(s>bs){ bs=s; bx=x; by=y; } if(s>46) break; }
   return [bx,by]; }
 let RSN=0; function reset(){ RSN++; N=0; nLobe=0; ptrs.clear(); extra=0; GW.fill(0); TW.fill(0); simT=0; sel=-1;
-  const TO=[2,3,2,2,3,2,4,2,3,2,2,3].map(t=>[t,Math.random()]).sort((p,q)=>p[1]-q[1]).map(p=>p[0]); /* 처음 뜰 때 단계를 고루 섞어 큰 것부터 작은 것까지 다 나오게 */
-  for(let i=0;i<G.count;i++){ TFORCE=TO[i%TO.length]; const R=Math.max(8,tierRS(2,5)), p=place(R,i+1); TFORCE=TO[i%TO.length]; addShape(p[0],p[1],R,(h(SEED,i,90)-.5)*16,(h(SEED,i,91)-.5)*16,700+i*17+(RSN-1)*1013); TFORCE=0; /* 다시 놓을 때마다 하트·별 자리가 바뀐다 (첫 화면은 그날의 배치) */ } btn(); selUI(); }
-let NSOFT=1e9; function more(){ if(N>CAP-240) return; extra++; const R=Math.max(8,tierRS(2,5)), p=place(R,400+extra); addShape(p[0],p[1],R,0,0,900+extra*13); btn(); }
+  const TO=[1,2,2,1,3,2,1,2,3,1,2,4].map(t=>[t,Math.random()]).sort((p,q)=>p[1]-q[1]).map(p=>p[0]); /* 처음 뜰 때 단계를 고루 섞어 큰 것부터 작은 것까지 다 나오게 */
+  for(let i=0;i<G.count;i++){ TFORCE=TO[i%TO.length]; const R=Math.max(6,tierRS(1,5)), p=place(R,i+1); TFORCE=TO[i%TO.length]; addShape(p[0],p[1],R,(h(SEED,i,90)-.5)*16,(h(SEED,i,91)-.5)*16,700+i*17+(RSN-1)*1013); TFORCE=0; /* 다시 놓을 때마다 하트·별 자리가 바뀐다 (첫 화면은 그날의 배치) */ } btn(); selUI(); }
+let NSOFT=1e9; function more(){ if(N>CAP-240) return; extra++; const R=Math.max(6,tierRS(1,5)), p=place(R,400+extra); addShape(p[0],p[1],R,0,0,900+extra*13); btn(); }
 /* 여러 모양: 그림 속 방울처럼 둥근 것, 길쭉한 것, 강낭콩·땅콩(볼록함 둘), 애벌레(볼록함 셋·넷)가 섞인다. 이어 붙은 볼록함은 서로 녹아 하나가 되지 않아 모양이 남는다 */
 /* 하트 방울 (로코로코처럼): 새로 그리지 않고, 지금 핏방울 알갱이들을 하트 모양 틀 안에 머물게 한다. 출렁임·명암·늘리기는 핏방울 그대로 */
 function sdHeart(x,y){ x=Math.abs(x); if(y+x>1){ const dx=x-.25, dy=y-.75; return Math.sqrt(dx*dx+dy*dy)-Math.SQRT2/4; } const d1=x*x+(y-1)*(y-1), m=.5*Math.max(x+y,0), d2=(x-m)*(x-m)+(y-m)*(y-m); return Math.sqrt(Math.min(d1,d2))*Math.sign(x-y); }   // 아래 끝이 (0,0), 위로 볼록한 두 덩이
@@ -1385,7 +1389,7 @@ function manage(dt){ mgT+=dt; if(mgT<.25) return; const mdt=mgT; mgT=0; tierGrow
   if(G.leave) for(let l=0;l<nLobe;l++){ if(!LCNT[l] || LLV[l]>0) continue; if(held.has(l)){ LBORN[l]=simT; continue; } if(simT-LBORN[l]>G.dwell*LDW[l]){ LLV[l]=simT; const ox=LCX[l]-CXs, oy=LCY[l]-CYs, ol=HY(ox,oy)+1, ja=(hh(l+lobeSerial,63)-.5)*1.2, ca=Math.cos(ja), sa=Math.sin(ja), ux=ox/ol, uy=oy/ol; LDX[l]=ux*ca-uy*sa; LDY[l]=ux*sa+uy*ca; } }   // 나가는 방향: 가운데에서 바깥쪽으로 (조금씩 제멋대로)
   for(let l=0;l<nLobe;l++){ if(!LCNT[l] || held.has(l)) continue; if(BX0[l]>WW+40 || BX1[l]<-40 || BY0[l]>WH+40 || BY1[l]<-40){ owed+=removeLobe(l); LCNT[l]=0; LLV[l]=0; } }
   if(!G.refill || N>NSOFT){ owed=0; return; }   /* 60프레임 우선에서 많이 밀리면 새로 채우지 않는다 */
-  for(let t=0;t<(owed>160?2:1) && owed>=3 && N<CAP-120;t++){ const want=Math.min(owed,Math.round(tierN(2,4))), r=Math.max(8,Math.sqrt(want*SP0*SP0*.866/Math.PI)), a=hh(born,70)*TAU, d0=12+45*hh(born,72), p=placeNear(CXs+Math.cos(a)*d0,CYs+Math.sin(a)*d0,r+6), sp=40+90*hh(born,71);
+  for(let t=0;t<(owed>160?2:1) && owed>=3 && N<CAP-120;t++){ const want=Math.min(owed,Math.round(tierN(1,3))), r=Math.max(8,Math.sqrt(want*SP0*SP0*.866/Math.PI)), a=hh(born,70)*TAU, d0=12+45*hh(born,72), p=placeNear(CXs+Math.cos(a)*d0,CYs+Math.sin(a)*d0,r+6), sp=40+90*hh(born,71);
     owed-=Math.max(3,addShape(p[0],p[1],r,Math.cos(a)*sp,Math.sin(a)*sp,born*7+11)); }   // 다시 채우기: 작은 방울을 하나씩, 크기와 모양을 섞어 가운데에서 사방으로 흩뿌린다   // 가운데에서 새로 생겨 천천히 떠난다
   btn(); }
 /* 두 번 누르면 펑: 그 방울을 가장 작은 방울들로 쪼개 사방으로 튀긴다. 정한 초 동안은 서로 다시 붙지 않는다 */
@@ -1398,22 +1402,22 @@ function popTiny(ol,ck){ const n=LCNT[ol]; let cx=0, cy=0, c=0; for(let i=0;i<N;
    터지면 한 단계 아래의 진짜 오브젝트 3~6개로 갈라지고, 뭉쳐서 커지면 다시 위 단계가 된다.
    별: 3·4단계는 별, 1·2단계는 노란 동그라미 (노란 동그라미가 뭉쳐 3단계가 되면 별) · 하트: 터지면 핏방울 · 핏방울: 뭉쳐 한 단계 커질 때마다 1/5 확률로 하트 (2단계 이상) */
 const TIERB=[0,6,20,70,250], TIERM=[0,3,11,37,132]; const tierOf=n=>n>=250?5:n>=70?4:n>=20?3:n>=6?2:1;   // 5단계: 1 아주 작은(6개 미만) · 2 작은 · 3 중간 · 4 큰 · 5 아주 큰
-const TW8=[0,0,.55,.3,.12,.03];   /* 등장 크기: 대부분 작은 것부터, 아주 큰 것은 드물게 */ function tierN(a,b){ let tot=0; for(let t=a;t<=b;t++) tot+=TW8[t]; let r=Math.random()*tot, t=a; for(;t<b;t++){ r-=TW8[t]; if(r<=0) break; } if(TFORCE){ t=Math.max(a,Math.min(b,TFORCE)); TFORCE=0; } const lo=Math.max(3,TIERB[t-1]), hi=t>=5?700:TIERB[t]-1; return Math.max(lo,Math.min(hi,lo*Math.pow(hi/lo,Math.random())*TSIZE)); }   /* 크기 조절을 곱해도 고른 단계 안에 머문다 */
+const TW8=[0,.32,.4,.2,.07,.01];   /* 등장 크기: 대부분 작은 것부터, 아주 큰 것은 드물게 */ function tierN(a,b){ let tot=0; for(let t=a;t<=b;t++) tot+=TW8[t]; let r=Math.random()*tot, t=a; for(;t<b;t++){ r-=TW8[t]; if(r<=0) break; } if(TFORCE){ t=Math.max(a,Math.min(b,TFORCE)); TFORCE=0; } const lo=Math.max(3,TIERB[t-1]), hi=t>=5?700:TIERB[t]-1; return Math.max(lo,Math.min(hi,lo*Math.pow(hi/lo,Math.random())*TSIZE)); }   /* 크기 조절을 곱해도 고른 단계 안에 머문다 */
 let TFORCE=0, TSIZE=1; const tierRS=(a,b)=>{ TSIZE=G.size; const r=tierR(a,b); TSIZE=1; return r; };   // 고른 단계 안에서 크기를 고르게 섞어 뽑는다
 const tierR=(a,b)=>Math.sqrt(tierN(a,b)*SP0*SP0*.866/Math.PI); const LTR=new Int8Array(LMAX), FSX=new Float32Array(LMAX).fill(NaN), FSY=new Float32Array(LMAX);
 function tierBurst(ol){ let n=0; for(let i=0;i<N;i++) if(LBL[i]===ol) n++; const t=tierOf(n); if(t<=1) return false; const kind=LHRT[ol]===2||LCOL[ol]===1?"y":LCOL[ol]===2?"b":"r";
   let cx=0, cy=0, c=0; for(let i=0;i<N;i++) if(LBL[i]===ol){ cx+=X[i]; cy+=Y[i]; c++; } if(!c) return false; cx/=c; cy/=c; for(const id of [...ptrs.keys()]) release(id);
   /* 신나게 팡: 바로 아래 단계 크기를 중심으로 크고 작은 조각이 섞여 사방으로 튄다. 작은 조각일수록 더 멀리·빨리.
      전체 속도를 낮춰도 터지는 순간은 시원하게 (속도 설정만큼 되받아 준다) */
-  const r=Math.sqrt(n*SP0*SP0*.866/Math.PI), ct=t-1, hi=TIERB[ct]-1, tot=n*.92, boost=1/Math.max(.3,G.speed);
-  const W8=[]; let left=tot; const k0=Math.max(3,Math.min(6,Math.round(tot/TIERM[ct]))); for(let q=0;q<k0 && left>3;q++){ const w=Math.min(hi,Math.max(3,TIERM[ct]*(.45+1.1*Math.random()))); W8.push(Math.min(w,left)); left-=w; }   // 큰 조각: 아래 단계 크기 안에서 제각각
-  while(left>3 && W8.length<14){ const w=Math.max(3,Math.min(left,Math.pow(Math.random(),1.6)*Math.max(4,TIERM[Math.max(1,ct-1)]*1.6))); W8.push(w); left-=w; }   // 남은 몫은 더 작은 조각들로
-  if(LHRT[ol]===2){ W8.length=0; const lo=Math.max(3,TIERB[ct-1]), k=Math.max(3,Math.min(6,Math.round(tot/TIERM[ct]))), nc=Math.max(lo,Math.min(hi,tot/k)); for(let q=0;q<k;q++) W8.push(nc*(.9+.2*Math.random())); }   /* 별: 한 단계 작은 별들로 고르게 나뉜다 */
+  const wasStar=LHRT[ol]===2, r=Math.sqrt(n*SP0*SP0*.866/Math.PI), ct=t-1, hi=TIERB[ct]-1, tot=n*.92, boost=1/Math.max(.3,G.speed);
+  /* 조각 크기: 큰 조각은 한두 개만(바로 아래 단계 안에서 제각각), 나머지는 작은 조각 여럿 — 거대한 덩어리는 새로 생기지 않는다 */
+  const W8=[]; let left=tot; const nb=1+(Math.random()<.45?1:0); for(let q=0;q<nb && left>3;q++){ const w=Math.min(hi,Math.max(3,TIERM[ct]*(.35+.75*Math.random()))); W8.push(Math.min(w,left)); left-=w; }
+  const sm=Math.max(4,TIERM[Math.max(1,ct-1)]*1.5); while(left>3 && W8.length<18){ const w=Math.max(3,Math.min(left,sm*Math.pow(Math.random(),2.2)+3)); W8.push(w); left-=w; }
   W8.sort(()=>Math.random()-.5); const K=W8.length;
   removeLobe(ol); LCNT[ol]=0; if(onPop) onPop(cx+OXp,cy+OYp,"pop",r); const a0=Math.random()*TAU, ck=kind==="y"?1:kind==="b"?2:0;
   for(let q=0;q<K;q++){ const nc=W8[q], rq=Math.sqrt(nc*SP0*SP0*.866/Math.PI)*1.04, small=1-Math.min(1,nc/Math.max(4,TIERM[ct])), a=a0+q*TAU/K+(Math.random()-.5)*.5, d=Math.max(r*.4,rq*1.3/Math.sin(Math.PI/Math.max(3,K)))*(.85+.3*Math.random()),
       sp=(230+200*Math.random())*(1+.9*small)*G.bSpd*boost; addDrop(cx+Math.cos(a)*d,cy+Math.sin(a)*d,rq,Math.cos(a)*sp,Math.sin(a)*sp); const l=nLobe-1;
-    LCOL[l]=ck; LNF[l]=simT+G.sep; LTR[l]=tierOf(nc); LEV[l]+=12; if(kind==="y" && tierOf(nc)>=4){ LHRT[l]=2; LKEEP[l]=1; LHA[l]=(Math.random()-.5)*2; } }
+    LCOL[l]=ck; LNF[l]=simT+G.sep; LTR[l]=tierOf(nc); LEV[l]+=12; if(wasStar || (kind==="y" && tierOf(nc)>=4)){ LHRT[l]=2; LKEEP[l]=1; LHA[l]=(Math.random()-.5)*2; } }   /* 별에서 나온 조각은 크기와 상관없이 모두 별 */
   if(G.tiny>0) for(let u=0;u<Math.round((10+n*.04)*G.tiny);u++){ const a=Math.random()*TAU, sp=(260+340*Math.random())*G.bSpd*boost; sprAdd(cx,cy,Math.cos(a)*sp,Math.sin(a)*sp,1.2+4*Math.pow(Math.random(),1.5),ck); }   // 물보라
   born++; sel=-1; selUI(); return true; }
 function tierGrow(){ for(let l=0;l<nLobe;l++){ if(!LCNT[l] || LIMG[l] || LGRP[l]>=0) continue; const t=tierOf(LCNT[l]); if(!LTR[l]){ LTR[l]=t; continue; } if(t<=LTR[l]) continue; LTR[l]=t;   // 한 단계 커졌다
@@ -1705,7 +1709,7 @@ function swatches(id,key){ const box=$(id); if(!box) return; const bs=[...box.qu
   bs.forEach((b,i)=>{ b.setAttribute("aria-pressed",(G[key]|0)===i?"true":"false"); b.addEventListener("click",()=>{ G[key]=i; saveG(); bs.forEach((x,j)=>x.setAttribute("aria-pressed",j===i?"true":"false")); }); }); }
 const SPK=[], SKC={f:"#FFE11C",l:"#F2941A",h:"#FFF6AE"}; let skAcc=0, skSeed=0, skBeat=0; const SKPAT=[1,.5,.5,1,2,.5,.5,.5,1.5,1,.75,.75,2.5];
 /* 스파크 자리: 보이는 화면 전체(가장자리 포함)에서 무작위로 뽑되, 후보 몇 개 중 최근에 터진 곳들과 가장 먼 자리를 고른다 (한곳에 몰리지 않게) */
-const SKR=[]; function skPlace(){ let best=null, bd=-1; for(let c=0;c<5;c++){ const x=lerpV(0,.02+.96*Math.random()), y=lerpV(1,.02+.96*Math.random()); let m=1e18; for(const q of SKR){ const d=(q[0]-x)**2+(q[1]-y)**2; if(d<m) m=d; } if(m>bd){ bd=m; best=[x,y]; } } SKR.push(best); if(SKR.length>8) SKR.shift(); return best; }
+const SKR=[]; function skPlace(){ let best=null, bd=-1; for(let c=0;c<6;c++){ const u=.02+.96*Math.random(), v=.02+.96*Math.random(), x=lerpV(0,u), y=lerpV(1,v), e=Math.max(Math.abs(u-.5),Math.abs(v-.5))*2; let m=1e18; for(const q of SKR){ const d=(q[0]-x)**2+(q[1]-y)**2; if(d<m) m=d; } const sc=Math.min(m,1e12)*(.35+e*e*1.6); if(sc>bd){ bd=sc; best=[x,y]; } } SKR.push(best); if(SKR.length>8) SKR.shift(); return best; }   /* 가장자리 쪽에 더 자주 */
 function skSpawn(type,x,y,size,dir){ skSeed++; { const a=Math.min(G.skMin,G.skMax), b=Math.max(G.skMin,G.skMax); size*=a*Math.pow(b/a,Math.random()); }   // 크기 범위: 가장 작은 ~ 가장 큰 사이에서 무작위
   SPK.push({cf:G.skMix?MIXS[Math.floor(Math.random()*MIXS.length)]:undefined,type,x,y,size,dir:dir??hh(skSeed,1)*TAU,rot:(hh(skSeed,2)-.5)*.8,t:0,life:G.skLife*(.7+.6*hh(skSeed,3))*(type===2?.75:1),sd:skSeed*7919+Math.floor(Math.random()*99991)}); if(SPK.length>150) SPK.shift(); }   // 모양 씨앗은 매번 무작위 (열 때마다·터질 때마다 다른 모양)
 function skTick(dt){ if(!G.skOn){ SPK.length=0; return; } const fl=G.skFloat && G.skT3, ts=[0,1,2,3,4].filter(i=>G["skT"+i] && !(fl && i===3));
@@ -1713,10 +1717,10 @@ function skTick(dt){ if(!G.skOn){ SPK.length=0; return; } const fl=G.skFloat && 
   for(const s of SPK){ if(!s.fl && !s.fl2 && !G.skFloat) continue; if(s.vx===undefined){ s.vx=0; s.vy=0; } const w=waterAt(s.x,s.y), k=Math.min(1,dt*2.2), ph=s.sd*1.7;   // 물 흐름을 따라 천천히, 제자리에서 둥실둥실
     s.vx+=(w[0]*.9*G.skFlow+Math.sin(s.t*.5+ph)*6-s.vx)*k; s.vy+=(w[1]*.9*G.skFlow+Math.cos(s.t*.43+ph)*6-s.vy)*k; s.x+=s.vx*dt; s.y+=s.vy*dt; s.rot+=Math.sin(s.t*.6+ph)*.25*dt;
     if(s.x<-80 || s.x>WW+80 || s.y<-80 || s.y>WH+80) s.t=s.life; }
-  popT-=dt; if(POPQ.length && popT<=0){ const q=POPQ.shift(); popNow(q[0],q[1],q[2],q[3]); popT=.07+.05*Math.random(); }
+  popT-=dt; if(POPQ.length && popT<=0){ const q=POPQ.shift(); if(Math.random()<.55 || q[2]==="bolt") popNow(q[0],q[1],q[2],q[3]);   /* 터질 때마다 다 나오지 않게 */ popT=.07+.05*Math.random(); }
   /* 리듬: 한 번에 하나씩, 박자 무늬(길게·짧게·짧게·길게·쉼…)를 따라 나온다. 늦어진 프레임에 몰아서 터뜨리지 않는다 */
   skAcc-=dt; if(skAcc<=0 && ts.length && G.skRate>0){ skSeed++; const ty=ts[Math.floor(hh(skSeed,9)*ts.length)]; const pp=skPlace(); skSpawn(ty,pp[0],pp[1],(ty===4?.45:1)*(.55+.9*Math.random()));
-    const beat=1/G.skRate, pat=SKPAT[skBeat++%SKPAT.length]; skAcc=Math.max(.16,beat*pat*(.9+.2*Math.random())); }
+    const beat=1.7/G.skRate, pat=SKPAT[skBeat++%SKPAT.length]; skAcc=Math.max(.22,beat*pat*(.9+.2*Math.random())); }   /* 빈도: 예전보다 덜 자주 */
   if(G.skLink) for(const P of POURS){ if(P.skd || P.delay>0 || P.s<=0) continue; P.skd=1; if(P.c===1 && hh(P.key,77)<.6) continue; const d=Math.atan2(P.dy||0,P.dx||1);   // 분홍 줄기가 새로 터져 나올 때 같은 방향으로 같이 터진다
     if(G.skT0) skSpawn(0,P.x,P.y,1+.3*hh(P.key,78),d); if(G.skT2) skSpawn(2,P.x,P.y,1,d); if(G.skT1) skSpawn(1,P.x+Math.cos(d)*30,P.y+Math.sin(d)*30,.8,d+(hh(P.key,79)-.5)); }
   for(let i=SPK.length-1;i>=0;i--){ SPK[i].t+=dt; if(SPK[i].t>=SPK[i].life) SPK.splice(i,1); } }
@@ -2470,7 +2474,7 @@ if(window.NF_VIEW==="panel")(function(){
       ["빛·색",["kHi","kCo","kHHi","kHCo","@kSel"]],
       ["하트 모양",["@pvH","mhP","mhR","mhA","mhH","mhW","mhTip","mhCl","mhInf","mhTilt","mhSave","kHShape","kEdgeH","kEdgeJ"]],
       ["별 모양",["@pvS","msP","msN","msRi","msInf","msTip","msIn","msW","msTilt","msSave","kEdgeS"]],
-      ["천사",["anAdd","anStyle","anSize","anFlow","anSpeed","anSoft","anCode"]]]]];
+      ["천사",["anAdd","anAuto","anWaveN","anWaveT","anLife","anStyle","anSize","anFlow","anSpeed","anSoft","anCode"]]]]];
   const mt=$("mtabs"); if(!mt) return; const host=mt.parentNode, old=[...document.querySelectorAll(".mpanel")];
   const item=k=>Q('.it[data-k="'+k+'"]');
   const blocks={ color:()=>{ const o=$("otabs"); return o && o.closest(".ctl"); }, kSel:()=>$("kSel"),
@@ -2732,7 +2736,7 @@ function walls(a){ const r=a.R()*1.02; for(const [nx,ny,dist] of [[-1,0,a.x],[1,
 
 /* ---------- NU FLOW에 붙이기: 천사는 방울과 같은 소용돌이 판 위에 산다 (같은 좌표, 같은 카메라·확대·3D로 그려진다) ---------- */
 const stage=document.querySelector(".stage"); if(!stage) return;
-const AK="nu-flow-angel"; let S={style:"paint",size:1,speed:.5,soft:.7,spin:1,flow:.6,v:3};
+const AK="nu-flow-angel"; let S={style:"paint",size:1,speed:.5,soft:.7,spin:1,flow:.6,v:3,auto:1,waveN:10,waveT:30,life:70};
 try{ const o=JSON.parse(localStorage.getItem(AK)||"null"); if(o){ Object.assign(S,o); if(!(o.v>=2)){ S.speed=(o.speed==null?1:o.speed)*.5; } if(!(o.v>=3)){ S.spin=1; } S.v=3; } }catch(_){}
 const saveS=()=>{ try{ localStorage.setItem(AK,JSON.stringify(S)); }catch(_){} };
 STYLE=S.style;
@@ -2745,7 +2749,10 @@ function addAngels(n){ fitR(); n=Math.min(n,Math.max(0,60-A.length));   /* 천�
     const a=new Angel(g,x,y,false); a.z=R0()<.5?-1:1; a.vx=rr(-60,60); a.vy=rr(-60,30); a.pop=0;   /* 두 층 중 하나 */ a.poke(R0()*TAU,.4); A.push(a); } }
 let last=performance.now(), T=0, drag=null;
 /* 한 걸음: 물 흐름(소용돌이 영향) + 혼자 떠다님 + 서로·방울·가장자리와 부딪힘 */
-function tick(dt){ const spd=S.speed, fi=S.flow||0, own=1-.7*Math.min(1,fi), fk=Math.min(1,dt*2.4)*Math.min(1,fi), B=BDo(), cx=W*.5, cy=H*.5;
+/* 주기적으로 무리 지어 등장: 정한 간격마다 정한 수만큼. 자동으로 들어온 천사는 한동안 머물다 위로 날아가 사라진다 */
+let waveAcc=0; function waves(dt){ if(!S.auto) return; waveAcc+=dt; if(waveAcc>=Math.max(3,S.waveT) || (waveAcc>2 && !A.length)){ waveAcc=0; const n0=A.length; addAngels(Math.round(S.waveN)); for(let i=n0;i<A.length;i++) A[i].life=S.life*(.7+.6*Math.random()); syncUI(); }
+  for(let i=A.length-1;i>=0;i--){ const a=A[i]; if(a.life==null || a.hold) continue; a.life-=dt; if(a.life<0){ a.vy-=120*dt; a.leave=(a.leave||0)+dt; if(a.leave>2.2){ A.splice(i,1); syncUI(); } } } }
+function tick(dt){ waves(dt); const spd=S.speed, fi=S.flow||0, own=1-.7*Math.min(1,fi), fk=Math.min(1,dt*2.4)*Math.min(1,fi), B=BDo(), cx=W*.5, cy=H*.5;
   for(const a of A){ if(S.spin){ const sy=nz(T*.13+a.ph,a.seed+11)*.55+nz(T*.37+a.ph,a.seed+17)*.15, sx=nz(T*.11+a.ph*1.3,a.seed+23)*.28;   /* 자유로운 빙글: 천사마다 빠르기·방향이 느리게 바뀌며, 거의 멈췄다가 다시 돌기도 한다 */
       for(const o of [a.g,a.gt,a.base]){ o.spinY=sy; o.spinX=sx; } }
     a.step(dt,T); a.pop=Math.min(1,(a.pop||0)+dt*2.5); if(a.hold) continue;
@@ -2755,9 +2762,9 @@ function tick(dt){ const spd=S.speed, fi=S.flow||0, own=1-.7*Math.min(1,fi), fk=
   collide(dt); bump(dt); for(const a of A) walls(a);
   for(const a of A){ if(!a.hold){ a.x+=a.vx*dt; a.y+=a.vy*dt; } } }
 /* 방울을 다 그린 뒤 같은 판 위에 천사를 그린다 (3D로 기울이면 방울과 같은 자리 보정) */
-window.NF_ANGEL=(g,mapF,z,dk,dx,dy)=>{ if(!A.length) return; if(z===undefined || z===-1){ const now=performance.now(), dt=Math.min(.05,(now-last)/1000); last=now; T+=dt; fitR(); tick(dt); }   /* 한 프레임에 한 번 움직이고, 층마다 제 천사만 그린다 */
+window.NF_ANGEL=(g,mapF,z,dk,dx,dy)=>{ if(!A.length){ if(S.auto && (z===undefined || z===-1)){ const now=performance.now(), dt=Math.min(.05,(now-last)/1000); last=now; waves(dt); } return; } if(z===undefined || z===-1){ const now=performance.now(), dt=Math.min(.05,(now-last)/1000); last=now; T+=dt; fitR(); tick(dt); }   /* 한 프레임에 한 번 움직이고, 층마다 제 천사만 그린다 */
   const order=A.filter(a=>z===undefined || (a.z||1)===z).sort((p,q)=>p.y-q.y);
-  for(const a of order){ const k=(a.pop<1?1-Math.pow(1-a.pop,3)*Math.cos(a.pop*9):1)*(dk||1); let ox=dx||0, oy=dy||0; if(mapF){ const m=mapF(a.x,a.y); ox+=m[0]; oy+=m[1]; } g.save(); g.translate(a.x+ox,a.y+oy); if(k!==1) g.scale(k,k); g.translate(-a.x,-a.y); drawAngel(g,a,T,false); g.restore(); } };
+  for(const a of order){ const k=(a.pop<1?1-Math.pow(1-a.pop,3)*Math.cos(a.pop*9):1)*(dk||1)*(a.leave?Math.max(0,1-a.leave/2.2):1);   /* 떠날 때 작아지며 사라진다 */ let ox=dx||0, oy=dy||0; if(mapF){ const m=mapF(a.x,a.y); ox+=m[0]; oy+=m[1]; } g.save(); g.translate(a.x+ox,a.y+oy); if(k!==1) g.scale(k,k); g.translate(-a.x,-a.y); drawAngel(g,a,T,false); g.restore(); } };
 /* 다른 오브젝트와 주고받기: 같은 판 위라 좌표 그대로 — 천사는 방울 모양대로 오목하게, 방울은 천사 모양대로 움푹 */
 function bump(dt){ const B=BDo(); if(!B || !B.on || !B.on() || !B.lobesW) return; const L=B.lobesW(); if(!L.length) return;
   for(const a of A){ const ra=a.R(); a.cool=Math.max(0,(a.cool||0)-dt); for(let j=0;j<L.length;j+=5){ if(L[j+3]!==(a.z||1)) continue; const dx=L[j]-a.x, dy=L[j+1]-a.y, rl=L[j+2], rs=ra+rl, d2=dx*dx+dy*dy; if(d2>=rs*rs || d2<1e-3) continue;
@@ -2779,14 +2786,16 @@ const fit=fitR, kick=()=>{};
 /* ---------- 천사 탭 손잡이 ---------- */
 const $$=id=>document.getElementById(id), pctT=v=>Math.round(v*100)+"%";
 function syncUI(){ const set=(id,v,t)=>{ const el=$$(id); if(el){ el.value=v; const o=$$(id+"V"); if(o) o.textContent=t; } };
-  set("anSize",S.size,pctT(S.size)); set("anSpeed",S.speed,pctT(S.speed)); set("anSoft",S.soft,pctT(S.soft)); set("anFlow",S.flow,pctT(S.flow));
-  const b=(id,on)=>{ const el=$$(id); if(el) el.setAttribute("aria-pressed",on?"true":"false"); }; b("anPaint",S.style==="paint"); b("anPen",S.style==="pen"); b("anSpin",!!S.spin);
+  set("anSize",S.size,pctT(S.size)); set("anSpeed",S.speed,pctT(S.speed)); set("anSoft",S.soft,pctT(S.soft)); set("anFlow",S.flow,pctT(S.flow)); set("anWaveN",S.waveN,Math.round(S.waveN)+"마리"); set("anWaveT",S.waveT,Math.round(S.waveT)+"초마다"); set("anLife",S.life,Math.round(S.life)+"초");
+  const b=(id,on)=>{ const el=$$(id); if(el) el.setAttribute("aria-pressed",on?"true":"false"); }; b("anPaint",S.style==="paint"); b("anPen",S.style==="pen"); b("anSpin",!!S.spin); b("anAuto",!!S.auto); { const ab=$$("anAuto"); if(ab) ab.textContent=S.auto?"켜짐":"꺼짐"; }
   const n=$$("anCount"); if(n) n.textContent=A.length?"지금 "+A.length+"마리":"아직 없음"; }
 const on=(id,ev,f)=>{ const el=$$(id); if(el) el.addEventListener(ev,f); };
 on("anAdd1","click",()=>{ addAngels(1); syncUI(); }); on("anAdd5","click",()=>{ addAngels(5); syncUI(); });
 on("anClear","click",()=>{ A=[]; drag=null; syncUI(); });
 on("anPaint","click",()=>{ S.style=STYLE="paint"; saveS(); syncUI(); }); on("anPen","click",()=>{ S.style=STYLE="pen"; saveS(); syncUI(); });
 on("anSize","input",()=>{ S.size=+$$("anSize").value; saveS(); fit(); syncUI(); });
+on("anAuto","click",()=>{ S.auto=S.auto?0:1; waveAcc=0; saveS(); syncUI(); });
+on("anWaveN","input",()=>{ S.waveN=+$$("anWaveN").value; saveS(); syncUI(); }); on("anWaveT","input",()=>{ S.waveT=+$$("anWaveT").value; saveS(); syncUI(); }); on("anLife","input",()=>{ S.life=+$$("anLife").value; saveS(); syncUI(); });
 on("anFlow","input",()=>{ S.flow=+$$("anFlow").value; saveS(); syncUI(); });
 on("anSpeed","input",()=>{ S.speed=+$$("anSpeed").value; saveS(); syncUI(); });
 on("anSoft","input",()=>{ S.soft=+$$("anSoft").value; for(const a of A){ a.g.soft=a.gt.soft=a.base.soft=S.soft; } saveS(); syncUI(); });
