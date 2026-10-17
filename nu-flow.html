@@ -1232,7 +1232,7 @@ function lobes(dt){ FMX=Math.PI*(G.fmax/2)*(G.fmax/2)/(SP0*SP0*.866); const n=gw
   // 덩이 정리: 남의 덩이 깊숙이 섞여 들어간 알갱이는 그 덩이가 된다. 그리고 어느 덩이가 더 큰 덩이와 맞닿아 있는지 적어 둔다
   for(let i=0;i<N;i++){ const k=Math.round(Y[i]*inv)*gw+Math.round(X[i]*inv), lid=LID[k], own=LBL[i]; if(lid<0 || LDZ[lid]!==LDZ[own]) continue;   /* 다른 층과는 섞이지도 합쳐지지도 않는다 */ const a=M1[k], b=M2[k]; let o=-1;
     if(LNF[own]>simT || LNF[lid]>simT) continue;   // 안 합쳐지는 동안은 섞이지도 않는다
-    if(lid!==own){ o=lid; if((LCNT[own]<7 || a-b>(a+b)*.36) && LCNT[lid]<FMX && !LKEEP[own] && !LKEEP[lid]) LBL[i]=lid; } else if(b>.7 && LI2[k]>=0 && LDZ[LI2[k]]===LDZ[own]) o=LI2[k];
+    if(lid!==own){ o=lid; if(((G.touch?LCNT[own]<3:LCNT[own]<7) || (!G.touch && a-b>(a+b)*.36)) && LCNT[lid]<FMX && !LKEEP[own] && !LKEEP[lid]) LBL[i]=lid;   /* 붙어 쌓이는 방식에서는 작은 방울도 제 모양을 지킨다 */ } else if(b>.7 && LI2[k]>=0 && LDZ[LI2[k]]===LDZ[own]) o=LI2[k];
     if(o>=0 && (LCNT[o]+LCNT[own]>FMX || LKEEP[o] || LKEEP[own])) o=-1;   // 정한 크기를 넘게는 하나로 합쳐지지 않는다: 붙은 채로 골이 남아 여러 모양이 된다
     if(o>=0 && (LCNT[o]>LCNT[own] || (LCNT[o]===LCNT[own] && o<own)) && (LCAND[own]<0 || LCNT[o]>LCNT[LCAND[own]])) LCAND[own]=o; }
   // 맞닿은 지 정해 둔 시간이 지나면 작은 덩이가 큰 덩이에 녹아든다: 사이의 골이 옅어지고, 빛 성격이 큰 덩이를 닮아 가다가, 한 덩이가 된다
@@ -1408,6 +1408,7 @@ function tierBurst(ol){ let n=0; for(let i=0;i<N;i++) if(LBL[i]===ol) n++; const
   const r=Math.sqrt(n*SP0*SP0*.866/Math.PI), ct=t-1, hi=TIERB[ct]-1, tot=n*.92, boost=1/Math.max(.3,G.speed);
   const W8=[]; let left=tot; const k0=Math.max(3,Math.min(6,Math.round(tot/TIERM[ct]))); for(let q=0;q<k0 && left>3;q++){ const w=Math.min(hi,Math.max(3,TIERM[ct]*(.45+1.1*Math.random()))); W8.push(Math.min(w,left)); left-=w; }   // 큰 조각: 아래 단계 크기 안에서 제각각
   while(left>3 && W8.length<14){ const w=Math.max(3,Math.min(left,Math.pow(Math.random(),1.6)*Math.max(4,TIERM[Math.max(1,ct-1)]*1.6))); W8.push(w); left-=w; }   // 남은 몫은 더 작은 조각들로
+  if(LHRT[ol]===2){ W8.length=0; const lo=Math.max(3,TIERB[ct-1]), k=Math.max(3,Math.min(6,Math.round(tot/TIERM[ct]))), nc=Math.max(lo,Math.min(hi,tot/k)); for(let q=0;q<k;q++) W8.push(nc*(.9+.2*Math.random())); }   /* 별: 한 단계 작은 별들로 고르게 나뉜다 */
   W8.sort(()=>Math.random()-.5); const K=W8.length;
   removeLobe(ol); LCNT[ol]=0; if(onPop) onPop(cx+OXp,cy+OYp,"pop",r); const a0=Math.random()*TAU, ck=kind==="y"?1:kind==="b"?2:0;
   for(let q=0;q<K;q++){ const nc=W8[q], rq=Math.sqrt(nc*SP0*SP0*.866/Math.PI)*1.04, small=1-Math.min(1,nc/Math.max(4,TIERM[ct])), a=a0+q*TAU/K+(Math.random()-.5)*.5, d=Math.max(r*.4,rq*1.3/Math.sin(Math.PI/Math.max(3,K)))*(.85+.3*Math.random()),
