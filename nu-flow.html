@@ -2183,7 +2183,7 @@ if(window.NF_VIEW==="panel")(function(){
   const DEF={name:"새 오브젝트",src:"",on:1,mode:"jelly",rate:3,max:3,size:1,round:.04,outline:0,line:"#33123A",gloss:.3,pop:"shards",bob:.3,sway:.25,breath:.2,spin:0,squash:.35,aspd:1,vSize:.3,vHue:0,vTilt:15,vFlip:.3};
   let msgEl=null; function alertMsg(t){ if(msgEl){ msgEl.textContent=t; setTimeout(()=>{ if(msgEl) msgEl.textContent=""; },4000); } }
   function readFile(f){ return new Promise(res=>{ const fr=new FileReader(); fr.onload=()=>{ const im=new Image(); im.onload=()=>{ let w=im.naturalWidth, h=im.naturalHeight; if(!w||!h){ w=300; h=300; } const k=Math.min(1,384/Math.max(w,h)), c=document.createElement("canvas"); c.width=Math.round(w*k); c.height=Math.round(h*k); c.getContext("2d").drawImage(im,0,0,c.width,c.height); res(c.toDataURL("image/png")); }; im.onerror=()=>res(null); im.src=fr.result; }; fr.readAsDataURL(f); }); }
-  async function addFiles(fs){ for(const f of fs){ const src=await readFile(f); if(!src){ alertMsg(f.name+" 은(는) 열 수 없어요."); continue; } CU.push(Object.assign({},DEF,{name:f.name.replace(/\.[a-z0-9]+$/i,""),src})); } save(); drawCust(); }
+  async function addFiles(fs){ for(const f of fs){ const src=await readFile(f); if(!src){ alertMsg(f.name+" 은(는) 열 수 없어요."); continue; } CU.push(Object.assign({},DEF,{name:f.name.replace(/\.[a-z0-9]+$/i,""),src,mode:await modeOf(src)})); } save(); drawCust(); }
   const RANGES=[["크기","size",.3,3,.05,v=>Math.round(v*100)+"%"],["출현 빈도","rate",0,30,.5,v=>v+"번/분"],["최대 수","max",1,10,1,v=>v+"개"],
     ["#움직임 (로코로코처럼)"],["둥실","bob",0,1,.05,p],["흔들흔들","sway",0,1,.05,p],["숨쉬기","breath",0,1,.05,p],["말랑 출렁","squash",0,1,.05,p],["빙글","spin",-180,180,5,v=>v+"°/초"],["움직임 빠르기","aspd",.2,3,.05,p],
     ["#변주 (나올 때마다 조금씩 다르게)"],["크기 차이","vSize",0,.8,.05,v=>"±"+Math.round(v*100)+"%"],["색 차이","vHue",0,180,5,v=>"±"+v+"°"],["기울기 차이","vTilt",0,90,1,v=>"±"+v+"°"],["뒤집기","vFlip",0,1,.05,p],
@@ -2208,12 +2208,30 @@ if(window.NF_VIEW==="panel")(function(){
       const dy=-c.bob*6*Math.sin(tt*.45), rot=c.sway*.35*Math.sin(tt*.6), sc=1+c.breath*.12*Math.sin(tt*.8), sq=1+c.squash*.16*Math.sin(tt*1.1), sp=c.spin*Math.PI/180*t/1000; x.clearRect(0,0,W,W); x.save(); x.translate(W/2,W/2+dy); x.rotate(rot+sp); x.scale(sc*sq,sc/sq);
       const k=W*.78/Math.max(im.naturalWidth||1,im.naturalHeight||1); x.drawImage(im,-im.naturalWidth*k/2,-im.naturalHeight*k/2,im.naturalWidth*k,im.naturalHeight*k); x.restore(); }); }
   requestAnimationFrame(tick);
+  /* 뉴레이어 아카이브에서 바로 가져오기: 깃허브 저장소의 gallery 폴더(투명 PNG 오브젝트)를 훑어 썸네일로 보여 준다 */
+  function archCfg(){ let c=null; try{ c=JSON.parse(localStorage.getItem("objet_studio_archive_cfg")); }catch(_){} if(!c||!c.owner){ try{ const g=JSON.parse(localStorage.getItem("objet_studio_gh_config")); if(g&&g.owner) c={owner:g.owner,repo:g.repo,branch:g.branch||"main",path:"gallery"}; }catch(_){} }
+    c=Object.assign({owner:"leeyunsung-web",repo:"nu-layer",branch:"main",path:"gallery"},c||{}); let tk=null; try{ const g=JSON.parse(localStorage.getItem("objet_studio_gh_config")); tk=g&&g.token||null; }catch(_){} return {c,tk}; }
+  /* 선 그림처럼 가늘고 빈 곳이 많은 그림은 젤리 몸이 되기 어려워 '물에 떠다님'으로 시작한다 */
+  function modeOf(src){ return new Promise(res=>{ const im=new Image(); im.onload=()=>{ const w=Math.max(1,Math.min(96,im.naturalWidth)), h=Math.max(1,Math.round(w*im.naturalHeight/Math.max(1,im.naturalWidth))), c=document.createElement("canvas"); c.width=w; c.height=h; const x=c.getContext("2d"); x.drawImage(im,0,0,w,h); const d=x.getImageData(0,0,w,h).data; let n=0; for(let i=3;i<d.length;i+=4) if(d[i]>128) n++; res(n/(w*h)>.3?"jelly":"float"); }; im.onerror=()=>res("jelly"); im.src=src; }); }
+  let ARCH=null;
+  async function archList(force){ if(ARCH && !force) return ARCH; const {c,tk}=archCfg(), h={Accept:"application/vnd.github+json"}; if(tk) h.Authorization="Bearer "+tk;
+    const r=await fetch("https://api.github.com/repos/"+c.owner+"/"+c.repo+"/git/trees/"+encodeURIComponent(c.branch)+"?recursive=1",{headers:h}); if(!r.ok) throw new Error(r.status===403?"깃허브 조회 한도에 걸렸어요. 잠시 뒤 다시 해 주세요.":"아카이브를 못 읽었어요 ("+r.status+")");
+    const j=await r.json(), root=(c.path||"gallery").replace(/^\/+|\/+$/g,"")+"/"; ARCH=(j.tree||[]).filter(t=>t.type==="blob" && t.path.startsWith(root) && /\.(png|webp)$/i.test(t.path) && !/\.trace\./i.test(t.path)).map(t=>({path:t.path, dir:t.path.slice(root.length).split("/").slice(0,-1).join(" / ")||"(맨 위)", name:t.path.split("/").pop().replace(/\.[a-z]+$/i,""), url:"https://raw.githubusercontent.com/"+c.owner+"/"+c.repo+"/"+encodeURIComponent(c.branch)+"/"+t.path.split("/").map(encodeURIComponent).join("/")})).reverse(); return ARCH; }
+  function urlToData(u){ return new Promise(res=>{ const im=new Image(); im.crossOrigin="anonymous"; im.onload=()=>{ const w=im.naturalWidth, h=im.naturalHeight, k=Math.min(1,384/Math.max(w,h)), c=document.createElement("canvas"); c.width=Math.max(1,Math.round(w*k)); c.height=Math.max(1,Math.round(h*k)); c.getContext("2d").drawImage(im,0,0,c.width,c.height); try{ res(c.toDataURL("image/png")); }catch(_){ res(null); } }; im.onerror=()=>res(null); im.src=u; }); }
+  function archPanel(host){ const box=mk("div","arch"); const top=mk("div","cbar"); const fsel=mk("select"); const rf=mk("button","","새로고침"); rf.type="button"; const st=mk("span","hint","불러오는 중…"); const cl=mk("button","","닫기"); cl.type="button"; cl.addEventListener("click",()=>box.remove()); top.append(fsel,rf,st,cl); box.appendChild(top);
+    const grid=mk("div","agrid"); box.appendChild(grid); host.after(box);
+    const show=(list)=>{ const dirs=[...new Set(list.map(a=>a.dir))]; fsel.replaceChildren(...["모든 폴더",...dirs].map((d,i)=>{ const o=mk("option","",d); o.value=i?d:""; return o; })); const draw=()=>{ const f=fsel.value; grid.replaceChildren(); const L=list.filter(a=>!f||a.dir===f).slice(0,240); st.textContent=L.length+"개 · 눌러서 내 오브젝트에 더하기";
+        for(const a of L){ const b=mk("button","athumb"); b.type="button"; b.title=a.dir+" / "+a.name; const im=mk("img"); im.loading="lazy"; im.src=a.url; im.alt=a.name; b.appendChild(im);
+          b.addEventListener("click",async()=>{ if(b.classList.contains("added")) return; b.classList.add("busy"); const src=await urlToData(a.url); b.classList.remove("busy"); if(!src){ alertMsg("그림을 가져오지 못했어요."); return; } load(); CU.push(Object.assign({},DEF,{name:a.name.replace(/^pattern_/,""),src,mode:await modeOf(src)})); save(); drawCust(); b.classList.add("added"); }); grid.appendChild(b); } };
+      fsel.onchange=draw; draw(); };
+    const go=f=>{ st.textContent="불러오는 중…"; archList(f).then(show).catch(e=>{ st.textContent=e.message+" — 이 화면이 인터넷 연결을 막는 곳이면 깃허브 페이지 주소(…github.io/nu-layer/nu-flow.html)에서 열어 주세요."; }); };
+    rf.addEventListener("click",()=>go(true)); go(false); }
   window.NF_OBJLIST=function(){ const root=mk("div","olist"); root.appendChild(mk("h3","msub","화면에 나오는 오브젝트"));
     const t=mk("div","otbl"); for(const [nm,kind,ctr,rule] of BASE){ const row=mk("div","orow"); const h=mk("div","oname"); h.appendChild(mk("b","",nm)); h.appendChild(mk("small","",kind)); row.appendChild(h); const cs=mk("div","octl"); for(const [lab,id] of ctr){ const e=proxy(lab,id); if(e) cs.appendChild(e); } if(rule){ const e=ruleSel(rule); if(e) cs.appendChild(e); } row.appendChild(cs); t.appendChild(row); }
     root.appendChild(t); setInterval(()=>{ if(root.offsetParent) syncs.forEach(f=>f()); },700);
     root.appendChild(mk("h3","msub","내 오브젝트 (뉴레이어에서 불러오기)"));
     const bar=mk("div","cbar"); const fi=mk("input"); fi.type="file"; fi.accept=".svg,.png,.jpg,.jpeg,.webp,image/*"; fi.multiple=true; fi.hidden=true; fi.addEventListener("change",()=>{ addFiles([...fi.files]); fi.value=""; });
-    const fb=mk("button","","＋ 그림 불러오기 (SVG·PNG)"); fb.type="button"; fb.addEventListener("click",()=>fi.click()); msgEl=mk("span","hint",""); bar.append(fb,fi,msgEl); root.appendChild(bar);
+    const fb=mk("button","","＋ 그림 불러오기 (SVG·PNG)"); fb.type="button"; fb.addEventListener("click",()=>fi.click()); const ab=mk("button","","＋ 뉴레이어 아카이브에서 가져오기"); ab.type="button"; ab.addEventListener("click",()=>{ const o=root.querySelector(".arch"); if(o){ o.remove(); return; } archPanel(bar); }); msgEl=mk("span","hint",""); bar.append(ab,fb,fi,msgEl); root.appendChild(bar);
     const drop=mk("div","cdrop","또는 여기에 파일을 끌어다 놓으세요"); drop.addEventListener("dragover",e=>{ e.preventDefault(); drop.classList.add("on"); }); drop.addEventListener("dragleave",()=>drop.classList.remove("on")); drop.addEventListener("drop",e=>{ e.preventDefault(); drop.classList.remove("on"); addFiles([...e.dataTransfer.files].filter(f=>/image|svg/.test(f.type)||/\.(svg|png|jpe?g|webp)$/i.test(f.name))); }); root.appendChild(drop);
     custWrap=mk("div","cwrap"); root.appendChild(custWrap); drawCust(); return root; };
 })();
@@ -2231,6 +2249,9 @@ if(window.NF_VIEW==="panel")(function(){
 .cust{border:2px solid var(--line,#ccc);border-radius:12px;padding:10px 12px}
 .chead{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px}.chead input[type=text]{flex:1;min-width:120px;padding:4px 6px}
 .pxy button[aria-pressed="true"],.chead button[aria-pressed="true"]{background:#9C2F86;color:#fff;border-color:#9C2F86}
+.arch{border:2px solid #9C2F86;border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.agrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px;max-height:420px;overflow:auto}
+.athumb{aspect-ratio:1;padding:4px!important;background:#f4f1ea!important;border-radius:10px!important;display:flex;align-items:center;justify-content:center;min-height:0!important}.athumb img{max-width:100%;max-height:100%;object-fit:contain}.athumb.added{outline:3px solid #9C2F86}.athumb.busy{opacity:.5}
 .cthumb{width:96px;height:96px;background:#f4f1ea;border-radius:10px;border:1px solid rgba(0,0,0,.12)}
 </style>
 <script>
