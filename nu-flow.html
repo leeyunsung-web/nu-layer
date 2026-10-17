@@ -1083,7 +1083,7 @@ function place(R,key){ // 다른 방울과 겹치지 않는 빈자리를 고른�
     const s=m-R; if(s>bs){ bs=s; bx=x; by=y; } if(s>46) break; }
   return [bx,by]; }
 let RSN=0; function reset(){ RSN++; N=0; nLobe=0; ptrs.clear(); extra=0; GW.fill(0); TW.fill(0); simT=0; sel=-1;
-  const TO=[2,3,4,5,2,3,4,3,5,2,4,3].map(t=>[t,Math.random()]).sort((p,q)=>p[1]-q[1]).map(p=>p[0]); /* 처음 뜰 때 단계를 고루 섞어 큰 것부터 작은 것까지 다 나오게 */
+  const TO=[2,3,2,2,3,2,4,2,3,2,2,3].map(t=>[t,Math.random()]).sort((p,q)=>p[1]-q[1]).map(p=>p[0]); /* 처음 뜰 때 단계를 고루 섞어 큰 것부터 작은 것까지 다 나오게 */
   for(let i=0;i<G.count;i++){ TFORCE=TO[i%TO.length]; const R=Math.max(8,tierRS(2,5)), p=place(R,i+1); TFORCE=TO[i%TO.length]; addShape(p[0],p[1],R,(h(SEED,i,90)-.5)*16,(h(SEED,i,91)-.5)*16,700+i*17+(RSN-1)*1013); TFORCE=0; /* 다시 놓을 때마다 하트·별 자리가 바뀐다 (첫 화면은 그날의 배치) */ } btn(); selUI(); }
 let NSOFT=1e9; function more(){ if(N>CAP-240) return; extra++; const R=Math.max(8,tierRS(2,5)), p=place(R,400+extra); addShape(p[0],p[1],R,0,0,900+extra*13); btn(); }
 /* 여러 모양: 그림 속 방울처럼 둥근 것, 길쭉한 것, 강낭콩·땅콩(볼록함 둘), 애벌레(볼록함 셋·넷)가 섞인다. 이어 붙은 볼록함은 서로 녹아 하나가 되지 않아 모양이 남는다 */
@@ -1398,7 +1398,7 @@ function popTiny(ol,ck){ const n=LCNT[ol]; let cx=0, cy=0, c=0; for(let i=0;i<N;
    터지면 한 단계 아래의 진짜 오브젝트 3~6개로 갈라지고, 뭉쳐서 커지면 다시 위 단계가 된다.
    별: 3·4단계는 별, 1·2단계는 노란 동그라미 (노란 동그라미가 뭉쳐 3단계가 되면 별) · 하트: 터지면 핏방울 · 핏방울: 뭉쳐 한 단계 커질 때마다 1/5 확률로 하트 (2단계 이상) */
 const TIERB=[0,6,20,70,250], TIERM=[0,3,11,37,132]; const tierOf=n=>n>=250?5:n>=70?4:n>=20?3:n>=6?2:1;   // 5단계: 1 아주 작은(6개 미만) · 2 작은 · 3 중간 · 4 큰 · 5 아주 큰
-const TW8=[0,0,.3,.3,.25,.15]; function tierN(a,b){ let tot=0; for(let t=a;t<=b;t++) tot+=TW8[t]; let r=Math.random()*tot, t=a; for(;t<b;t++){ r-=TW8[t]; if(r<=0) break; } if(TFORCE){ t=Math.max(a,Math.min(b,TFORCE)); TFORCE=0; } const lo=Math.max(3,TIERB[t-1]), hi=t>=5?700:TIERB[t]-1; return Math.max(lo,Math.min(hi,lo*Math.pow(hi/lo,Math.random())*TSIZE)); }   /* 크기 조절을 곱해도 고른 단계 안에 머문다 */
+const TW8=[0,0,.55,.3,.12,.03];   /* 등장 크기: 대부분 작은 것부터, 아주 큰 것은 드물게 */ function tierN(a,b){ let tot=0; for(let t=a;t<=b;t++) tot+=TW8[t]; let r=Math.random()*tot, t=a; for(;t<b;t++){ r-=TW8[t]; if(r<=0) break; } if(TFORCE){ t=Math.max(a,Math.min(b,TFORCE)); TFORCE=0; } const lo=Math.max(3,TIERB[t-1]), hi=t>=5?700:TIERB[t]-1; return Math.max(lo,Math.min(hi,lo*Math.pow(hi/lo,Math.random())*TSIZE)); }   /* 크기 조절을 곱해도 고른 단계 안에 머문다 */
 let TFORCE=0, TSIZE=1; const tierRS=(a,b)=>{ TSIZE=G.size; const r=tierR(a,b); TSIZE=1; return r; };   // 고른 단계 안에서 크기를 고르게 섞어 뽑는다
 const tierR=(a,b)=>Math.sqrt(tierN(a,b)*SP0*SP0*.866/Math.PI); const LTR=new Int8Array(LMAX), FSX=new Float32Array(LMAX).fill(NaN), FSY=new Float32Array(LMAX);
 function tierBurst(ol){ let n=0; for(let i=0;i<N;i++) if(LBL[i]===ol) n++; const t=tierOf(n); if(t<=1) return false; const kind=LHRT[ol]===2||LCOL[ol]===1?"y":LCOL[ol]===2?"b":"r";
