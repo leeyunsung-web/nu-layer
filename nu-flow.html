@@ -1403,11 +1403,17 @@ let TFORCE=0, TSIZE=1; const tierRS=(a,b)=>{ TSIZE=G.size; const r=tierR(a,b); T
 const tierR=(a,b)=>Math.sqrt(tierN(a,b)*SP0*SP0*.866/Math.PI); const LTR=new Int8Array(LMAX), FSX=new Float32Array(LMAX).fill(NaN), FSY=new Float32Array(LMAX);
 function tierBurst(ol){ let n=0; for(let i=0;i<N;i++) if(LBL[i]===ol) n++; const t=tierOf(n); if(t<=1) return false; const kind=LHRT[ol]===2||LCOL[ol]===1?"y":LCOL[ol]===2?"b":"r";
   let cx=0, cy=0, c=0; for(let i=0;i<N;i++) if(LBL[i]===ol){ cx+=X[i]; cy+=Y[i]; c++; } if(!c) return false; cx/=c; cy/=c; for(const id of [...ptrs.keys()]) release(id);
-  const r=Math.sqrt(n*SP0*SP0*.866/Math.PI), ct=t-1, mid=TIERM[ct], k=Math.max(3,Math.min(6,Math.round(n*.9/mid))), lo=Math.max(3,TIERB[ct-1]), hi=TIERB[ct]-1, nc=Math.max(lo,Math.min(hi,n*.9/k)), rr=Math.sqrt(nc*SP0*SP0*.866/Math.PI)*1.04;
+  /* 신나게 팡: 바로 아래 단계 크기를 중심으로 크고 작은 조각이 섞여 사방으로 튄다. 작은 조각일수록 더 멀리·빨리.
+     전체 속도를 낮춰도 터지는 순간은 시원하게 (속도 설정만큼 되받아 준다) */
+  const r=Math.sqrt(n*SP0*SP0*.866/Math.PI), ct=t-1, hi=TIERB[ct]-1, tot=n*.92, boost=1/Math.max(.3,G.speed);
+  const W8=[]; let left=tot; const k0=Math.max(3,Math.min(6,Math.round(tot/TIERM[ct]))); for(let q=0;q<k0 && left>3;q++){ const w=Math.min(hi,Math.max(3,TIERM[ct]*(.45+1.1*Math.random()))); W8.push(Math.min(w,left)); left-=w; }   // 큰 조각: 아래 단계 크기 안에서 제각각
+  while(left>3 && W8.length<14){ const w=Math.max(3,Math.min(left,Math.pow(Math.random(),1.6)*Math.max(4,TIERM[Math.max(1,ct-1)]*1.6))); W8.push(w); left-=w; }   // 남은 몫은 더 작은 조각들로
+  W8.sort(()=>Math.random()-.5); const K=W8.length;
   removeLobe(ol); LCNT[ol]=0; if(onPop) onPop(cx+OXp,cy+OYp,"pop",r); const a0=Math.random()*TAU, ck=kind==="y"?1:kind==="b"?2:0;
-  for(let q=0;q<k;q++){ const a=a0+q*TAU/k+(Math.random()-.4)*.3, d=Math.max(r*.45,rr*1.25/Math.sin(Math.PI/k)), sp=(200+160*Math.random())*G.bSpd, rq=rr*(.9+.2*Math.random()); /* 처음부터 서로 겹치지 않게 둘러 놓는다 (겹치면 알갱이를 뺏어 다시 큰 하나가 된다) */ addDrop(cx+Math.cos(a)*d,cy+Math.sin(a)*d,rq,Math.cos(a)*sp,Math.sin(a)*sp); const l=nLobe-1;
-    LCOL[l]=ck; LNF[l]=simT+G.sep; LTR[l]=ct; if(kind==="y" && ct>=4){ LHRT[l]=2; LKEEP[l]=1; LHA[l]=(Math.random()-.5)*2; } }
-  if(G.tiny>0) for(let u=0;u<Math.round(8*G.tiny);u++){ const a=Math.random()*TAU, sp=(220+260*Math.random())*G.bSpd; sprAdd(cx,cy,Math.cos(a)*sp,Math.sin(a)*sp,1.2+3*Math.random(),ck); }
+  for(let q=0;q<K;q++){ const nc=W8[q], rq=Math.sqrt(nc*SP0*SP0*.866/Math.PI)*1.04, small=1-Math.min(1,nc/Math.max(4,TIERM[ct])), a=a0+q*TAU/K+(Math.random()-.5)*.5, d=Math.max(r*.4,rq*1.3/Math.sin(Math.PI/Math.max(3,K)))*(.85+.3*Math.random()),
+      sp=(230+200*Math.random())*(1+.9*small)*G.bSpd*boost; addDrop(cx+Math.cos(a)*d,cy+Math.sin(a)*d,rq,Math.cos(a)*sp,Math.sin(a)*sp); const l=nLobe-1;
+    LCOL[l]=ck; LNF[l]=simT+G.sep; LTR[l]=tierOf(nc); LEV[l]+=12; if(kind==="y" && tierOf(nc)>=4){ LHRT[l]=2; LKEEP[l]=1; LHA[l]=(Math.random()-.5)*2; } }
+  if(G.tiny>0) for(let u=0;u<Math.round((10+n*.04)*G.tiny);u++){ const a=Math.random()*TAU, sp=(260+340*Math.random())*G.bSpd*boost; sprAdd(cx,cy,Math.cos(a)*sp,Math.sin(a)*sp,1.2+4*Math.pow(Math.random(),1.5),ck); }   // 물보라
   born++; sel=-1; selUI(); return true; }
 function tierGrow(){ for(let l=0;l<nLobe;l++){ if(!LCNT[l] || LIMG[l] || LGRP[l]>=0) continue; const t=tierOf(LCNT[l]); if(!LTR[l]){ LTR[l]=t; continue; } if(t<=LTR[l]) continue; LTR[l]=t;   // 한 단계 커졌다
     if(LCOL[l]===0 && !LHRT[l] && t>=2 && Math.random()<.2){ heartStyle(l); LHA[l]=(Math.random()-.5)*.6; if(onPop) onPop(LCX[l]+OXp,LCY[l]+OYp,"pop",12); }   // 핏방울이 뭉쳐 커지면 가끔 하트로
@@ -1445,12 +1451,12 @@ function burst1(x,y){ { const hk=custHit(x,y); if(hk>=0) return custPopFloat(hk)
     for(let g2=0;g2<K;g2++) if(an[g2]){ sx[g2]=ax[g2]/an[g2]; sy[g2]=ay[g2]/an[g2]; } }
   const lob=new Int32Array(K), vx=new Float32Array(K), vy=new Float32Array(K);
   const pcol=im?(pc>=0?pc:0):(pc>=0?pc:LCOL[ocol]); const imSet=(l,px,py)=>{ if(!im || pc>=0) return; const ca=Math.cos(im.a), sa=Math.sin(im.a), dx=px-cx, dy=py-cy, u=dx*ca+dy*sa, v=-dx*sa+dy*ca; LCOL[l]=7; LIMG[l]=im.i; LIS[l]=im.s; LIA[l]=im.a; LIU[l]=im.flip*u; LIV[l]=v-im.s*im.cy; LFLP[l]=im.flip; LVAR[l]=im.va; LPH[l]=im.ph; };   // 그림 조각: 원래 그림에서 그 자리를 들고 날아간다
-  for(let g2=0;g2<K;g2++){ lob[g2]=newLobe(); LCOL[lob[g2]]=pcol; imSet(lob[g2],sx[g2],sy[g2]); LNF[lob[g2]]=simT+G.sep; LFR[lob[g2]]=star?0:1; if(star){ LHRT[lob[g2]]=2; LKEEP[lob[g2]]=1; LHA[lob[g2]]=(Math.random()-.5)*1.2; } const dx=sx[g2]-cx, dy=sy[g2]-cy, dl=HY(dx,dy)||1, a=Math.atan2(dy,dx)+(hh(born+g2,72)-.5)*.6, sp=(150+150*hh(born+g2,73))*(.6+.4*Math.min(1,dl/30))*G.bSpd; vx[g2]=Math.cos(a)*sp; vy[g2]=Math.sin(a)*sp; }
+  for(let g2=0;g2<K;g2++){ lob[g2]=newLobe(); LCOL[lob[g2]]=pcol; imSet(lob[g2],sx[g2],sy[g2]); LNF[lob[g2]]=simT+G.sep; LFR[lob[g2]]=star?0:1; if(star){ LHRT[lob[g2]]=2; LKEEP[lob[g2]]=1; LHA[lob[g2]]=(Math.random()-.5)*1.2; } const dx=sx[g2]-cx, dy=sy[g2]-cy, dl=HY(dx,dy)||1, a=Math.atan2(dy,dx)+(hh(born+g2,72)-.5)*.6, sp=(150+150*hh(born+g2,73))*(.6+.4*Math.min(1,dl/30))*G.bSpd/Math.max(.3,G.speed); vx[g2]=Math.cos(a)*sp; vy[g2]=Math.sin(a)*sp; }
   for(let q=0;q<qt;q++){ const i=idx[q], g2=as[q]; LBL[i]=lob[g2]; VX[i]=vx[g2]; VY[i]=vy[g2]; QX[i]=X[i]; QY[i]=Y[i]; QVX[i]=vx[g2]; QVY[i]=vy[g2]; GW[i]=0; }
   if(G.tiny>0 && qt>=16 && !star){ const ord=idx.slice().sort((a,b)=>((X[b]-cx)**2+(Y[b]-cy)**2)-((X[a]-cx)**2+(Y[a]-cy)**2)), m=Math.round(qt*.16*G.tiny); let q=0, s=0;   // 가장 작은 물방울: 바깥쪽 알갱이를 한두 개씩 떼어 더 빨리 튀긴다
-    while(q<m){ const sz=hh(born+s,76)<.6?1:2, l=newLobe(); LCOL[l]=pcol; LNF[l]=simT+G.sep; LFR[l]=1; const i0=ord[q]; imSet(l,X[i0],Y[i0]); const a=Math.atan2(Y[i0]-cy,X[i0]-cx)+(hh(born+s,77)-.5)*.8, sp=(260+220*hh(born+s,78))*G.bSpd;
+    while(q<m){ const sz=hh(born+s,76)<.6?1:2, l=newLobe(); LCOL[l]=pcol; LNF[l]=simT+G.sep; LFR[l]=1; const i0=ord[q]; imSet(l,X[i0],Y[i0]); const a=Math.atan2(Y[i0]-cy,X[i0]-cx)+(hh(born+s,77)-.5)*.8, sp=(260+220*hh(born+s,78))*G.bSpd/Math.max(.3,G.speed);
       for(let u=0;u<sz && q<m;u++,q++){ const i=ord[q]; LBL[i]=l; VX[i]=QVX[i]=Math.cos(a)*sp; VY[i]=QVY[i]=Math.sin(a)*sp; } s++; } }
-  if(G.tiny>0){ const m=Math.round((10+qt*.12)*G.tiny); for(let u=0;u<m;u++){ const i=idx[Math.floor(Math.random()*qt)], a=Math.atan2(Y[i]-cy,X[i]-cx)+(Math.random()-.5)*1.2, sp=(180+320*Math.random())*G.bSpd; sprAdd(X[i],Y[i],Math.cos(a)*sp,Math.sin(a)*sp,1+5*Math.pow(Math.random(),1.5),pcol); if(im && pc<0) SPR[SPR.length-1].cc=im.e.avg; } }   // 알갱이보다 작은 물보라 방울
+  if(G.tiny>0){ const m=Math.round((10+qt*.12)*G.tiny); for(let u=0;u<m;u++){ const i=idx[Math.floor(Math.random()*qt)], a=Math.atan2(Y[i]-cy,X[i]-cx)+(Math.random()-.5)*1.2, sp=(180+320*Math.random())*G.bSpd/Math.max(.3,G.speed); sprAdd(X[i],Y[i],Math.cos(a)*sp,Math.sin(a)*sp,1+5*Math.pow(Math.random(),1.5),pcol); if(im && pc<0) SPR[SPR.length-1].cc=im.e.avg; } }   // 알갱이보다 작은 물보라 방울
   born++; sel=-1; selUI(); return true; }
 function box(){ let x0=1e9, x1=-1e9, y0=1e9, y1=-1e9, cnt=0; for(let i=0;i<N;i++){ if(ZL!==null && LDZ[LBL[i]]!==ZL) continue; cnt++; const a=X[i], b=Y[i], c=QX[i], d=QY[i]; if(a<x0) x0=a; if(a>x1) x1=a; if(b<y0) y0=b; if(b>y1) y1=b; if(c<x0) x0=c; if(c>x1) x1=c; if(d<y0) y0=d; if(d>y1) y1=d; }
   const m=RK+RKS+40; QB0=Math.max(0,Math.floor((x0-m)/CELL)); QB1=Math.min(gw-1,Math.ceil((x1+m)/CELL)); QC0=Math.max(0,Math.floor((y0-m)/CELL)); QC1=Math.min(gh-1,Math.ceil((y1+m)/CELL)); if(!cnt){ QB0=QB1=QC0=QC1=0; } return cnt; }   /* 알갱이가 하나도 없을 때 범위가 뒤집혀 큰 배열을 만들던 오류 */
