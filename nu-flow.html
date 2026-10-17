@@ -1203,8 +1203,9 @@ function styleLobe(l){ const k=++lobeSerial; // 덩이마다 빛을 받는 성�
   L3Z[l]=hh(k,48)<.75?.15+.07*hh(k,49):0; L3A[l]=(hh(k,53)-.5)*.9;                                      // 그늘 쪽에 뜨는 작은 되비침 점
   for(let q=0;q<8;q++) SB[q][l]=SE[q][l]; LS0[l]=(hh(k,51)<.5?-1:1)*(.5+.6*hh(k,52)); LTO[l]=-1; LTM[l]=0; LFD[l]=1; LCX[l]=0; LCY[l]=0; LSP[l]=0; LIR[l]=0; LEX[l]=0; LEV[l]=0; }
 const hh=(a,b)=>h(SEED,a,b);
-function newLobe(){ if(nLobe>=LMAX-2) packLobes(); const l=nLobe++; styleLobe(l); LIMG[l]=0; LIS[l]=0; LTR[l]=0; FSX[l]=NaN; return l; }
-function packLobes(){ const map=new Int16Array(LMAX).fill(-1); let k=0; for(let i=0;i<N;i++){ const l=LBL[i]; if(map[l]<0){ map[l]=k; for(let q=0;q<8;q++){ SB[q][k]=SB[q][l]; SE[q][k]=SE[q][l]; } LS0[k]=LS0[l]; L3A[k]=L3A[l]; LEX[k]=LEX[l]; LEV[k]=LEV[l]; LBORN[k]=LBORN[l]; LNF[k]=LNF[l]; LLV[k]=LLV[l]; LDX[k]=LDX[l]; LDY[k]=LDY[l]; LDW[k]=LDW[l]; LFR[k]=LFR[l]; LKEEP[k]=LKEEP[l]; LDZ[k]=LDZ[l]; LHRT[k]=LHRT[l]; LHA[k]=LHA[l]; LCOL[k]=LCOL[l]; LIMG[k]=LIMG[l]; LTR[k]=LTR[l]; FSX[k]=FSX[l]; FSY[k]=FSY[l]; LIU[k]=LIU[l]; LIV[k]=LIV[l]; LIS[k]=LIS[l]; LIA[k]=LIA[l]; LVAR[k]=LVAR[l]; LFLP[k]=LFLP[l]; LPH[k]=LPH[l]; LGRP[k]=LGRP[l]; LOX[k]=LOX[l]; LOY[k]=LOY[l]; LTO[k]=-1; LTM[k]=0; LFD[k]=1; k++; } LBL[i]=map[l]; } nLobe=k; }
+let SOLOB=0; const LSOK=new Uint8Array(LMAX);   /* 따로 보기: 터져 생긴 조각 표시 */
+function newLobe(){ if(nLobe>=LMAX-2) packLobes(); const l=nLobe++; styleLobe(l); LSOK[l]=SOLOB; LIMG[l]=0; LIS[l]=0; LTR[l]=0; FSX[l]=NaN; return l; }
+function packLobes(){ const map=new Int16Array(LMAX).fill(-1); let k=0; for(let i=0;i<N;i++){ const l=LBL[i]; if(map[l]<0){ map[l]=k; for(let q=0;q<8;q++){ SB[q][k]=SB[q][l]; SE[q][k]=SE[q][l]; } LS0[k]=LS0[l]; L3A[k]=L3A[l]; LEX[k]=LEX[l]; LEV[k]=LEV[l]; LBORN[k]=LBORN[l]; LNF[k]=LNF[l]; LLV[k]=LLV[l]; LDX[k]=LDX[l]; LDY[k]=LDY[l]; LDW[k]=LDW[l]; LFR[k]=LFR[l]; LKEEP[k]=LKEEP[l]; LDZ[k]=LDZ[l]; LHRT[k]=LHRT[l]; LHA[k]=LHA[l]; LCOL[k]=LCOL[l]; LIMG[k]=LIMG[l]; LTR[k]=LTR[l]; FSX[k]=FSX[l]; FSY[k]=FSY[l]; LIU[k]=LIU[l]; LIV[k]=LIV[l]; LIS[k]=LIS[l]; LIA[k]=LIA[l]; LVAR[k]=LVAR[l]; LFLP[k]=LFLP[l]; LPH[k]=LPH[l]; LGRP[k]=LGRP[l]; LSOK[k]=LSOK[l]; LOX[k]=LOX[l]; LOY[k]=LOY[l]; LTO[k]=-1; LTM[k]=0; LFD[k]=1; k++; } LBL[i]=map[l]; } nLobe=k; }
 let FMX=1e9;
 function lobes(dt){ FMX=Math.PI*(G.fmax/2)*(G.fmax/2)/(SP0*SP0*.866); const n=gw*gh, inv=1/CELL, r2=RK*RK, ir=1/r2;   // 지름(px) → 알갱이 수
   for(let l=0;l<nLobe;l++){ LCNT[l]=0; BX0[l]=1e9; BY0[l]=1e9; BX1[l]=-1e9; BY1[l]=-1e9; LCX[l]=0; LCY[l]=0; LCAND[l]=-1; LFUS[l]=-1; }
@@ -1308,11 +1309,12 @@ const CY={base:"#FAD805",core:"#EDA40E",hi:"#FFF6AE",line:"#C57718"}, CB={base:"
 function lavg(L,l,o){ const s=L.S[l], n=L.N[l], B=L.B; let x=0, y=0, x0=1e9, y0=1e9, x1=-1e9, y1=-1e9; for(let i=0;i<n;i++){ const a=B[s+2*i], b=B[s+2*i+1]; x+=a; y+=b; if(a<x0) x0=a; if(a>x1) x1=a; if(b<y0) y0=b; if(b>y1) y1=b; } o[0]=n?x/n:0; o[1]=n?y/n:0; o[2]=x0; o[3]=y0; o[4]=x1; o[5]=y1; }
 function inLoop(L,l,px,py){ const s=L.S[l], n=L.N[l], B=L.B; let c=false; for(let i=0,j=n-1;i<n;j=i++){ const xi=B[s+2*i], yi=B[s+2*i+1], xj=B[s+2*j], yj=B[s+2*j+1]; if((yi>py)!==(yj>py) && px<(xj-xi)*(py-yi)/(yj-yi)+xi) c=!c; } return c; }
 const LAV=[0,0,0,0,0,0];
+function lobeAt(x,y){ const inv=1/CELL, gx=Math.round(x*inv), gy=Math.round(y*inv); if(gx>=0 && gy>=0 && gx<gw && gy<gh){ const l=LID[gy*gw+gx]; if(l>=0 && LCNT[l]) return l; } let b=-1, bd=1e18; for(let l=0;l<nLobe;l++){ if(!LCNT[l]) continue; const d=(LCX[l]-x)**2+(LCY[l]-y)**2; if(d<bd){ bd=d; b=l; } } return b; }
 function zOfPt(x,y){ const inv=1/CELL; let gx=Math.round(x*inv), gy=Math.round(y*inv); if(gx>=0 && gy>=0 && gx<gw && gy<gh){ const l=LID[gy*gw+gx]; if(l>=0 && LCNT[l]) return LDZ[l]; } let b=-1, bd=1e18; for(let l=0;l<nLobe;l++){ if(!LCNT[l]) continue; const d=(LCX[l]-x)**2+(LCY[l]-y)**2; if(d<bd){ bd=d; b=l; } } return b>=0?LDZ[b]:0; }
 function prepDepth(){ const D=DPA, n=BL.n; D.n=n;
   for(let l=0;l<n;l++){ lavg(BL,l,LAV); D.cx[l]=LAV[0]; D.cy[l]=LAV[1]; D.x0[l]=LAV[2]; D.y0[l]=LAV[3]; D.x1[l]=LAV[4]; D.y1[l]=LAV[5]; }
   for(let l=0;l<n;l++){ let p=l, pa=1e18; for(let m=0;m<n;m++){ if(m===l) continue; if(D.x0[m]<=D.x0[l] && D.x1[m]>=D.x1[l] && D.y0[m]<=D.y0[l] && D.y1[m]>=D.y1[l]){ const ar=(D.x1[m]-D.x0[m])*(D.y1[m]-D.y0[m]); if(ar<pa && inLoop(BL,m,D.cx[l],D.cy[l])){ pa=ar; p=m; } } } D.root[l]=p; }   // 구멍 윤곽은 바깥 윤곽을 따른다
-  for(let l=0;l<n;l++) if(D.root[l]===l){ let b=-1, bc=0; for(let q=0;q<nLobe;q++){ const c=LCNT[q]; if(c<=bc) continue; const x=LCX[q], y=LCY[q]; if(x<D.x0[l] || x>D.x1[l] || y<D.y0[l] || y>D.y1[l] || !inLoop(BL,l,x,y)) continue; b=q; bc=c; } D.z[l]=b>=0?LDZ[b]:zOfPt(D.cx[l],D.cy[l]); D.col[l]=b>=0?LCOL[b]:0; D.lb[l]=(b>=0 && ((LHRT[b]===1 && G.edgeH>0)||(LHRT[b]===2 && G.edgeS>0)) && MOLDS[LHRT[b]] && LCNT[b]>6)?b:-1; } }   // 붙은 방울은 가장 큰 방울의 깊이를 따른다 (프레임마다 바뀌어 깜빡이지 않게)
+  for(let l=0;l<n;l++) if(D.root[l]===l){ let b=-1, bc=0; for(let q=0;q<nLobe;q++){ const c=LCNT[q]; if(c<=bc) continue; const x=LCX[q], y=LCY[q]; if(x<D.x0[l] || x>D.x1[l] || y<D.y0[l] || y>D.y1[l] || !inLoop(BL,l,x,y)) continue; b=q; bc=c; } if(b<0) b=lobeAt(D.cx[l],D.cy[l]); /* 윤곽 안에 중심이 없는 방울(구름·길쭉한 것)도 제 색을 잃지 않게: 가장 가까운 방울을 따른다 */ D.z[l]=b>=0?LDZ[b]:zOfPt(D.cx[l],D.cy[l]); D.col[l]=b>=0?LCOL[b]:0; D.lb[l]=(b>=0 && ((LHRT[b]===1 && G.edgeH>0)||(LHRT[b]===2 && G.edgeS>0)) && MOLDS[LHRT[b]] && LCNT[b]>6)?b:-1; } }   // 붙은 방울은 가장 큰 방울의 깊이를 따른다 (프레임마다 바뀌어 깜빡이지 않게)
 function parentOf(L,l){ lavg(L,l,LAV); const D=DPA, px=LAV[0], py=LAV[1]; let b=-1, ba=1e18; for(let m=0;m<D.n;m++){ if(D.root[m]!==m || px<D.x0[m] || px>D.x1[m] || py<D.y0[m] || py>D.y1[m]) continue; const ar=(D.x1[m]-D.x0[m])*(D.y1[m]-D.y0[m]); if(ar<ba && inLoop(BL,m,px,py)){ ba=ar; b=m; } } return b; }
 function loopPathT(L,l,r){ const s=L.S[l], n=L.N[l], LB=L.B; if(n<3) return; const D=DPA, z=D.z[r], cx=D.cx[r], cy=D.cy[r], k=1+(z<0?-.34:z>0?.16:0)*G.dep, T=(i)=>i; let ox=z*camX*G.dep, oy=z*camY*G.dep; if(mapF){ const m=mapF(cx,cy); ox+=m[0]; oy+=m[1]; }   // 3D: 방울은 소용돌이 판 위 같은 자리에 보이게 (모양은 덜 눕는다)
   const X0=(i)=>cx+(LB[s+2*i]-cx)*k+ox, Y0=(i)=>cy+(LB[s+2*i+1]-cy)*k+oy;
@@ -1419,7 +1421,8 @@ function sprDraw(){ if(!SPR.length) return; for(const s of SPR){ const CC=s.cc?{
   g.beginPath(); g.arc(x,y,r,0,TAU); g.fillStyle=CC.base; g.fill(); if(r>1.6){ g.lineWidth=Math.min(2.2,r*.35); g.strokeStyle=CC.line; g.stroke(); g.beginPath(); g.arc(x-r*.3,y-r*.3,r*.32,0,TAU); g.fillStyle=CC.hi; g.fill(); } } }
 function pickLobe(x,y){ let best=-1, bs=1e9; for(let l=0;l<nLobe;l++){ if(!LCNT[l]) continue; const z=LDZ[l], k=1+(z<0?-.34:z>0?.16:0)*G.dep; let ox=z*camX*G.dep, oy=z*camY*G.dep; if(mapF){ const m=mapF(LCX[l],LCY[l]); ox+=m[0]; oy+=m[1]; }
     const r=Math.sqrt(LCNT[l]*SP0*SP0*.866/Math.PI)*k*1.15+14, d=Math.hypot(x-(LCX[l]+ox),y-(LCY[l]+oy))/r; if(d<1 && d<bs){ bs=d; best=l; } } return best; }   // 화면에 '보이는' 자리로 고른다 (3D로 기울이면 그려지는 자리와 계산 자리가 달라 안 터지던 문제)
-function burst(x,y){ { const hk=custHit(x,y); if(hk>=0) return custPopFloat(hk); } let best=-1, bd=1e9; const pl=pickLobe(x,y);
+function burst(x,y){ SOLOB=SOLO?1:0; try{ return burst1(x,y); } finally{ SOLOB=0; } }   /* 따로 보기에서 터진 조각은 그 오브젝트의 잔해라 남겨 둔다 */
+function burst1(x,y){ { const hk=custHit(x,y); if(hk>=0) return custPopFloat(hk); } let best=-1, bd=1e9; const pl=pickLobe(x,y);
   if(pl>=0){ for(let i=0;i<N;i++) if(LBL[i]===pl){ const d=(X[i]-LCX[pl])**2+(Y[i]-LCY[pl])**2; if(d<bd){ bd=d; best=i; } } bd=0; } if(best<0){ bd=1e9; for(let i=0;i<N;i++){ const d=(X[i]-x)**2+(Y[i]-y)**2; if(d<bd){ bd=d; best=i; } } } if(best<0 || bd>54*54) return false;
   const ocol=LBL[best]; let pc=-1, star=false, im=null; if(LIMG[ocol] && !LIS[ocol]){ const c=CUST[LIMG[ocol]-1], e=CIMG[LIMG[ocol]-1]; if(c && e){ const n=LCNT[ocol], r=Math.max(14,Math.sqrt(n*SP0*SP0*.866/Math.PI)); if(onPop) onPop(LCX[ocol]+OXp,LCY[ocol]+OYp,"pop",r); if(c.pop==="pop"){ for(const id of [...ptrs.keys()]) release(id); removeLobe(ocol); LCNT[ocol]=0; return true; } im={c,e,s:Math.sqrt(n*SP0*SP0*.866/e.mold.area),a:LHA[ocol],flip:LFLP[ocol]||1,va:LVAR[ocol],ph:LPH[ocol],i:LIMG[ocol],cy:e.mold.cy}; if(c.pop==="drops") pc=0; } } if(!im){ const ol=ocol, src=LHRT[ol]===1?"tfH":LHRT[ol]===2?"tfS":LCOL[ol]===2?"tfB":LCOL[ol]===3?"":"tfR", rule=src?G[src]|0:0;   // 방울 종류마다 정한 규칙
     pc=rule===4?2:rule===5?0:rule===6?1:-1; star=rule===6;   // 4 작은 물방울(파랑) · 5 핏방울(빨강) · 6 작은 별들
@@ -1440,7 +1443,7 @@ function burst(x,y){ { const hk=custHit(x,y); if(hk>=0) return custPopFloat(hk);
   if(G.tiny>0){ const m=Math.round((10+qt*.12)*G.tiny); for(let u=0;u<m;u++){ const i=idx[Math.floor(Math.random()*qt)], a=Math.atan2(Y[i]-cy,X[i]-cx)+(Math.random()-.5)*1.2, sp=(180+320*Math.random())*G.bSpd; sprAdd(X[i],Y[i],Math.cos(a)*sp,Math.sin(a)*sp,1+5*Math.pow(Math.random(),1.5),pcol); if(im && pc<0) SPR[SPR.length-1].cc=im.e.avg; } }   // 알갱이보다 작은 물보라 방울
   born++; sel=-1; selUI(); return true; }
 function box(){ let x0=1e9, x1=-1e9, y0=1e9, y1=-1e9; for(let i=0;i<N;i++){ const a=X[i], b=Y[i], c=QX[i], d=QY[i]; if(a<x0) x0=a; if(a>x1) x1=a; if(b<y0) y0=b; if(b>y1) y1=b; if(c<x0) x0=c; if(c>x1) x1=c; if(d<y0) y0=d; if(d>y1) y1=d; }
-  const m=RK+RKS+40; QB0=Math.max(0,Math.floor((x0-m)/CELL)); QB1=Math.min(gw-1,Math.ceil((x1+m)/CELL)); QC0=Math.max(0,Math.floor((y0-m)/CELL)); QC1=Math.min(gh-1,Math.ceil((y1+m)/CELL)); if(!N){ QB1=QB0; QC1=QC0; } }
+  const m=RK+RKS+40; QB0=Math.max(0,Math.floor((x0-m)/CELL)); QB1=Math.min(gw-1,Math.ceil((x1+m)/CELL)); QC0=Math.max(0,Math.floor((y0-m)/CELL)); QC1=Math.min(gh-1,Math.ceil((y1+m)/CELL)); if(!N){ QB0=QB1=QC0=QC1=0; } }   /* 알갱이가 하나도 없을 때 범위가 뒤집혀 큰 배열을 만들던 오류 */
 function compute(dt){ sprTick(dt); custTick(dt); box(); splat(); march(F,BL,TH); lobes(dt); custGeo(); inflate(); light(dt); splat2(); march(FC,CL,TH); march(FL,HL,1.4); march(FM,H2,1.5); }
 function render(dt){ compute(dt); draw(); }
 
@@ -1584,13 +1587,20 @@ function custPopFloat(k){ const s=SPRT[k]; SPRT.splice(k,1); const c=CUST[s.i], 
 
 /* 따로 보기 창: 고른 오브젝트 한 종류만 화면에 두고 조절해 보는 창 (설정은 저장하지 않는다 → 메인 창의 설정을 그대로 따라간다) */
 let SOLO="", SOLOT=0, NOSAVE=false;
-const soloIs=l=>{ if(!LCNT[l]) return true; const k=SOLO; if(k.startsWith("cust")) return LIMG[l]===+k.slice(4)+1; if(LIMG[l]) return false; if(k==="heart"||k==="drop") return (LCOL[l]===0||LCOL[l]===5) && LGRP[l]<0; if(k==="star") return LCOL[l]===1; if(k==="blue") return LCOL[l]===2 && LGRP[l]<0; if(k==="cloud") return LGRP[l]>=0; return false; };
-function soloTick(dt){ if(!SOLO) return; if(SOLO==="spark"||SOLO==="cross"){ for(let l=0;l<nLobe;l++) if(LCNT[l]){ removeLobe(l); LCNT[l]=0; } return; } for(let l=0;l<nLobe;l++) if(LCNT[l] && !soloIs(l)){ removeLobe(l); LCNT[l]=0; }
-  let big=0; for(let l=0;l<nLobe;l++) if(LCNT[l] && LCNT[l]>=15) big++; SOLOT=big?0:SOLOT+dt; if(SOLOT<1.2) return; SOLOT=0;   // 하나도 안 남으면 가운데에 새로 하나
-  const k=SOLO, R=Math.sqrt((k==="star"?320:k==="heart"?190:k==="cloud"?0:90)*SP0*SP0*.866/Math.PI)*G.size, p=placeNear(CXs+(Math.random()-.5)*80,CYs+(Math.random()-.5)*60,Math.max(30,R)*1.2);
-  if(k==="cloud"){ addCloud(p[0],p[1]); return; } if(k.startsWith("cust")){ custSpawn(+k.slice(4),true); return; } addDrop(p[0],p[1],R,0,0); const l=nLobe-1;
-  if(k==="heart"){ heartStyle(l); } else if(k==="star"){ LHRT[l]=2; LCOL[l]=1; LKEEP[l]=1; } else if(k==="blue"){ LCOL[l]=2; } }
-return { setSolo(k){ SOLO=k||""; SOLOT=9; }, noSave(){ NOSAVE=true; }, reload(){ load(); buildMolds(); }, G, setView, syncUI, setZone(a,b,c,d){ ZX0=a; ZY0=b; ZX1=c; ZY1=d; }, center(x,y){ CXs=x; CYs=y; }, light(a){ LBASE=a; }, dbg(){ let hl=0, ha=0, big=0, sm8=0; for(let l=0;l<HL.n;l++){ const a=HL.A[l]*HL.sign; if(a>24){ hl++; ha+=a; } else if(a>0) sm8++; } let lob=0; for(let l=0;l<nLobe;l++) if(LCNT[l]) lob++; let maxc=0; for(let l=0;l<nLobe;l++) if(LCNT[l]>maxc) maxc=LCNT[l]; return {N,lob,maxc,sm8,hl,ha:Math.round(ha),h2:H2.n,simT:+simT.toFixed(1)}; }, setWater(f){ waterAt=f; }, burst(x,y){ return G.on && burst(x-OXp,y-OYp); },
+const JELLY=["drop","heart","star","blue","cloud"];
+/* 따로 보기: 고른 종류만 남긴다. 처음부터 그 종류였던 것 + 그것이 터져 생긴 잔해(LSOK)만 산다 */
+const soloIs=l=>{ if(!LCNT[l]) return true; const k=SOLO; if(k.startsWith("cust")) return LIMG[l]===+k.slice(4)+1; if(LSOK[l]) return true; if(LIMG[l]) return false;
+  if(k==="heart") return LHRT[l]===1; if(k==="star") return LHRT[l]===2; if(k==="drop") return !LHRT[l] && (LCOL[l]===0||LCOL[l]===5) && LGRP[l]<0; if(k==="blue") return !LHRT[l] && LCOL[l]===2 && LGRP[l]<0; if(k==="cloud") return LGRP[l]>=0; return false; };
+const SOLOW={drop:5,heart:3,star:3,blue:5,cloud:2}, SOLOTR={drop:[3,4,5,2],heart:[4,3,5,2],star:[5,4],blue:[3,4,2],cloud:[0]}; let SOLON=0;
+function soloSpawn(){ const k=SOLO; SOLOB=1; try{ if(k==="cloud"){ const p=placeNear(CXs+(Math.random()-.5)*260,CYs+(Math.random()-.5)*160,90*G.cloudS); addCloud(p[0],p[1]); return; } if(k.startsWith("cust")){ custSpawn(+k.slice(4),true); return; }
+    const T=SOLOTR[k]; if(!T) return; TFORCE=T[SOLON++%T.length]; const R=Math.max(10,k==="star"?tierRS(4,5):k==="blue"?tierRS(2,4):tierRS(2,5)), p=placeNear(CXs+(Math.random()-.5)*300,CYs+(Math.random()-.5)*200,R*1.25);
+    addDrop(p[0],p[1],R,(Math.random()-.5)*20,(Math.random()-.5)*20); const l=nLobe-1; LKEEP[l]=1; LHA[l]=(Math.random()-.5)*.6;
+    if(k==="heart") heartStyle(l); else if(k==="star"){ LHRT[l]=2; LCOL[l]=1; } else if(k==="blue") LCOL[l]=2; } finally{ SOLOB=0; TFORCE=0; } }
+function soloTick(dt){ if(!SOLO) return; const jelly=JELLY.includes(SOLO)||SOLO.startsWith("cust");
+  for(let l=0;l<nLobe;l++) if(LCNT[l] && (!jelly || !soloIs(l))){ removeLobe(l); LCNT[l]=0; }
+  if(!jelly) return; let have=0; for(let l=0;l<nLobe;l++) if(LCNT[l]>=6) have++; if(SOLO==="cloud"){ const gs=new Set(); for(let l=0;l<nLobe;l++) if(LCNT[l] && LGRP[l]>=0) gs.add(LGRP[l]); have=gs.size; }
+  const want=SOLO.startsWith("cust")?1:SOLOW[SOLO]||3; SOLOT+=dt; if(have<want && SOLOT>.5){ SOLOT=0; soloSpawn(); } }   /* 모자라면 단계를 바꿔 가며 하나씩 놓는다 (큰 것부터 작은 것까지 섞여 보이게) */
+return { setSolo(k){ SOLO=k||""; SOLOT=9; SOLON=0; }, soloSpawn(){ if(SOLO) soloSpawn(); }, soloClear(){ for(let l=0;l<nLobe;l++) if(LCNT[l]){ removeLobe(l); LCNT[l]=0; } SOLOT=9; }, noSave(){ NOSAVE=true; }, reload(){ load(); buildMolds(); }, G, setView, syncUI, setZone(a,b,c,d){ ZX0=a; ZY0=b; ZX1=c; ZY1=d; }, center(x,y){ CXs=x; CYs=y; }, light(a){ LBASE=a; }, dbg(){ let hl=0, ha=0, big=0, sm8=0; for(let l=0;l<HL.n;l++){ const a=HL.A[l]*HL.sign; if(a>24){ hl++; ha+=a; } else if(a>0) sm8++; } let lob=0; for(let l=0;l<nLobe;l++) if(LCNT[l]) lob++; let maxc=0; for(let l=0;l<nLobe;l++) if(LCNT[l]>maxc) maxc=LCNT[l]; return {N,lob,maxc,sm8,hl,ha:Math.round(ha),h2:H2.n,simT:+simT.toFixed(1)}; }, setWater(f){ waterAt=f; }, burst(x,y){ return G.on && burst(x-OXp,y-OYp); },
   start(){ if(!started){ started=true; reset(); } },
   on(){ return !!G.on; },
   setOn(v){ G.on=v?1:0; save(); syncUI(); if(!G.on){ ptrs.clear(); if(own){ g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,W,Hh); } } },
@@ -1988,12 +1998,52 @@ $("bSave").addEventListener("click",savePNG);
 
 /* 두 창 잇기: 화면 창은 조절 창에서 온 손짓을 제 손잡이에 그대로 옮기고, 지금 상태를 조절 창에 돌려준다 (같은 출처의 BroadcastChannel) */
 /* 따로 보기 창 */
-if(window.NF_SOLO){ const K=window.NF_SOLO, NAMES={drop:"핏방울",heart:"하트",star:"별",blue:"물방울",cloud:"구름",spark:"노란 스파크",cross:"십자별"};
+if(window.NF_SOLO){ const K=window.NF_SOLO, NAMES={drop:"핏방울",heart:"하트",star:"별",blue:"물방울",cloud:"구름",liquid:"액체 줄기",spark:"노란 스파크",cross:"십자별",bub:"비눗방울",dot:"색 점",wave:"물결 띠",ray:"방사 집중선",paint:"페인트 튀김 줄",zeb:"얼룩말 줄무늬"};
+  const FX={bub:"fxBubOn",dot:"fxDotOn",wave:"fxWaveOn",ray:"fxRayOn",paint:"fxPaintOn",zeb:"fxZebOn"}, JEL=["drop","heart","star","blue","cloud"].includes(K)||K.startsWith("cust");
+  /* 이 창은 보여 주기용으로 다른 것을 끄므로 그대로 저장하지 않는다. 손잡이로 바꾼 값만 골라 저장하고, 열려 있는 메인 창에도 같은 손짓을 보낸다 */
   saveG=()=>{}; BD.noSave(); BD.setSolo(K);
-  const apply=()=>{ for(let c=0;c<4;c++) if(G.vis[c]) setVis(c,false); for(const k in G) if(/^fx[A-Z][a-z]*On$/.test(k)) G[k]=0; G.stOn=K==="cross"?1:0; G.skOn=K==="spark"?1:0; const b=BD.G; b.leave=0; b.outP=0; b.refill=0; b.heart=0; b.star=0; b.blue=0; b.cloud=0; };
-  apply(); addEventListener("storage",e=>{ if(e.key===KEY){ loadG(); apply(); } else if(e.key==="swirl-flow-bd"){ BD.reload(); apply(); } });
+  const apply=()=>{ if(K!=="liquid") for(let c=0;c<4;c++) if(G.vis[c]) setVis(c,false); for(const k in G) if(/^fx[A-Z][a-z]*On$/.test(k)) G[k]=0; if(FX[K]) G[FX[K]]=1; G.stOn=K==="cross"?1:0; G.skOn=K==="spark"?1:0; const b=BD.G; b.leave=0; b.outP=0; b.refill=0; b.heart=0; b.star=0; b.blue=0; b.cloud=0; };
+  const rd=k=>{ try{ return JSON.parse(localStorage.getItem(k)||"{}")||{}; }catch(_){ return {}; } };
+  let RG=rd(KEY), RB=rd("swirl-flow-bd"), SG="", SB="";
+  const snapAll=()=>{ SG=JSON.stringify(G); SB=JSON.stringify(BD.G); };
+  apply(); snapAll();
+  addEventListener("storage",e=>{ if(e.key===KEY){ RG=rd(KEY); loadG(); apply(); syncUI(); snapAll(); } else if(e.key==="swirl-flow-bd"){ RB=rd("swirl-flow-bd"); BD.reload(); apply(); BD.syncUI(); snapAll(); } });
   window.__soloApply=apply; document.title="따로 보기 · "+(NAMES[K]||(K.startsWith("cust")?"내 오브젝트":K));
-  const tag=document.createElement("div"); tag.textContent="따로 보기 · "+(NAMES[K]||"내 오브젝트")+" — 더블클릭으로 터뜨려 보세요"; tag.style.cssText="position:fixed;left:12px;top:12px;z-index:6;font:700 13px/1.4 system-ui;color:#33123A;background:rgba(255,255,255,.85);border:2px solid #9C2F86;border-radius:10px;padding:4px 10px"; document.body.appendChild(tag); }
+  function keep(){ const og=JSON.parse(SG), ob=JSON.parse(SB); let cg=0, cb=0;
+    for(const k in G){ const v=G[k]; if(typeof v==="object") continue; if(og[k]!==v){ RG[k]=v; cg=1; } }
+    for(const k in BD.G){ const v=BD.G[k]; if(typeof v==="object") continue; if(ob[k]!==v){ RB[k]=v; cb=1; } }
+    if(Array.isArray(G.mat) && JSON.stringify(G.mat)!==JSON.stringify(og.mat)){ RG.mat=G.mat; cg=1; }
+    try{ if(cg) localStorage.setItem(KEY,JSON.stringify(RG)); if(cb) localStorage.setItem("swirl-flow-bd",JSON.stringify(RB)); }catch(_){} snapAll(); }
+  let sbc=null; try{ sbc=new BroadcastChannel("nu-flow-solo"); }catch(_){}
+  /* 미세 설정: 원래 설정 칸을 이 창의 작은 판으로 옮겨 온다 (손잡이는 그대로 움직인다) */
+  const JC=["kHi","kCo","kDyn","kVisc","kWob","kSt","kJelly","kRot","kDep","kTiny","kChunk","kBSpd","kApart","kSep","kFuse","kXAtt","kFRamp","kCalm","kMass","kBigN","kBigAtt","kSpd","kPush"];
+  const SETS={drop:[["모양·크기",["tfR","kSize","kFmax"]],["젤리 느낌",JC]],
+    heart:[["하트 모양",["mhP","mhR","mhA","mhH","mhW","mhTip","mhCl","mhInf","mhTilt","mhSave","kEdgeH","kEdgeJ","kHShape"]],["하트 색·터짐",["kHHi","kHCo","tfH","kSize"]],["젤리 느낌",JC]],
+    star:[["별 모양",["msP","msN","msRi","msInf","msTip","msIn","msW","msTilt","msSave","kEdgeS","kEdgeJ"]],["터짐",["tfS","kSize"]],["젤리 느낌",JC]],
+    blue:[["모양·크기",["tfB","kSize"]],["젤리 느낌",JC]],
+    cloud:[["구름",["kCloudS","kCFree","kCloudN"]],["젤리 느낌",["kHi","kCo","kDyn","kWob","kRot","kDep","kTiny","kChunk","kBSpd","kCalm"]]],
+    liquid:[["보이기",["vA"]],["흐름",["gSpd","gSpin","gCirc","gOut","gSpread","gRim","gRimW","gVisc","gCalm"]],["줄기 모양",["gInit","gAdd","gPer","gCarry","gHead","gTail","gStr","gTD","gRnd","gSep","gMerge","gDry","tear","tearLong","tearCap","tipLen","tearRate","tearPer","tearRnd"]],["빛·그림자",["gLA","gLs","oKsz","oBrk","oHth","oHmin","oBsz","oTd","oNa","oDth"]],["다시",["bReset"]]],
+    cross:[["십자별",["stCol","stN","stSize","stLen","stHV","stBody","stArmW","stTw","stSpin"]]],
+    spark:[["모양",["skT0","skSpikes","skJag","skVar","skLine","skSize","skMin","skMax"]],["색",["skCF","skCL","skCH"]],["움직임",["skRate","skLife","skPop","skFloat","skStarN","skStarLife","skFlow","skSpin"]],["번개",["skBI0","skBO0","skBoltN","skBoltLag","skBoil"]],["입체",["sk3On","sk3N","sk3Spin","sk3Tilt","sk3Wob","sk3Shade","sk3Persp","sk3Rand"]]],
+    bub:[["비눗방울",["fxBubN","fxBubS","fxBubC1"]]], dot:[["색 점",["fxDotN","fxDotS"]]], wave:[["물결 띠",["fxWaveN","fxWaveSp","fxWaveC1","fxWaveC2"]]], ray:[["방사 집중선",["fxRayN","fxRaySp","fxRayC1","fxRayC2"]]], paint:[["페인트 튀김 줄",["fxPaintN","fxPaintS","fxPaintC1","fxPaintC2"]]], zeb:[["얼룩말 줄무늬",["fxZebN","fxZebSp","fxZebS","fxZebC1","fxZebC2","fxInkC"]]]};
+  const st=document.createElement("style"); st.textContent="#soloP{position:fixed;right:10px;top:10px;bottom:10px;width:min(330px,calc(100vw - 20px));z-index:8;display:flex!important;flex-direction:column;gap:0!important;margin:0!important;padding:0!important;max-height:none!important;overflow:hidden!important;background:var(--panel,#fff);color:var(--ink,#33123A);border:2px solid #9C2F86;border-radius:14px;box-shadow:0 6px 24px rgba(51,18,58,.18);font:13px/1.4 system-ui}#soloP.min{bottom:auto}#soloP.min .sb{display:none}#soloP .hd{display:flex;gap:6px;align-items:center;padding:8px 10px;border-bottom:1.5px solid #ECD8E7}#soloP .hd b{flex:1;color:#9C2F86}#soloP .hd button{font:inherit;border:1.5px solid #ECD8E7;border-radius:999px;background:#F7E8F2;color:#33123A;padding:4px 10px;cursor:pointer}#soloP .sb{display:block!important;flex:1 1 auto;min-height:0;overflow:auto;padding:6px 10px 12px;margin:0!important}#soloP .sb>div{display:block!important}#soloP h4{margin:12px 0 4px;color:#9C2F86;font-size:13px}#soloP .it{display:grid!important;grid-template-columns:1fr;gap:2px;margin:6px 0}#soloP .it.row{display:flex!important;flex-wrap:wrap;gap:4px}#soloP .it input[type=range]{width:100%}#soloP .it[hidden]{display:none!important}#soloP .desc{display:none}#soloP .nt{color:#7B5876;font-size:12px;margin:4px 0}";
+  document.head.appendChild(st);
+  const P=document.createElement("section"); P.id="soloP"; P.className="ctl"; P.setAttribute("aria-label","미세 설정");
+  P.innerHTML='<div class="hd"><b>⚙ '+(NAMES[K]||"내 오브젝트")+' 미세 설정</b>'+(JEL?'<button type="button" id="soloAdd">하나 더</button><button type="button" id="soloNew">다시 놓기</button>':'')+'<button type="button" id="soloMin" aria-expanded="true">접기</button></div><div class="sb"></div>';
+  const SBX=P.querySelector(".sb"); let moved=0;
+  for(const [h,ids] of (SETS[K]||[])){ const h4=document.createElement("h4"); h4.textContent=h; const box=document.createElement("div"); for(const id of ids){ const el=document.querySelector('.it[data-k="'+id+'"]'); if(el){ box.appendChild(el); moved++; } } if(box.children.length){ SBX.append(h4,box); } }
+  if(!moved){ const p=document.createElement("p"); p.className="nt"; p.textContent=K.startsWith("cust")?"내 오브젝트는 메인 창의 오브젝트 → 목록 → 편집에서 바꾸면 이 창에 바로 나타나요.":"이 오브젝트는 따로 바꿀 값이 없어요."; SBX.appendChild(p); }
+  const nt=document.createElement("p"); nt.className="nt"; nt.textContent="여기서 바꾼 값은 저장되고, 메인 화면에도 바로 적용돼요."+(JEL?" 더블클릭하면 터져요.":""); SBX.appendChild(nt);
+  document.body.appendChild(P);
+  const fwd=(el,kind)=>{ if(!el || !el.id || !sbc) return; sbc.postMessage({t:"sev",id:el.id,k:kind,v:el.value}); };
+  P.addEventListener("input",e=>{ fwd(e.target,"input"); setTimeout(keep,40); });
+  P.addEventListener("change",e=>{ if(e.target.tagName==="SELECT") fwd(e.target,"input"); setTimeout(keep,40); });
+  P.addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b || b.closest(".hd")) return; fwd(b,"click"); setTimeout(()=>{ keep(); apply(); },60); });
+  const mn=P.querySelector("#soloMin"); mn.addEventListener("click",()=>{ const m=P.classList.toggle("min"); mn.textContent=m?"펼치기":"접기"; mn.setAttribute("aria-expanded",m?"false":"true"); });
+  if(JEL){ P.querySelector("#soloAdd").addEventListener("click",()=>BD.soloSpawn()); P.querySelector("#soloNew").addEventListener("click",()=>BD.soloClear()); }
+  const tag=document.createElement("div"); tag.textContent="따로 보기 · "+(NAMES[K]||"내 오브젝트")+(JEL?" — 더블클릭으로 터뜨려 보세요":""); tag.style.cssText="position:fixed;left:12px;top:12px;z-index:6;font:700 13px/1.4 system-ui;color:#33123A;background:rgba(255,255,255,.85);border:2px solid #9C2F86;border-radius:10px;padding:4px 10px"; document.body.appendChild(tag); }
+else { /* 메인 창: 따로 보기 창에서 바꾼 손잡이를 여기 손잡이에도 그대로 옮긴다 (화면과 설정 칸이 같이 바뀐다) */
+  try{ const sb2=new BroadcastChannel("nu-flow-solo"); sb2.onmessage=e=>{ const m=e.data||{}; if(m.t!=="sev") return; const el=$(m.id); if(!el) return; if(m.k==="input"){ el.value=m.v; el.dispatchEvent(new Event("input",{bubbles:true})); el.dispatchEvent(new Event("change",{bubbles:true})); } else el.click(); }; }catch(_){} }
 if(window.NF_VIEW==="stage"){
   let bc=null; try{ bc=new BroadcastChannel("nu-flow"); }catch(_){}
   const snap=()=>{ const o={}; document.querySelectorAll(".ctl [id], #tabs [id], #bdBox").forEach(el=>{ const r={}, t=el.tagName;
@@ -2264,7 +2314,7 @@ if(window.NF_VIEW==="panel")(function(){
     ["방사 집중선","장식",[["나오기","fxRayOn"],["광선 수","fxRayN"]],null],
     ["페인트 튀김 줄","장식",[["나오기","fxPaintOn"],["빈도","fxPaintN"]],null],
     ["얼룩말 줄무늬","장식",[["나오기","fxZebOn"],["줄 수","fxZebN"]],null]];
-  const syncs=[]; const SOLOK={"핏방울":"drop","하트":"heart","별":"star","물방울":"blue","구름":"cloud","십자별":"cross","노란 스파크":"spark"};
+  const syncs=[]; const SOLOK={"핏방울":"drop","하트":"heart","별":"star","물방울":"blue","구름":"cloud","십자별":"cross","노란 스파크":"spark","액체 줄기":"liquid","비눗방울":"bub","색 점":"dot","물결 띠":"wave","방사 집중선":"ray","페인트 튀김 줄":"paint","얼룩말 줄무늬":"zeb"};
   const openSolo=k=>{ const w=window.open(location.pathname+"?view=stage&solo="+encodeURIComponent(k),"nuflow-solo","popup,width=900,height=700"); if(w) w.focus(); };   // 따로 보기 창 (한 창을 다시 쓴다)
   function proxy(label,id){ const o=$(id); if(!o) return null; const w=mk("label","pxy"); w.appendChild(mk("span","",label));
     if(o.tagName==="BUTTON"){ const b=mk("button","",""); b.type="button"; b.addEventListener("click",()=>{ o.click(); setTimeout(sy,30); }); const sy=()=>{ b.setAttribute("aria-pressed",o.getAttribute("aria-pressed")||"false"); b.textContent=o.getAttribute("aria-pressed")==="true"?"켜짐":"꺼짐"; }; syncs.push(sy); sy(); w.appendChild(b); return w; }
@@ -2454,13 +2504,13 @@ if(window.NF_VIEW==="panel")(function(){
   const ls={ get:k=>{ try{ return localStorage.getItem(k); }catch(_){ return null; } }, set:(k,v)=>{ try{ if(v==null) localStorage.removeItem(k); else localStorage.setItem(k,v); }catch(_){} } };
   let DEV=ls.get("nu-flow-dev"); if(!DEV){ DEV=Math.random().toString(36).slice(2); ls.set("nu-flow-dev",DEV); }   // 이 기기 이름 (같은 기기의 다른 창끼리는 브라우저 저장소로 이미 맞춰진다)
   let ref=null, assets=null, quiet=false, timer=0, busy=false, again=false, lastT=+(ls.get(TK)||0);
-  const raw=Storage.prototype.setItem; Storage.prototype.setItem=function(k,v){ raw.call(this,k,v); if(!quiet && !SOLO && this===window.localStorage && KEYS.includes(k)) soon(); };   // 이 창에서 설정이 바뀌면 곧 올린다
+  const raw=Storage.prototype.setItem; Storage.prototype.setItem=function(k,v){ raw.call(this,k,v); if(!quiet && this===window.localStorage && KEYS.includes(k)) soon(); };   // 이 창에서 설정이 바뀌면 곧 올린다
   function soon(){ clearTimeout(timer); timer=setTimeout(push,1500); }
   function dataUrlBlob(u){ const [h,b]=u.split(","), m=/data:([^;]+)/.exec(h), bin=atob(b), a=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) a[i]=bin.charCodeAt(i); return new Blob([a],{type:m?m[1]:"image/png"}); }
   async function custOut(){ let L=[]; try{ L=JSON.parse(ls.get("nu-flow-cust")||"[]"); }catch(_){} let changed=false;   // 그림은 보관함에, 설정에는 주소만
     for(const c of L){ if(c.src && c.src.startsWith("data:") && assets){ try{ const r=await assets.upload(dataUrlBlob(c.src)); c.src=r.url; c.aid=r.id; changed=true; }catch(_){} } }
     if(changed){ quiet=true; ls.set("nu-flow-cust",JSON.stringify(L)); quiet=false; if(window.__nfCust) window.__nfCust(); } return JSON.stringify(L.filter(c=>!c.src || !c.src.startsWith("data:"))); }
-  async function push(){ if(!ref || SOLO) return; if(busy){ again=true; return; } busy=true; try{ const v={}; for(const k of KEYS) v[k]=k==="nu-flow-cust"?await custOut():ls.get(k); const t=Date.now(); await ref.set({t,dev:DEV,v}); lastT=t; ls.set(TK,String(t)); }catch(e){ if(window.console) console.warn("설정 서버 저장 실패:",e&&e.code||e); } busy=false; if(again){ again=false; soon(); } }
+  async function push(){ if(!ref) return; if(busy){ again=true; return; } busy=true; try{ const v={}; for(const k of KEYS) v[k]=k==="nu-flow-cust"?await custOut():ls.get(k); const t=Date.now(); await ref.set({t,dev:DEV,v}); lastT=t; ls.set(TK,String(t)); }catch(e){ if(window.console) console.warn("설정 서버 저장 실패:",e&&e.code||e); } busy=false; if(again){ again=false; soon(); } }
   function applyDoc(d,reload){ quiet=true; for(const k of KEYS) if(k in d.v){ const val=d.v[k]; if(k==="nu-flow-cust" && val){ let mine=[]; try{ mine=JSON.parse(ls.get(k)||"[]"); }catch(_){} let theirs=[]; try{ theirs=JSON.parse(val); }catch(_){} const keep=mine.filter(c=>c.src && c.src.startsWith("data:")); ls.set(k,JSON.stringify(theirs.concat(keep))); } else ls.set(k,val); } quiet=false; lastT=d.t; ls.set(TK,String(d.t)); if(reload){ try{ sessionStorage.setItem("nu-flow-sync-r",String(d.t)); }catch(_){} location.reload(); } }
   let note=null; function notice(){ if(note) return; note=document.createElement("button"); note.type="button"; note.textContent="다른 기기에서 설정이 바뀌었어요 · 눌러서 새로 고침"; note.style.cssText="position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:50;font:700 13px system-ui;background:#9C2F86;color:#fff;border:0;border-radius:999px;padding:8px 16px"; note.addEventListener("click",()=>location.reload()); document.body.appendChild(note); }
   (async()=>{ const db=await claude.use("db"), user=await claude.use("user"); if(!db || !user) return; const id=await user.id(); if(!id) return; assets=await claude.use("assets");
