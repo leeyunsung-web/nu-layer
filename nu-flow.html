@@ -428,7 +428,7 @@ const hh=(a,b)=>h(SEED,a,b);
 const HY=(a,b)=>Math.sqrt(a*a+b*b);   // Math.hypot보다 네 배쯤 빠르다 (매 칸 계산에 쓰임)
 let OVN=1; const VR=()=>{ const ix=WW*(1-1/OVN)/2, iy=WH*(1-1/OVN)/2; return [ix,iy,WW-ix,WH-iy]; };   // 3D 넓은 무대: 판이 화면보다 OVN배 크다 → 실제로 보이는 세상 범위
 const AREA=540000, CELL=5, CV=10, PAD=60, DT=1/30, NC=4, NL=2;
-const G={vis:[1,1,1,1], fxSprOn:0, fxSprN:0.25, fxSprS:1, fxSprC1:5, fxSprC2:9, fxSprLink:0, fxCrownOn:0, fxCrownS:.75, fxCrownC1:7, fxCrownC2:13, fxHeartOn:0, fxHeartN:4, fxHeartS:1, fxHeartC1:6, fxHeartC2:7, fxBubOn:0, fxBubN:5, fxBubS:1, fxBubC1:15, fxCloudOn:0, fxCloudN:5, fxCloudS:1, fxCloudC1:19, fxCloudC2:0, fxDotOn:1, fxDotN:40, fxDotS:1, fxWaveOn:0, fxWaveN:4, fxWaveSp:1, fxWaveC1:14, fxWaveC2:16, fxRayOn:0, fxRayN:10, fxRaySp:1, fxRayC1:0, fxRayC2:3, fxPaintOn:0, fxPaintN:0.6, fxPaintS:1, fxPaintC1:17, fxPaintC2:0, fxZebOn:0, fxZebN:7, fxZebSp:1, fxZebS:1, fxZebC1:13, fxZebC2:19, fxInkOn:1, fxInkC:13, d3kB:1, d3kF:1, d3kD:.4,d3Wide:1.25,gpu:1,pix:0,pxS:6,dot:1,swK:1.4,bkS:1.5,camZ:1,camX:0,camY:0,bgI:-1, bgCn:0xF5F5EF, d3kS:.3, smooth:.45, stOn:1, stN:9, stSize:1, stLen:4, stHV:.75, stBody:.3, stArmW:.55, skOn:1,sk3On:0,sk3v:1,sk3N:2,sk3Spin:.25,sk3Tilt:18,sk3Wob:.35,sk3Shade:.35,sk3Persp:.5,sk3Rand:.2, skT0:1, skT1:0, skBoltIn:0, skBoltOut:0, skBoltN:1, skBoltLag:.12, skMig1:0, denMig:0, skMig2:0, skT2:1, skT3:1, skT4:1, skLink:1, skRate:.5, skCap:10, skPopP:.55, skSpread:.6, skEdge:.85, skRMig:0, spd2Mig:0, skEMig:0, fxSpd:.5, skSize:1, skLife:1.6, skPop:1, skSpikes:9, skJag:.6, skLine:2.2, skSpin:.5, skBoil:.6, skFloat:1, skCF:0, skCL:3, skCH:2, skMix:0, stCol:19, stMix:0, skStarN:6, skStarLife:12, skFlow:1,skVar:.8,skMin:.5,skMax:1.6,stSpin:8, stTw:1, tear:60, tearPer:15, tearSpd:.4, tearRnd:.75, tearLong:.3, tearCap:.75, tearRate:.05, tipLen:50, d3:1, d3Tilt:22, d3Depth:.5, d3Drift:.4, d3Mouse:.5, spread:1, rim:0, rimW:130, visc:1, lightA:225, sp:1, spShow:0, spDen:1, spW:34, spPull:1, spStr:1, spBg:.35, spArms:1, spRot:1, spWob:1, speed:1, carry:1, dry:1, circ:.9, lspd:.5, dir:1, sep:.5, merge:1, head:1.3, tail:.9, strands:1.5, round:1, init:6, add:3, per:3.4, spin:1, calm:1, out:1, tailDry:1.5,
+const G={vis:[1,1,1,1], fxSprOn:0, fxSprN:0.25, fxSprS:1, fxSprC1:5, fxSprC2:9, fxSprLink:0, fxCrownOn:0, fxCrownS:.75, fxCrownC1:7, fxCrownC2:13, fxHeartOn:0, fxHeartN:4, fxHeartS:1, fxHeartC1:6, fxHeartC2:7, fxBubOn:0, fxBubN:5, fxBubS:1, fxBubC1:15, fxCloudOn:0, fxCloudN:5, fxCloudS:1, fxCloudC1:19, fxCloudC2:0, fxDotOn:1, fxDotN:40, fxDotS:1, fxWaveOn:0, fxWaveN:4, fxWaveSp:1, fxWaveC1:14, fxWaveC2:16, fxRayOn:0, fxRayN:10, fxRaySp:1, fxRayC1:0, fxRayC2:3, fxPaintOn:0, fxPaintN:0.6, fxPaintS:1, fxPaintC1:17, fxPaintC2:0, fxZebOn:0, fxZebN:7, fxZebSp:1, fxZebS:1, fxZebC1:13, fxZebC2:19, fxInkOn:1, fxInkC:13, d3kB:1, d3kF:1, d3kD:.4,d3Wide:1.25,gpu:1,pix:0,pxS:6,dot:1,swK:1.4,bkS:1.5,camZ:1,camX:0,camY:0,bgI:-1, bgCn:0xF5F5EF, d3kS:.3, smooth:.45, stOn:1, stN:9, stSize:1, stLen:4, stHV:.75, stBody:.3, stArmW:.55, skOn:1,sk3On:0,sk3v:1,sk3N:2,sk3Spin:.25,sk3Tilt:18,sk3Wob:.35,sk3Shade:.35,sk3Persp:.5,sk3Rand:.2, skT0:1, skT1:0, skBoltIn:0, skBoltOut:0, skBoltN:1, skBoltLag:.12, skMig1:0, denMig:0, skMig2:0, skT2:1, skT3:1, skT4:1, skLink:1, skRate:.5, skCap:10, skPopP:.55, skSpread:.6, skEdge:.85, skRMig:0, spd2Mig:0, skEMig:0, scnv:null, colv:null, fxSpd:.5, skSize:1, skLife:1.6, skPop:1, skSpikes:9, skJag:.6, skLine:2.2, skSpin:.5, skBoil:.6, skFloat:1, skCF:0, skCL:3, skCH:2, skMix:0, stCol:19, stMix:0, skStarN:6, skStarLife:12, skFlow:1,skVar:.8,skMin:.5,skMax:1.6,stSpin:8, stTw:1, tear:60, tearPer:15, tearSpd:.4, tearRnd:.75, tearLong:.3, tearCap:.75, tearRate:.05, tipLen:50, d3:1, d3Tilt:22, d3Depth:.5, d3Drift:.4, d3Mouse:.5, spread:1, rim:0, rimW:130, visc:1, lightA:225, sp:1, spShow:0, spDen:1, spW:34, spPull:1, spStr:1, spBg:.35, spArms:1, spRot:1, spWob:1, speed:1, carry:1, dry:1, circ:.9, lspd:.5, dir:1, sep:.5, merge:1, head:1.3, tail:.9, strands:1.5, round:1, init:6, add:3, per:3.4, spin:1, calm:1, out:1, tailDry:1.5,
   mat:[{carry:1,dir:0,exitR:.3,sl:1,size:1,share:1,ksz:.42,brk:.55,hth:.36,hmin:40,bsz:.17,td:.5,nA:.16,dth:.5},{carry:.6,dir:0,exitR:.3,sl:1,size:1,share:.25,ksz:.42,brk:0,hth:.36,hmin:40,bsz:0,td:.62,nA:.3,dth:.5},{carry:.5,dir:0,exitR:.3,sl:1,size:1,share:.4,ksz:.4,brk:0,hth:.36,hmin:40,bsz:.17,td:.6,nA:.3,dth:.5},{carry:1,dir:0,exitR:.3,sl:1,size:1,share:1,ksz:.42,brk:.55,hth:.36,hmin:40,bsz:.17,td:.5,nA:.16,dth:.5}]};   // 오브젝트마다: 크기, 솟는 비율, 하이라이트·어두운 면 세부   // out: 밖으로 밀려나는 힘   // spin: 도는 힘, calm: 물이 제 흐름으로 돌아오는 빠르기   // init: 처음 개수, add: 한 번에 더 솟는 개수, per: 간격(초)   // head: 머리 뭉침, tail: 꼬리 늘어짐, strands: 떨어지는 가닥 수
 let RIM, rimKey='';
 const LIVE=[]; let UNI, THK, NSF, MX, MY, TMP2, RD=[], RDF, PV=[], backT=0, backPT=0, STEPPED=false, FLIP=false;   // PV: 한 박자 전의 잉크 (그리기는 PV→지금 사이를 이어서 그린다), FLIP: 이 채널은 반대로 돈다
@@ -1683,7 +1683,7 @@ SCENES[0].mats.forEach((M,i)=>{ M.idx=i; });
    rule:"토르소 그림의 배경: 검정 바탕 위로 보라 줄기와 분홍 물보라가 기류를 타고 돈다. 길게 늘어난 옆면은 매끈하고, 흐름을 마주 보는 끝은 흐르는 쪽으로 몇 갈래로 뾰족하게 찢어진다. 분홍 하이라이트도 번개처럼 찢긴 결이고, 하얀 네 갈래 반짝이가 떠 있다.",
    move:"분홍 소용돌이와 똑같이 움직인다 (조절값도 같이 쓴다). 찢긴 갈래는 떨리지 않고 공간에 고정돼, 늘어나면서 생긴 결처럼 보인다."}));
   SCENES[1].mats.forEach((M,i)=>{ M.idx=i; }); }   // 장면 2: 토르소 그림 배경처럼 찢긴 소용돌이
-let SC=SCENES[0], scene=0, T=0;
+let SC=SCENES[0], scene=0, T=0, SWREADY=false, SWSY=0;
 /* 핏방울 자리: 화면의 한쪽 (세로 화면이면 위·아래). 소용돌이 축은 나머지 자리의 가운데로 */
 function bdSide(){ let sd=BD.G.side; if(WH>WW*1.05){ if(sd===0) sd=3; else if(sd===1) sd=2; } return sd; }
 function bdRect(){ const r=bdRect0(), v=VR(), o=OVN; return [v[0]+r[0]/o, v[1]+r[1]/o, r[2]/o, r[3]/o]; }   // 처음 놓이는 자리는 보이는 화면 안에서
@@ -1698,7 +1698,14 @@ const popNow=(x,y,kind,r,force)=>{ if(!G.skOn || (!force && skLive()>=(G.skCap||
 BD.onPlace=()=>{ const r=bdRect(); BD.setZone(r[0],r[1],r[0]+r[2],r[1]+r[3]); };
 const lumH=h=>{ if(!h || h[0]!=="#") return 1; const v=parseInt(h.slice(1,7),16); return (.299*(v>>16&255)+.587*(v>>8&255)+.114*(v&255))/255; };
 function BGN(){ if(G.bgI===99) return "#"+((G.bgCn|0)&0xFFFFFF).toString(16).padStart(6,"0"); return G.bgI>=0 && PAL[G.bgI]?PAL[G.bgI]:SC.bg; }   /* 99 = 직접 고른 색 */   // 배경색: 고르면 그 색, 아니면 장면 기본
-function setScene(i){ tphInit=false; scene=i; try{ localStorage.setItem("nu-flow-scene",String(i)); }catch(_){} SC=SCENES[i]; simT=0; puffNo=0; POURS.length=0; RMX=HY(WW,WH)*.5; placeCenter(); backT=0; U.fill(0); V.fill(0); for(let y=0;y<gh;y++) for(let x=0;x<gw;x++){ const k=y*gw+x; MX[k]=x*CELL; MY[k]=y*CELL; NSF[k]=pat(x*CELL,y*CELL,0); } for(const L of DYE) for(const D of L) D.fill(0);
+/* 소용돌이마다 따로: 분홍·삐죽 소용돌이는 모양·흐름·줄기·어두움·하이라이트 값을 각자 갖는다. G에는 지금 장면 값이 들어 있고, 다른 장면 값은 G.scnv에 보관 */
+const SWID={dCW:"dir",spOn:"sp",swK:"swK",bkS:"bkS",spDen:"spDen",spW:"spW",spArms:"spArms",spRot:"spRot",spWob:"spWob",gSpd:"speed",gSpin:"spin",gCirc:"circ",gOut:"out",gSpread:"spread",gRim:"rim",gRimW:"rimW",spPull:"spPull",spStr:"spStr",spBg:"spBg",gVisc:"visc",gCalm:"calm",gInit:"init",gAdd:"add",gPer:"per",gCarry:"carry",gHead:"head",gTail:"tail",gStr:"strands",gTD:"tailDry",gRnd:"round",gSep:"sep",gMerge:"merge",gDry:"dry",tear:"tear",tearLong:"tearLong",tearCap:"tearCap",tipLen:"tipLen",tearRate:"tearRate",tearPer:"tearPer",tearRnd:"tearRnd"};
+function swStash(s){ if(!G.scnv || typeof G.scnv!=="object") G.scnv={}; const o={}; for(const id in SWID){ const k=SWID[id]; if(typeof G[k]==="number") o[k]=G[k]; } o.mat=JSON.parse(JSON.stringify(G.mat)); G.scnv[s]=o; }
+function swLoad(s){ const o=G.scnv && G.scnv[s]; if(!o) return false; for(const k in o){ if(k==="mat"){ if(Array.isArray(o.mat)) o.mat.forEach((m,i)=>{ if(G.mat[i]&&m) for(const q in m) if(typeof m[q]==="number") G.mat[i][q]=m[q]; }); } else if(k in G && typeof o[k]==="number") G[k]=o[k]; } return true; }
+function swSyncUI(){ try{ syncUI(); }catch(_){} try{ syncSp(); }catch(_){} for(const id in SWID){ const e=$(id); if(e && e.type==="range"){ e.value=G[SWID[id]]; e.dispatchEvent(new Event("input")); } } try{ $("spOn").setAttribute("aria-pressed",G.sp?"true":"false"); }catch(_){} try{ syncO(); }catch(_){} if(window.NF_COLSYNC) window.NF_COLSYNC(); }
+/* 액체 색 바꾸기: 장면·액체마다 바탕색·어두운 색·하이라이트 색 (비우면 원래 색) */
+function applyCols(){ for(let s=0;s<SCENES.length;s++) SCENES[s].mats.forEach((M,i)=>{ if(!M.o0) M.o0={base:M.base,core:M.core,hi:M.hi}; const c=(G.colv && G.colv[s] && G.colv[s][i])||{}; M.base=c.base||M.o0.base; M.core=c.core||M.o0.core; M.hi=c.hi||M.o0.hi; }); }
+function setScene(i){ if(typeof scene==='number' && scene!==i && SWREADY){ swStash(scene); if(!swLoad(i)) swStash(i); saveG(); SWSY=1; } tphInit=false; scene=i; try{ localStorage.setItem("nu-flow-scene",String(i)); }catch(_){} SC=SCENES[i]; if(SWSY){ SWSY=0; swSyncUI(); } if(window.NF_SWSCENE) window.NF_SWSCENE(i); simT=0; puffNo=0; POURS.length=0; RMX=HY(WW,WH)*.5; placeCenter(); backT=0; U.fill(0); V.fill(0); for(let y=0;y<gh;y++) for(let x=0;x<gw;x++){ const k=y*gw+x; MX[k]=x*CELL; MY[k]=y*CELL; NSF[k]=pat(x*CELL,y*CELL,0); } for(const L of DYE) for(const D of L) D.fill(0);
   SC.seed(1000+i*400); for(let y=1;y<vh-1;y++){ let k=y*vw+1; for(let x=1;x<vw-1;x++,k++){ const f=target(x*CV-PAD,y*CV-PAD,0); U[k]=f[0]; V[k]=f[1]; } } if(G.gpu && GPUV.ok) GPUV.upload(); for(const E of EMA) for(const A of E) A.fill(0); LIVE.length=0;
   const tb=$("tabs").children; for(let kk=0;kk<tb.length;kk++) tb[kk].setAttribute("aria-selected",kk===i?"true":"false"); $("nRule").textContent=SC.rule; $("nMove").textContent=SC.move; }
 function burst(cx,cy,R,sd){ const nn=14; g.beginPath();
@@ -1976,7 +1983,7 @@ cv.addEventListener("pointerup",pup); cv.addEventListener("pointercancel",pup); 
 /* 조절: 값은 브라우저에 저장되어 다음에 열어도 이어진다 */
 const pct=v=>Math.round(v*100)+"%", KEY="swirl-flow-g";
 function saveG(){ try{ localStorage.setItem(KEY,JSON.stringify(G)); }catch(_){} }
-function loadG(){ try{ const o=JSON.parse(localStorage.getItem(KEY)||"{}"); if(!o.sk3v){ o.sk3On=0; o.sk3v=1; }   /* 입체 스파크는 고를 때만 (기본은 예전 평면) */ for(const k in o) if(k in G && typeof o[k]==="number") G[k]=o[k]; if(Array.isArray(o.vis)) o.vis.forEach((v,i)=>{ if(i<4) G.vis[i]=v?1:0; }); if(Array.isArray(o.mat)) o.mat.forEach((m,i)=>{ if(G.mat[i]&&m) for(const k in m) if(k in G.mat[i] && typeof m[k]==="number") G.mat[i][k]=m[k]; }); }catch(_){} }
+function loadG(){ try{ const o=JSON.parse(localStorage.getItem(KEY)||"{}"); if(!o.sk3v){ o.sk3On=0; o.sk3v=1; }   /* 입체 스파크는 고를 때만 (기본은 예전 평면) */ for(const k in o) if(k in G && typeof o[k]==="number") G[k]=o[k]; if(o.scnv && typeof o.scnv==='object') G.scnv=o.scnv; if(o.colv && typeof o.colv==='object') G.colv=o.colv; if(Array.isArray(o.vis)) o.vis.forEach((v,i)=>{ if(i<4) G.vis[i]=v?1:0; }); if(Array.isArray(o.mat)) o.mat.forEach((m,i)=>{ if(G.mat[i]&&m) for(const k in m) if(k in G.mat[i] && typeof m[k]==="number") G.mat[i][k]=m[k]; }); }catch(_){} }
 loadG(); if(!G.skMig1){ G.skMig1=1; G.skT1=0; saveG(); } G.fxSprOn=0; G.fxSprLink=0; G.fxCrownOn=0; G.fxHeartOn=0; G.fxCloudOn=0; if(!G.skMig2){ G.skMig2=1; G.fxBubOn=0; G.skT3=0; saveG(); } if(!G.skMig3){ G.skMig3=1; G.skT2=0; saveG(); } if(!G.wMig){ G.wMig=1; G.d3Wide=1.2; saveG(); } if(!G.wMig3){ G.wMig3=1; if(G.d3Wide>1.25) G.d3Wide=1.25; saveG(); } if(!G.bkMig){ G.bkMig=1; G.bkS=1.5; saveG(); } if(!G.skMig4){ G.skMig4=1; G.skMix=1; saveG(); } if(!G.wMig2){ G.wMig2=1; G.d3Wide=1.4; saveG(); } if(!G.swMig){ G.swMig=1; G.swK=1.4; saveG(); } if(!G.skRMig){ G.skRMig=1; G.skRate=Math.max(.1,G.skRate*.6); saveG(); } if(!G.skEMig){ G.skEMig=1; G.skEdge=Math.max(G.skEdge==null?.6:G.skEdge,.85); saveG(); } if(!G.spd2Mig){ G.spd2Mig=1; G.speed=Math.max(.1,G.speed*.5); G.lspd=Math.max(.1,G.lspd*.5); saveG(); }   /* 전체 속도 한 번 절반 (소용돌이·빛) */   /* 스파크 빈도 한 번 줄임 */ if(G.denMig!==2){ if(G.denMig===1){ G.init=Math.round(G.init/2); G.add=Math.round(G.add/2); G.per=G.per*2; G.swK=G.swK/1.35; G.spDen=G.spDen/1.8; G.spread=G.spread/1.3; }   /* 두 배로 했던 것을 되돌리고 */
   G.init=Math.min(12,Math.round(G.init*1.5)); G.add=Math.min(6,Math.round(G.add*1.5)); G.per=Math.max(1.5,G.per/1.5); G.swK=Math.min(2.5,G.swK*1.18); G.spDen=Math.min(3,G.spDen*1.4); G.spread=Math.min(3,G.spread*1.15); G.denMig=2; saveG(); }   /* 소용돌이 밀도 1.5배, 가장자리 쪽으로 조금 더 */   // 떠다니는 오각별·비눗방울은 핏방울 원리의 별 방울·파란 물방울로 대신한다 (한 번만)   // 분사·왕관·그린 하트는 쓰지 않는다   // 번개는 일단 쉬게 둔다 (한 번만)
 function syncUI(){ $("dCW").setAttribute("aria-pressed",G.dir>0?"true":"false"); $("dCCW").setAttribute("aria-pressed",G.dir>0?"false":"true");
@@ -2042,7 +2049,7 @@ function syncVis(){ for(const [id,c] of VIS) $(id).setAttribute("aria-pressed",G
 $("vD").addEventListener("click",()=>{ BD.setOn(!BD.on()); placeCenter(); syncVis(); });
 for(const [id,c] of VIS) $(id).addEventListener("click",()=>setVis(c,!G.vis[c]));
 syncVis();
-fit(); aspect=WW>WH?1:2; let sc0=0; try{ sc0=+localStorage.getItem("nu-flow-scene")||0; }catch(_){} setScene(sc0<SCENES.length?sc0:0);   // 마지막에 본 장면으로 연다   // 저장된 값을 읽은 다음에 시작한다 (처음 개수 등이 첫 판부터 반영되도록)
+fit(); aspect=WW>WH?1:2; let sc0=0; try{ sc0=+localStorage.getItem("nu-flow-scene")||0; }catch(_){} setScene(sc0<SCENES.length?sc0:0); applyCols(); SWREADY=true; window.NF_SW={ get scene(){ return scene; }, get G(){ return G; }, SCENES, applyCols, saveG };   // 마지막에 본 장면으로 연다   // 저장된 값을 읽은 다음에 시작한다 (처음 개수 등이 첫 판부터 반영되도록)
 
 /* 화질과 이미지 저장 */
 const QS=[["q1",2.1e6],["q2",3.7e6],["q3",8.4e6]];
@@ -2069,7 +2076,7 @@ if(window.NF_SOLO){ const K=window.NF_SOLO, NAMES={drop:"핏방울",heart:"하�
   let RG=rd(KEY), RB=rd("swirl-flow-bd"), SG="", SB="";
   const snapAll=()=>{ SG=JSON.stringify(G); SB=JSON.stringify(BD.G); };
   apply(); snapAll();
-  addEventListener("storage",e=>{ if(e.key===KEY){ RG=rd(KEY); loadG(); apply(); syncUI(); snapAll(); } else if(e.key==="swirl-flow-bd"){ RB=rd("swirl-flow-bd"); BD.reload(); apply(); BD.syncUI(); snapAll(); } });
+  addEventListener("storage",e=>{ if(e.key===KEY){ RG=rd(KEY); loadG(); applyCols(); apply(); syncUI(); snapAll(); } else if(e.key==="swirl-flow-bd"){ RB=rd("swirl-flow-bd"); BD.reload(); apply(); BD.syncUI(); snapAll(); } });
   window.__soloApply=apply; document.title="따로 보기 · "+(NAMES[K]||(K.startsWith("cust")?"내 오브젝트":K));
   function keep(){ const og=JSON.parse(SG), ob=JSON.parse(SB); let cg=0, cb=0;
     for(const k in G){ const v=G[k]; if(typeof v==="object") continue; if(og[k]!==v){ RG[k]=v; cg=1; } }
@@ -2478,11 +2485,8 @@ if(window.NF_VIEW==="panel")(function(){
       ["장식 이펙트",[H("비눗방울"),"fxBubOn","fxBubN","fxBubS","fxBubC1",H("색 점"),"fxDotOn","fxDotN","fxDotS",H("물결 띠"),"fxWaveOn","fxWaveN","fxWaveSp","fxWaveC1","fxWaveC2",H("방사 집중선"),"fxRayOn","fxRayN","fxRaySp","fxRayC1","fxRayC2",H("페인트 튀김 줄"),"fxPaintOn","fxPaintN","fxPaintS","fxPaintC1","fxPaintC2",H("얼룩말 줄무늬와 잉크"),"fxZebOn","fxZebN","fxZebSp","fxZebS","fxZebC1","fxZebC2","fxInkC"]]]],
     ["배경",[
       ["배경색",["bgSw"]],
-      ["소용돌이 모양",["dCW","spOn","swK","bkS","spDen","spW","spArms","spRot","spWob"]],
-      ["소용돌이 힘·흐름",["gSpd","gSpin","gCirc","gOut","gSpread","gRim","gRimW","spPull","spStr","spBg","gVisc","gCalm","bReset"]],
-      ["액체 줄기",["gInit","gAdd","gPer","gCarry","gHead","gTail","gStr","gTD","gRnd","gSep","gMerge","gDry"]],
-      ["색별 세부",["@color"]],
-      ["찢긴 결",["@tearHint","tear","tearLong","tearCap","tipLen","tearRate","tearPer","tearRnd"]],
+      ["분홍 소용돌이",["@sw0"]],
+      ["삐죽 소용돌이",["@sw1"]],
       ["빛 방향",["gLA","gLs"]]]],
     ["오브젝트",[
       ["목록",["@objList"]],
@@ -2505,14 +2509,36 @@ if(window.NF_VIEW==="panel")(function(){
   const item=k=>Q('.it[data-k="'+k+'"]');
   const blocks={ color:()=>{ const o=$("otabs"); return o && o.closest(".ctl"); }, kSel:()=>$("kSel"),
     tearHint:()=>{ const p=document.createElement("p"); p.className="hint"; p.textContent="'삐죽 소용돌이' 장면에서 쓰입니다."; return p; },
-    objList:()=>window.NF_OBJLIST?window.NF_OBJLIST():null, pvH:()=>pv("mhCv"), pvS:()=>pv("msCv") };
+    objList:()=>window.NF_OBJLIST?window.NF_OBJLIST():null, sw0:()=>swHost(0), sw1:()=>swHost(1), pvH:()=>pv("mhCv"), pvS:()=>pv("msCv") };
+
+  /* 배경 > 분홍·삐죽 소용돌이: 한 벌의 칸을 두 탭이 같이 쓴다. 탭을 열면 화면도 그 소용돌이로 바뀌고, 칸은 그 소용돌이 값을 보여 준다 */
+  const SWG=[["모양",["dCW","spOn","swK","bkS","spDen","spW","spArms","spRot","spWob"]],["힘·흐름",["gSpd","gSpin","gCirc","gOut","gSpread","gRim","gRimW","spPull","spStr","spBg","gVisc","gCalm","bReset"]],["액체 줄기",["gInit","gAdd","gPer","gCarry","gHead","gTail","gStr","gTD","gRnd","gSep","gMerge","gDry"]],["색",["@cols"]],["어두움·하이라이트",["@color"]],["찢긴 결",["tear","tearLong","tearCap","tipLen","tearRate","tearPer","tearRnd"]]];
+  let SWW=null, swCur=0; const swHosts=[];
+  function swBuild(){ const w=document.createElement("div"); w.className="swwrap"; const tb=document.createElement("div"); tb.className="tabs itabs"; tb.setAttribute("role","tablist"); const note=document.createElement("p"); note.className="hint swnote"; w.append(note,tb); const pans=[];
+    SWG.forEach(([n,keys],q)=>{ const b=document.createElement("button"); b.type="button"; b.setAttribute("role","tab"); b.textContent=n; b.addEventListener("click",()=>swTab(q)); tb.appendChild(b); const c=document.createElement("div"); c.className="ctl swc"; c.hidden=true;
+      for(const k of keys){ let el=null; if(k==="@cols") el=colBlock(); else if(k==="@color"){ el=blocks.color(); if(el){ el.classList.add("sub"); c.appendChild(el); continue; } } else el=item(k); if(el) c.appendChild(el); } w.appendChild(c); pans.push([b,c]); });
+    w._p=pans; w._n=note; return w; }
+  function swTab(q){ if(!SWW) return; if(swCur===0 && q===5) q=0; SWW._p.forEach(([b,c],k)=>{ b.setAttribute("aria-selected",k===q?"true":"false"); c.hidden=k!==q; }); SWW.dataset.t=q; try{ localStorage.setItem("nu-flow-swtab",String(q)); }catch(_){} }
+  window.NF_SWSCENE=s=>{ const p=P[bi] && P[bi][cur[bi]]; if(!p || p.dataset.sw==null || +p.dataset.sw===s) return; for(let a=0;a<P.length;a++) for(let c=0;c<P[a].length;c++) if(P[a][c].dataset.sw===String(s)){ show(a,c); return; } };
+  function swHost(s){ if(!SWW) SWW=swBuild(); const h=document.createElement("div"); h.className="swhost"; h.dataset.sw=String(s); swHosts[s]=h; return h; }
+  function swShow(p){ const s=+p.dataset.sw; swCur=s; const h=swHosts[s]; if(h && SWW.parentNode!==h) h.appendChild(SWW); SWW._p[5][0].hidden=s!==1; SWW._n.textContent=s===0?"분홍 소용돌이 설정입니다. 이 탭을 열면 화면도 분홍 소용돌이로 바뀝니다.":"삐죽 소용돌이 설정입니다. 이 탭을 열면 화면도 삐죽 소용돌이로 바뀝니다.";
+    if(window.NF_SW && NF_SW.scene!==s){ const b=$("st"+s); if(b) b.click(); } let q=+(SWW.dataset.t||0); if(SWW.dataset.t==null){ try{ q=+(localStorage.getItem("nu-flow-swtab")||0)||0; }catch(_){} } swTab(q); }
+  /* 색: 액체마다 바탕·어두운 면·하이라이트 */
+  function colBlock(){ const d=document.createElement("div"); d.className="it colblk"; d.dataset.k="swCols";
+    d.innerHTML='<div class="tabs coltabs" role="tablist"></div><div class="colrow"></div><button type="button" class="colreset">이 액체 원래 색으로</button><small class="desc">고른 색은 지금 보고 있는 소용돌이에만 적용됩니다.</small>';
+    const tabs=d.querySelector(".coltabs"), row=d.querySelector(".colrow"), names=["분홍 A","분홍 B","보라","붉은"], MI=[0,3,1,2], KS=[["base","바탕색"],["core","어두운 색"],["hi","하이라이트 색"]]; let ci=0;
+    names.forEach((n,i)=>{ const b=document.createElement("button"); b.type="button"; b.setAttribute("role","tab"); b.textContent=n; b.addEventListener("click",()=>{ ci=i; const o=$("ot"+i); if(o) o.click(); sync(); }); tabs.appendChild(b); });
+    const ins={}; KS.forEach(([k,n])=>{ const l=document.createElement("label"); l.className="colpick"; l.innerHTML="<span></span><input type='color'>"; l.firstChild.textContent=n; const inp=l.querySelector("input"); inp.addEventListener("input",()=>{ const G=NF_SW.G, s=NF_SW.scene, mi=MI[ci]; if(!G.colv || typeof G.colv!=="object") G.colv={}; G.colv[s]=G.colv[s]||{}; G.colv[s][mi]=Object.assign({},G.colv[s][mi],{[k]:inp.value}); NF_SW.applyCols(); NF_SW.saveG(); }); ins[k]=inp; row.appendChild(l); });
+    d.querySelector(".colreset").addEventListener("click",()=>{ const G=NF_SW.G, s=NF_SW.scene, mi=MI[ci]; if(G.colv && G.colv[s]) delete G.colv[s][mi]; NF_SW.applyCols(); NF_SW.saveG(); sync(); });
+    function sync(){ [...tabs.children].forEach((b,i)=>b.setAttribute("aria-selected",i===ci?"true":"false")); if(!window.NF_SW) return; const M=NF_SW.SCENES[NF_SW.scene].mats[MI[ci]]; for(const [k] of KS) ins[k].value=M[k]; }
+    window.NF_COLSYNC=sync; sync(); return d; }
   function pv(id){ const c=$(id); if(!c) return null; const d=document.createElement("div"); d.className="pvbox"; d.appendChild(c); const s=document.createElement("small"); s.className="desc"; s.textContent="조절하면 여기와 화면 속 방울이 바로 바뀝니다."; d.appendChild(s); return d; }
   const nav=document.createElement("div"); nav.className="navw"; const bt=document.createElement("div"); bt.className="tabs mtabs btabs"; bt.setAttribute("role","tablist"); bt.setAttribute("aria-label","설정 큰 묶음");
   const st=document.createElement("div"); st.className="tabs stabs"; st.setAttribute("role","tablist"); st.setAttribute("aria-label","설정 작은 묶음"); nav.append(bt,st); host.insertBefore(nav,mt);
   const P=[], SB=[];   // P[i][j] = 작은 탭 내용, SB[i] = 그 큰 탭의 작은 탭 버튼들
   L.forEach(([bn,subs],i)=>{ const b=document.createElement("button"); b.type="button"; b.setAttribute("role","tab"); b.textContent=bn; b.addEventListener("click",()=>show(i,cur[i]||0)); bt.appendChild(b); P[i]=[]; SB[i]=[];
     subs.forEach(([sn,keys],j)=>{ const p=document.createElement("div"); p.className="mpanel np"; p.setAttribute("role","tabpanel"); p.hidden=true; const c=document.createElement("div"); c.className="ctl"; c.dataset.g=i+"."+j; c.dataset.n=bn+"/"+sn; p.appendChild(c); host.insertBefore(p,old[0]||null);
-      for(const k of keys){ let el=null; if(k[0]==="#"){ el=document.createElement("div"); el.className="it hd"; el.dataset.k="h:"+k.slice(1); el.innerHTML="<span></span>"; el.firstChild.textContent=k.slice(1); } else if(k[0]==="@"){ el=blocks[k.slice(1)] && blocks[k.slice(1)](); if(el && el.classList.contains("ctl")){ el.classList.add("sub"); p.appendChild(el); continue; } if(el && (k==="@pvH"||k==="@pvS"||k==="@objList")){ p.insertBefore(el,c); continue; } } else el=item(k); if(el) c.appendChild(el); }
+      for(const k of keys){ let el=null; if(k[0]==="#"){ el=document.createElement("div"); el.className="it hd"; el.dataset.k="h:"+k.slice(1); el.innerHTML="<span></span>"; el.firstChild.textContent=k.slice(1); } else if(k[0]==="@"){ el=blocks[k.slice(1)] && blocks[k.slice(1)](); if(el && el.classList.contains("ctl")){ el.classList.add("sub"); p.appendChild(el); continue; } if(el && (k==="@pvH"||k==="@pvS"||k==="@objList")){ p.insertBefore(el,c); continue; } if(el && el.dataset.sw!=null){ p.insertBefore(el,c); p.dataset.sw=el.dataset.sw; c.remove(); continue; } } else el=item(k); if(el) c.appendChild(el); }
       P[i][j]=p; const sb=document.createElement("button"); sb.type="button"; sb.setAttribute("role","tab"); sb.textContent=sn; sb.dataset.g=i+"."+j; sb.addEventListener("click",()=>show(i,j)); SB[i][j]=sb; }); });
   const left=[]; old.forEach(p=>p.querySelectorAll(".it[data-k]").forEach(el=>left.push(el)));   // 빠진 칸이 있으면 오브젝트 맨 끝 '기타'에
   if(left.length){ const i=2, j=P[i].length, p=document.createElement("div"); p.className="mpanel np"; p.hidden=true; const c=document.createElement("div"); c.className="ctl"; c.dataset.g=i+"."+j; p.appendChild(c); host.insertBefore(p,old[0]||null); left.forEach(el=>c.appendChild(el)); P[i][j]=p; const sb=document.createElement("button"); sb.type="button"; sb.textContent="기타"; sb.dataset.g=i+"."+j; sb.addEventListener("click",()=>show(i,j)); SB[i][j]=sb; if(window.console) console.warn("메뉴 정리: 자리가 정해지지 않은 칸",left.map(e=>e.dataset.k)); }
@@ -2523,7 +2549,7 @@ if(window.NF_VIEW==="panel")(function(){
   applySaved();
   let cur=[0,0,0], bi=0; try{ const s=(localStorage.getItem("nu-flow-tab2")||"0.0").split("."); bi=+s[0]||0; cur[bi]=+s[1]||0; }catch(_){}
   function show(i,j){ if(!P[i]) i=0; if(!P[i][j]) j=0; bi=i; cur[i]=j; [...bt.children].forEach((b,k)=>b.setAttribute("aria-selected",k===i?"true":"false")); st.replaceChildren(...SB[i]); SB[i].forEach((b,k)=>b.setAttribute("aria-selected",k===j?"true":"false"));
-    P.forEach((r,a)=>r.forEach((p,c)=>p.hidden=!(a===i && c===j))); try{ localStorage.setItem("nu-flow-tab2",i+"."+j); }catch(_){} navH(); }
+    P.forEach((r,a)=>r.forEach((p,c)=>p.hidden=!(a===i && c===j))); if(P[i][j].dataset.sw!=null) swShow(P[i][j]); try{ localStorage.setItem("nu-flow-tab2",i+"."+j); }catch(_){} navH(); }
   function navH(){ document.documentElement.style.setProperty("--navh",nav.offsetHeight+"px"); }
   addEventListener("resize",navH); show(bi,cur[bi]);
   /* 배치 처음대로 (편집 중에만 보인다) */
@@ -2559,6 +2585,18 @@ if(window.NF_VIEW==="panel")(function(){
 .ctl.sub{border:2px solid var(--line);border-radius:12px;padding:10px 12px}
 .pvbox{position:sticky;top:calc(var(--navh,90px) + 4px);z-index:4;display:flex;align-items:center;gap:12px;background:var(--bg,#F5F5EF);padding:6px 0;border-bottom:1px solid rgba(0,0,0,.08)}
 .pvbox canvas{width:150px;height:150px;background:#f4f1ea;border-radius:12px;border:1px solid rgba(0,0,0,.12)}
+.swwrap{display:block}.swnote{margin:2px 0 8px;font-size:12px;opacity:.75}
+.itabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px;padding-bottom:8px;border-bottom:1px dashed rgba(156,47,134,.35)}
+.itabs button{border-radius:8px;min-height:28px;font-size:12px;padding:3px 10px;background:transparent}
+.itabs button[aria-selected="true"]{background:#9C2F86;color:#fff;border-color:#9C2F86}
+.swc[hidden]{display:none!important}
+.ctl .it.colblk{grid-column:1/-1;display:flex!important;flex-direction:column!important;align-items:flex-start!important;gap:10px}
+.ctl .it.colblk .coltabs,.ctl .it.colblk .colrow{flex-direction:row!important}
+.coltabs{display:flex;flex-wrap:wrap;gap:6px}.coltabs button{border-radius:999px;min-height:28px;font-size:12px;padding:3px 12px}
+.coltabs button[aria-selected="true"]{background:#33123A;color:#fff;border-color:#33123A}
+.colrow{display:flex;flex-wrap:wrap;gap:14px}.colpick{display:flex;align-items:center;gap:8px;font-size:13px}
+.colpick input[type=color]{width:44px;height:32px;padding:0;border:1px solid rgba(0,0,0,.2);border-radius:8px;background:none}
+.colreset{align-self:flex-start}
 .dg{display:none!important}
 .editing .np .it>.dg{display:inline-flex!important;position:absolute;left:-10px;top:-8px;width:24px;height:24px;min-height:0!important;padding:0!important;align-items:center;justify-content:center;border-radius:6px!important;font-size:14px!important;background:#9C2F86!important;color:#fff!important;border:0!important;cursor:grab;touch-action:none;z-index:2}
 .it.dragging{position:fixed!important;z-index:1000;pointer-events:none;background:var(--bg,#F5F5EF);box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:.95}
