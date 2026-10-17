@@ -1616,19 +1616,23 @@ function src(l,c,a){ const sl=l*NC+c, D=DYE[l][c], P=PV[l][c]; if(!TCN[sl]) retu
   RDF[sl]=frameNo; if(!G.smooth) return R; const SMB=SMO[sl]&&SMO[sl].length===R.length?SMO[sl]:(SMO[sl]=new Float32Array(R.length)), q=G.smooth; for(let k=0;k<R.length;k++){ const v=SMB[k]+(R[k]-SMB[k])*q; SMB[k]=v<1e-4?0:v; R[k]=SMB[k]; } return R; }   // 아주 짧은 시간 평활: 한 프레임만 튀었다 돌아오는 변화(떨림)를 걸러낸다
 /* 보이는 곳만 그리기: 판은 줌아웃·기울기 대비로 화면보다 크게 깔려 있다. 지금 화면에 보이는 네모만 칠하고 바깥은 건너뛴다 */
 let NOCLIP=false; const VISR=[null,null,null,null];
-function visRect(i){ const r=stEl.getBoundingClientRect(), sw=stEl.clientWidth, sh=stEl.clientHeight, cw=cv.clientWidth, ch=cv.clientHeight; if(!sw||!sh||!cw||!ch) return null; let x0=1e9, y0=1e9, x1=-1e9, y1=-1e9;
+const SZ={sw:0,sh:0,cw:0,ch:0,ok:false}; function szUp(){ SZ.sw=stEl.clientWidth; SZ.sh=stEl.clientHeight; SZ.cw=cv.clientWidth; SZ.ch=cv.clientHeight; SZ.ok=true; }   // 크기는 바뀔 때만 잰다 (매 프레임 재면 브라우저가 화면 배치를 다시 계산하느라 멈칫한다)
+try{ const ro=new ResizeObserver(szUp); ro.observe(stEl); ro.observe(cv); }catch(_){ addEventListener("resize",szUp); }
+function visRect(i){ if(!SZ.ok) szUp(); const sw=SZ.sw, sh=SZ.sh, cw=SZ.cw, ch=SZ.ch; if(!sw||!sh||!cw||!ch) return null; let x0=1e9, y0=1e9, x1=-1e9, y1=-1e9;
   for(const [px,py] of [[0,0],[sw,0],[0,sh],[sw,sh]]){ let x=(px-sw/2-G.camX*sw)/G.camZ, y=(py-sh/2-G.camY*sh)/G.camZ; if(D3.split && D3.Hi[i]){ const q=unpr(D3.Hi[i],x,y); if(!q) return null; x=q[0]; y=q[1]; }
     const X=(x+cw/2)/cw*W, Y=(y+ch/2)/ch*Hh; if(X<x0) x0=X; if(X>x1) x1=X; if(Y<y0) y0=Y; if(Y>y1) y1=Y; }
   const m=10; x0=Math.max(0,Math.floor(x0-m)); y0=Math.max(0,Math.floor(y0-m)); x1=Math.min(W,Math.ceil(x1+m)); y1=Math.min(Hh,Math.ceil(y1+m)); if(x1<=x0||y1<=y0) return null; if(x0===0 && y0===0 && x1===W && y1===Hh) return null; return [x0,y0,x1-x0,y1-y0]; }
 function render(dt,a){ const sp3=D3.split, L=[[gMain,1]]; if(sp3) L.push([gB,0],[gS,3]); for(let i=0;i<4;i++) VISR[i]=null; const on=[];
   if(!NOCLIP) for(const [c,i] of L){ const R=visRect(i); VISR[i]=R; if(R){ c.save(); c.setTransform(1,0,0,1,0,0); c.beginPath(); c.rect(R[0],R[1],R[2],R[3]); c.clip(); on.push(c); } }
   try{ renderIn(dt,a); } finally { for(const c of on) c.restore(); } }
+/* 그래픽카드 그리기 감시: 기기에서 오히려 느리면 그리기만 CPU로 돌린다 (계산은 그대로 그래픽카드) */
+const GRW={avg:0,n:0,off:false,why:""}; function rwatch(ms){ GRW.avg+=(ms-GRW.avg)*.05; if((++GRW.n>120 && GRW.avg>9) || (GRW.n>15 && GRW.avg>40)){ GRW.off=true; GRW.why="그리기는 CPU (그래픽카드 그리기가 "+GRW.avg.toFixed(1)+"ms로 느림)"; } }
 function renderIn(dt,a){ RA=((a||0)+.5)%1; STRANDS=!!SC.jag; JAGON=!!SC.jag && G.tipLen>0; frameNo++; T=simT; dt=dt||1/60; a=a||0; RT=simT-DT+a*DT;
   const sp3=D3.split; g=gMain; if(sp3){ if(cvB.width!==W||cvB.height!==Hh){ cvB.width=W; cvB.height=Hh; } gB.setTransform(1,0,0,1,0,0); gB.clearRect(0,0,W,Hh); gB.setTransform(scale,0,0,scale,0,0); gB.lineJoin="round"; gB.lineCap="round"; }   // 3D: 뒤쪽 물은 뒤 판에 따로
   g.setTransform(1,0,0,1,0,0); if(sp3) g.clearRect(0,0,W,Hh); else { g.fillStyle=BGN(); g.fillRect(0,0,W,Hh); } g.setTransform(scale,0,0,scale,0,0); g.lineJoin="round"; g.lineCap="round";
   fxTick(Math.min(dt/(G.speed||1),.1)); { const g0=g; g=sp3?gB:gMain; fxBack(); g=g0; }   // 이펙트 바탕 쪽: 액체 뒤
   for(let l=0;l<NL;l++){ g=(sp3 && l===0)?gB:gMain; g.save(); if(l===0){ g.translate(CX,CY); g.scale(SC.bscale*G.bkS,SC.bscale*G.bkS); g.translate(-CX,-CY); }
-    const gcv=(G.gpu && GPUV.ok && GPUV.dyeOn && !SC.jag)?GPUV.renderLayer(l,a,dt,VISR[(sp3 && l===0)?0:1]):null; if(gcv){ g.setTransform(1,0,0,1,0,0); const vr=VISR[(sp3 && l===0)?0:1]; if(vr) g.drawImage(gcv,vr[0],vr[1],vr[2],vr[3],vr[0],vr[1],vr[2],vr[3]); else g.drawImage(gcv,0,0,W,Hh); g.restore(); }   /* 보이는 네모만 옮겨 담는다 */ else {   // 그래픽카드가 이 층을 통째로 그린다
+    const rT0=performance.now(), gcv=(G.gpu && GPUV.ok && GPUV.dyeOn && !SC.jag && !GRW.off)?GPUV.renderLayer(l,a,dt,VISR[(sp3 && l===0)?0:1]):null; if(gcv){ g.setTransform(1,0,0,1,0,0); const vr=VISR[(sp3 && l===0)?0:1]; if(vr) g.drawImage(gcv,vr[0],vr[1],vr[2],vr[3],vr[0],vr[1],vr[2],vr[3]); else g.drawImage(gcv,0,0,W,Hh); g.restore(); rwatch(performance.now()-rT0); }   /* 보이는 네모만 옮겨 담는다 */ else {   // 그래픽카드가 이 층을 통째로 그린다
     const SL=!!G.mat[3].sl;   // 분홍 B가 분홍 A와 같은 빛을 쓰면 두 분홍을 한 몸으로 명암을 넣는다
     for(let c=0;c<NC;c++){ const M=(l===0 && SC.backM)?SC.backM:SC.mats[c], both=SL && l===NL-1 && c!==1 && c!==2, sh=M.shaded && l===NL-1 && !both; if(!LIVE[l*NC+c]) continue; JSET=l*NC+c; prepare(src(l,c,a),M,sh,EMA[c],dt); paint(M,SC.fade[l],BGN(),sh); }   // 뒤쪽 층은 명암 없이 옅게
     if(SL && l===NL-1 && (LIVE[l*NC] || LIVE[l*NC+3])){ const D0=LIVE[l*NC]?src(l,0,a):DYE[l][0], D3=LIVE[l*NC+3]?src(l,3,a):DYE[l][3]; for(let k=0;k<n;k++) UNI[k]=D0[k]>D3[k]?D0[k]:D3[k]; JSET=8; prepare(UNI,SC.mats[0],true,EMA[0],dt); paint(SC.mats[0],0,BGN(),true,true); }   // 분홍 두 무리의 명암은 한 번에 (닿은 자리도 한 몸으로 빛난다)
@@ -1664,7 +1668,8 @@ function frame(now){ const dt=Math.min(.1,(now-last)/1000); last=now; if(!docume
     const t1=performance.now(); TR.bead=0; TR.tgt=0; const t2=performance.now(), t3=t2; STEPPED=true; render(rdt*G.speed,acc/DT); rdt=0; const t4=performance.now(); PF.dr+=(t4-t3-PF.dr)*.1;   // 소용돌이는 매 프레임 그린다 (박자 사이는 흐름대로 밀어 메운다)
     if(BD.on()){ const r=bdRect(); BD.setView(W,Hh,scale,0,0,WW,WH); BD.center(CX,CY); BD.light(G.lightA*Math.PI/180); BD.bgc(BGN()); BD.setZone(r[0],r[1],r[0]+r[2],r[1]+r[3]); BD.start(); bdT+=Math.min(dt,.05); BD.advance(Math.min(dt,.05)*(SLOW?.4:1)); if(!lite || (fno&1)){ BD.compute(bdT*BD.G.speed); bdT=0; } BD.draw(); }   // 핏방울도 화면 전체를 쓴다 (자리는 처음 놓이는 곳일 뿐). 바쁠 때는 핏방울을 두 프레임에 한 번 그린다
     if(G.pix && G.dot) dotFilter();   // 선명한 도트
-    PF.bd+=(performance.now()-t4-PF.bd)*.1; PF.fr+=(dt*1000-PF.fr)*.1;
+    const rb=performance.now()-t4, rs=t1-w0, rd=t4-t3; PF.bd+=(rb-PF.bd)*.1; PF.fr+=(dt*1000-PF.fr)*.1;
+    if(dt*1000>45 && PF.pv){ const [a,b2,c]=PF.pv, m=Math.max(a,b2,c); PF.hit.push(now); PF.hw=m<12?"브라우저·화면 합성 "+Math.round(dt*1000):(m===a?"물 계산 ":m===b2?"물 그리기 ":"오브젝트 ")+Math.round(m); } PF.pv=[rs,rd,rb];   // 끊김 기록: 바로 앞 프레임에서 가장 오래 걸린 부분
     if(window.__nfTrace) window.__nfTrace.push([+(dt*1000).toFixed(1),k,+(t1-w0).toFixed(1),+(t3-t2).toFixed(1),+(t4-t3).toFixed(1),+(performance.now()-t4).toFixed(1),TR.bead,TR.tgt,+QF.toFixed(2)]);   // [프레임 간격, 박자, 물리, 뒤층, 그리기, 핏방울, 방울맺힘, 기류갱신, 화질]
     fno++; const wk=performance.now()-w0; work+=(wk-work)*.05; if(!lite && work>20) lite=true; else if(lite && work<9) lite=false; } 
   requestAnimationFrame(frame); }
@@ -1843,9 +1848,9 @@ if(window.NF_VIEW==="stage"){
 
 /* fps 표시: 지금 화면이 실제로 초당 몇 장 그려지는지 (끊김이 프레임 탓인지 모양 탓인지 가늠용) */
 let showFps=false; try{ showFps=localStorage.getItem("nu-flow-fps")==="1"; }catch(_){}
-const PF={st:0,dr:0,bd:0,fr:16};   // 프레임 시간 나눠 보기 (ms)
+const PF={st:0,dr:0,bd:0,fr:16,hit:[],hw:"",pv:null};   // 프레임 시간 나눠 보기 (ms)
 const fpsEl=$("fpsM"); let fpsN=0, fpsT0=performance.now();
-function fpsTick(now){ if(!showFps){ fpsEl.hidden=true; return; } fpsN++; if(now-fpsT0>=500){ const js=PF.st+PF.dr+PF.bd, gs=!G.gpu?"꺼짐":GPUV.ok?(GPUV.dyeOn?"켜짐":"켜짐(물감은 CPU)"):(GPUV.why||"준비 중"); fpsEl.textContent=Math.round(fpsN*1000/(now-fpsT0))+" fps · 화질 "+Math.round(QF*100)+"%\n그래픽카드: "+gs+(SC.jag && G.gpu && GPUV.ok?" · 이 장면 그리기는 CPU":"")+"\n물 계산 "+PF.st.toFixed(1)+" · 물 그리기 "+PF.dr.toFixed(1)+" · 오브젝트 "+PF.bd.toFixed(1)+"\n브라우저·화면 합성 "+Math.max(0,PF.fr-js).toFixed(1)+" (ms)"; fpsN=0; fpsT0=now; } fpsEl.hidden=false; }
+function fpsTick(now){ if(!showFps){ fpsEl.hidden=true; return; } fpsN++; if(now-fpsT0>=500){ const js=PF.st+PF.dr+PF.bd, gs=!G.gpu?"꺼짐":GPUV.ok?(GPUV.dyeOn?"켜짐":"켜짐(물감은 CPU)"):(GPUV.why||"준비 중"); fpsEl.textContent=Math.round(fpsN*1000/(now-fpsT0))+" fps · 화질 "+Math.round(QF*100)+"%\n그래픽카드: "+gs+(GRW.off?" · "+GRW.why:"")+(SC.jag && G.gpu && GPUV.ok?" · 이 장면 그리기는 CPU":"")+"\n물 계산 "+PF.st.toFixed(1)+" · 물 그리기 "+PF.dr.toFixed(1)+" · 오브젝트 "+PF.bd.toFixed(1)+"\n브라우저·화면 합성 "+Math.max(0,PF.fr-js).toFixed(1)+" (ms)"+(()=>{ PF.hit=PF.hit.filter(t=>now-t<10000); return "\n끊김 "+PF.hit.length+"회/10초"+(PF.hw?" · 마지막: "+PF.hw+"ms":""); })(); fpsN=0; fpsT0=now; } fpsEl.hidden=false; }
 function syncFps(){ $("fpsT").setAttribute("aria-pressed",showFps?"true":"false"); }
 { const b=$("pixOn"), r=$("pxS"), sy=()=>{ b.setAttribute("aria-pressed",G.pix?"true":"false"); stEl.classList.toggle("pix",!!G.pix); r.value=G.pxS; $("pxSV").textContent=G.pxS+"px"; const d=$("pxDot"); d.setAttribute("aria-pressed",G.dot?"true":"false"); d.textContent=G.dot?"선명한 도트":"부드러운 픽셀"; }; $("pxDot").addEventListener("click",()=>{ G.dot=G.dot?0:1; saveG(); sy(); }); b.addEventListener("click",()=>{ G.pix=G.pix?0:1; saveG(); sy(); }); r.addEventListener("input",()=>{ G.pxS=+r.value; saveG(); sy(); }); sy(); }   // 픽셀 필터
 { const b=$("gpuOn"), sy=()=>{ b.setAttribute("aria-pressed",G.gpu?"true":"false"); b.textContent=G.gpu?(GPUV.ok?"그래픽카드 엔진 켜짐":"그래픽카드 엔진 (준비 중)"):"그래픽카드 엔진 꺼짐"; }; b.addEventListener("click",()=>{ G.gpu=G.gpu?0:1; if(G.gpu){ GPUV.init(); GPUV.upload(); } saveG(); sy(); }); setTimeout(()=>{ if(G.gpu) GPUV.init(); sy(); if(G.gpu && !GPUV.ok) b.textContent="그래픽카드 엔진 (이 기기는 안 됨)"; },1500); setInterval(()=>{ if(G.gpu && GPUV.slow) b.textContent="그래픽카드 엔진 (이 기기는 CPU가 더 빠름)"; },2000); sy(); }
