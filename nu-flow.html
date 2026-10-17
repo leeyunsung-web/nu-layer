@@ -1118,7 +1118,7 @@ const MOLDS=[null,null,null]; let moldVer=0, onMold=null;
 function buildMolds(which){ if(which!==2) MOLDS[1]=mkMold(heartG(),G.mhCl,G.mhTip); if(which!==1) MOLDS[2]=mkMold(starG(),G.msIn,G.msTip); moldVer++; if(onMold) onMold(); }
 buildMolds(); let grpNo=0;
 /* 거품 구름: 핏방울과 같은 말랑한 방울 4~6개를 한 무리로 묶는다. 무리 안 방울은 정해진 자리로 서로 끌려 붙은 채 출렁인다 */
-function addCloud(cx,cy){ const zf0=ZFORCE; if(ZFORCE===null) ZFORCE=(ZALT++&1)?-1:1; const gid=(grpNo++)%30000, S=G.cloudS*G.size*1.25, R=Math.random, n=3+Math.floor(R()*5), w=(46+R()*70)*S, P=[]; let k=0;   // 구름: 매번 다른 모양 (송이 수·크기·높낮이·너비가 무작위, 바닥은 대체로 평평)
+function addCloud(cx,cy){ const zf0=ZFORCE; if(ZFORCE===null) ZFORCE=0; const gid=(grpNo++)%30000, S=G.cloudS*G.size*1.25, R=Math.random, n=3+Math.floor(R()*5), w=(46+R()*70)*S, P=[]; let k=0;   // 구름: 매번 다른 모양 (송이 수·크기·높낮이·너비가 무작위, 바닥은 대체로 평평)
   for(let q=0;q<n;q++){ const x=((q+.5)/n-.5)*w+(R()-.5)*w/n*.7, e=1-Math.min(1,Math.abs(x)/(w*.5+1)), r=(11+R()*12+e*(8+R()*10))*S, y=-r*(.35+.25*R())-e*(R()*.5+.2)*r; P.push([x,y,r]); }
   if(R()<.55){ const t=P[Math.floor(R()*P.length)]; P.push([t[0]+(R()-.5)*t[2],t[1]-t[2]*(.55+.3*R()),t[2]*(.55+.3*R())]); }   // 가끔 위에 작은 송이 하나 더
   let mx=0, my=0; for(const p of P){ mx+=p[0]; my+=p[1]; } mx/=P.length; my/=P.length;
@@ -1130,7 +1130,7 @@ function addShape(cx,cy,base,vx,vy,key){ const u=hh(key,80);
   if(G.heart && base>=12 && hh(key,91)<G.heartR){ const k=addDrop(cx,cy,tierRS(2,5),vx,vy), l=nLobe-1;   /* 하트는 알갱이가 넉넉해야 오목한 윗부분과 뾰족한 끝이 산다 */ heartStyle(l); LHA[l]=(hh(key,92)-.5)*.6; return k; }   // 하트 방울: 정한 비율만큼
   if(u<.42 || base<11 || base*base*Math.PI/(SP0*SP0*.866)>=TIERB[3]) return u>=.42 && base>=11?addDrop(cx,cy,base,vx,vy,1.15+.4*hh(key,81),hh(key,82)*TAU):addDrop(cx,cy,base,vx,vy);   /* 큰 단계는 한 덩어리로 (여러 혹으로 나누면 작은 단계가 된다) */
   if(u<.58) return addDrop(cx,cy,base,vx,vy,1.3+.8*hh(key,81),hh(key,82)*TAU);
-  const zf1=ZFORCE; if(ZFORCE===null) ZFORCE=(ZALT++&1)?-1:1; const n=u<.85?2:3+(hh(key,83)<.4?1:0), bend=(hh(key,85)-.5)*1.4; let x=cx, y=cy, a=hh(key,84)*TAU, pr=0, k=0; const ls=[];
+  const zf1=ZFORCE; if(ZFORCE===null) ZFORCE=0; const n=u<.85?2:3+(hh(key,83)<.4?1:0), bend=(hh(key,85)-.5)*1.4; let x=cx, y=cy, a=hh(key,84)*TAU, pr=0, k=0; const ls=[];
   for(let q=0;q<n;q++){ const r=Math.max(8,base*(.5+.45*hh(key,86+q))); if(q>0){ const st=(pr+r)*.8; x+=Math.cos(a)*st; y+=Math.sin(a)*st; a+=bend; } k+=addDrop(x,y,r,vx,vy); ls.push(nLobe-1); pr=r; }
   for(const l of ls) LKEEP[l]=1; ZFORCE=zf1; return k; }
 function btn(){ $("kAdd").disabled=N>CAP-240; }
@@ -1155,7 +1155,7 @@ function hands(){ TW.fill(0,0,N);
 const CELL=4, RK=21, TH=.8;
 let gw=0, gh=0, F=new Float32Array(0), FH=F, FK=F, FLX=F, FLY=F, ZS=F, Z=F, HT=F, AB=F, CRV=F, M1=F, M2=F, TMP=F, SD=F, SH=F, S2=F, FC=F, FL=F, FM=F, LID=new Int16Array(0), LI2=LID, nextE=new Int32Array(0), EX=F, EY=F, starts=nextE, MF=F, MT=TH;
 const mkL=(minHole)=>({B:F,S:[],N:[],A:[],P:[],X0:[],Y0:[],X1:[],Y1:[],n:0,sign:1,minHole});
-let BL=mkL(170), CL=mkL(22), HL=mkL(22), H2=mkL(22); const LAYS=[-1,1], GEO={}; for(const z of LAYS) GEO[z]={BL:mkL(170),CL:mkL(22),HL:mkL(22),H2:mkL(22),on:false};   /* 층마다 따로 만든 윤곽 */
+let BL=mkL(170), CL=mkL(22), HL=mkL(22), H2=mkL(22); const LAYS=[-1,0], GEO={}; for(const z of LAYS) GEO[z]={BL:mkL(170),CL:mkL(22),HL:mkL(22),H2:mkL(22),on:false};   /* 층마다 따로 만든 윤곽 */
 function useGeo(z){ const o=GEO[z]; BL=o.BL; CL=o.CL; HL=o.HL; H2=o.H2; }   // 몸 테두리, 어두운 면 테두리, 큰 하이라이트 테두리, 곁 하이라이트·반사광 테두리
 function alloc(){ gw=Math.ceil(WW/CELL)+2; gh=Math.ceil(WH/CELL)+2; const n=gw*gh; if(F.length>=n) return; const A=()=>new Float32Array(n);
   F=A(); FH=A(); FK=A(); FLX=A(); FLY=A(); ZS=A(); Z=A(); HT=A(); AB=A(); CRV=A(); M1=A(); M2=A(); TMP=A(); SD=A(); SH=A(); S2=A(); FC=A(); FL=A(); FM=A(); LID=new Int16Array(n); LI2=new Int16Array(n);
@@ -1209,7 +1209,7 @@ let waterAt=null;   // 태어난 때, 이때까지 안 합쳐짐, 밀려나기 �
 const SE=[LAC,LAS,LEL,LSZ,L2C,L2S,L2Z,L3Z];
 let nLobe=0, lobeSerial=0;
 function styleLobe(l){ const k=++lobeSerial; // 덩이마다 빛을 받는 성격이 다르다
-  LBORN[l]=simT; LNF[l]=0; LLV[l]=0; LFR[l]=0; LKEEP[l]=0; LHRT[l]=0; LCOL[l]=0; LGRP[l]=-1; { LDZ[l]=(ZALT++&1)?-1:1; }   /* 두 층: 뒤(-1)·앞(1)에 번갈아 고르게 */ LDW[l]=.6+.8*hh(k,61); const da=hh(k,62)*TAU; LDX[l]=Math.cos(da); LDY[l]=Math.sin(da);   // 머무는 시간은 방울마다 조금씩 다르고, 나가는 방향은 제멋대로
+  LBORN[l]=simT; LNF[l]=0; LLV[l]=0; LFR[l]=0; LKEEP[l]=0; LHRT[l]=0; LCOL[l]=0; LGRP[l]=-1; { LDZ[l]=0; }   /* 오브젝트는 모두 한 층(0). 뒤층(-1)은 천사 전용 */ LDW[l]=.6+.8*hh(k,61); const da=hh(k,62)*TAU; LDX[l]=Math.cos(da); LDY[l]=Math.sin(da);   // 머무는 시간은 방울마다 조금씩 다르고, 나가는 방향은 제멋대로
   const az=(hh(k,41)-.5)*.9, a2=az+(hh(k,44)<.5?-1:1)*(.85+.6*hh(k,45));
   LAC[l]=Math.cos(az); LAS[l]=Math.sin(az); LEL[l]=.42+.42*hh(k,42);          // 빛의 높이: 낮으면 가장자리에 붙은 초승달, 높으면 가운데 쪽 둥근 얼룩
   LSZ[l]=.33+.17*hh(k,43);                                                     // 큰 하이라이트의 크기
@@ -2725,7 +2725,7 @@ function drawAngel(ctx,a,t,sel){ const g=a.g, R=a.R();
 
 /* 부딪힘: 서로 겹치면 맞닿은 면이 젤리처럼 납작하게 눌리고(그 대신 옆으로 살짝 불룩), 천천히 밀려나며 출렁인다 */
 function collide(dt){ for(const a of A) a.ct.length=0;
-  for(let i=0;i<A.length;i++) for(let j=i+1;j<A.length;j++){ const p=A[i], q=A[j]; if((p.z||1)!==(q.z||1)) continue; const rp=p.R(), rq=q.R(), dx=q.x-p.x, dy=q.y-p.y, d2=dx*dx+dy*dy, rs=rp+rq; if(d2>=rs*rs || d2<1e-3) continue;
+  for(let i=0;i<A.length;i++) for(let j=i+1;j<A.length;j++){ const p=A[i], q=A[j]; if(p.z!==q.z) continue; const rp=p.R(), rq=q.R(), dx=q.x-p.x, dy=q.y-p.y, d2=dx*dx+dy*dy, rs=rp+rq; if(d2>=rs*rs || d2<1e-3) continue;
     const d=Math.sqrt(d2), nx=dx/d, ny=dy/d, hp=d*rp/rs, hq=d-hp, big=rp>rq?p:q;   /* 작은 쪽은 큰 쪽의 둥근 모양대로 오목하게, 큰 쪽은 살짝만 납작하게 */
     p.ct.push([nx,ny,hp,d,rp<rq*.9?hq+(rq-hq)*.35:0]); q.ct.push([-nx,-ny,hq,d,rq<rp*.9?hp+(rp-hp)*.35:0]);
     const tgt=rs*.8; if(d<tgt){ const o=(tgt-d)*Math.min(1,dt*9), wp=p.hold?0:q.hold?1:.5, wq=1-wp; p.x-=nx*o*wp; p.y-=ny*o*wp; q.x+=nx*o*wq; q.y+=ny*o*wq; }
@@ -2746,8 +2746,8 @@ function spinOf(on){ return on?[(R0()<.5?-1:1)*rr(.35,.9),(R0()<.5?-1:1)*rr(.12,
 function addAngels(n){ fitR(); n=Math.min(n,Math.max(0,60-A.length));   /* 천사는 많아도 60마리까지 */ const M=MP(), r0=stage.getBoundingClientRect();
   for(let i=0;i<n;i++){ const g=randGene(BASE); g.soft=S.soft; g.spinY=0; g.spinX=0;
     let x=rr(.15,.85)*W, y=rr(.15,.85)*H; if(M && M.toBD){ const p=M.toBD(r0.left+rr(.12,.88)*r0.width, r0.top+rr(.12,.88)*r0.height); if(isFinite(p[0]) && isFinite(p[1])){ x=p[0]; y=p[1]; } }   // 지금 보이는 화면 안 아무 데나
-    const a=new Angel(g,x,y,false); a.z=R0()<.5?-1:1; a.vx=rr(-60,60); a.vy=rr(-60,30); a.pop=0;   /* 두 층 중 하나 */ a.poke(R0()*TAU,.4); A.push(a); } }
-let last=performance.now(), T=0, drag=null;
+    const a=new Angel(g,x,y,false); a.z=(ANGN++%10===4)?0:-1;   /* 열에 하나만 오브젝트 층(0)에 들어가 부딪히고 터뜨린다. 나머지는 뒤쪽 천사 전용 층(-1) */ a.vx=rr(-60,60); a.vy=rr(-60,30); a.pop=0;   /* 두 층 중 하나 */ a.poke(R0()*TAU,.4); A.push(a); } }
+let last=performance.now(), T=0, drag=null, ANGN=0;
 /* 한 걸음: 물 흐름(소용돌이 영향) + 혼자 떠다님 + 서로·방울·가장자리와 부딪힘 */
 /* 주기적으로 무리 지어 등장: 정한 간격마다 정한 수만큼. 자동으로 들어온 천사는 한동안 머물다 위로 날아가 사라진다 */
 let waveAcc=0; function waves(dt){ if(!S.auto) return; waveAcc+=dt; if(waveAcc>=Math.max(3,S.waveT) || (waveAcc>2 && !A.length)){ waveAcc=0; const n0=A.length; addAngels(Math.round(S.waveN)); for(let i=n0;i<A.length;i++) A[i].life=S.life*(.7+.6*Math.random()); syncUI(); }
@@ -2763,15 +2763,15 @@ function tick(dt){ waves(dt); const spd=S.speed, fi=S.flow||0, own=1-.7*Math.min
   for(const a of A){ if(!a.hold){ a.x+=a.vx*dt; a.y+=a.vy*dt; } } }
 /* 방울을 다 그린 뒤 같은 판 위에 천사를 그린다 (3D로 기울이면 방울과 같은 자리 보정) */
 window.NF_ANGEL=(g,mapF,z,dk,dx,dy)=>{ if(!A.length){ if(S.auto && (z===undefined || z===-1)){ const now=performance.now(), dt=Math.min(.05,(now-last)/1000); last=now; waves(dt); } return; } if(z===undefined || z===-1){ const now=performance.now(), dt=Math.min(.05,(now-last)/1000); last=now; T+=dt; fitR(); tick(dt); }   /* 한 프레임에 한 번 움직이고, 층마다 제 천사만 그린다 */
-  const order=A.filter(a=>z===undefined || (a.z||1)===z).sort((p,q)=>p.y-q.y);
+  const order=A.filter(a=>z===undefined || a.z===z).sort((p,q)=>p.y-q.y);
   for(const a of order){ const k=(a.pop<1?1-Math.pow(1-a.pop,3)*Math.cos(a.pop*9):1)*(dk||1)*(a.leave?Math.max(0,1-a.leave/2.2):1);   /* 떠날 때 작아지며 사라진다 */ let ox=dx||0, oy=dy||0; if(mapF){ const m=mapF(a.x,a.y); ox+=m[0]; oy+=m[1]; } g.save(); g.translate(a.x+ox,a.y+oy); if(k!==1) g.scale(k,k); g.translate(-a.x,-a.y); drawAngel(g,a,T,false); g.restore(); } };
 /* 다른 오브젝트와 주고받기: 같은 판 위라 좌표 그대로 — 천사는 방울 모양대로 오목하게, 방울은 천사 모양대로 움푹 */
 function bump(dt){ const B=BDo(); if(!B || !B.on || !B.on() || !B.lobesW) return; const L=B.lobesW(); if(!L.length) return;
-  for(const a of A){ const ra=a.R(); a.cool=Math.max(0,(a.cool||0)-dt); for(let j=0;j<L.length;j+=5){ if(L[j+3]!==(a.z||1)) continue; const dx=L[j]-a.x, dy=L[j+1]-a.y, rl=L[j+2], rs=ra+rl, d2=dx*dx+dy*dy; if(d2>=rs*rs || d2<1e-3) continue;
+  for(const a of A){ const ra=a.R(); a.cool=Math.max(0,(a.cool||0)-dt); for(let j=0;j<L.length;j+=5){ if(L[j+3]!==a.z) continue; const dx=L[j]-a.x, dy=L[j+1]-a.y, rl=L[j+2], rs=ra+rl, d2=dx*dx+dy*dy; if(d2>=rs*rs || d2<1e-3) continue;
       if(!L[j+4] && a.cool<=0 && B.burstB && B.burstB(L[j],L[j+1])){ a.cool=.45; a.poke(Math.atan2(dy,dx),.3); a.ryv+=(R0()-.5)*8; break; }   /* 천사가 닿으면 그 오브젝트가 더블클릭처럼 팡 (천사는 안 터지고 출렁) */
       const d=Math.sqrt(d2), nx=dx/d, ny=dy/d, ov=rs-d, hp=d*ra/rs; a.ct.push([nx,ny,hp,d,ra<rl*.9?(d-hp)+(rl-(d-hp))*.35:0]);
       if(!a.hold){ a.x-=nx*ov*Math.min(1,dt*5); a.y-=ny*ov*Math.min(1,dt*5); const vn=a.vx*nx+a.vy*ny; if(vn>0){ a.vx-=nx*vn*1.2; a.vy-=ny*vn*1.2; if(vn>140) a.poke(Math.atan2(ny,nx),Math.min(.35,vn*.0015)); if(vn>40){ a.ryv+=(R0()-.5)*vn*.03; a.rxv+=(R0()-.5)*vn*.02; } } } }   /* 부딪히면 그 힘만큼 데굴 */
-    B.repel(a.x,a.y,ra*.92,a.vx||0,a.vy||0,a.z||1); } }
+    B.repel(a.x,a.y,ra*.92,a.vx||0,a.vy||0,a.z); } }
 /* 손: 천사 위에서 누르면 무대(물·방울) 대신 천사를 잡는다 — 판 위 자리로 바꿔 읽으니 확대·이동·3D에서도 맞는다 */
 const posB=e=>{ const M=MP(); return M && M.toBD ? M.toBD(e.clientX,e.clientY) : [NaN,NaN]; };
 function hit(x,y){ for(let i=A.length-1;i>=0;i--){ const a=A[i]; if(Math.hypot(x-a.x,y-a.y)<a.R()*1.15) return a; } return null; }
