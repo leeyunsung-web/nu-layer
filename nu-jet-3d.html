@@ -173,25 +173,37 @@ fn wts(d: vec3f) -> array<vec3f,3> { return array<vec3f,3>(0.5*(0.5-d)*(0.5-d), 
   let i = id.x*4u; atomicStore(&gi[i],0); atomicStore(&gi[i+1u],0); atomicStore(&gi[i+2u],0); atomicStore(&gi[i+3u],0);
 }
 /* 방울 → 격자 (한 번에): 질량, 운동량, 그리고 '모양 기억'에서 나온 누르는 힘·당기는 힘을 함께 뿌린다 */
+/* 1단계: 무게만 격자에 모은다 (칸마다 1번만 더하기) */
+@compute @workgroup_size(64) fn p2gMass(@builtin(global_invocation_id) id: vec3u) {
+  if (id.x >= U.g.w) { return; }
+  let p = pos[id.x].xyz;
+  let cell = vec3i(floor(p)); let d = p - vec3f(cell) - 0.5; let w = wts(d);
+  for (var gx = 0; gx < 3; gx++) { for (var gy = 0; gy < 3; gy++) { for (var gz = 0; gz < 3; gz++) {
+    atomicAdd(&gi[gidx(cell + vec3i(gx-1, gy-1, gz-1)) * 4u], enc(w[gx].x * w[gy].y * w[gz].z));
+  }}}
+}
+/* 2단계: 지금 이 순간의 밀도를 읽고, 움직임과 힘을 함께 모은다 */
 @compute @workgroup_size(64) fn p2g(@builtin(global_invocation_id) id: vec3u) {
   if (id.x >= U.g.w) { return; }
-  let p = pos[id.x].xyz; let vv = vel[id.x]; let v = vv.xyz; let C = Cm[id.x]; let F = Fm[id.x];
-  /* 밀도는 지난 박자에 격자에서 모아 둔 값 (부피를 정확히 지킨다) */
-  let dens = max(vv.w, 0.0001); let vol = 1.0 / dens;
+  let p = pos[id.x].xyz; let v = vel[id.x].xyz; let C = Cm[id.x]; let F = Fm[id.x];
+  let cell = vec3i(floor(p)); let d = p - vec3f(cell) - 0.5; let w = wts(d);
+  var dens = 0.0;
+  for (var gx = 0; gx < 3; gx++) { for (var gy = 0; gy < 3; gy++) { for (var gz = 0; gz < 3; gz++) {
+    dens += dec(atomicLoad(&gi[gidx(cell + vec3i(gx-1, gy-1, gz-1)) * 4u])) * (w[gx].x * w[gy].y * w[gz].z);
+  }}}
+  dens = max(dens, 0.0001); let vol = 1.0 / dens;
   var pr = U.a.z * (pow(dens / U.a.w, 4.0) - 1.0);            /* 빽빽하면 밀어낸다 */
   pr = max(pr, -U.a.z * U.c.w);                                /* 뭉침: 성긴 곳이 당기는 힘의 한도 */
   var st = I3 * (-pr);
-  if (U.c.y > 0.0) { let s2 = pow(max(determinant(F), 1e-6), 1.0/3.0); st += (F - I3 * s2) * U.c.y; }   /* 말랑함: 늘어난 만큼 되돌아가려는 힘 (F는 늘어난 정도 b) */
+  if (U.c.y > 0.0) { let s2 = pow(max(determinant(F), 1e-6), 1.0/3.0); st += (F - I3 * s2) * U.c.y; }   /* 말랑함: 늘어난 만큼 되돌아가려는 힘 */
   st += (C + transpose(C)) * U.b.x;                            /* 끈적임 */
   let A = st * (-vol * 4.0 * U.a.x) + C;
-  let cell = vec3i(floor(p)); let d = p - vec3f(cell) - 0.5; let w = wts(d);
   for (var gx = 0; gx < 3; gx++) { for (var gy = 0; gy < 3; gy++) { for (var gz = 0; gz < 3; gz++) {
     let wt = w[gx].x * w[gy].y * w[gz].z;
     let c = cell + vec3i(gx-1, gy-1, gz-1);
-    let cd = vec3f(c) - p + 0.5;
-    let mv = (v + A * cd) * wt;
+    let mv = (v + A * (vec3f(c) - p + 0.5)) * wt;
     let i = gidx(c) * 4u;
-    atomicAdd(&gi[i], enc(wt)); atomicAdd(&gi[i+1u], enc(mv.x)); atomicAdd(&gi[i+2u], enc(mv.y)); atomicAdd(&gi[i+3u], enc(mv.z));
+    atomicAdd(&gi[i+1u], enc(mv.x)); atomicAdd(&gi[i+2u], enc(mv.y)); atomicAdd(&gi[i+3u], enc(mv.z));
   }}}
 }
 @compute @workgroup_size(64) fn updGrid(@builtin(global_invocation_id) id: vec3u) {
@@ -405,7 +417,7 @@ async function init(){
   const mod=dev.createShaderModule({code:WGSL});
   const bgl=dev.createBindGroupLayout({entries:[0,1,2,3,4,5,6].map(b=>({binding:b,visibility:GPUShaderStage.COMPUTE,buffer:{type:b?"storage":"uniform"}}))});
   const pl=dev.createPipelineLayout({bindGroupLayouts:[bgl]});
-  for(const e of ["clearGrid","p2g","updGrid","g2p"]) PL[e]=dev.createComputePipeline({layout:pl,compute:{module:mod,entryPoint:e}});
+  for(const e of ["clearGrid","p2gMass","p2g","updGrid","g2p"]) PL[e]=dev.createComputePipeline({layout:pl,compute:{module:mod,entryPoint:e}});
   E.bgl=bgl; resizeTank();
   const rmod=dev.createShaderModule({code:RWGSL});
   const rbgl=dev.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.VERTEX|GPUShaderStage.FRAGMENT,buffer:{type:"uniform"}},{binding:1,visibility:GPUShaderStage.VERTEX,buffer:{type:"read-only-storage"}},{binding:2,visibility:GPUShaderStage.VERTEX,buffer:{type:"read-only-storage"}}]});
@@ -461,7 +473,7 @@ function step(enc){
   const e=dev.createCommandEncoder(), c=e.beginComputePass(); c.setBindGroup(0,BG0);
   const gC=Math.ceil(CELLS/WG), gP=Math.ceil(N/WG);
   c.setPipeline(PL.clearGrid); c.dispatchWorkgroups(gC);
-  if(gP){ c.setPipeline(PL.p2g); c.dispatchWorkgroups(gP); }
+  if(gP){ c.setPipeline(PL.p2gMass); c.dispatchWorkgroups(gP); c.setPipeline(PL.p2g); c.dispatchWorkgroups(gP); }
   c.setPipeline(PL.updGrid); c.dispatchWorkgroups(gC);
   if(gP){ c.setPipeline(PL.g2p); c.dispatchWorkgroups(gP); }
   c.end(); dev.queue.submit([e.finish()]); stepNo++;
