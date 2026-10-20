@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>NU JET 3D</title>
+<style>
+/* 배치: 왼쪽(좁은 화면에서는 위) 남색 무대, 오른쪽(아래) 조절 판. NU JET과 같은 색과 버튼 */
+:root{
+  --bg:#FBF8F7; --panel:#FFFFFF; --ink:#33123A; --soft:#7A5C80; --line:#9C2F86; --pink:#F9618D; --yellow:#FBE01E; --night:#00012A;
+  --ui:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#1C0E22; --panel:#28152F; --ink:#FBEAF1; --soft:#C39FC6; --line:#E06BC6; color-scheme:dark } }
+:root[data-theme="dark"]{ --bg:#1C0E22; --panel:#28152F; --ink:#FBEAF1; --soft:#C39FC6; --line:#E06BC6; color-scheme:dark }
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--ui);line-height:1.5}
+.wrap{max-width:1400px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 28px;display:flex;flex-direction:column;gap:12px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 16px}
+h1{margin:0;font-size:22px;font-weight:900;letter-spacing:.14em}
+header p{margin:0;color:var(--soft);font-size:13px;max-width:70ch}
+header a{color:var(--line);font-weight:800}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+@media (max-width:980px){ .main{grid-template-columns:minmax(0,1fr)} }
+.stagebox{display:flex;flex-direction:column;gap:10px;min-width:0}
+.stage{position:relative;border:3px solid var(--line);border-radius:14px;overflow:hidden;background:var(--night);aspect-ratio:16/10;width:100%;touch-action:none;cursor:grab}
+.stage canvas{position:absolute;inset:0;display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges}
+.stage:fullscreen{border:0;border-radius:0;aspect-ratio:auto;width:100vw;height:100vh}
+.msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;color:#E9DDF5;font-size:14px;line-height:1.6}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button{font:inherit;font-size:13px;font-weight:800;color:var(--ink);background:var(--panel);border:2px solid var(--line);border-radius:999px;min-height:40px;padding:6px 15px;cursor:pointer;white-space:nowrap}
+button[aria-pressed="true"]{background:var(--pink);color:#33123A;border-color:#9C2F86}
+button.hot{background:var(--yellow);color:#33123A;border-color:#9C2F86;font-size:15px;padding-inline:22px}
+button:focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
+#stat{margin-left:auto;font-size:12px;color:var(--soft);font-variant-numeric:tabular-nums}
+.panel{background:var(--panel);border:2px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.ctl{display:grid;grid-template-columns:5.6em minmax(0,1fr) 4.2em;gap:2px 8px;align-items:center;font-size:13px;font-weight:700}
+.ctl output{text-align:right;font-variant-numeric:tabular-nums}
+.ctl input[type=range]{width:100%;accent-color:var(--line)}
+.desc{grid-column:1/-1;font-size:11.5px;line-height:1.4;color:var(--soft);font-weight:500}
+.row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.lab{font-size:13px;font-weight:700;margin-right:4px}
+h3{margin:4px 0 0;font-size:12px;letter-spacing:.08em;color:var(--soft)}
+.note{font-size:11.5px;color:var(--soft);margin:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>NU JET 3D</h1>
+    <p>입체 수조 실험. 방울 수만 개를 그래픽카드로 계산해 파도를 만듭니다. 화면을 끌면 수조가 돌아가고, 휠로 가까이·멀리 봅니다. 두 번 누르면 물 덩어리가 떨어집니다. <a href="nu-jet.html">← NU JET (2D)</a></p>
+  </header>
+  <div class="main">
+    <div class="stagebox">
+      <div class="stage" id="stage"><canvas id="cv" aria-label="3D 수조 화면"></canvas><div class="msg" id="msg">그래픽카드를 준비하는 중…</div></div>
+      <div class="bar">
+        <button id="bSlap" class="hot" type="button" title="파도 판을 한 번 세게 밉니다 (스페이스 키)">철썩!</button>
+        <button id="bWave" type="button" aria-pressed="true">파도 판 움직이기</button>
+        <button id="bDrop" type="button">물 덩어리</button>
+        <button id="bFill" type="button">다시 채우기</button>
+        <button id="bPause" type="button" aria-pressed="false">멈춤</button>
+        <button id="bFull" type="button">전체 화면</button>
+        <span id="stat"></span>
+      </div>
+    </div>
+    <aside class="panel" id="panel">
+      <div class="row" id="views"><span class="lab">시점</span></div>
+      <h3>파도</h3>
+      <div id="secWave"></div>
+      <h3>액체</h3>
+      <div id="secLiq"></div>
+      <h3>화면</h3>
+      <div class="row" id="colors"><span class="lab">색</span></div>
+      <div id="secLook"></div>
+      <div class="row"><button id="bReset" type="button">처음 값으로</button></div>
+      <p class="note">1단계 시안: 계산 엔진과 기본 수조입니다. 방울을 둥근 점으로 그려 움직임을 미리 봅니다. 매끈한 물 표면·셀 채색·거품은 2단계에서 입힙니다.</p>
+    </aside>
+  </div>
+</div>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+
+/* ── 조절값 ── [칸, 이름, 키, 최소, 최대, 간격, 처음 값, 단위, 설명, 다시 채우기] */
+const CTL=[
+ ["secWave","물 높이","level",0.15,0.6,0.01,0.34,"%","수조에 채울 물의 높이. 바꾸면 다시 채웁니다.",1],
+ ["secWave","파도 세기","amp",0,14,0.5,6,"칸","파도 판이 밀고 나가는 거리(격자 칸).",0],
+ ["secWave","파도 주기","per",0.6,6,0.1,2.2,"초","한 번 밀었다 돌아오는 시간.",0],
+ ["secWave","밀어치기","skew",0,1,0.05,0.4,"%","빠르게 밀고 천천히 돌아오는 정도. 높이면 파도 앞이 가팔라집니다.",0],
+ ["secWave","해변 경사","beach",0,0.8,0.02,0.3,"","오른쪽 바닥을 비탈로 만듭니다. 바꾸면 다시 채웁니다.",1],
+ ["secLiq","중력","grav",0,0.6,0.01,0.3,"","아래로 당기는 힘.",0],
+ ["secLiq","끈적임","visc",0,0.6,0.01,0.1,"","높을수록 꿀처럼 무겁게 흐릅니다.",0],
+ ["secLiq","단단함","stiff",2,30,0.5,10,"","눌리지 않으려는 힘. 높이면 철썩 튀고, 낮추면 출렁출렁 눌립니다.",0],
+ ["secLiq","방울 촘촘함","dens",0.3,1,0.05,0.6,"%","방울 수. 높을수록 매끈하지만 무거워집니다. 바꾸면 다시 채웁니다.",1],
+ ["secLook","픽셀 크기","px",1,6,1,3,"px","한 칸의 크기. 클수록 굵은 픽셀 그림이 됩니다.",0],
+ ["secLook","방울 크기","psize",0.5,2,0.05,1,"배","점으로 그린 방울의 크기.",0],
+];
+const COLORS={
+  water:{n:"물",c:[[44,156,224],[22,104,176],[222,246,255],[12,58,120]]},
+  jelly:{n:"핑크 젤리",c:[[246,104,142],[221,62,116],[255,244,247],[160,36,104]]},
+  milk:{n:"우유",c:[[248,241,228],[222,204,178],[255,255,255],[206,150,30]]},
+  blood:{n:"핏빛",c:[[226,60,96],[176,32,74],[255,222,230],[122,22,60]]},
+};
+const DEF=(()=>{ const o={col:"water",cyaw:-38,cpit:24,czoom:1}; for(const c of CTL) o[c[2]]=c[6]; return o; })();
+const KEY="nu-jet-3d-v1";
+let S=Object.assign({},DEF); try{ const v=JSON.parse(localStorage.getItem(KEY)||"null"); if(v) for(const k in DEF) if(k in v) S[k]=v[k]; }catch(_){}
+const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(_){} };
+const fmt=(c,v)=>c[7]==="%"?Math.round(v*100)+"%":c[7]==="초"?(+v).toFixed(1)+"초":c[7]==="칸"?(+v).toFixed(1)+"칸":c[7]==="px"?v+"px":c[7]==="배"?(+v).toFixed(2)+"배":(+v).toFixed(2);
+const inputs={}; let refillT=0;
+for(const c of CTL){ const w=document.createElement("label"); w.className="ctl"; const sp=document.createElement("span"); sp.textContent=c[1];
+  const r=document.createElement("input"); r.type="range"; r.id="k_"+c[2]; r.min=c[3]; r.max=c[4]; r.step=c[5]; r.value=S[c[2]];
+  const o=document.createElement("output"); o.textContent=fmt(c,S[c[2]]); const d=document.createElement("small"); d.className="desc"; d.textContent=c[8];
+  r.addEventListener("input",()=>{ S[c[2]]=+r.value; o.textContent=fmt(c,S[c[2]]); save(); if(c[9]){ clearTimeout(refillT); refillT=setTimeout(()=>{ if(E.ok) fill(); },300); } });
+  w.append(sp,r,o,d); $(c[0]).appendChild(w); inputs[c[2]]=[r,o,c]; }
+for(const k in COLORS){ const b=document.createElement("button"); b.type="button"; b.dataset.c=k; b.textContent=COLORS[k].n; b.addEventListener("click",()=>{ S.col=k; save(); colUI(); }); $("colors").appendChild(b); }
+function colUI(){ for(const b of document.querySelectorAll("#colors button")) b.setAttribute("aria-pressed",b.dataset.c===S.col?"true":"false"); }
+for(const [nm,y,p] of [["비스듬히",-38,24],["옆모습",0,3],["위에서",-20,62],["물가에서",-88,12]]){ const b=document.createElement("button"); b.type="button"; b.textContent=nm; b.addEventListener("click",()=>{ S.cyaw=y; S.cpit=p; S.czoom=1; save(); }); $("views").appendChild(b); }
+function syncUI(){ for(const k in inputs){ const [r,o,c]=inputs[k]; r.value=S[k]; o.textContent=fmt(c,S[k]); } colUI(); }
+colUI();
+$("bReset").addEventListener("click",()=>{ S=Object.assign({},DEF); save(); syncUI(); if(E.ok) fill(); });
+
+/* ── 격자와 방울 ──
+   MLS-MPM: 방울이 가진 질량·운동량을 격자에 뿌리고(P2G) → 격자에서 압력·중력·벽을 계산하고 → 다시 방울로 모아(G2P) 움직인다.
+   단위: 거리는 격자 칸, 한 박자 dt. 한 프레임에 세 박자 */
+const Q=new URLSearchParams(location.search);
+const SMALL=Q.get("small")==="1", OFF=Q.get("off")==="1";   /* off=1: 점검용 — 화면 대신 보이지 않는 그림판에 그린다 */
+const GX=SMALL?40:72, GY=SMALL?24:40, GZ=SMALL?20:36, CELLS=GX*GY*GZ, MAXP=SMALL?40000:260000, WG=64, SUB=3, DT=0.2;
+const E={ok:false};
+let N=0, stepNo=0, PADX=2.5, PADV=0, SLAP=0, waveOn=true, paused=false, AMPc=0, WPH=0;
+const BX0=GX*0.45;
+const floorAt=x=>2+(S.beach>0 && x>BX0? S.beach*(x-BX0):0);
+
+const WGSL=/* wgsl */`
+struct P { g: vec4u, a: vec4f, b: vec4f, c: vec4f };
+@group(0) @binding(0) var<uniform> U: P;
+@group(0) @binding(1) var<storage, read_write> pos: array<vec4f>;
+@group(0) @binding(2) var<storage, read_write> vel: array<vec4f>;
+@group(0) @binding(3) var<storage, read_write> Cm: array<mat3x3f>;
+@group(0) @binding(4) var<storage, read_write> gi: array<atomic<i32>>;
+@group(0) @binding(5) var<storage, read_write> gv: array<vec4f>;
+const FP: f32 = 1e5;
+fn enc(x: f32) -> i32 { return i32(clamp(x, -20000.0, 20000.0) * FP); }
+fn dec(x: i32) -> f32 { return f32(x) / FP; }
+fn gidx(c: vec3i) -> u32 { return u32(c.x) + U.g.x * (u32(c.y) + U.g.y * u32(c.z)); }
+fn wts(d: vec3f) -> array<vec3f,3> { return array<vec3f,3>(0.5*(0.5-d)*(0.5-d), 0.75-d*d, 0.5*(0.5+d)*(0.5+d)); }
+
+@compute @workgroup_size(64) fn clearGrid(@builtin(global_invocation_id) id: vec3u) {
+  let n = U.g.x*U.g.y*U.g.z; if (id.x >= n) { return; }
+  let i = id.x*4u; atomicStore(&gi[i],0); atomicStore(&gi[i+1u],0); atomicStore(&gi[i+2u],0); atomicStore(&gi[i+3u],0);
+}
+@compute @workgroup_size(64) fn p2g1(@builtin(global_invocation_id) id: vec3u) {
+  if (id.x >= U.g.w) { return; }
+  let p = pos[id.x].xyz; let v = vel[id.x].xyz; let C = Cm[id.x];
+  let cell = vec3i(floor(p)); let d = p - vec3f(cell) - 0.5; let w = wts(d);
+  for (var gx = 0; gx < 3; gx++) { for (var gy = 0; gy < 3; gy++) { for (var gz = 0; gz < 3; gz++) {
+    let wt = w[gx].x * w[gy].y * w[gz].z;
+    let c = cell + vec3i(gx-1, gy-1, gz-1);
+    let cd = vec3f(c) - p + 0.5;
+    let q = C * cd;
+    let mv = (v + q) * wt;
+    let i = gidx(c) * 4u;
+    atomicAdd(&gi[i], enc(wt)); atomicAdd(&gi[i+1u], enc(mv.x)); atomicAdd(&gi[i+2u], enc(mv.y)); atomicAdd(&gi[i+3u], enc(mv.z));
+  }}}
+}
+@compute @workgroup_size(64) fn p2g2(@builtin(global_invocation_id) id: vec3u) {
+  if (id.x >= U.g.w) { return; }
+  let p = pos[id.x].xyz; let C = Cm[id.x];
+  let cell = vec3i(floor(p)); let d = p - vec3f(cell) - 0.5; let w = wts(d);
+  var dens = 0.0;
+  for (var gx = 0; gx < 3; gx++) { for (var gy = 0; gy < 3; gy++) { for (var gz = 0; gz < 3; gz++) {
+    let wt = w[gx].x * w[gy].y * w[gz].z;
+    dens += dec(atomicLoad(&gi[gidx(cell + vec3i(gx-1, gy-1, gz-1))*4u])) * wt;
+  }}}
+  let vol = 1.0 / max(dens, 0.0001);
+  let pr = max(-0.1, U.a.z * (pow(max(dens / U.a.w, 0.0), 4.0) - 1.0));
+  var st = mat3x3f(-pr,0,0, 0,-pr,0, 0,0,-pr);
+  st += (C + transpose(C)) * U.b.x;
+  let t0 = st * (-vol * 4.0 * U.a.x);
+  for (var gx = 0; gx < 3; gx++) { for (var gy = 0; gy < 3; gy++) { for (var gz = 0; gz < 3; gz++) {
+    let wt = w[gx].x * w[gy].y * w[gz].z;
+    let c = cell + vec3i(gx-1, gy-1, gz-1);
+    let cd = vec3f(c) - p + 0.5;
+    let m = (t0 * cd) * wt;
+    let i = gidx(c) * 4u;
+    atomicAdd(&gi[i+1u], enc(m.x)); atomicAdd(&gi[i+2u], enc(m.y)); atomicAdd(&gi[i+3u], enc(m.z));
+  }}}
+}
+@compute @workgroup_size(64) fn updGrid(@builtin(global_invocation_id) id: vec3u) {
+  let n = U.g.x*U.g.y*U.g.z; if (id.x >= n) { return; }
+  let i = id.x*4u;
+  let m = dec(atomicLoad(&gi[i]));
+  var v = vec3f(0.0);
+  if (m > 0.0) {
+    v = vec3f(dec(atomicLoad(&gi[i+1u])), dec(atomicLoad(&gi[i+2u])), dec(atomicLoad(&gi[i+3u]))) / m;
+    v.y += U.a.x * U.a.y;
+    let x = id.x % U.g.x; let y = (id.x / U.g.x) % U.g.y; let z = id.x / (U.g.x*U.g.y);
+    let fx = f32(x);
+    if (x < 2u || x > U.g.x-3u) { v.x = 0.0; }
+    if (y < 2u || y > U.g.y-3u) { v.y = 0.0; }
+    if (z < 2u || z > U.g.z-3u) { v.z = 0.0; }
+    /* 파도 판: 그보다 왼쪽 칸은 판과 함께 움직인다 */
+    if (fx < U.b.y + 1.0) { v.x = max(v.x, U.b.z); }
+    /* 해변 비탈: 비탈 안으로 들어가는 속도를 없앤다 */
+    if (U.c.x > 0.0 && fx > U.b.w) {
+      let fy = 2.0 + U.c.x * (fx - U.b.w);
+      if (f32(y) < fy + 0.5) { let nn = normalize(vec3f(-U.c.x, 1.0, 0.0)); let vn = dot(v, nn); if (vn < 0.0) { v -= vn * nn; } }
+    }
+  }
+  gv[id.x] = vec4f(v, m);
+}
+@compute @workgroup_size(64) fn g2p(@builtin(global_invocation_id) id: vec3u) {
+  if (id.x >= U.g.w) { return; }
+  var p = pos[id.x].xyz;
+  let cell = vec3i(floor(p)); let d = p - vec3f(cell) - 0.5; let w = wts(d);
+  var v = vec3f(0.0); var B = mat3x3f(0,0,0,0,0,0,0,0,0);
+  for (var gx = 0; gx < 3; gx++) { for (var gy = 0; gy < 3; gy++) { for (var gz = 0; gz < 3; gz++) {
+    let wt = w[gx].x * w[gy].y * w[gz].z;
+    let c = cell + vec3i(gx-1, gy-1, gz-1);
+    let cd = vec3f(c) - p + 0.5;
+    let g = gv[gidx(c)].xyz * wt;
+    v += g;
+    B += mat3x3f(g * cd.x, g * cd.y, g * cd.z);
+  }}}
+  let C = B * 4.0;
+  p += v * U.a.x;
+  /* 벽 가까이 가면 미리 밀어 낸다 (다음 박자 위치로 판단) */
+  let lo = vec3f(3.0, 3.0, 3.0); let hi = vec3f(f32(U.g.x)-4.0, f32(U.g.y)-4.0, f32(U.g.z)-4.0);
+  let xn = p + v * U.a.x * 3.0;
+  if (xn.x < max(lo.x, U.b.y)) { v.x += max(lo.x, U.b.y) - xn.x; }
+  if (xn.x > hi.x) { v.x += hi.x - xn.x; }
+  if (xn.y < lo.y) { v.y += lo.y - xn.y; }
+  if (xn.y > hi.y) { v.y += hi.y - xn.y; }
+  if (xn.z < lo.z) { v.z += lo.z - xn.z; }
+  if (xn.z > hi.z) { v.z += hi.z - xn.z; }
+  if (U.c.x > 0.0 && p.x > U.b.w) { let fy = 2.0 + U.c.x * (p.x - U.b.w) + 1.0; if (p.y < fy) { p.y = fy; let nn = normalize(vec3f(-U.c.x, 1.0, 0.0)); let vn = dot(v, nn); if (vn < 0.0) { v -= vn * nn; } } }
+  p = clamp(p, vec3f(2.0, 2.0, 2.0), vec3f(f32(U.g.x)-3.0, f32(U.g.y)-3.0, f32(U.g.z)-3.0));
+  p.x = max(p.x, min(U.b.y, f32(U.g.x)-3.0));
+  pos[id.x] = vec4f(p, 1.0);
+  vel[id.x] = vec4f(v, 0.0);
+  Cm[id.x] = C;
+}
+`;
+
+/* 그리기: 방울마다 화면을 향한 작은 원판. 둥근 공처럼 빛을 나눠 칠한다(1단계 미리보기) */
+const RWGSL=/* wgsl */`
+struct Cam { vp: mat4x4f, view: mat4x4f, c0: vec4f, c1: vec4f, c2: vec4f, c3: vec4f, prm: vec4f };
+@group(0) @binding(0) var<uniform> K: Cam;
+@group(0) @binding(1) var<storage, read> pos: array<vec4f>;
+@group(0) @binding(2) var<storage, read> vel: array<vec4f>;
+struct VO { @builtin(position) p: vec4f, @location(0) uv: vec2f, @location(1) s: f32, @location(2) dz: f32 };
+@vertex fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VO {
+  var cs = array<vec2f,6>(vec2f(-1,-1), vec2f(1,-1), vec2f(-1,1), vec2f(-1,1), vec2f(1,-1), vec2f(1,1));
+  let c = cs[vi];
+  let wp = pos[ii].xyz - vec3f(K.prm.y, K.prm.z, K.prm.w) * 0.5;
+  var vp = K.view * vec4f(wp, 1.0);
+  vp = vec4f(vp.xy + c * K.prm.x, vp.z, 1.0);
+  var o: VO; o.p = K.vp * vp; o.uv = c; o.s = length(vel[ii].xyz); o.dz = -vp.z; return o;
+}
+@fragment fn fs(i: VO) -> @location(0) vec4f {
+  let r2 = dot(i.uv, i.uv); if (r2 > 1.0) { discard; }
+  let n = vec3f(i.uv.x, -i.uv.y, sqrt(1.0 - r2));
+  let L = normalize(vec3f(-0.5, 0.7, 0.6));
+  let ndl = dot(n, L);
+  var col = K.c0.rgb;
+  if (ndl < 0.35) { col = K.c1.rgb; }
+  if (ndl > 0.93) { col = K.c2.rgb; }
+  if (i.s > K.c3.w) { col = mix(col, vec3f(1.0), 0.75); }
+  if (r2 > 0.8) { col = K.c3.rgb; }
+  return vec4f(col, 1.0);
+}
+struct LV { @builtin(position) p: vec4f, @location(0) c: vec3f };
+@vertex fn lvs(@location(0) a: vec3f, @location(1) c: vec3f) -> LV { var o: LV; o.p = K.vp * (K.view * vec4f(a - vec3f(K.prm.y, K.prm.z, K.prm.w) * 0.5, 1.0)); o.c = c; return o; }
+@fragment fn lfs(i: LV) -> @location(0) vec4f { return vec4f(i.c, 1.0); }
+`;
+
+const cv=$("cv"); let dev=null, ctx=null, fmtTex=null, depth=null;
+let offTex=null, B={}, PL={}, BG0=null, BGR=null, BGL=null, lineBuf=null, lineN=0;
+const params=new ArrayBuffer(64), pU=new Uint32Array(params), pF=new Float32Array(params);
+async function init(){
+  if(!navigator.gpu){ $("msg").textContent="이 브라우저는 WebGPU(그래픽카드 계산)를 지원하지 않아요. 최신 크롬이나 엣지에서 열어 주세요."; return; }
+  const ad=await navigator.gpu.requestAdapter({powerPreference:"high-performance"}); E.adapter=ad;   /* 어댑터를 붙잡아 둔다 (놓치면 일부 브라우저에서 연결이 끊긴다) */ if(!ad){ $("msg").textContent="그래픽카드를 찾지 못했어요."; return; }
+  dev=await ad.requestDevice({requiredLimits:{maxStorageBufferBindingSize:Math.min(ad.limits.maxStorageBufferBindingSize,256*1024*1024)}});
+  dev.lost.then(i=>{ $("msg").hidden=false; $("msg").textContent="그래픽카드 연결이 끊겼어요. 새로고침해 주세요. ("+(i.message||"")+")"; });
+  if(OFF) fmtTex="rgba8unorm"; else { ctx=cv.getContext("webgpu"); fmtTex=navigator.gpu.getPreferredCanvasFormat(); ctx.configure({device:dev,format:fmtTex,alphaMode:"opaque"}); }
+  const SB=GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST|GPUBufferUsage.COPY_SRC;
+  B.U=dev.createBuffer({size:64,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
+  B.pos=dev.createBuffer({size:MAXP*16,usage:SB}); B.vel=dev.createBuffer({size:MAXP*16,usage:SB}); B.C=dev.createBuffer({size:MAXP*48,usage:SB});
+  B.gi=dev.createBuffer({size:CELLS*16,usage:SB}); B.gv=dev.createBuffer({size:CELLS*16,usage:SB});
+  B.cam=dev.createBuffer({size:240,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
+  const mod=dev.createShaderModule({code:WGSL});
+  const bgl=dev.createBindGroupLayout({entries:[0,1,2,3,4,5].map(b=>({binding:b,visibility:GPUShaderStage.COMPUTE,buffer:{type:b?"storage":"uniform"}}))});
+  const pl=dev.createPipelineLayout({bindGroupLayouts:[bgl]});
+  for(const e of ["clearGrid","p2g1","p2g2","updGrid","g2p"]) PL[e]=dev.createComputePipeline({layout:pl,compute:{module:mod,entryPoint:e}});
+  BG0=dev.createBindGroup({layout:bgl,entries:[{binding:0,resource:{buffer:B.U}},{binding:1,resource:{buffer:B.pos}},{binding:2,resource:{buffer:B.vel}},{binding:3,resource:{buffer:B.C}},{binding:4,resource:{buffer:B.gi}},{binding:5,resource:{buffer:B.gv}}]});
+  const rmod=dev.createShaderModule({code:RWGSL});
+  const rbgl=dev.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.VERTEX|GPUShaderStage.FRAGMENT,buffer:{type:"uniform"}},{binding:1,visibility:GPUShaderStage.VERTEX,buffer:{type:"read-only-storage"}},{binding:2,visibility:GPUShaderStage.VERTEX,buffer:{type:"read-only-storage"}}]});
+  const rpl=dev.createPipelineLayout({bindGroupLayouts:[rbgl]});
+  const ds={format:"depth24plus",depthWriteEnabled:true,depthCompare:"less"};
+  PL.draw=dev.createRenderPipeline({layout:rpl,vertex:{module:rmod,entryPoint:"vs"},fragment:{module:rmod,entryPoint:"fs",targets:[{format:fmtTex}]},primitive:{topology:"triangle-list"},depthStencil:ds});
+  PL.line=dev.createRenderPipeline({layout:rpl,vertex:{module:rmod,entryPoint:"lvs",buffers:[{arrayStride:24,attributes:[{shaderLocation:0,offset:0,format:"float32x3"},{shaderLocation:1,offset:12,format:"float32x3"}]}]},fragment:{module:rmod,entryPoint:"lfs",targets:[{format:fmtTex}]},primitive:{topology:"line-list"},depthStencil:ds});
+  BGR=dev.createBindGroup({layout:rbgl,entries:[{binding:0,resource:{buffer:B.cam}},{binding:1,resource:{buffer:B.pos}},{binding:2,resource:{buffer:B.vel}}]});
+  lineBuf=dev.createBuffer({size:64*24,usage:GPUBufferUsage.VERTEX|GPUBufferUsage.COPY_DST});
+  E.ok=true; $("msg").hidden=true; fill(); requestAnimationFrame(frame);
+}
+
+/* 물 채우기: 물 높이까지 방울을 고르게 (살짝 흔들어) 놓는다 */
+function spacing(){ return 0.62-0.22*S.dens; }   /* 촘촘함 0.3 → 0.55칸, 1 → 0.40칸 */
+function fill(){ const sp=spacing(), top=2+S.level*(GY-5), P=new Float32Array(MAXP*4); let n=0;
+  for(let z=3.2;z<GZ-3.2;z+=sp) for(let y=3.2;y<top;y+=sp) for(let x=PADX+1.2;x<GX-3.2;x+=sp){ if(y<floorAt(x)+1.3) continue; if(n>=MAXP) break;
+    P[n*4]=x+(Math.random()-.5)*sp*0.3; P[n*4+1]=y+(Math.random()-.5)*sp*0.3; P[n*4+2]=z+(Math.random()-.5)*sp*0.3; P[n*4+3]=1; n++; }
+  N=n; dev.queue.writeBuffer(B.pos,0,P,0,n*4); dev.queue.writeBuffer(B.vel,0,new Float32Array(n*4)); dev.queue.writeBuffer(B.C,0,new Float32Array(n*12));
+  stepNo=0; WPH=0; PADX=2.5; restD=1/(sp*sp*sp); }
+let restD=1;
+function dropBlob(){ if(!E.ok) return; const sp=spacing(), R=Math.min(GY,GZ)*0.16, cx=GX*(0.3+0.4*Math.random()), cy=GY-R-4, cz=GZ/2+(Math.random()-.5)*GZ*0.3, A=[];
+  for(let z=-R;z<=R;z+=sp) for(let y=-R;y<=R;y+=sp) for(let x=-R;x<=R;x+=sp){ if(x*x+y*y+z*z>R*R || N+A.length/4>=MAXP) continue; A.push(cx+x,cy+y,cz+z,1); }
+  const k=A.length/4; if(!k) return; dev.queue.writeBuffer(B.pos,N*16,new Float32Array(A)); const V=new Float32Array(k*4); for(let i=0;i<k;i++) V[i*4+1]=-0.5; dev.queue.writeBuffer(B.vel,N*16,V); dev.queue.writeBuffer(B.C,N*48,new Float32Array(k*12)); N+=k; }
+
+/* 파도 판 위치: 빠르게 밀고 천천히 돌아오는 모양. 한 박자에 움직이는 거리는 제한 */
+function padStep(){ const sps=60*SUB; WPH+=1/(S.per*sps); const ph=WPH%1, p=0.5-0.35*S.skew, w=ph<p?0.5*ph/p:0.5+0.5*(ph-p)/(1-p), f=0.5-0.5*Math.cos(w*Math.PI*2);
+  AMPc+=((waveOn?S.amp:0)-AMPc)*0.01; SLAP*=0.996; const tgt=2.5+Math.min(GX*0.35,(AMPc+S.amp*1.2*SLAP)*f+S.amp*0.8*SLAP*(1-f));
+  const d=Math.max(-0.12,Math.min(0.12,tgt-PADX)); PADX+=d; PADV=d/DT; }
+
+function step(enc){
+  padStep();
+  pU[0]=GX; pU[1]=GY; pU[2]=GZ; pU[3]=N; pF[4]=DT; pF[5]=-S.grav; pF[6]=S.stiff; pF[7]=restD; pF[8]=S.visc; pF[9]=PADX; pF[10]=PADV; pF[11]=BX0; pF[12]=S.beach; pF[13]=0; pF[14]=stepNo; pF[15]=0;
+  dev.queue.writeBuffer(B.U,0,params);
+  const e=dev.createCommandEncoder(), c=e.beginComputePass(); c.setBindGroup(0,BG0);
+  const gC=Math.ceil(CELLS/WG), gP=Math.ceil(N/WG);
+  c.setPipeline(PL.clearGrid); c.dispatchWorkgroups(gC);
+  if(gP){ c.setPipeline(PL.p2g1); c.dispatchWorkgroups(gP); c.setPipeline(PL.p2g2); c.dispatchWorkgroups(gP); }
+  c.setPipeline(PL.updGrid); c.dispatchWorkgroups(gC);
+  if(gP){ c.setPipeline(PL.g2p); c.dispatchWorkgroups(gP); }
+  c.end(); dev.queue.submit([e.finish()]); stepNo++;
+}
+
+/* ── 카메라 (작은 행렬 계산) ── */
+const m4={ persp(f,a,n,fa){ const t=1/Math.tan(f/2); return [t/a,0,0,0, 0,t,0,0, 0,0,fa/(n-fa),-1, 0,0,n*fa/(n-fa),0]; },
+  look(e,c,u){ const z=nrm(sub(e,c)), x=nrm(crs(u,z)), y=crs(z,x); return [x[0],y[0],z[0],0, x[1],y[1],z[1],0, x[2],y[2],z[2],0, -dot(x,e),-dot(y,e),-dot(z,e),1]; } };
+const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]], dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2], crs=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]], nrm=a=>{ const l=Math.hypot(...a)||1; return [a[0]/l,a[1]/l,a[2]/l]; };
+const camData=new Float32Array(60);
+function lines(){ const hx=GX/2-2, hy=GY/2-2, hz=GZ/2-2, L=[]; const P=[[-hx,-hy,-hz],[hx,-hy,-hz],[hx,hy,-hz],[-hx,hy,-hz],[-hx,-hy,hz],[hx,-hy,hz],[hx,hy,hz],[-hx,hy,hz]], Eg=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+  const gl=[0.75,0.66,1], ye=[0.98,0.88,0.12], sand=[0.42,0.28,0.66];
+  for(const [a,b] of Eg) L.push(...P[a],...gl,...P[b],...gl);
+  const px=PADX-GX/2; for(const [a,b] of [[[px,-hy,-hz],[px,hy*0.5,-hz]],[[px,-hy,hz],[px,hy*0.5,hz]],[[px,hy*0.5,-hz],[px,hy*0.5,hz]],[[px,-hy,-hz],[px,-hy,hz]]]) L.push(...a,...ye,...b,...ye);
+  if(S.beach>0){ const x0=BX0-GX/2, y1=Math.min(hy,2+S.beach*(GX-2-BX0)-GY/2); for(const [a,b] of [[[x0,-hy,-hz],[hx,y1,-hz]],[[x0,-hy,hz],[hx,y1,hz]],[[x0,-hy,-hz],[x0,-hy,hz]],[[hx,y1,-hz],[hx,y1,hz]]]) L.push(...a,...sand,...b,...sand); }
+  lineN=L.length/6; dev.queue.writeBuffer(lineBuf,0,new Float32Array(L)); }
+
+/* ── 돌리기 ── */
+let last=performance.now(), fT=0, fN=0;
+function frame(now){
+  const dt=Math.min(0.05,(now-last)/1000); last=now;
+  if(!paused) for(let i=0;i<SUB;i++) step();
+  /* 화면 크기: 작은 해상도로 그린 뒤 픽셀 그대로 키운다 */
+  const r=$("stage").getBoundingClientRect(), w=Math.max(80,Math.round(r.width/S.px)), h=Math.max(50,Math.round(r.height/S.px));
+  if(cv.width!==w || cv.height!==h || !depth){ cv.width=w; cv.height=h; if(depth) depth.destroy(); depth=dev.createTexture({size:[w,h],format:"depth24plus",usage:GPUTextureUsage.RENDER_ATTACHMENT}); if(OFF){ if(offTex) offTex.destroy(); offTex=dev.createTexture({size:[w,h],format:fmtTex,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC}); } }
+  const yaw=S.cyaw*Math.PI/180, pit=S.cpit*Math.PI/180, dist=Math.max(GX,GZ)*1.55/S.czoom;
+  const eye=[Math.sin(yaw)*Math.cos(pit)*dist, Math.sin(pit)*dist-2, Math.cos(yaw)*Math.cos(pit)*dist];
+  const V=m4.look(eye,[0,-GY*0.12,0],[0,1,0]), Pm=m4.persp(0.62,w/h,0.5,1000);
+  const C=COLORS[S.col].c, cc=c=>[c[0]/255,c[1]/255,c[2]/255];
+  camData.set(Pm,0); camData.set(V,16); camData.set([...cc(C[0]),1],32); camData.set([...cc(C[1]),1],36); camData.set([...cc(C[2]),1],40); camData.set([...cc(C[3]),1.6],44);
+  camData.set([spacing()*0.95*S.psize,GX,GY,GZ],48);
+  dev.queue.writeBuffer(B.cam,0,camData,0,52); lines();
+  const e=dev.createCommandEncoder(), p=e.beginRenderPass({colorAttachments:[{view:OFF?offTex.createView():ctx.getCurrentTexture().createView(),clearValue:{r:0,g:1/255,b:42/255,a:1},loadOp:"clear",storeOp:"store"}],depthStencilAttachment:{view:depth.createView(),depthClearValue:1,depthLoadOp:"clear",depthStoreOp:"store"}});
+  p.setBindGroup(0,BGR);
+  if(N){ p.setPipeline(PL.draw); p.draw(6,N); }
+  p.setPipeline(PL.line); p.setVertexBuffer(0,lineBuf); p.draw(lineN);
+  p.end(); dev.queue.submit([e.finish()]);
+  fN++; fT+=dt; if(fT>=0.5){ $("stat").textContent=N.toLocaleString()+"알 · "+Math.round(fN/fT)+"fps"; fN=0; fT=0; }
+  requestAnimationFrame(frame);
+}
+
+/* ── 손잡이 ── */
+const stage=$("stage"), ORB={pts:new Map(),x:0,y:0,d0:0};
+stage.addEventListener("pointerdown",e=>{ stage.setPointerCapture(e.pointerId); ORB.pts.set(e.pointerId,[e.clientX,e.clientY]); ORB.x=e.clientX; ORB.y=e.clientY; if(ORB.pts.size===2){ const [a,b]=[...ORB.pts.values()]; ORB.d0=Math.hypot(a[0]-b[0],a[1]-b[1]); } });
+stage.addEventListener("pointermove",e=>{ if(!ORB.pts.has(e.pointerId)) return; ORB.pts.set(e.pointerId,[e.clientX,e.clientY]);
+  if(ORB.pts.size===2){ const [a,b]=[...ORB.pts.values()], d=Math.hypot(a[0]-b[0],a[1]-b[1]); if(ORB.d0>0) S.czoom=Math.min(4,Math.max(0.4,S.czoom*d/ORB.d0)); ORB.d0=d; return; }
+  S.cyaw=((S.cyaw-(e.clientX-ORB.x)*0.4)+540)%360-180; S.cpit=Math.min(85,Math.max(-5,S.cpit+(e.clientY-ORB.y)*0.3)); ORB.x=e.clientX; ORB.y=e.clientY; });
+const up=e=>{ ORB.pts.delete(e.pointerId); ORB.d0=0; save(); };
+stage.addEventListener("pointerup",up); stage.addEventListener("pointercancel",up);
+stage.addEventListener("wheel",e=>{ e.preventDefault(); S.czoom=Math.min(4,Math.max(0.4,S.czoom*Math.exp(-e.deltaY*0.0012))); save(); },{passive:false});
+stage.addEventListener("dblclick",()=>dropBlob());
+$("bSlap").addEventListener("click",()=>{ SLAP=1; });
+$("bWave").addEventListener("click",()=>{ waveOn=!waveOn; $("bWave").setAttribute("aria-pressed",waveOn?"true":"false"); });
+$("bDrop").addEventListener("click",dropBlob);
+$("bFill").addEventListener("click",()=>{ if(E.ok) fill(); });
+$("bPause").addEventListener("click",()=>{ paused=!paused; $("bPause").setAttribute("aria-pressed",paused?"true":"false"); });
+$("bFull").addEventListener("click",()=>{ try{ if(document.fullscreenElement) document.exitFullscreen(); else stage.requestFullscreen(); }catch(_){} });
+document.addEventListener("keydown",e=>{ if(e.target.tagName==="INPUT") return; if(e.code==="Space"){ e.preventDefault(); SLAP=1; } else if(e.key==="f"||e.key==="F") $("bFull").click(); });
+
+/* 점검용: 방울 위치를 읽어 온다 */
+window.__nj3={ async snap(){ const w=cv.width, h=cv.height, bpr=Math.ceil(w*4/256)*256, rb=dev.createBuffer({size:bpr*h,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}); const e=dev.createCommandEncoder(); e.copyTextureToBuffer({texture:offTex},{buffer:rb,bytesPerRow:bpr},[w,h]); dev.queue.submit([e.finish()]); await rb.mapAsync(GPUMapMode.READ); const a=new Uint8Array(rb.getMappedRange()); let c=document.getElementById("snap"); if(!c){ c=document.createElement("canvas"); c.id="snap"; c.style.cssText="position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated"; $("stage").appendChild(c); } c.width=w; c.height=h; const g=c.getContext("2d"), im=g.createImageData(w,h); for(let y=0;y<h;y++) im.data.set(a.subarray(y*bpr,y*bpr+w*4),y*w*4); g.putImageData(im,0,0); rb.unmap(); rb.destroy(); }, get n(){ return N; }, get S(){ return S; }, slap(){ SLAP=1; }, fill:()=>fill(), async probe(){ const k=Math.min(N,20000), rb=dev.createBuffer({size:k*16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}); const e=dev.createCommandEncoder(); e.copyBufferToBuffer(B.pos,0,rb,0,k*16); dev.queue.submit([e.finish()]); await rb.mapAsync(GPUMapMode.READ); const a=new Float32Array(rb.getMappedRange().slice(0)); rb.unmap(); rb.destroy();
+  let bad=0, my=0, mxy=-1e9, mx=0; for(let i=0;i<k;i++){ const x=a[i*4], y=a[i*4+1], z=a[i*4+2]; if(!isFinite(x)||!isFinite(y)||!isFinite(z)) bad++; else { my+=y; mx+=x; if(y>mxy) mxy=y; } } return {k,bad,meanY:my/k,maxY:mxy,meanX:mx/k,padX:PADX}; } };
+init().catch(e=>{ $("msg").hidden=false; $("msg").textContent="그래픽카드를 준비하지 못했어요: "+e.message; console.error(e); });
+})();
+</script>
+</body>
+</html>
