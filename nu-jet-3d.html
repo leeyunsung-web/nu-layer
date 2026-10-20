@@ -65,6 +65,8 @@ h3{margin:4px 0 0;font-size:12px;letter-spacing:.08em;color:var(--soft)}
     </div>
     <aside class="panel" id="panel">
       <div class="row" id="views"><span class="lab">시점</span></div>
+      <h3>수조</h3>
+      <div id="secTank"></div>
       <h3>파도</h3>
       <div id="secWave"></div>
       <h3>액체</h3>
@@ -84,8 +86,11 @@ const $=id=>document.getElementById(id);
 
 /* ── 조절값 ── [칸, 이름, 키, 최소, 최대, 간격, 처음 값, 단위, 설명, 다시 채우기] */
 const CTL=[
+ ["secTank","가로","tx",48,180,4,112,"칸","수조의 가로 길이. 넓을수록 파도가 길게 달려갑니다. 바꾸면 다시 채웁니다.",2],
+ ["secTank","깊이","tz",16,120,4,56,"칸","수조의 앞뒤 깊이. 바꾸면 다시 채웁니다.",2],
+ ["secTank","높이","ty",24,72,4,44,"칸","수조의 높이. 높을수록 물보라가 높이 튈 공간이 생깁니다. 바꾸면 다시 채웁니다.",2],
  ["secWave","물 높이","level",0.15,0.6,0.01,0.34,"%","수조에 채울 물의 높이. 바꾸면 다시 채웁니다.",1],
- ["secWave","파도 세기","amp",0,14,0.5,6,"칸","파도 판이 밀고 나가는 거리(격자 칸).",0],
+ ["secWave","파도 세기","amp",0,30,0.5,8,"칸","파도 판이 밀고 나가는 거리(격자 칸).",0],
  ["secWave","파도 주기","per",0.6,6,0.1,2.2,"초","한 번 밀었다 돌아오는 시간.",0],
  ["secWave","밀어치기","skew",0,1,0.05,0.4,"%","빠르게 밀고 천천히 돌아오는 정도. 높이면 파도 앞이 가팔라집니다.",0],
  ["secWave","해변 경사","beach",0,0.8,0.02,0.3,"","오른쪽 바닥을 비탈로 만듭니다. 바꾸면 다시 채웁니다.",1],
@@ -111,24 +116,27 @@ const inputs={}; let refillT=0;
 for(const c of CTL){ const w=document.createElement("label"); w.className="ctl"; const sp=document.createElement("span"); sp.textContent=c[1];
   const r=document.createElement("input"); r.type="range"; r.id="k_"+c[2]; r.min=c[3]; r.max=c[4]; r.step=c[5]; r.value=S[c[2]];
   const o=document.createElement("output"); o.textContent=fmt(c,S[c[2]]); const d=document.createElement("small"); d.className="desc"; d.textContent=c[8];
-  r.addEventListener("input",()=>{ S[c[2]]=+r.value; o.textContent=fmt(c,S[c[2]]); save(); if(c[9]){ clearTimeout(refillT); refillT=setTimeout(()=>{ if(E.ok) fill(); },300); } });
+  r.addEventListener("input",()=>{ S[c[2]]=+r.value; o.textContent=fmt(c,S[c[2]]); save(); if(c[9]){ clearTimeout(refillT); refillT=setTimeout(()=>{ if(!E.ok) return; if(c[9]===2) resizeTank(); fill(); },350); } });
   w.append(sp,r,o,d); $(c[0]).appendChild(w); inputs[c[2]]=[r,o,c]; }
 for(const k in COLORS){ const b=document.createElement("button"); b.type="button"; b.dataset.c=k; b.textContent=COLORS[k].n; b.addEventListener("click",()=>{ S.col=k; save(); colUI(); }); $("colors").appendChild(b); }
 function colUI(){ for(const b of document.querySelectorAll("#colors button")) b.setAttribute("aria-pressed",b.dataset.c===S.col?"true":"false"); }
 for(const [nm,y,p] of [["비스듬히",-38,24],["옆모습",0,3],["위에서",-20,62],["물가에서",-88,12]]){ const b=document.createElement("button"); b.type="button"; b.textContent=nm; b.addEventListener("click",()=>{ S.cyaw=y; S.cpit=p; S.czoom=1; save(); }); $("views").appendChild(b); }
 function syncUI(){ for(const k in inputs){ const [r,o,c]=inputs[k]; r.value=S[k]; o.textContent=fmt(c,S[k]); } colUI(); }
 colUI();
-$("bReset").addEventListener("click",()=>{ S=Object.assign({},DEF); save(); syncUI(); if(E.ok) fill(); });
+$("bReset").addEventListener("click",()=>{ S=Object.assign({},DEF); save(); syncUI(); if(E.ok){ resizeTank(); fill(); } });
 
 /* ── 격자와 방울 ──
    MLS-MPM: 방울이 가진 질량·운동량을 격자에 뿌리고(P2G) → 격자에서 압력·중력·벽을 계산하고 → 다시 방울로 모아(G2P) 움직인다.
    단위: 거리는 격자 칸, 한 박자 dt. 한 프레임에 세 박자 */
 const Q=new URLSearchParams(location.search);
 const SMALL=Q.get("small")==="1", OFF=Q.get("off")==="1";   /* off=1: 점검용 — 화면 대신 보이지 않는 그림판에 그린다 */
-const GX=SMALL?40:72, GY=SMALL?24:40, GZ=SMALL?20:36, CELLS=GX*GY*GZ, MAXP=SMALL?40000:260000, WG=64, SUB=3, DT=0.2;
+let GX=72, GY=40, GZ=36, CELLS=GX*GY*GZ;
+const MAXP=SMALL?40000:420000, WG=64, SUB=3, DT=0.2;
+function tankSize(){ if(SMALL){ GX=40; GY=24; GZ=20; } else { GX=Math.round(S.tx); GY=Math.round(S.ty); GZ=Math.round(S.tz); } CELLS=GX*GY*GZ; }
+tankSize();
 const E={ok:false};
 let N=0, stepNo=0, PADX=2.5, PADV=0, SLAP=0, waveOn=true, paused=false, AMPc=0, WPH=0;
-const BX0=GX*0.45;
+let BX0=GX*0.45;
 const floorAt=x=>2+(S.beach>0 && x>BX0? S.beach*(x-BX0):0);
 
 const WGSL=/* wgsl */`
@@ -286,13 +294,13 @@ async function init(){
   const SB=GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST|GPUBufferUsage.COPY_SRC;
   B.U=dev.createBuffer({size:64,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
   B.pos=dev.createBuffer({size:MAXP*16,usage:SB}); B.vel=dev.createBuffer({size:MAXP*16,usage:SB}); B.C=dev.createBuffer({size:MAXP*48,usage:SB});
-  B.gi=dev.createBuffer({size:CELLS*16,usage:SB}); B.gv=dev.createBuffer({size:CELLS*16,usage:SB});
+
   B.cam=dev.createBuffer({size:240,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
   const mod=dev.createShaderModule({code:WGSL});
   const bgl=dev.createBindGroupLayout({entries:[0,1,2,3,4,5].map(b=>({binding:b,visibility:GPUShaderStage.COMPUTE,buffer:{type:b?"storage":"uniform"}}))});
   const pl=dev.createPipelineLayout({bindGroupLayouts:[bgl]});
   for(const e of ["clearGrid","p2g1","p2g2","updGrid","g2p"]) PL[e]=dev.createComputePipeline({layout:pl,compute:{module:mod,entryPoint:e}});
-  BG0=dev.createBindGroup({layout:bgl,entries:[{binding:0,resource:{buffer:B.U}},{binding:1,resource:{buffer:B.pos}},{binding:2,resource:{buffer:B.vel}},{binding:3,resource:{buffer:B.C}},{binding:4,resource:{buffer:B.gi}},{binding:5,resource:{buffer:B.gv}}]});
+  E.bgl=bgl; resizeTank();
   const rmod=dev.createShaderModule({code:RWGSL});
   const rbgl=dev.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.VERTEX|GPUShaderStage.FRAGMENT,buffer:{type:"uniform"}},{binding:1,visibility:GPUShaderStage.VERTEX,buffer:{type:"read-only-storage"}},{binding:2,visibility:GPUShaderStage.VERTEX,buffer:{type:"read-only-storage"}}]});
   const rpl=dev.createPipelineLayout({bindGroupLayouts:[rbgl]});
@@ -304,9 +312,15 @@ async function init(){
   E.ok=true; $("msg").hidden=true; fill(); requestAnimationFrame(frame);
 }
 
-/* 물 채우기: 물 높이까지 방울을 고르게 (살짝 흔들어) 놓는다 */
-function spacing(){ return 0.62-0.22*S.dens; }   /* 촘촘함 0.3 → 0.55칸, 1 → 0.40칸 */
-function fill(){ const sp=spacing(), top=2+S.level*(GY-5), P=new Float32Array(MAXP*4); let n=0;
+/* 수조 크기가 바뀌면 격자를 새로 만든다 */
+function resizeTank(){ tankSize(); BX0=GX*0.45; const SB=GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST|GPUBufferUsage.COPY_SRC;
+  if(B.gi) B.gi.destroy(); if(B.gv) B.gv.destroy();
+  B.gi=dev.createBuffer({size:CELLS*16,usage:SB}); B.gv=dev.createBuffer({size:CELLS*16,usage:SB});
+  BG0=dev.createBindGroup({layout:E.bgl,entries:[{binding:0,resource:{buffer:B.U}},{binding:1,resource:{buffer:B.pos}},{binding:2,resource:{buffer:B.vel}},{binding:3,resource:{buffer:B.C}},{binding:4,resource:{buffer:B.gi}},{binding:5,resource:{buffer:B.gv}}]}); }
+/* 물 채우기: 물 높이까지 방울을 고르게 (살짝 흔들어) 놓는다. 수조가 커서 방울이 한도를 넘으면 간격을 조금 넓힌다 */
+let SPC=0.5; function spacing(){ return SPC; }
+function baseSpacing(){ return 0.62-0.22*S.dens; }   /* 촘촘함 0.3 → 0.55칸, 1 → 0.40칸 */
+function fill(){ const top=2+S.level*(GY-5), vol=Math.max(1,(GX-PADX-4.4)*(top-3.2)*(GZ-6.4)); SPC=Math.max(baseSpacing(),Math.cbrt(vol/(MAXP*0.97))); const sp=SPC, P=new Float32Array(MAXP*4); let n=0;
   for(let z=3.2;z<GZ-3.2;z+=sp) for(let y=3.2;y<top;y+=sp) for(let x=PADX+1.2;x<GX-3.2;x+=sp){ if(y<floorAt(x)+1.3) continue; if(n>=MAXP) break;
     P[n*4]=x+(Math.random()-.5)*sp*0.3; P[n*4+1]=y+(Math.random()-.5)*sp*0.3; P[n*4+2]=z+(Math.random()-.5)*sp*0.3; P[n*4+3]=1; n++; }
   N=n; dev.queue.writeBuffer(B.pos,0,P,0,n*4); dev.queue.writeBuffer(B.vel,0,new Float32Array(n*4)); dev.queue.writeBuffer(B.C,0,new Float32Array(n*12));
