@@ -86,6 +86,7 @@ const $=id=>document.getElementById(id);
 
 /* ── 조절값 ── [칸, 이름, 키, 최소, 최대, 간격, 처음 값, 단위, 설명, 다시 채우기] */
 const CTL=[
+ ["secTank","빠르기","spd",0.1,2,0.05,1,"배","물이 움직이는 빠르기. 화면이 몇 프레임으로 돌든 같은 빠르기로 흐릅니다. 낮추면 슬로모션.",0],
  ["secTank","가로","tx",48,180,4,112,"칸","수조의 가로 길이. 넓을수록 파도가 길게 달려갑니다. 바꾸면 다시 채웁니다.",2],
  ["secTank","깊이","tz",16,120,4,56,"칸","수조의 앞뒤 깊이. 바꾸면 다시 채웁니다.",2],
  ["secTank","높이","ty",24,72,4,44,"칸","수조의 높이. 높을수록 물보라가 높이 튈 공간이 생깁니다. 바꾸면 다시 채웁니다.",2],
@@ -331,7 +332,7 @@ function dropBlob(){ if(!E.ok) return; const sp=spacing(), R=Math.min(GY,GZ)*0.1
   const k=A.length/4; if(!k) return; dev.queue.writeBuffer(B.pos,N*16,new Float32Array(A)); const V=new Float32Array(k*4); for(let i=0;i<k;i++) V[i*4+1]=-0.5; dev.queue.writeBuffer(B.vel,N*16,V); dev.queue.writeBuffer(B.C,N*48,new Float32Array(k*12)); N+=k; }
 
 /* 파도 판 위치: 빠르게 밀고 천천히 돌아오는 모양. 한 박자에 움직이는 거리는 제한 */
-function padStep(){ const sps=60*SUB; WPH+=1/(S.per*sps); const ph=WPH%1, p=0.5-0.35*S.skew, w=ph<p?0.5*ph/p:0.5+0.5*(ph-p)/(1-p), f=0.5-0.5*Math.cos(w*Math.PI*2);
+function padStep(){ const sps=SPS; WPH+=1/(S.per*sps); const ph=WPH%1, p=0.5-0.35*S.skew, w=ph<p?0.5*ph/p:0.5+0.5*(ph-p)/(1-p), f=0.5-0.5*Math.cos(w*Math.PI*2);
   AMPc+=((waveOn?S.amp:0)-AMPc)*0.01; SLAP*=0.996; const tgt=2.5+Math.min(GX*0.35,(AMPc+S.amp*1.2*SLAP)*f+S.amp*0.8*SLAP*(1-f));
   const d=Math.max(-0.12,Math.min(0.12,tgt-PADX)); PADX+=d; PADV=d/DT; }
 
@@ -361,10 +362,11 @@ function lines(){ const hx=GX/2-2, hy=GY/2-2, hz=GZ/2-2, L=[]; const P=[[-hx,-hy
   lineN=L.length/6; dev.queue.writeBuffer(lineBuf,0,new Float32Array(L)); }
 
 /* ── 돌리기 ── */
-let last=performance.now(), fT=0, fN=0;
+let last=performance.now(), fT=0, fN=0, acc=0, slowF=0;
+const SPS=180, MAXSTEP=10;   /* 빠르기 1배 = 1초에 180박자. 한 프레임에 최대 10박자까지만 (넘치면 그만큼 느려진다) */
 function frame(now){
   const dt=Math.min(0.05,(now-last)/1000); last=now;
-  if(!paused) for(let i=0;i<SUB;i++) step();
+  if(!paused){ acc+=dt*SPS*S.spd; let k=0; while(acc>=1 && k<MAXSTEP){ step(); acc-=1; k++; } slowF=acc>=1?1:Math.max(0,slowF-dt); if(acc>2) acc=0; }
   /* 화면 크기: 작은 해상도로 그린 뒤 픽셀 그대로 키운다 */
   const r=$("stage").getBoundingClientRect(), w=Math.max(80,Math.round(r.width/S.px)), h=Math.max(50,Math.round(r.height/S.px));
   if(cv.width!==w || cv.height!==h || !depth){ cv.width=w; cv.height=h; if(depth) depth.destroy(); depth=dev.createTexture({size:[w,h],format:"depth24plus",usage:GPUTextureUsage.RENDER_ATTACHMENT}); if(OFF){ if(offTex) offTex.destroy(); offTex=dev.createTexture({size:[w,h],format:fmtTex,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC}); } }
@@ -380,7 +382,7 @@ function frame(now){
   if(N){ p.setPipeline(PL.draw); p.draw(6,N); }
   p.setPipeline(PL.line); p.setVertexBuffer(0,lineBuf); p.draw(lineN);
   p.end(); dev.queue.submit([e.finish()]);
-  fN++; fT+=dt; if(fT>=0.5){ $("stat").textContent=N.toLocaleString()+"알 · "+Math.round(fN/fT)+"fps"; fN=0; fT=0; }
+  fN++; fT+=dt; if(fT>=0.5){ $("stat").textContent=N.toLocaleString()+"알 · "+Math.round(fN/fT)+"fps"+(slowF>0?" · 그래픽카드가 따라가지 못해 조금 느리게 흐르는 중":""); fN=0; fT=0; }
   requestAnimationFrame(frame);
 }
 
