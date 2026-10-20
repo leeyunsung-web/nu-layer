@@ -301,10 +301,11 @@ function draw(showNozzle){
     for(const c of comps.values()){ const w=c.x1-c.x0+1, h=c.y1-c.y0+1; c.md=Math.max(w,h); c.w=w; c.h=h; }
     /* 작은 덩이는 같은 넓이·같은 방향의 타원 젤리로 바꿔 그린다 → 삐죽한 조각 대신 동글동글한 방울 */
     BEADS.length=0;
-    for(const [r,c] of comps){ c.big=1; if(c.a<3 || c.md>300/px) continue; const mx=c.sx/c.a, my=c.sy/c.a, cxx=c.sxx/c.a-mx*mx, cyy=c.syy/c.a-my*my, cxy=c.sxy/c.a-mx*my;
+    for(const [r,c] of comps){ c.big=1; if(c.a<3 || c.md>300/px || c.x0<=2 || c.y0<=2 || c.x1>=LW-3 || c.y1>=LH-3) continue;   /* 화면 가장자리에 걸쳐 잘린 덩어리는 방울로 바꾸지 않는다 */
+      const mx=c.sx/c.a, my=c.sy/c.a, cxx=c.sxx/c.a-mx*mx, cyy=c.syy/c.a-my*my, cxy=c.sxy/c.a-mx*my;
       const th=0.5*Math.atan2(2*cxy,cxx-cyy), m=(cxx+cyy)/2, dd=Math.sqrt(((cxx-cyy)/2)**2+cxy*cxy); let a=2*Math.sqrt(Math.max(0.3,m+dd)), b=2*Math.sqrt(Math.max(0.3,m-dd));
       const fill=c.a/(Math.PI*a*b); if(c.md>60/px && fill<0.8) continue;   /* 크게 휘어진 줄기는 그대로 둔다 */
-      c.big=0; const sc=Math.sqrt(fill); a*=sc; b*=sc; if(b<1.4){ a*=b/1.4; b=1.4; } if(a<b) a=b; BEADS.push([mx+.5,my+.5,a,b,th]); c.bead=1; }
+      c.big=0; const sc=Math.sqrt(fill); a*=sc; b*=sc; if(b<1.4){ a*=b/1.4; b=1.4; } if(a<b) a=b; if(a>c.md*0.62+1){ c.big=1; continue; } BEADS.push([mx+.5,my+.5,a,b,th]); c.bead=1; }
     for(let i=0;i<n;i++) if(LAB[i]>=0){ const c=comps.get(find(i)); if(c&&c.bead){ DIST[i]=0; LAB[i]=0; } else LAB[i]=c&&c.big?1:0; } else LAB[i]=0; }
   for(let y=1;y<LH-1;y++){ const row=y*LW; for(let x=1;x<LW-1;x++){ const i=row+x, dd=DIST[i]; if(!dd) continue;
     let col;
