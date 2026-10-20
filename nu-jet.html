@@ -99,28 +99,30 @@ const CTL=[
  ["jet","맥박","pulse",0,4,0.1,0,"회","초당 몇 번 끊어 쏘는지. 0이면 계속 나오고, 1~2면 피가 뿜어지듯 쏩니다."],
  ["jet","촥 세기","burst",1,3,0.1,1.8,"배","촥! 버튼을 눌렀을 때 수압과 굵기를 몇 배로 할지."],
  ["liq","중력","grav",0,0.4,0.01,0.12,"","아래로 당기는 힘. 0이면 무중력이라 물줄기가 곧게 뻗어 떠다닙니다."],
- ["liq","끈적임","visc",0,1,0.02,0.2,"%","높을수록 꿀처럼 한 덩어리로 늘어지고, 낮을수록 물처럼 튑니다."],
- ["liq","뭉침","tens",0,1,0.02,0.45,"%","방울끼리 당기는 힘. 높으면 동글동글한 방울로 맺히고, 낮으면 잘게 부서집니다."],
+ ["liq","끈적임","visc",0,1,0.02,0.3,"%","높을수록 꿀처럼 한 덩어리로 늘어지고, 낮을수록 물처럼 튑니다."],
+ ["liq","뭉침","tens",0,1,0.02,0.7,"%","방울끼리 당기는 힘. 높으면 동글동글한 방울로 맺히고, 낮으면 잘게 부서집니다."],
  ["liq","탄력","stiff",0.1,1,0.02,0.5,"%","눌렸다가 되튀는 힘. 높으면 철썩 튀고, 낮으면 푹신하게 퍼집니다."],
  ["liq","최대 양","max",300,4000,100,2200,"알","화면에 있을 수 있는 방울 수. 넘으면 오래된 것부터 사라집니다. 많으면 무거워져요."],
- ["look","픽셀 크기","px",1,8,1,3,"px","한 칸의 크기. 클수록 굵은 픽셀 그림이 됩니다."],
- ["look","방울 크기","size",0.6,1.6,0.02,1,"배","같은 양이라도 더 통통하게, 또는 가늘게 보이게 합니다."],
+ ["look","픽셀 크기","px",1,8,1,4,"px","한 칸의 크기. 클수록 굵은 픽셀 그림이 됩니다."],
+ ["look","방울 크기","size",0.6,1.6,0.02,1.12,"배","같은 양이라도 더 통통하게, 또는 가늘게 보이게 합니다."],
  ["look","하이라이트","hi",0,1,0.05,1,"%","흰 반짝임의 양."],
 ];
 const COLORS={
+  jelly:{n:"핑크 젤리",c:[[246,104,142],[221,62,116],[255,244,247],[160,36,104],[255,170,196]]},
   blood:{n:"핏빛",c:[[226,60,96],[176,32,74],[255,222,230],[122,22,60]]},
   pink:{n:"분홍",c:[[249,97,141],[204,58,112],[255,232,240],[126,30,84]]},
   water:{n:"물",c:[[44,156,224],[22,104,176],[222,246,255],[12,58,120]]},
   milk:{n:"우유",c:[[248,241,228],[222,204,178],[255,255,255],[206,150,30]]},
   gold:{n:"금빛",c:[[246,196,40],[214,150,16],[255,248,206],[150,90,10]]},
 };
-const DEF=(()=>{ const o={col:"blood",floor:1,walls:1,ol:1,stars:1,nz:1}; for(const c of CTL) o[c[2]]=c[6]; return o; })();
-const KEY="nu-jet-v1";
+const DEF=(()=>{ const o={col:"jelly",floor:1,walls:1,ol:1,stars:1,nz:1,jel:1}; for(const c of CTL) o[c[2]]=c[6]; return o; })();
+const KEY="nu-jet-v2";
 let S=Object.assign({},DEF);
 try{ const v=JSON.parse(localStorage.getItem(KEY)||"null"); if(v) for(const k in DEF) if(k in v) S[k]=v[k]; }catch(_){}
 const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(_){} };
 
 const PRESETS=[
+ ["핑크 젤리",{press:8,rate:1,width:4,angle:20,spread:2,wob:5,pulse:0,grav:0.1,visc:0.3,tens:0.75,stiff:0.42,floor:1,col:"jelly",px:4,size:1.12}],
  ["수도꼭지",{press:3,rate:1,width:3,angle:-90,spread:0.5,wob:0,pulse:0,grav:0.14,visc:0.15,tens:0.4,stiff:0.5,floor:1,col:"water"}],
  ["소방 호스",{press:16,rate:1,width:6,angle:15,spread:2,wob:6,pulse:0,grav:0.12,visc:0.1,tens:0.3,stiff:0.6,floor:1,col:"water"}],
  ["분수",{press:9,rate:1,width:3,angle:90,spread:4,wob:0,pulse:0,grav:0.13,visc:0.1,tens:0.5,stiff:0.5,floor:1,col:"milk"}],
@@ -155,6 +157,7 @@ function mkToggle(sec,label,key,desc,before){
 const togSet=[];
 togSet.push(mkToggle("liq","바닥","floor","끄면 바닥 없이 아래로 흘러 나가고, 켜면 고입니다."));
 togSet.push(mkToggle("liq","옆 벽","walls","끄면 옆으로 나간 물이 사라집니다."));
+togSet.push(mkToggle("look","젤리 반짝임","jel","방울마다 동그란 하이라이트와 아래쪽 되비침을 넣어 말랑한 젤리처럼 보이게 합니다."));
 togSet.push(mkToggle("look","외곽선","ol",""));
 togSet.push(mkToggle("look","별빛","stars",""));
 togSet.push(mkToggle("look","노즐 표시","nz","저장한 이미지에는 노즐이 들어가지 않습니다."));
@@ -254,12 +257,13 @@ function step(){
 
 /* ── 그리기: 작은 픽셀 화면에 방울을 녹여 한 덩어리로 칠하고, 셀 채색처럼 네 단계 색으로 나눈다 ── */
 const cv=$("cv"), cx=cv.getContext("2d",{willReadFrequently:false});
-let LW=1, LH=1, F=new Float32Array(1), G2=new Float32Array(1), TMP=new Float32Array(1), DIST=new Float32Array(1), NB=new Float32Array(1), IMG=null, PXS=0;
+let LW=1, LH=1, F=new Float32Array(1), G2=new Float32Array(1), TMP=new Float32Array(1), DIST=new Float32Array(1), NB=new Float32Array(1), HL=new Uint8Array(1), LAB=new Int32Array(1), IMG=null, PXS=0;
+const BEADS=[];
 const STARS=Array.from({length:22},()=>({x:Math.random(),y:Math.random(),p:Math.random()*6.28,s:Math.random()<.3?2:1}));
 function resize(){
   const r=$("stage").getBoundingClientRect(); W=Math.max(200,r.width); Ht=Math.max(150,r.height);
   PXS=S.px; LW=Math.max(40,Math.ceil(W/PXS)); LH=Math.max(30,Math.ceil(Ht/PXS));
-  if(cv.width!==LW||cv.height!==LH){ cv.width=LW; cv.height=LH; IMG=cx.createImageData(LW,LH); F=new Float32Array(LW*LH); G2=new Float32Array(LW*LH); TMP=new Float32Array(LW*LH); DIST=new Float32Array(LW*LH); NB=new Float32Array(LW*LH); }
+  if(cv.width!==LW||cv.height!==LH){ cv.width=LW; cv.height=LH; IMG=cx.createImageData(LW,LH); F=new Float32Array(LW*LH); G2=new Float32Array(LW*LH); TMP=new Float32Array(LW*LH); DIST=new Float32Array(LW*LH); NB=new Float32Array(LW*LH); HL=new Uint8Array(LW*LH); LAB=new Int32Array(LW*LH); }
 }
 new ResizeObserver(resize).observe($("stage"));
 const BG=[0,1,42];
@@ -278,7 +282,7 @@ function draw(showNozzle){
     for(let k=-L;k<=L;k++){ dot(x+k,y,255,255,255); dot(x,y+k,255,255,255); } } }
   /* 액체: 한 번 흐리게 녹여 둥글게 만든 뒤, 가장자리에서 얼마나 들어왔는지(거리)로 색 띠를 나눈다
      → 바깥 한 칸은 외곽선, 빛 반대쪽 가장자리는 어두운 면, 빛 쪽은 밝은 면과 흰 하이라이트 띠, 안쪽은 본색 */
-  blur(F,G2); blur(G2,F); blur(F,G2); blur(G2,NB); blur(NB,G2); blur(G2,NB); blur(NB,G2); blur(G2,NB);   /* 색 띠의 방향은 더 흐린 판(NB)에서 읽는다 → 안쪽 얼룩이 생기지 않게 */
+  blur(F,G2); blur(G2,F); if(S.jel){ blur(F,G2); blur(G2,F); } blur(F,G2); blur(G2,NB); blur(NB,G2); blur(G2,NB); blur(NB,G2); blur(G2,NB);   /* 색 띠의 방향은 더 흐린 판(NB)에서 읽는다 → 안쪽 얼룩이 생기지 않게 */
   const C=COLORS[S.col].c, T=0.4, lx=-0.55, ly=-0.83, hi=S.hi;
   const LT=[0,1,2].map(q=>Math.round(C[0][q]+(C[2][q]-C[0][q])*0.3));
   /* 줄기 안에 생긴 한두 칸짜리 빈 구멍은 메운다 (안쪽에 검은 점이 박히지 않게) */
@@ -286,16 +290,46 @@ function draw(showNozzle){
   for(let i=0;i<n;i++) DIST[i]=F[i]>T?1e4:0;
   for(let y=1;y<LH-1;y++){ const row=y*LW; for(let x=1;x<LW-1;x++){ const i=row+x; if(!DIST[i]) continue; const v=Math.min(DIST[i-1]+1,DIST[i-LW]+1,DIST[i-LW-1]+1.41,DIST[i-LW+1]+1.41); if(v<DIST[i]) DIST[i]=v; } }
   for(let y=LH-2;y>0;y--){ const row=y*LW; for(let x=LW-2;x>0;x--){ const i=row+x; if(!DIST[i]) continue; const v=Math.min(DIST[i+1]+1,DIST[i+LW]+1,DIST[i+LW+1]+1.41,DIST[i+LW-1]+1.41); if(v<DIST[i]) DIST[i]=v; } }
-  const k=1/px, oS=10*k, oL=8*k, h0=4*k, h1=h0+Math.max(1,9*k*hi);
+  const k=1/px, oS=10*k, oL=8*k, h0=4*k, h1=h0+Math.max(1,(S.jel?13:9)*k*hi), JEL=!!S.jel && hi>0, RIM=C[4]||LT, rimW=Math.max(1,5*k);
+  /* 젤리 반짝임: 붙어 있는 덩이마다 위 왼쪽에 동그란 하이라이트(큰 것 하나 + 작은 점). 길게 늘어진 줄기·고인 물은 빛 쪽 가장자리 띠로 */
+  HL.fill(0,0,n);
+  if(JEL){ for(let i=0;i<n;i++) LAB[i]=DIST[i]?i:-1;
+    const find=a=>{ while(LAB[a]!==a){ LAB[a]=LAB[LAB[a]]; a=LAB[a]; } return a; };
+    for(let y=1;y<LH-1;y++){ const row=y*LW; for(let x=1;x<LW-1;x++){ const i=row+x; if(LAB[i]<0) continue; if(LAB[i-1]>=0){ const a=find(i), b=find(i-1); if(a!==b) LAB[a]=b; } if(LAB[i-LW]>=0){ const a=find(i), b=find(i-LW); if(a!==b) LAB[a]=b; } } }
+    const comps=new Map();
+    for(let y=1;y<LH-1;y++){ const row=y*LW; for(let x=1;x<LW-1;x++){ const i=row+x; if(LAB[i]<0) continue; const r=find(i); let c=comps.get(r); if(!c){ c={a:0,x0:x,x1:x,y0:y,y1:y,sx:0,sy:0,sxx:0,syy:0,sxy:0}; comps.set(r,c); } c.a++; c.sx+=x; c.sy+=y; c.sxx+=x*x; c.syy+=y*y; c.sxy+=x*y; if(x<c.x0)c.x0=x; if(x>c.x1)c.x1=x; if(y<c.y0)c.y0=y; if(y>c.y1)c.y1=y; } }
+    for(const c of comps.values()){ const w=c.x1-c.x0+1, h=c.y1-c.y0+1; c.md=Math.max(w,h); c.w=w; c.h=h; }
+    /* 작은 덩이는 같은 넓이·같은 방향의 타원 젤리로 바꿔 그린다 → 삐죽한 조각 대신 동글동글한 방울 */
+    BEADS.length=0;
+    for(const [r,c] of comps){ c.big=1; if(c.a<3 || c.md>300/px) continue; const mx=c.sx/c.a, my=c.sy/c.a, cxx=c.sxx/c.a-mx*mx, cyy=c.syy/c.a-my*my, cxy=c.sxy/c.a-mx*my;
+      const th=0.5*Math.atan2(2*cxy,cxx-cyy), m=(cxx+cyy)/2, dd=Math.sqrt(((cxx-cyy)/2)**2+cxy*cxy); let a=2*Math.sqrt(Math.max(0.3,m+dd)), b=2*Math.sqrt(Math.max(0.3,m-dd));
+      const fill=c.a/(Math.PI*a*b); if(c.md>60/px && fill<0.8) continue;   /* 크게 휘어진 줄기는 그대로 둔다 */
+      c.big=0; const sc=Math.sqrt(fill); a*=sc; b*=sc; if(b<1.4){ a*=b/1.4; b=1.4; } if(a<b) a=b; BEADS.push([mx+.5,my+.5,a,b,th]); c.bead=1; }
+    for(let i=0;i<n;i++) if(LAB[i]>=0){ const c=comps.get(find(i)); if(c&&c.bead){ DIST[i]=0; LAB[i]=0; } else LAB[i]=c&&c.big?1:0; } else LAB[i]=0; }
   for(let y=1;y<LH-1;y++){ const row=y*LW; for(let x=1;x<LW-1;x++){ const i=row+x, dd=DIST[i]; if(!dd) continue;
     let col;
     if(S.ol && dd<1.5) col=C[3];
-    else { const gx=NB[i+1]-NB[i-1], gy=NB[i+LW]-NB[i-LW], gl=Math.hypot(gx,gy); const ndl=gl>0.03?(-gx*lx-gy*ly)/gl:0, dw=dd-(S.ol?1:0);
-      if(hi>0 && ndl>0.5 && dw>=h0 && dw<h1) col=C[2];
-      else if(ndl<-0.2 && dw<oS) col=C[1];
+    else if(HL[i]) col=C[2];
+    else { const gx=NB[i+1]-NB[i-1], gy=NB[i+LW]-NB[i-LW], gl=Math.hypot(gx,gy); const ndl=gl>0.03?(-gx*lx-gy*ly)/gl:0, dw=dd-(S.ol?1:0), band=!JEL||LAB[i];
+      if(band && hi>0 && ndl>0.5 && dw>=h0 && dw<h1) col=C[2];
+      else if(JEL && ndl<-0.3 && dw<rimW) col=RIM;   /* 아래쪽 안쪽 가장자리의 되비침 */
+      else if(ndl<-0.2 && dw<oS+(JEL?rimW:0)) col=C[1];
       else if(ndl>0.15 && dw<oL+h1) col=LT;
       else col=C[0]; }
     const j=i*4; d[j]=col[0]; d[j+1]=col[1]; d[j+2]=col[2]; } }
+  if(JEL) for(const [ex,ey,ea,eb,th] of BEADS){ const ct=Math.cos(th), st=Math.sin(th), R=Math.ceil(ea)+1, Lx=-0.5, Ly=-0.62, Lz=0.6, hiT=1-0.13*hi, mn=Math.min(ea,eb);
+    for(let y=Math.max(0,Math.floor(ey-R));y<=Math.min(LH-1,Math.ceil(ey+R));y++) for(let x=Math.max(0,Math.floor(ex-R));x<=Math.min(LW-1,Math.ceil(ex+R));x++){
+      const px0=x+.5-ex, py0=y+.5-ey, u=(px0*ct+py0*st)/ea, v=(-px0*st+py0*ct)/eb, r2=u*u+v*v; if(r2>1) continue;
+      const edge=(1-Math.sqrt(r2))*mn, nz=Math.sqrt(1-r2), nx=u*ct-v*st, ny=u*st+v*ct, ndl=nx*Lx+ny*Ly+nz*Lz;
+      let col;
+      if(S.ol && edge<1) col=C[3];
+      else if(ndl>hiT && mn>=2) col=C[2];
+      else if(mn>=3 && Math.hypot(nx+0.05,ny+0.62)<0.13+0.05*hi && nz>0.3) col=C[2];   /* 작은 점 하이라이트 */
+      else if(r2>0.55 && -(nx*Lx+ny*Ly)>0.45 && edge<rimW+1.2) col=RIM;   /* 아래 가장자리 되비침 */
+      else if(ndl<0.32) col=C[1];
+      else if(ndl>0.8) col=LT;
+      else col=C[0];
+      const j=(y*LW+x)*4; d[j]=col[0]; d[j+1]=col[1]; d[j+2]=col[2]; } }
   if(showNozzle && S.nz){ const x=Math.round(NZ.x*W/px), y=Math.round(NZ.y*Ht/px), a=S.angle*Math.PI/180, rr=Math.max(3,Math.round(7/px*2));
     for(let k=0;k<64;k++){ const t=k/64*6.283; dot(Math.round(x+Math.cos(t)*rr),Math.round(y+Math.sin(t)*rr),251,224,30); }
     for(let k=rr+1;k<rr+Math.max(6,Math.round(26/px));k++) dot(Math.round(x+Math.cos(a)*k),Math.round(y-Math.sin(a)*k),251,224,30); }
