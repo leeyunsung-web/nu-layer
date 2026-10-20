@@ -386,6 +386,7 @@ const cv=$("cv"); let dev=null, ctx=null, fmtTex=null, depth=null;
 let offTex=null, B={}, PL={}, BG0=null, BGR=null, BGL=null, lineBuf=null, lineN=0;
 const params=new ArrayBuffer(64), pU=new Uint32Array(params), pF=new Float32Array(params);
 async function init(){
+  const slow=setTimeout(()=>{ if(!E.ok) $("msg").textContent="그래픽카드가 대답하지 않아요. 브라우저(또는 앱)를 완전히 닫았다 다시 열어 주세요. 다른 창에서 이 페이지가 돌고 있다면 먼저 닫아 주세요."; },12000);
   if(!navigator.gpu){ $("msg").textContent="이 브라우저는 WebGPU(그래픽카드 계산)를 지원하지 않아요. 최신 크롬이나 엣지에서 열어 주세요."; return; }
   const ad=await navigator.gpu.requestAdapter({powerPreference:"high-performance"}); E.adapter=ad;   /* 어댑터를 붙잡아 둔다 (놓치면 일부 브라우저에서 연결이 끊긴다) */ if(!ad){ $("msg").textContent="그래픽카드를 찾지 못했어요."; return; }
   dev=await ad.requestDevice({requiredLimits:{maxStorageBufferBindingSize:Math.min(ad.limits.maxStorageBufferBindingSize,256*1024*1024)}});
@@ -420,7 +421,7 @@ async function init(){
     E.dummy=dev.createTexture({size:[1,1],format:"r16float",usage:GPUTextureUsage.TEXTURE_BINDING}); }
   BGR=dev.createBindGroup({layout:rbgl,entries:[{binding:0,resource:{buffer:B.cam}},{binding:1,resource:{buffer:B.pos}},{binding:2,resource:{buffer:B.vel}}]});
   lineBuf=dev.createBuffer({size:64*24,usage:GPUBufferUsage.VERTEX|GPUBufferUsage.COPY_DST});
-  E.ok=true; $("msg").hidden=true; fill(); requestAnimationFrame(frame);
+  clearTimeout(slow); E.ok=true; $("msg").hidden=true; fill(); requestAnimationFrame(frame);
 }
 
 /* 수조 크기가 바뀌면 격자를 새로 만든다 */
