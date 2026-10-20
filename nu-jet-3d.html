@@ -162,7 +162,6 @@ struct P { g: vec4u, a: vec4f, b: vec4f, c: vec4f };
 @group(0) @binding(5) var<storage, read_write> gv: array<vec4f>;
 @group(0) @binding(6) var<storage, read_write> Fm: array<mat3x3f>;
 const FP: f32 = 1e5;
-const ILV: u32 = ${Q.get("ilv")==="0"?0:1}u;
 const I3 = mat3x3f(1,0,0, 0,1,0, 0,0,1);
 fn enc(x: f32) -> i32 { return i32(clamp(x, -20000.0, 20000.0) * FP); }
 fn dec(x: i32) -> f32 { return f32(x) / FP; }
@@ -175,10 +174,8 @@ fn wts(d: vec3f) -> array<vec3f,3> { return array<vec3f,3>(0.5*(0.5-d)*(0.5-d), 
 }
 /* 방울 → 격자 (한 번에): 질량, 운동량, 그리고 '모양 기억'에서 나온 누르는 힘·당기는 힘을 함께 뿌린다 */
 /* 1단계: 무게만 격자에 모은다 (칸마다 1번만 더하기) */
-/* 줄 세운 방울을 8알 건너 하나씩 집는다: 옆 일꾼끼리 같은 칸에 동시에 더하려고 줄 서지 않게, 그래도 가까운 칸끼리 */
-fn pick(t: u32) -> u32 { if (ILV == 0u) { return t; } let M = (U.g.w + 7u) / 8u; if (t >= M * 8u) { return 0xffffffffu; } return (t % M) * 8u + t / M; }
 @compute @workgroup_size(64) fn p2gMass(@builtin(global_invocation_id) id: vec3u) {
-  let pi = pick(id.x); if (pi >= U.g.w) { return; }
+  let pi = id.x; if (pi >= U.g.w) { return; }
   let p = pos[pi].xyz;
   let cell = vec3i(floor(p)); let d = p - vec3f(cell) - 0.5; let w = wts(d);
   for (var gx = 0; gx < 3; gx++) { for (var gy = 0; gy < 3; gy++) { for (var gz = 0; gz < 3; gz++) {
@@ -187,7 +184,7 @@ fn pick(t: u32) -> u32 { if (ILV == 0u) { return t; } let M = (U.g.w + 7u) / 8u;
 }
 /* 2단계: 지금 이 순간의 밀도를 읽고, 움직임과 힘을 함께 모은다 */
 @compute @workgroup_size(64) fn p2g(@builtin(global_invocation_id) id: vec3u) {
-  let pi = pick(id.x); if (pi >= U.g.w) { return; }
+  let pi = id.x; if (pi >= U.g.w) { return; }
   let p = pos[pi].xyz; let v = vel[pi].xyz; let C = Cm[pi]; let F = Fm[pi];
   let cell = vec3i(floor(p)); let d = p - vec3f(cell) - 0.5; let w = wts(d);
   var dens = 0.0;
@@ -525,7 +522,7 @@ function step(c,k){
   c.setBindGroup(0,BG0,[256*k]);
   const gC=Math.ceil(CELLS/WG), gP=Math.ceil(N/WG);
   c.setPipeline(PL.clearGrid); c.dispatchWorkgroups(gC);
-  if(gP){ const gI=Math.ceil(Math.ceil(N/8)*8/WG); c.setPipeline(PL.p2gMass); c.dispatchWorkgroups(gI); c.setPipeline(PL.p2g); c.dispatchWorkgroups(gI); }
+  if(gP){ c.setPipeline(PL.p2gMass); c.dispatchWorkgroups(gP); c.setPipeline(PL.p2g); c.dispatchWorkgroups(gP); }
   c.setPipeline(PL.updGrid); c.dispatchWorkgroups(gC);
   if(gP){ c.setPipeline(PL.g2p); c.dispatchWorkgroups(gP); }
   stepNo++;
