@@ -270,7 +270,7 @@ struct VO { @builtin(position) p: vec4f, @location(0) uv: vec2f, @location(1) s:
   return vec4f(col, 1.0);
 }
 struct LV { @builtin(position) p: vec4f, @location(0) c: vec3f };
-@vertex fn lvs(@location(0) a: vec3f, @location(1) c: vec3f) -> LV { var o: LV; o.p = K.vp * (K.view * vec4f(a - vec3f(K.prm.y, K.prm.z, K.prm.w) * 0.5, 1.0)); o.c = c; return o; }
+@vertex fn lvs(@location(0) a: vec3f, @location(1) c: vec3f) -> LV { var o: LV; o.p = K.vp * (K.view * vec4f(a, 1.0));   /* 테두리 좌표는 이미 수조 가운데 기준 */ o.c = c; return o; }
 @fragment fn lfs(i: LV) -> @location(0) vec4f { return vec4f(i.c, 1.0); }
 `;
 
