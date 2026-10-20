@@ -399,9 +399,53 @@ struct CO { @location(0) c: vec4f, @builtin(frag_depth) z: f32 };
   var o: CO; o.c = vec4f(col, 1.0); o.z = clamp(cp.z / cp.w, 0.0, 1.0); return o;
 }
 `;
+
+/* ── 방울 줄 세우기: 같은 칸에 있는 방울끼리 메모리에 나란히 놓는다 (격자에 더할 때 덜 헤맨다) ── */
+const SORTWGSL=/* wgsl */`
+struct Q { g: vec4u };
+@group(0) @binding(0) var<uniform> Uq: Q;
+@group(0) @binding(1) var<storage, read_write> pos: array<vec4f>;
+@group(0) @binding(2) var<storage, read_write> vel: array<vec4f>;
+@group(0) @binding(3) var<storage, read_write> Cm: array<mat3x3f>;
+@group(0) @binding(4) var<storage, read_write> Fm: array<mat3x3f>;
+@group(0) @binding(5) var<storage, read_write> pos2: array<vec4f>;
+@group(0) @binding(6) var<storage, read_write> vel2: array<vec4f>;
+@group(0) @binding(7) var<storage, read_write> C2: array<mat3x3f>;
+@group(0) @binding(8) var<storage, read_write> F2: array<mat3x3f>;
+@group(0) @binding(9) var<storage, read_write> cnt: array<atomic<u32>>;
+@group(0) @binding(10) var<storage, read_write> loc: array<u32>;
+@group(0) @binding(11) var<storage, read_write> bs: array<u32>;
+@group(0) @binding(12) var<storage, read_write> offs: array<u32>;
+var<workgroup> sh: array<u32, 256>;
+fn cellOf(p: vec3f) -> u32 { let c = clamp(vec3i(floor(p)), vec3i(0), vec3i(Uq.g.xyz) - 1); return u32(c.x) + Uq.g.x * (u32(c.y) + Uq.g.y * u32(c.z)); }
+fn ncell() -> u32 { return Uq.g.x * Uq.g.y * Uq.g.z; }
+@compute @workgroup_size(256) fn sClear(@builtin(global_invocation_id) id: vec3u) { if (id.x < ncell()) { atomicStore(&cnt[id.x], 0u); } }
+@compute @workgroup_size(256) fn sCount(@builtin(global_invocation_id) id: vec3u) { if (id.x >= Uq.g.w) { return; } loc[id.x] = atomicAdd(&cnt[cellOf(pos[id.x].xyz)], 1u); }
+/* 칸마다 '앞에 몇 알이 있나'를 256칸 묶음 안에서 센다 */
+@compute @workgroup_size(256) fn sScan(@builtin(global_invocation_id) id: vec3u, @builtin(local_invocation_id) l: vec3u, @builtin(workgroup_id) w: vec3u) {
+  var x = 0u; if (id.x < ncell()) { x = atomicLoad(&cnt[id.x]); }
+  sh[l.x] = x; workgroupBarrier();
+  for (var o = 1u; o < 256u; o = o * 2u) { var t = 0u; if (l.x >= o) { t = sh[l.x - o]; } workgroupBarrier(); sh[l.x] += t; workgroupBarrier(); }
+  if (id.x < ncell()) { offs[id.x] = sh[l.x] - x; }
+  if (l.x == 255u) { bs[w.x] = sh[255]; }
+}
+/* 묶음끼리의 합을 한 번 더 센다 (한 무리가 전부) */
+@compute @workgroup_size(256) fn sScanSums(@builtin(local_invocation_id) l: vec3u) {
+  let nb = (ncell() + 255u) / 256u; let per = (nb + 255u) / 256u; let b0 = l.x * per;
+  var tot = 0u; for (var k = 0u; k < per; k++) { let j = b0 + k; if (j < nb) { tot += bs[j]; } }
+  sh[l.x] = tot; workgroupBarrier();
+  for (var o = 1u; o < 256u; o = o * 2u) { var t = 0u; if (l.x >= o) { t = sh[l.x - o]; } workgroupBarrier(); sh[l.x] += t; workgroupBarrier(); }
+  var run = sh[l.x] - tot;
+  for (var k = 0u; k < per; k++) { let j = b0 + k; if (j < nb) { let v = bs[j]; bs[j] = run; run += v; } }
+}
+@compute @workgroup_size(256) fn sDest(@builtin(global_invocation_id) id: vec3u) { if (id.x >= Uq.g.w) { return; } let c = cellOf(pos[id.x].xyz); loc[id.x] = offs[c] + bs[c / 256u] + loc[id.x]; }
+@compute @workgroup_size(256) fn sMoveA(@builtin(global_invocation_id) id: vec3u) { if (id.x >= Uq.g.w) { return; } let d = loc[id.x]; pos2[d] = pos[id.x]; vel2[d] = vel[id.x]; }
+@compute @workgroup_size(256) fn sMoveB(@builtin(global_invocation_id) id: vec3u) { if (id.x >= Uq.g.w) { return; } let d = loc[id.x]; C2[d] = Cm[id.x]; F2[d] = Fm[id.x]; }
+`;
 const cv=$("cv"); let dev=null, ctx=null, fmtTex=null, depth=null;
 let offTex=null, B={}, PL={}, BG0=null, BGR=null, BGL=null, lineBuf=null, lineN=0;
-const params=new ArrayBuffer(64), pU=new Uint32Array(params), pF=new Float32Array(params);
+const NSLOT=32, params=new ArrayBuffer(256*NSLOT); let pU=null, pF=null;   /* 한 프레임 박자들의 값을 칸마다 따로 담아 한 번에 보낸다 */
+function slot(k){ pU=new Uint32Array(params,256*k,16); pF=new Float32Array(params,256*k,16); }
 async function init(){
   const slow=setTimeout(()=>{ if(!E.ok) $("msg").textContent="그래픽카드가 대답하지 않아요. 브라우저(또는 앱)를 완전히 닫았다 다시 열어 주세요. 다른 창에서 이 페이지가 돌고 있다면 먼저 닫아 주세요."; },12000);
   if(!navigator.gpu){ $("msg").textContent="이 브라우저는 WebGPU(그래픽카드 계산)를 지원하지 않아요. 최신 크롬이나 엣지에서 열어 주세요."; return; }
@@ -410,12 +454,14 @@ async function init(){
   dev.lost.then(i=>{ $("msg").hidden=false; $("msg").textContent="그래픽카드 연결이 끊겼어요. 새로고침해 주세요. ("+(i.message||"")+")"; });
   if(OFF) fmtTex="rgba8unorm"; else { ctx=cv.getContext("webgpu"); fmtTex=navigator.gpu.getPreferredCanvasFormat(); ctx.configure({device:dev,format:fmtTex,alphaMode:"opaque"}); }
   const SB=GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST|GPUBufferUsage.COPY_SRC;
-  B.U=dev.createBuffer({size:64,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
+  B.U=dev.createBuffer({size:256*NSLOT,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
   B.pos=dev.createBuffer({size:MAXP*16,usage:SB}); B.vel=dev.createBuffer({size:MAXP*16,usage:SB}); B.C=dev.createBuffer({size:MAXP*48,usage:SB}); B.F=dev.createBuffer({size:MAXP*48,usage:SB});
 
   B.cam=dev.createBuffer({size:256,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
   const mod=dev.createShaderModule({code:WGSL});
-  const bgl=dev.createBindGroupLayout({entries:[0,1,2,3,4,5,6].map(b=>({binding:b,visibility:GPUShaderStage.COMPUTE,buffer:{type:b?"storage":"uniform"}}))});
+  const bgl=dev.createBindGroupLayout({entries:[0,1,2,3,4,5,6].map(b=>({binding:b,visibility:GPUShaderStage.COMPUTE,buffer:b?{type:"storage"}:{type:"uniform",hasDynamicOffset:true}}))});
+  { const sm=dev.createShaderModule({code:SORTWGSL}); for(const e of ["sClear","sCount","sScan","sScanSums","sDest","sMoveA","sMoveB"]) PL[e]=dev.createComputePipeline({layout:"auto",compute:{module:sm,entryPoint:e}});
+    B.SU=dev.createBuffer({size:16,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}); B.pos2=dev.createBuffer({size:MAXP*16,usage:SB}); B.vel2=dev.createBuffer({size:MAXP*16,usage:SB}); B.C2=dev.createBuffer({size:MAXP*48,usage:SB}); B.F2=dev.createBuffer({size:MAXP*48,usage:SB}); B.loc=dev.createBuffer({size:MAXP*4,usage:SB}); }
   const pl=dev.createPipelineLayout({bindGroupLayouts:[bgl]});
   for(const e of ["clearGrid","p2gMass","p2g","updGrid","g2p"]) PL[e]=dev.createComputePipeline({layout:pl,compute:{module:mod,entryPoint:e}});
   E.bgl=bgl; resizeTank();
@@ -445,7 +491,11 @@ async function init(){
 function resizeTank(){ tankSize(); BX0=GX*0.45; const SB=GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST|GPUBufferUsage.COPY_SRC;
   if(B.gi) B.gi.destroy(); if(B.gv) B.gv.destroy();
   B.gi=dev.createBuffer({size:CELLS*16,usage:SB}); B.gv=dev.createBuffer({size:CELLS*16,usage:SB});
-  BG0=dev.createBindGroup({layout:E.bgl,entries:[{binding:0,resource:{buffer:B.U}},{binding:1,resource:{buffer:B.pos}},{binding:2,resource:{buffer:B.vel}},{binding:3,resource:{buffer:B.C}},{binding:4,resource:{buffer:B.gi}},{binding:5,resource:{buffer:B.gv}},{binding:6,resource:{buffer:B.F}}]}); }
+  if(B.cnt) B.cnt.destroy(); if(B.offs) B.offs.destroy(); if(B.bs) B.bs.destroy();
+  B.cnt=dev.createBuffer({size:CELLS*4,usage:SB}); B.offs=dev.createBuffer({size:CELLS*4,usage:SB}); B.bs=dev.createBuffer({size:Math.ceil(CELLS/256)*4+16,usage:SB});
+  const SR={0:B.SU,1:B.pos,2:B.vel,3:B.C,4:B.F,5:B.pos2,6:B.vel2,7:B.C2,8:B.F2,9:B.cnt,10:B.loc,11:B.bs,12:B.offs}, USE={sClear:[0,9],sCount:[0,1,9,10],sScan:[0,9,11,12],sScanSums:[0,11],sDest:[0,1,10,11,12],sMoveA:[0,1,2,5,6,10],sMoveB:[0,3,4,7,8,10]};
+  E.sbg={}; for(const k in USE) E.sbg[k]=dev.createBindGroup({layout:PL[k].getBindGroupLayout(0),entries:USE[k].map(b=>({binding:b,resource:{buffer:SR[b]}}))});
+  BG0=dev.createBindGroup({layout:E.bgl,entries:[{binding:0,resource:{buffer:B.U,size:64}},{binding:1,resource:{buffer:B.pos}},{binding:2,resource:{buffer:B.vel}},{binding:3,resource:{buffer:B.C}},{binding:4,resource:{buffer:B.gi}},{binding:5,resource:{buffer:B.gv}},{binding:6,resource:{buffer:B.F}}]}); }
 /* 물 채우기: 물 높이까지 방울을 고르게 (살짝 흔들어) 놓는다. 수조가 커서 방울이 한도를 넘으면 간격을 조금 넓힌다 */
 let SPC=0.5; function spacing(){ return SPC; }
 function fill(){ const top=2+S.level*(GY-5), vol=Math.max(1,(GX-PADX-4.4)*(top-3.2)*(GZ-6.4)); SPC=Math.max(0.38,Math.cbrt(vol/Math.min(MAXP*0.97,S.pcount)));   /* 정한 방울 수에 맞춰 간격을 정한다 */ const sp=SPC, P=new Float32Array(MAXP*4); let n=0;
@@ -464,20 +514,30 @@ function padStep(){ const sps=SPS*0.2/DT; WPH+=1/(S.per*sps); const ph=WPH%1, p=
   AMPc+=((waveOn?S.amp:0)-AMPc)*0.01; SLAP*=0.996; const tgt=2.5+Math.min(GX*0.35,(AMPc+S.amp*1.2*SLAP)*f+S.amp*0.8*SLAP*(1-f));
   const lim=0.12*DT/0.2, d=Math.max(-lim,Math.min(lim,tgt-PADX)); PADX+=d; PADV=d/DT; }
 
-function step(enc){
-  padStep();
+function step(c,k){
+  padStep(); slot(k);
   pU[0]=GX; pU[1]=GY; pU[2]=GZ; pU[3]=N; const E5=S.stiff, JEL=S.mat===1;
   pF[4]=DT; pF[5]=-S.grav; pF[6]=E5; pF[7]=1/pVol; pF[8]=S.visc*0.5; pF[9]=PADX; pF[10]=PADV; pF[11]=BX0; pF[12]=S.beach;
   pF[13]=JEL?1.5+3.5*S.jmu:0; pF[14]=JEL?0.003+0.08*S.melt*S.melt:1; pF[15]=JEL?0.02+0.08*S.coh:0.002+0.02*S.coh;
-  dev.queue.writeBuffer(B.U,0,params);
-  const e=dev.createCommandEncoder(), c=e.beginComputePass(); c.setBindGroup(0,BG0);
+  c.setBindGroup(0,BG0,[256*k]);
   const gC=Math.ceil(CELLS/WG), gP=Math.ceil(N/WG);
   c.setPipeline(PL.clearGrid); c.dispatchWorkgroups(gC);
   if(gP){ c.setPipeline(PL.p2gMass); c.dispatchWorkgroups(gP); c.setPipeline(PL.p2g); c.dispatchWorkgroups(gP); }
   c.setPipeline(PL.updGrid); c.dispatchWorkgroups(gC);
   if(gP){ c.setPipeline(PL.g2p); c.dispatchWorkgroups(gP); }
-  c.end(); dev.queue.submit([e.finish()]); stepNo++;
+  stepNo++;
 }
+/* 줄 세우기 한 번: 세고 → 자리 매기고 → 새 자리로 옮긴 뒤 → 원래 통에 되돌려 담는다 */
+let sortOn=true;
+function sortPass(e){ if(!N || !sortOn) return; dev.queue.writeBuffer(B.SU,0,new Uint32Array([GX,GY,GZ,N]));
+  const c=e.beginComputePass(), nP=Math.ceil(N/256), nC=Math.ceil(CELLS/256), run=(k,n)=>{ c.setPipeline(PL[k]); c.setBindGroup(0,E.sbg[k]); c.dispatchWorkgroups(n); };
+  run("sClear",nC); run("sCount",nP); run("sScan",nC); run("sScanSums",1); run("sDest",nP); run("sMoveA",nP); run("sMoveB",nP); c.end();
+  e.copyBufferToBuffer(B.pos2,0,B.pos,0,N*16); e.copyBufferToBuffer(B.vel2,0,B.vel,0,N*16); e.copyBufferToBuffer(B.C2,0,B.C,0,N*48); e.copyBufferToBuffer(B.F2,0,B.F,0,N*48); }
+/* 한 프레임의 박자들을 한 주문서에 담아 한 번에 보낸다 */
+let frameNo=0;
+function runSteps(n){ if(n<=0) return; const e=dev.createCommandEncoder(); if(frameNo%4===0) sortPass(e);
+  const c=e.beginComputePass(); for(let k=0;k<n;k++) step(c,k); c.end();
+  dev.queue.writeBuffer(B.U,0,params,0,256*n); dev.queue.submit([e.finish()]); }
 
 /* ── 카메라 (작은 행렬 계산) ── */
 const m4={ persp(f,a,n,fa){ const t=1/Math.tan(f/2); return [t/a,0,0,0, 0,t,0,0, 0,0,fa/(n-fa),-1, 0,0,n*fa/(n-fa),0]; },
@@ -502,9 +562,11 @@ function lines(){ const hx=GX/2-2, hy=GY/2-2, hz=GZ/2-2, L=[]; const P=[[-hx,-hy
 let last=performance.now(), fT=0, fN=0, acc=0, slowF=0;
 const SPS=360, MAXSTEP=12;   /* 빠르기 1배 = 1초에 360박자. 한 프레임에 최대 12박자까지만 (넘치면 그만큼 느려진다) */
 let stepsN=0;
+let inflight=0;   /* 그래픽카드가 아직 못 끝낸 프레임 수. 2개 넘게 밀리면 이번 프레임은 쉬어 간다 (밀려서 버벅이지 않게) */
 function frame(now){
+  if(inflight>=2){ slowF=1; requestAnimationFrame(frame); return; }
   const dt=Math.min(0.05,(now-last)/1000); last=now;
-  if(!paused){ DT=stepDT(); const r2=0.2/DT; acc+=dt*SPS*r2*S.spd; let k=0; while(acc>=1 && k<Math.round(MAXSTEP*r2)){ step(); acc-=1; k++; } stepsN+=k; slowF=acc>=1?1:Math.max(0,slowF-dt); if(acc>2*r2) acc=0; }
+  if(!paused){ DT=stepDT(); const r2=0.2/DT; acc+=dt*SPS*r2*S.spd; let k=0; const km=Math.min(NSLOT,Math.round(MAXSTEP*r2)); while(acc>=1 && k<km){ acc-=1; k++; } runSteps(k); frameNo++; stepsN+=k; slowF=acc>=1?1:Math.max(0,slowF-dt); if(acc>2*r2) acc=0; }
   /* 화면 크기: 작은 해상도로 그린 뒤 픽셀 그대로 키운다 */
   const r=$("stage").getBoundingClientRect(), w=Math.max(80,Math.round(r.width/S.px)), h=Math.max(50,Math.round(r.height/S.px));
   if(cv.width!==w || cv.height!==h || !depth){ cv.width=w; cv.height=h; if(depth) depth.destroy(); depth=dev.createTexture({size:[w,h],format:"depth24plus",usage:GPUTextureUsage.RENDER_ATTACHMENT}); if(OFF){ if(offTex) offTex.destroy(); offTex=dev.createTexture({size:[w,h],format:fmtTex,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC}); } }
@@ -528,7 +590,7 @@ function frame(now){
   if(SURF){ p.setPipeline(PL.sComp); p.setBindGroup(0,T.bgComp); p.draw(3); p.setBindGroup(0,BGR); }
   else if(N){ p.setPipeline(PL.draw); p.draw(6,N); }
   p.setPipeline(PL.line); p.setVertexBuffer(0,lineBuf); p.draw(lineN);
-  p.end(); dev.queue.submit([e.finish()]);
+  p.end(); dev.queue.submit([e.finish()]); inflight++; dev.queue.onSubmittedWorkDone().then(()=>{ inflight--; });
   fN++; fT+=dt; if(fT>=0.5){ $("stat").textContent=N.toLocaleString()+"알 · "+Math.round(fN/fT)+"fps · 1초 "+Math.round(stepsN/fT)+"박자"+(slowF>0?" · 그래픽카드가 따라가지 못해 조금 느리게 흐르는 중":""); fN=0; fT=0; stepsN=0; }
   requestAnimationFrame(frame);
 }
@@ -552,7 +614,7 @@ $("bFull").addEventListener("click",()=>{ try{ if(document.fullscreenElement) do
 document.addEventListener("keydown",e=>{ if(e.target.tagName==="INPUT") return; if(e.code==="Space"){ e.preventDefault(); SLAP=1; } else if(e.key==="f"||e.key==="F") $("bFull").click(); });
 
 /* 점검용: 방울 위치를 읽어 온다 */
-window.__nj3={ async snap(){ const w=cv.width, h=cv.height, bpr=Math.ceil(w*4/256)*256, rb=dev.createBuffer({size:bpr*h,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}); const e=dev.createCommandEncoder(); e.copyTextureToBuffer({texture:offTex},{buffer:rb,bytesPerRow:bpr},[w,h]); dev.queue.submit([e.finish()]); await rb.mapAsync(GPUMapMode.READ); const a=new Uint8Array(rb.getMappedRange()); let c=document.getElementById("snap"); if(!c){ c=document.createElement("canvas"); c.id="snap"; c.style.cssText="position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated"; $("stage").appendChild(c); } c.width=w; c.height=h; const g=c.getContext("2d"), im=g.createImageData(w,h); for(let y=0;y<h;y++) im.data.set(a.subarray(y*bpr,y*bpr+w*4),y*w*4); g.putImageData(im,0,0); rb.unmap(); rb.destroy(); }, get n(){ return N; }, get S(){ return S; }, slap(){ SLAP=1; }, fill:()=>fill(), async probe(){ const k=Math.min(N,20000), rb=dev.createBuffer({size:k*16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}); const e=dev.createCommandEncoder(); e.copyBufferToBuffer(B.pos,0,rb,0,k*16); dev.queue.submit([e.finish()]); await rb.mapAsync(GPUMapMode.READ); const a=new Float32Array(rb.getMappedRange().slice(0)); rb.unmap(); rb.destroy();
+window.__nj3={ async snap(){ const w=cv.width, h=cv.height, bpr=Math.ceil(w*4/256)*256, rb=dev.createBuffer({size:bpr*h,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}); const e=dev.createCommandEncoder(); e.copyTextureToBuffer({texture:offTex},{buffer:rb,bytesPerRow:bpr},[w,h]); dev.queue.submit([e.finish()]); await rb.mapAsync(GPUMapMode.READ); const a=new Uint8Array(rb.getMappedRange()); let c=document.getElementById("snap"); if(!c){ c=document.createElement("canvas"); c.id="snap"; c.style.cssText="position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated"; $("stage").appendChild(c); } c.width=w; c.height=h; const g=c.getContext("2d"), im=g.createImageData(w,h); for(let y=0;y<h;y++) im.data.set(a.subarray(y*bpr,y*bpr+w*4),y*w*4); g.putImageData(im,0,0); rb.unmap(); rb.destroy(); }, get n(){ return N; }, set sort(v){ sortOn=!!v; }, get S(){ return S; }, slap(){ SLAP=1; }, fill:()=>fill(), async probe(){ const k=Math.min(N,20000), rb=dev.createBuffer({size:k*16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}); const e=dev.createCommandEncoder(); e.copyBufferToBuffer(B.pos,0,rb,0,k*16); dev.queue.submit([e.finish()]); await rb.mapAsync(GPUMapMode.READ); const a=new Float32Array(rb.getMappedRange().slice(0)); rb.unmap(); rb.destroy();
   let bad=0, my=0, mxy=-1e9, mx=0; for(let i=0;i<k;i++){ const x=a[i*4], y=a[i*4+1], z=a[i*4+2]; if(!isFinite(x)||!isFinite(y)||!isFinite(z)) bad++; else { my+=y; mx+=x; if(y>mxy) mxy=y; } } return {k,bad,meanY:my/k,maxY:mxy,meanX:mx/k,padX:PADX}; } };
 init().catch(e=>{ $("msg").hidden=false; $("msg").textContent="그래픽카드를 준비하지 못했어요: "+e.message; console.error(e); });
 })();
