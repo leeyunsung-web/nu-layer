@@ -562,9 +562,9 @@ function lines(){ const hx=GX/2-2, hy=GY/2-2, hz=GZ/2-2, L=[]; const P=[[-hx,-hy
 let last=performance.now(), fT=0, fN=0, acc=0, slowF=0;
 const SPS=360, MAXSTEP=12;   /* 빠르기 1배 = 1초에 360박자. 한 프레임에 최대 12박자까지만 (넘치면 그만큼 느려진다) */
 let stepsN=0;
-let inflight=0;   /* 그래픽카드가 아직 못 끝낸 프레임 수. 2개 넘게 밀리면 이번 프레임은 쉬어 간다 (밀려서 버벅이지 않게) */
+let inflight=0;   /* (화면 밖 시험용) 그래픽카드가 아직 못 끝낸 프레임 수 */
 function frame(now){
-  if(inflight>=2){ slowF=1; requestAnimationFrame(frame); return; }
+  if(OFF && inflight>=2){ slowF=1; requestAnimationFrame(frame); return; }   /* 화면에 그릴 때는 브라우저가 알아서 기다려 준다 */
   const dt=Math.min(0.05,(now-last)/1000); last=now;
   if(!paused){ DT=stepDT(); const r2=0.2/DT; acc+=dt*SPS*r2*S.spd; let k=0; const km=Math.min(NSLOT,Math.round(MAXSTEP*r2)); while(acc>=1 && k<km){ acc-=1; k++; } runSteps(k); frameNo++; stepsN+=k; slowF=acc>=1?1:Math.max(0,slowF-dt); if(acc>2*r2) acc=0; }
   /* 화면 크기: 작은 해상도로 그린 뒤 픽셀 그대로 키운다 */
@@ -590,7 +590,7 @@ function frame(now){
   if(SURF){ p.setPipeline(PL.sComp); p.setBindGroup(0,T.bgComp); p.draw(3); p.setBindGroup(0,BGR); }
   else if(N){ p.setPipeline(PL.draw); p.draw(6,N); }
   p.setPipeline(PL.line); p.setVertexBuffer(0,lineBuf); p.draw(lineN);
-  p.end(); dev.queue.submit([e.finish()]); inflight++; dev.queue.onSubmittedWorkDone().then(()=>{ inflight--; });
+  p.end(); dev.queue.submit([e.finish()]); if(OFF){ inflight++; dev.queue.onSubmittedWorkDone().then(()=>{ inflight--; }); }
   fN++; fT+=dt; if(fT>=0.5){ $("stat").textContent=N.toLocaleString()+"알 · "+Math.round(fN/fT)+"fps · 1초 "+Math.round(stepsN/fT)+"박자"+(slowF>0?" · 그래픽카드가 따라가지 못해 조금 느리게 흐르는 중":""); fN=0; fT=0; stepsN=0; }
   requestAnimationFrame(frame);
 }
