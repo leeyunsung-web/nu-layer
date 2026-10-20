@@ -115,6 +115,8 @@ const CTL=[
  ["wave","기울이기","tilt",0,20,0.5,0,"°","수조 전체를 좌우로 흔드는 각도. 배 위처럼 출렁입니다."],
  ["wave","기울이기 주기","tper",1,10,0.1,4,"초","한 번 기울었다 돌아오는 시간."],
  ["wave","거품","foam",0,1,0.05,0.6,"%","세게 튀어 오른 물이 흰 거품 방울이 되는 정도."],
+ ["wave","보는 높이","camh",0.05,1,0.01,0.35,"%","앞에서 보기에서 눈높이. 낮추면 파도가 우뚝 솟아 보이고, 높이면 바다를 내려다봅니다."],
+ ["wave","가로 물결","xwob",0,1,0.02,0.45,"%","앞에서 보기에서 파도 마루가 옆으로 구불거리는 정도. 0이면 반듯한 줄이 됩니다."],
  ["liq","중력","grav",0,0.4,0.01,0.12,"","아래로 당기는 힘. 0이면 무중력이라 물줄기가 곧게 뻗어 떠다닙니다."],
  ["liq","끈적임","visc",0,1,0.02,0.3,"%","높을수록 꿀처럼 한 덩어리로 늘어지고, 낮을수록 물처럼 튑니다."],
  ["liq","뭉침","tens",0,1,0.02,0.7,"%","방울끼리 당기는 힘. 높으면 동글동글한 방울로 맺히고, 낮으면 잘게 부서집니다."],
@@ -135,7 +137,7 @@ const COLORS={
 const DEF=(()=>{ const o={col:"jelly",floor:1,walls:1,ol:1,stars:1,nz:1,jel:1}; for(const c of CTL) o[c[2]]=c[6]; return o; })();
 /* NU JET과 파도는 설정을 따로 저장한다 (한쪽을 바꿔도 다른 쪽은 그대로) */
 const KEYS={jet:"nu-jet-v2",wave:"nu-wave-v1"};
-const DEFS={jet:DEF, wave:Object.assign({},DEF,{col:"water",grav:0.12,visc:0.12,tens:0.35,stiff:0.5,max:3600,floor:1,walls:1})};
+const DEFS={jet:DEF, wave:Object.assign({},DEF,{view:1,col:"water",grav:0.12,visc:0.12,tens:0.35,stiff:0.5,max:3600,floor:1,walls:1})};
 let MODE="jet"; try{ if(localStorage.getItem("nu-jet-mode")==="wave") MODE="wave"; }catch(_){}
 const load=m=>{ const o=Object.assign({},DEFS[m]); try{ const v=JSON.parse(localStorage.getItem(KEYS[m])||"null"); if(v) for(const k in o) if(k in v) o[k]=v[k]; }catch(_){} return o; };
 let S=load(MODE);
@@ -183,6 +185,7 @@ function mkToggle(sec,label,key,desc,before){
   return set;
 }
 const togSet=[];
+togSet.push(mkToggle("wave","앞에서 보기 (3D)","view","옆에서 본 파도 계산을 그대로 써서, 바닷가에 서서 밀려오는 파도를 바라보는 모습으로 그립니다. 끄면 옆에서 봅니다.",true));
 togSet.push(mkToggle("liq","바닥","floor","끄면 바닥 없이 아래로 흘러 나가고, 켜면 고입니다."));
 togSet.push(mkToggle("liq","옆 벽","walls","끄면 옆으로 나간 물이 사라집니다."));
 togSet.push(mkToggle("look","젤리 반짝임","jel","방울마다 동그란 하이라이트와 아래쪽 되비침을 넣어 말랑한 젤리처럼 보이게 합니다."));
@@ -307,13 +310,13 @@ function step(){
 
 /* ── 그리기: 작은 픽셀 화면에 방울을 녹여 한 덩어리로 칠하고, 셀 채색처럼 네 단계 색으로 나눈다 ── */
 const cv=$("cv"), cx=cv.getContext("2d",{willReadFrequently:false});
-let LW=1, LH=1, F=new Float32Array(1), G2=new Float32Array(1), TMP=new Float32Array(1), DIST=new Float32Array(1), NB=new Float32Array(1), FF=new Float32Array(1), G3=new Float32Array(1), HL=new Uint8Array(1), LAB=new Int32Array(1), IMG=null, PXS=0;
+let LW=1, LH=1, F=new Float32Array(1), G2=new Float32Array(1), TMP=new Float32Array(1), DIST=new Float32Array(1), NB=new Float32Array(1), FF=new Float32Array(1), G3=new Float32Array(1), ZB=new Float32Array(1), YM=new Int32Array(1), HL=new Uint8Array(1), LAB=new Int32Array(1), IMG=null, PXS=0;
 const BEADS=[];
 const STARS=Array.from({length:22},()=>({x:Math.random(),y:Math.random(),p:Math.random()*6.28,s:Math.random()<.3?2:1}));
 function resize(){
   const r=$("stage").getBoundingClientRect(); W=Math.max(200,r.width); Ht=Math.max(150,r.height);
   PXS=S.px; LW=Math.max(40,Math.ceil(W/PXS)); LH=Math.max(30,Math.ceil(Ht/PXS));
-  if(cv.width!==LW||cv.height!==LH){ cv.width=LW; cv.height=LH; IMG=cx.createImageData(LW,LH); F=new Float32Array(LW*LH); G2=new Float32Array(LW*LH); TMP=new Float32Array(LW*LH); DIST=new Float32Array(LW*LH); NB=new Float32Array(LW*LH); HL=new Uint8Array(LW*LH); LAB=new Int32Array(LW*LH); FF=new Float32Array(LW*LH); G3=new Float32Array(LW*LH); }
+  if(cv.width!==LW||cv.height!==LH){ cv.width=LW; cv.height=LH; IMG=cx.createImageData(LW,LH); F=new Float32Array(LW*LH); G2=new Float32Array(LW*LH); TMP=new Float32Array(LW*LH); DIST=new Float32Array(LW*LH); NB=new Float32Array(LW*LH); HL=new Uint8Array(LW*LH); LAB=new Int32Array(LW*LH); FF=new Float32Array(LW*LH); G3=new Float32Array(LW*LH); ZB=new Float32Array(LW*LH); YM=new Int32Array(LW); }
 }
 new ResizeObserver(resize).observe($("stage"));
 const BG=[0,1,42];
@@ -322,6 +325,7 @@ function blur(a,o){ const w=LW, h=LH; for(let y=0;y<h;y++){ const r=y*w; TMP[r]=
   for(let x=0;x<w;x++){ o[x]=(TMP[x]*2+TMP[x+w])/3; for(let y=1;y<h-1;y++){ const i=y*w+x; o[i]=(TMP[i-w]+TMP[i]+TMP[i+w])/3; } const l=(h-1)*w+x; o[l]=(TMP[l-w]+TMP[l]*2)/3; } }
 function draw(showNozzle){
   if(S.px!==PXS) resize();
+  if(MODE==="wave" && S.view){ drawFront(); return; }
   const px=PXS, d=IMG.data, n=LW*LH, WV=MODE==="wave", FOAMON=WV&&S.foam>0; F.fill(0); if(FOAMON) FF.fill(0);
   const R=H*0.74*S.size/px, R2=R*R, Ri=Math.ceil(R);
   for(let i=0;i<N;i++){ const fx=X[i]/px, fy=Y[i]/px, x0=Math.max(0,Math.floor(fx-R)), x1=Math.min(LW-1,Math.ceil(fx+R)), y0=Math.max(0,Math.floor(fy-R)), y1=Math.min(LH-1,Math.ceil(fy+R)); if(x0>x1||y0>y1) continue;
@@ -394,6 +398,66 @@ function draw(showNozzle){
     for(let k=rr+1;k<rr+Math.max(6,Math.round(26/px));k++) dot(Math.round(x+Math.cos(a)*k),Math.round(y-Math.sin(a)*k),251,224,30); }
   cx.putImageData(IMG,0,0);
   function dot(x,y,r,g,b){ if(x<0||y<0||x>=LW||y>=LH) return; const j=(y*LW+x)*4; d[j]=r; d[j+1]=g; d[j+2]=b; }
+}
+
+/* ── 앞에서 보기 (3D): 옆에서 계산한 파도 높이를 깊이 방향으로 펼쳐, 바닷가에서 밀려오는 파도를 바라보는 모습으로 그린다
+   가까운 줄부터 그리며 칸마다 이미 칠한 가장 높은 곳을 기억한다(가려진 곳은 건너뜀). 깊이가 크게 달라지는 곳에 외곽선 ── */
+const BW=4, BCN=new Float32Array(1024), BFO=new Float32Array(1024), BE=new Float32Array(1024), BT=new Float32Array(1024);
+function drawFront(){
+  const px=PXS, d=IMG.data, n=LW*LH, C=COLORS[S.col].c, t=simT/120;
+  const nb=Math.min(1024,Math.ceil(W/BW)); BCN.fill(0,0,nb); BFO.fill(0,0,nb);
+  for(let i=0;i<N;i++){ const b=Math.min(nb-1,Math.max(0,Math.floor(X[i]/BW))); BCN[b]++; BFO[b]+=FOAM[i]; }
+  const area=SP*SP*0.866/BW, fe=x=>Ht-3-beachY(x);
+  for(let b=0;b<nb;b++){ BE[b]=fe((b+.5)*BW)+BCN[b]*area; BFO[b]=BCN[b]?BFO[b]/BCN[b]:0; }
+  for(let r=0;r<3;r++){ BT[0]=BE[0]; for(let b=1;b<nb-1;b++) BT[b]=(BE[b-1]+BE[b]*2+BE[b+1])/4; BT[nb-1]=BE[nb-1]; BE.set(BT.subarray(0,nb)); }
+  const lev=S.level*Ht, padB=Math.min(nb-2,Math.ceil((PAD+8)/BW)+1);
+  /* 물가: 해변이 있으면 물이 끝나는 곳, 없으면 오른쪽 벽. 눈은 그 뒤에 선다 */
+  let xs=W-BW; if(S.beach>0){ for(let b=nb-2;b>padB;b--){ if(BE[b]-fe((b+.5)*BW)>SP*1.5 && BE[b-1]-fe((b-.5)*BW)>SP*1.5){ xs=(b+.5)*BW; break; } } }
+  xs-=Math.max(0,xs-PAD)*(S.beach>0?0.06:0.14);   /* 벽·물가에서 물이 치솟는 곳보다 조금 앞에 선다 */
+  const eAt=x=>{ if(x<=padB*BW) return lev; if(x>xs) x=xs; const fb=Math.min(nb-1.001,x/BW-.5), b=Math.floor(fb), u=fb-b; return BE[b]*(1-u)+BE[b+1]*u; };
+  const foAt=x=>{ if(x<=padB*BW) return 0; const b=Math.min(nb-1,Math.max(0,Math.floor(x/BW))); return BFO[b]; };
+  /* 하늘 */
+  const yH=Math.round(LH*0.28);
+  for(let i=0,j=0;i<n;i++,j+=4){ d[j]=BG[0]; d[j+1]=BG[1]; d[j+2]=BG[2]; d[j+3]=255; ZB[i]=1e9; }
+  if(S.stars){ for(const st of STARS){ const b=Math.sin(t*2.4+st.p); if(b<0.1) continue; const x=Math.floor(st.x*LW), y=Math.floor(st.y*yH*0.95), L=b>0.75?st.s+1:st.s; for(let k=-L;k<=L;k++){ dt(x+k,y); dt(x,y+k); } } }
+  function dt(x,y){ if(x<0||y<0||x>=LW||y>=LH) return; const j=(y*LW+x)*4; d[j]=255; d[j+1]=255; d[j+2]=255; }
+  /* 눈 */
+  const span=Math.max(80,xs-PAD), camH=lev+(0.04+S.camh*0.9)*Ht, zN=Math.max(120,span*0.3), f=(LH*1.02-yH)*zN/Math.max(8,camH-lev), cxs=LW/2, A=S.xwob*60, eCap=lev+(camH-lev)*0.72;
+  YM.fill(LH);
+  const LT=[0,1,2].map(q=>Math.round(C[0][q]+(C[2][q]-C[0][q])*0.3)), FB=[0,1,2].map(q=>Math.round(C[0][q]+(255-C[0][q])*0.88)), FS=[0,1,2].map(q=>Math.round(C[1][q]+(255-C[1][q])*0.62));
+  const SAND=[74,46,132], SAND2=[46,26,98];
+  const zEnd=zN+span*14;
+  let z=zN;
+  while(z<zEnd){ const near=z<zN+span, dz=near?Math.max(1.5,BW*0.5):Math.max(BW,(z-zN-span)*0.06), x=near?xs-(z-zN):-1, fog=Math.min(0.85,Math.max(0,(z-zN)/(zN+span*3))*0.9);
+    for(let sx=0;sx<LW;sx++){ const ym=YM[sx]; if(ym<=yH-1) continue;
+      const u=(sx+.5-cxs)*z/f;
+      let e, xx=x, sl=0, fo=0, sand=false;
+      if(near){ xx=Math.min(xs,x+A*(Math.sin(u*0.008+t*0.5)+0.5*Math.sin(u*0.019-t*0.8))); e=Math.min(eCap,eAt(xx)); sl=(eAt(xx+BW*2)-eAt(xx-BW*2))/(BW*4); fo=foAt(xx); sand=e-fe(Math.max(0,xx))<1.2 && S.beach>0; }
+      else e=lev+3*Math.sin(u*0.004+z*0.002+t*0.3);
+      const sy=yH+(camH-e)*f/z, y0=Math.max(0,Math.ceil(sy));
+      if(y0>=ym) continue;
+      /* 색: 파도 앞면(다가오는 쪽)은 빛을 받아 밝고, 뒷면은 어둡다 */
+      const nd=(-sl*0.55+0.84)/Math.sqrt(1+sl*sl);
+      let col;
+      if(sand) col=y0<ym-1?SAND2:SAND;
+      else if(fo>0.18+0.3*(0.5+0.5*Math.sin(u*0.09+xx*0.05))) col=nd<0.78?FS:FB;
+      else if(nd>0.975 && Math.sin(u*0.13+xx*0.11+t*2)>0.93) col=C[2];
+      else if(nd>0.93) col=LT;
+      else if(nd<0.74) col=C[1];
+      else col=C[0];
+      const r=col[0]+(BG[0]-col[0])*fog, g=col[1]+(BG[1]-col[1])*fog, b=col[2]+(BG[2]-col[2])*fog;
+      const fc=sand?SAND2:ym>=LH?C[1]:(col===FB||col===FS)?FS:(nd<0.85?C[1]:C[0]),   /* 맨 앞 물(화면 아래 끝까지 채우는 줄)은 한 색으로 */
+        hiTop=col===C[2]?1:2, fr=fc[0]+(BG[0]-fc[0])*fog, fg=fc[1]+(BG[1]-fc[1])*fog, fb=fc[2]+(BG[2]-fc[2])*fog;
+      for(let y=y0;y<ym;y++){ const i=y*LW+sx, j=i*4, top=y<y0+hiTop; d[j]=top?r:fr; d[j+1]=top?g:fg; d[j+2]=top?b:fb; ZB[i]=z; }
+      YM[sx]=y0; }
+    z+=dz; }
+  /* 외곽선: 바로 위 칸이 훨씬 멀리 있으면 마루의 윤곽 */
+  if(S.ol) for(let y=yH;y<LH;y++) for(let x=0;x<LW;x++){ const i=y*LW+x; if(ZB[i]>=1e9) continue; const za=y>0?ZB[i-LW]:1e9; if(za>ZB[i]*1.18+14){ const fog=Math.min(0.85,Math.max(0,(ZB[i]-zN)/(zN+span*3))*0.9), j=i*4; d[j]=C[3][0]+(BG[0]-C[3][0])*fog; d[j+1]=C[3][1]+(BG[1]-C[3][1])*fog; d[j+2]=C[3][2]+(BG[2]-C[3][2])*fog; } }
+  /* 튀어 오른 거품: 옆으로 여러 번 흩어 그린다 */
+  for(let i=0;i<N;i++){ if(FOAM[i]<0.45) continue; const b=Math.min(nb-1,Math.max(0,Math.floor(X[i]/BW))); const ei=Ht-Y[i]; if(ei<BE[b]+4) continue; const zz=zN+(xs-X[i]); if(zz<zN) continue;
+    for(let k=0;k<5;k++){ const h=Math.sin((i*12.9898+k*78.233))*43758.5453, rnd=h-Math.floor(h), u=(rnd-0.5)*(LW*zz/f)*1.1, sx=Math.round(cxs+u*f/zz), sy=Math.round(yH+(camH-ei)*f/zz); if(sx<0||sy<0||sx>=LW||sy>=LH) continue; const ii=sy*LW+sx; if(ZB[ii]<zz) continue;
+      const sz=zz<zN+span*0.35?1:0; for(let a=0;a<=sz;a++) for(let c=0;c<=sz;c++){ const xx=sx+a, yy=sy+c; if(xx>=LW||yy>=LH) continue; const j=(yy*LW+xx)*4; d[j]=255; d[j+1]=255; d[j+2]=255; } } }
+  cx.putImageData(IMG,0,0);
 }
 
 /* ── 돌리기 ── */
