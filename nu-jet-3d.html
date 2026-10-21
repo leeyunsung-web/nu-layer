@@ -164,6 +164,8 @@ const CTL=[
  ["secLiq","알갱이 크기","dsz",0.1,1,0.02,1,"배","물을 이루는 알갱이 하나의 크기. 수조 크기는 그대로 두고 알갱이만 작게 만들어 물보라가 더 잘게 부서집니다. 작게 할수록 알갱이 수가 크게 늘고(절반이면 8배) 계산이 무거워집니다. 바꾸면 다시 채웁니다.",2],
  ["secLiq","물보라 양","spray",0,10,0.05,0.5,"배","부서지며 튀는 물에서 흩어지는 작은 물보라 알갱이의 양 (최대 10배). 양에 맞춰 물보라를 담는 통도 커집니다. 물과 쫀득한 물에 나옵니다. 많을수록 화면 그리기가 무거워져서, 5배를 넘기면 fps가 꽤 떨어질 수 있습니다.",0],
  ["secLiq","물보라 무게","spgrav",0.5,6,0.1,2.5,"배","물보라 알갱이에만 따로 거는 중력 배수. 본체 물은 그대로 두고, 높이면 물보라가 둥둥 뜨지 않고 빨리 떨어집니다.",0],
+ ["secLiq","튀는 힘","spkick",0,3,0.05,1,"배","물보라가 물 밖으로 튀어 나가는 힘. 낮으면 물보라가 물 표면 안에서 생겨 바로 다시 빨려 들어가 잘 안 보입니다. 높일수록 위로 높이 튀어 오릅니다.",0],
+ ["secLiq","백사장 물보라","bspr",0,5,0.05,1,"배","백사장으로 얇게 밀려 올라가는 물 앞머리에서 물보라가 앞·위·옆으로 촥 퍼집니다. 0이면 끄기.",0],
  ["secLiq","물보라 크기","spsz",0.15,0.9,0.01,0.4,"배","작은 물보라 알갱이의 크기 (본체 알갱이 대비).",0],
  ["secLiq","칸당 알갱이","ppc",1,8,1,4,"알","격자 한 칸에 넣는 알갱이 수. 적을수록 가볍고(4알이면 8알의 절반), 많을수록 물 표면이 고와집니다. 1알은 가장 가볍지만 물이 듬성듬성 갈라지거나 표면이 울퉁불퉁해질 수 있습니다. 바꾸면 다시 채웁니다.",1],
  ["secWave","옆 출렁임 줄이기","latd",0,1,0.05,0.5,"","좁은 수조 옆벽에 부딪혀 좌우로 오가는 물결을 잠재웁니다. 앞뒤로 밀려오는 파도는 그대로입니다. 0이면 끄기, 높일수록 좌우 움직임이 빨리 멎습니다.",0],
@@ -241,7 +243,7 @@ for(const c of CTL){ const w=document.createElement("label"); w.className="ctl";
   w.append(sp,r,o,d); $(c[0]).appendChild(w); inputs[c[2]]=[r,o,c]; }
 /* 탭 나누기: 자주 쓰는 메뉴만 앞 세 탭으로 옮기고, 남은 것은 모두 '세부' 탭에 그대로 둔다 */
 { const TABS={tWave:["#scenes","#views","cfx","spd","amp","per","skew","level","beach","h3[data-sc='1']","#secDrop"],
-    tWater:["#mats","stick","coh","visc","dsz","ppc","spray","spgrav"],
+    tWater:["#mats","stick","coh","visc","dsz","ppc","spray","spkick","bspr","spgrav"],
     tLook:["#colors","#skies","fsamt","flsz","fsx0","fsgw","fspr","fstay","btr","bwh","px","mball","cull","smooth","conn","whue","wsat","wbri"]};
   const el=k=>k[0]==="#"||k.includes("[")?document.querySelector(k):(inputs[k]&&inputs[k][0].closest(".ctl"));
   for(const t in TABS) for(const k of TABS[t]){ const e=el(k); if(e) $(t).appendChild(e); }
@@ -362,7 +364,7 @@ const WGSL=/* wgsl */`
 /* f: 카메라 자리(격자 칸), 가까움 기준 거리 — 카메라 가까운 곳에 물보라를 더 많이 */
 /* h: 처음 물 높이(칸), 백사장 마찰(파도가 쓸려 올라간 물이 모래에 붙잡혀 덜 미끄러져 내려온다) */
 /* i: 앞바다 바닥 높이(칸) — 깊은 앞바다를 얕게 해 알갱이 수를 줄인다 */
-struct P { g: vec4u, a: vec4f, b: vec4f, c: vec4f, d: vec4f, e: vec4f, f: vec4f, h: vec4f, i: vec4f };
+struct P { g: vec4u, a: vec4f, b: vec4f, c: vec4f, d: vec4f, e: vec4f, f: vec4f, h: vec4f, i: vec4f, j: vec4f };   /* j: 백사장 물보라, 튀는 힘 */
 @group(0) @binding(0) var<uniform> U: P;
 @group(0) @binding(1) var<storage, read_write> pos: array<vec4f>;
 @group(0) @binding(2) var<storage, read_write> vel: array<vec4f>;
@@ -557,7 +559,7 @@ fn updAt(cid: u32) {
   if (any(c < vec3i(2)) || any(c >= vec3i(U.g.xyz) - 2)) { life = 0.0; }
   else {
     let live = atomicLoad(&sc[16u + 2u * nblk() + bidx(vec3u(c))]) != 0u;   /* 계산하지 않은 묶음의 격자 값은 오래된 것이라 보지 않는다 */
-    if (live && s.p.w < 0.995 && gread(c).w > U.a.w * 0.45) { life = 0.0; }   /* 물에 다시 떨어지면 본체에 흡수 (막 튀어 나온 동안은 봐준다) */
+    if (live && s.p.w < 0.99 && gread(c).w > U.a.w * 0.45) { life = 0.0; }   /* 물에 다시 떨어지면 본체에 흡수 (막 튀어 나온 동안은 봐준다) */
     if (p.y < floorY(p.x) + 0.7) { life = 0.0; }                     /* 바닥·모래에 닿으면 사라진다 */
     let zw = zwalls(p.x); if (p.z < zw.x - 0.5 || p.z > zw.y + 0.5) { life = 0.0; }
   }
@@ -645,6 +647,22 @@ fn updAt(cid: u32) {
       atomicAdd(&fa[fi + 4u], i32((gen + select(0.0, 0.03 * U.e.y * min(sw, 2.0), onBeach && sw > 0.15)) * 100000.0));   /* 백사장으로 밀려 올라가는 물은 거품을 더 만든다 */
     }
     fo = clamp(fo * (1.0 - 0.0075 * U.a.x) - 0.004 * U.a.x, 0.0, 1.0);    /* 1~2초에 걸쳐 꺼진다 */
+    /* 백사장 물보라: 백사장으로 얇게 밀려 올라가는 물 앞머리에서 물보라가 앞·위·옆으로 촥 퍼진다 */
+    if (U.j.x > 0.0 && life > 0.0 && onBeach && v.x > 0.0 && sw > 0.25 && dens < U.a.w * 0.9) {
+      let r1 = hh(p * 2.37 - v * 1.91 + vec3f(f32(id.x % 613u)));
+      let pb = U.j.x * 0.05 * min(1.0, (sw - 0.25) * 1.2);
+      if (r1 < min(pb, 1.0)) {
+        let nb = 2u + u32(clamp((pb - 1.0) * 4.0, 0.0, 10.0));
+        let lv = length(v);
+        for (var k = 0u; k < nb; k++) {
+          let fk = f32(k) * 2.11 + r1 * 7.7;
+          let a = vec3f(hh(p + fk), hh(p.zxy - fk), hh(p.yzx + fk * 0.7));
+          let vb = vec3f(v.x * (0.7 + 0.6 * a.x), lv * (0.35 + 0.65 * a.y) * U.j.y, v.z + (a.z - 0.5) * lv * 1.4);   /* 앞으로, 위로, 옆으로 부채꼴 */
+          let ix = atomicAdd(&sc[0], 1u) % max(u32(U.i.z), 1u);
+          spr[ix] = Sp(vec4f(p + vec3f(0.3, 0.8 + a.y * 0.6, (a.z - 0.5) * 0.8), 1.0), vec4f(vb, 0.5 + 0.7 * hh(p.zyx - fk)));
+        }
+      }
+    }
     /* 물보라 만들기: 성긴 곳에서 빠르게 튀어 나가는 물이 작은 알갱이를 흩뿌린다. 카메라에 가까울수록 많이 */
     if (U.e.w > 0.0 && life > 0.0 && dens < U.a.w * 0.7 && sw > 0.5) {
       let prox = clamp(U.f.w / max(length(p - U.f.xyz), 1.0), 0.35, 2.5);
@@ -656,7 +674,9 @@ fn updAt(cid: u32) {
           let fk = f32(k) * 1.37 + r0 * 9.1;
           let j = vec3f(hh(p + fk), hh(p.yzx + fk * 1.3), hh(p.zxy + fk * 2.1)) - 0.5;
           let ix = atomicAdd(&sc[0], 1u) % max(u32(U.i.z), 1u);
-          spr[ix] = Sp(vec4f(p + v * U.a.x * 2.0 + j * 0.6, 1.0), vec4f(v * (0.85 + 0.3 * hh(p - fk)) + j * length(v) * 0.4, 0.7 + 0.6 * hh(p.zyx + fk)));
+          /* 튀는 힘: 물 밖으로 살짝 띄워 내보낸다 (안 그러면 물 표면 안에서 생겨 바로 다시 빨려 들어가 보이지 않는다) */
+          let lv = length(v); let up = vec3f(0.0, (0.25 + 0.5 * hh(p.yxz + fk)) * lv * U.j.y, 0.0);
+          spr[ix] = Sp(vec4f(p + v * U.a.x * 2.0 + j * 0.6 + normalize(v + up + vec3f(0.0, 1e-3, 0.0)) * 0.9 * U.j.y, 1.0), vec4f(v * (0.85 + 0.3 * hh(p - fk)) + j * lv * 0.4 + up, 0.7 + 0.6 * hh(p.zyx + fk)));
         }
       }
     }
@@ -1179,7 +1199,7 @@ fn ncell() -> u32 { return Uq.g.x * Uq.g.y * Uq.g.z + 1u; }   /* 마지막 한 �
 const cv=$("cv"); let dev=null, ctx=null, fmtTex=null, depth=null;
 let offTex=null, B={}, PL={}, BG0=null, BGR=null, BGL=null, lineBuf=null, lineN=0, sandBuf=null, sandN=0, sandKey="";
 const NSLOT=64, params=new ArrayBuffer(256*NSLOT); let pU=null, pF=null;   /* 한 프레임 박자들의 값을 칸마다 따로 담아 한 번에 보낸다 */
-function slot(k){ pU=new Uint32Array(params,256*k,32); pF=new Float32Array(params,256*k,36); }
+function slot(k){ pU=new Uint32Array(params,256*k,32); pF=new Float32Array(params,256*k,40); }
 async function init(){
   const slow=setTimeout(()=>{ if(!E.ok) $("msg").textContent="그래픽카드가 대답하지 않아요. 브라우저(또는 앱)를 완전히 닫았다 다시 열어 주세요. 다른 창에서 이 페이지가 돌고 있다면 먼저 닫아 주세요."; },12000);
   if(!navigator.gpu){ $("msg").textContent="이 브라우저는 WebGPU(그래픽카드 계산)를 지원하지 않아요. 최신 크롬이나 엣지에서 열어 주세요."; return; }
@@ -1266,7 +1286,7 @@ function resizeTank(){ tankSize(); BX0=GX*0.45; const SB=GPUBufferUsage.STORAGE|
   B.cnt=dev.createBuffer({size:(CELLS+1)*4,usage:SB}); B.offs=dev.createBuffer({size:(CELLS+1)*4,usage:SB}); B.bs=dev.createBuffer({size:Math.ceil((CELLS+1)/256)*4+16,usage:SB});
   const SR={0:B.SU,1:B.pos,2:B.vel,3:B.C,4:B.F,5:B.pos2,6:B.vel2,7:B.C2,8:B.F2,9:B.cnt,10:B.loc,11:B.bs,12:B.offs}, USE={sClear:[0,9],sCount:[0,1,9,10],sScan:[0,9,11,12],sScanSums:[0,11],sDest:[0,1,10,11,12],sMoveA:[0,1,2,5,6,10],sMoveB:[0,3,4,7,8,10]};
   E.sbg={}; for(const k in USE) E.sbg[k]=dev.createBindGroup({layout:PL[k].getBindGroupLayout(0),entries:USE[k].map(b=>({binding:b,resource:{buffer:SR[b]}}))});
-  BG0=dev.createBindGroup({layout:E.bgl,entries:[{binding:0,resource:{buffer:B.U,size:144}},{binding:1,resource:{buffer:B.pos}},{binding:2,resource:{buffer:B.vel}},{binding:3,resource:{buffer:B.C}},{binding:4,resource:{buffer:B.gi}},{binding:5,resource:{buffer:B.gv}},{binding:6,resource:{buffer:B.F}},{binding:7,resource:{buffer:B.spr}},{binding:8,resource:{buffer:B.sc}}]}); }
+  BG0=dev.createBindGroup({layout:E.bgl,entries:[{binding:0,resource:{buffer:B.U,size:160}},{binding:1,resource:{buffer:B.pos}},{binding:2,resource:{buffer:B.vel}},{binding:3,resource:{buffer:B.C}},{binding:4,resource:{buffer:B.gi}},{binding:5,resource:{buffer:B.gv}},{binding:6,resource:{buffer:B.F}},{binding:7,resource:{buffer:B.spr}},{binding:8,resource:{buffer:B.sc}}]}); }
 /* 물 채우기: 물 높이까지 방울을 고르게 (살짝 흔들어) 놓는다. 수조가 커서 방울이 한도를 넘으면 간격을 조금 넓힌다 */
 let SPC=0.5; function spacing(){ return SPC; }
 function fill(){ PEND.length=0; dripT=0; PADX=2.5; PADV=0;   /* 파도 판을 제자리로 돌린 뒤 채운다 (밀려 나간 순간에 채우면 물이 덜 차고 알갱이 수가 들쭉날쭉해진다) */ if(B.spr){ const e=dev.createCommandEncoder(); e.clearBuffer(B.spr); if(B.fmA){ e.clearBuffer(B.fmA); e.clearBuffer(B.fmB); e.clearBuffer(B.gv); } dev.queue.submit([e.finish()]); } const POOL=S.scene===1 && S.dpool>0;
@@ -1311,7 +1331,7 @@ function step(e,k){
   const POOL=DROP&&S.dpool>0; pF[16]=DROP&&!POOL&&S.dfade>0?1/(72*(9-7.8*S.dfade)):0; pF[17]=DROP&&!POOL?0.015+0.1*(1-S.dspread):0;   /* 웅덩이가 있으면 사라지지 않고 바닥에서 끌리지도 않는다 */ pF[18]=JEL?0.04:STK?Math.max(DROP?0.25:0,0.06+0.2*stk):DROP?0.25:0.06;   /* 파도 장면은 약하게: 세면 물보라가 덩어리째 눌려 따로 튀어 나가지 못한다 */ pF[19]=HW1;
   pF[20]=DS; pF[21]=DROP?0:S.foam*2; pF[22]=!DROP&&S.soak>0?S.soak/(72*0.4):0; pF[23]=S.mat!==1?S.spray*0.35:0;
   pF[24]=EYEG[0]; pF[25]=EYEG[1]; pF[26]=EYEG[2]; pF[27]=EYEG[3];
-  pF[32]=bedR(); pF[33]=S.ftile===0?0:1; pF[34]=SPCAP(); pF[35]=S.spgrav===undefined?2.5:S.spgrav; pF[28]=TOPG; pF[29]=!DROP?S.soak*0.06:0; pF[30]=FR; pF[31]=S.scene===0?S.latd:0;   /* 옆 출렁임 줄이기 (+10 = 거품 지도에 모으는 박자) */
+  pF[32]=bedR(); pF[33]=S.ftile===0?0:1; pF[34]=SPCAP(); pF[35]=S.spgrav===undefined?2.5:S.spgrav; pF[36]=!DROP&&S.mat!==1?(S.bspr===undefined?1:S.bspr):0; pF[37]=S.spkick===undefined?1:S.spkick; pF[38]=0; pF[39]=0; pF[28]=TOPG; pF[29]=!DROP?S.soak*0.06:0; pF[30]=FR; pF[31]=S.scene===0?S.latd:0;   /* 옆 출렁임 줄이기 (+10 = 거품 지도에 모으는 박자) */
   const gB=Math.ceil(NBLK/WG), gP=Math.ceil(N/WG);
   /* ① 알갱이가 있는 칸 묶음(과 이웃)만 골라 목록을 만들고 → ② 그 묶음만 비우고 계산한다 (빈 공기는 건너뛴다) */
   let c=e.beginComputePass(); c.setBindGroup(0,BG0,[256*k]);
