@@ -162,7 +162,7 @@ const CTL=[
  ["secDrop","퍼짐","dspread",0,1,0.02,0.6,"%","바닥에 닿은 물이 얼마나 멀리 미끄러져 퍼지는지.",0],
  ["secDrop","사라지는 빠르기","dfade",0,1,0.02,0.6,"%","바닥에 닿은 물이 스르륵 사라지는 빠르기. 0이면 사라지지 않고 고입니다.",0],
  ["secLiq","알갱이 크기","dsz",0.1,1,0.02,1,"배","물을 이루는 알갱이 하나의 크기. 수조 크기는 그대로 두고 알갱이만 작게 만들어 물보라가 더 잘게 부서집니다. 작게 할수록 알갱이 수가 크게 늘고(절반이면 8배) 계산이 무거워집니다. 바꾸면 다시 채웁니다.",2],
- ["secLiq","물보라 양","spray",0,3,0.05,0.5,"배","부서지며 튀는 물에서 흩어지는 작은 물보라 알갱이의 양. 1배를 넘기면 물보라를 담는 통도 2배로 커집니다 (최대 3배). 물과 쫀득한 물에 나옵니다. 작은 알갱이는 따로 가볍게 계산하지만, 많을수록 화면 그리기는 조금 무거워집니다.",0],
+ ["secLiq","물보라 양","spray",0,10,0.05,0.5,"배","부서지며 튀는 물에서 흩어지는 작은 물보라 알갱이의 양 (최대 10배). 양에 맞춰 물보라를 담는 통도 커집니다. 물과 쫀득한 물에 나옵니다. 많을수록 화면 그리기가 무거워져서, 5배를 넘기면 fps가 꽤 떨어질 수 있습니다.",0],
  ["secLiq","물보라 무게","spgrav",0.5,6,0.1,2.5,"배","물보라 알갱이에만 따로 거는 중력 배수. 본체 물은 그대로 두고, 높이면 물보라가 둥둥 뜨지 않고 빨리 떨어집니다.",0],
  ["secLiq","물보라 크기","spsz",0.15,0.9,0.01,0.4,"배","작은 물보라 알갱이의 크기 (본체 알갱이 대비).",0],
  ["secLiq","칸당 알갱이","ppc",1,8,1,4,"알","격자 한 칸에 넣는 알갱이 수. 적을수록 가볍고(4알이면 8알의 절반), 많을수록 물 표면이 고와집니다. 1알은 가장 가볍지만 물이 듬성듬성 갈라지거나 표면이 울퉁불퉁해질 수 있습니다. 바꾸면 다시 채웁니다.",1],
@@ -341,7 +341,7 @@ let FR=1, FX=2, FZ=2, POOLG=2;   /* POOLG: 물방울 장면 웅덩이 높이 */ 
 let HW0=20, HW1=20, NBLK=1, TOPG=10;   /* TOPG: 처음 물 높이(격자 칸) */ const EYEG=[0,0,0,1];   /* 카메라 자리 (격자 칸)와 가까움 기준 거리 */
 tankSize();
 const E={ok:false};
-const SPCAP=()=>S.spray>1?524288:262144;   /* 물보라를 1배보다 많이 쓰면 물보라 통을 2배로 */
+const SPCAP=()=>262144*Math.min(8,Math.max(1,Math.ceil(S.spray)));   /* 물보라 양만큼 물보라 통을 키운다 (1배 = 26만, 최대 8배 = 210만) */
 let N=0, stepNo=0, PADX=2.5, PADV=0, SLAP=0, waveOn=true, paused=false, AMPc=0, WPH=0;
 let BX0=GX*0.45;
 /* 수조 앞뒤 벽 (x에 따라): 계산 쪽 zwalls()와 같은 식 */
@@ -374,7 +374,7 @@ struct P { g: vec4u, a: vec4f, b: vec4f, c: vec4f, d: vec4f, e: vec4f, f: vec4f,
 struct Sp { p: vec4f, v: vec4f };   /* p.w = 남은 시간, v.w = 크기(본체 알갱이 대비) */
 @group(0) @binding(7) var<storage, read_write> spr: array<Sp>;
 @group(0) @binding(8) var<storage, read_write> sc: array<atomic<u32>>;
-const SPMAX: u32 = 524288u;   /* 물보라 통 크기 (실제로 쓰는 수는 U.i.z: 물보라 양이 많을 때만 2배로) */
+const SPMAX: u32 = 2097152u;   /* 물보라 통 크기 (실제로 쓰는 수는 U.i.z: 물보라 양이 많을 때만 2배로) */
 /* 빈 공간 건너뛰기: 격자를 4×4×4 칸 묶음으로 나눠, 물 알갱이가 있는 묶음(과 그 이웃)만 비우고 계산한다.
    sc 칸: [0] 물보라 수, [1] 계산할 묶음 수, [16..] 묶음마다 '알갱이 있음', 그 뒤 '계산할 묶음' 목록, 그 뒤 '계산함' 표시 */
 fn nbx() -> vec3u { return (U.g.xyz + 3u) / 4u; }
@@ -649,8 +649,10 @@ fn updAt(cid: u32) {
     if (U.e.w > 0.0 && life > 0.0 && dens < U.a.w * 0.7 && sw > 0.5) {
       let prox = clamp(U.f.w / max(length(p - U.f.xyz), 1.0), 0.35, 2.5);
       let r0 = hh(p * 1.71 + v * 3.13 + vec3f(f32(id.x % 977u)));
-      if (r0 < U.e.w * prox * min(1.0, (sw - 0.5) * 1.5)) {
-        for (var k = 0u; k < 2u; k++) {
+      let amt = U.e.w * prox * min(1.0, (sw - 0.5) * 1.5);
+      if (r0 < min(amt, 1.0)) {
+        let nk = 2u + u32(clamp((amt - 1.0) * 2.0, 0.0, 18.0));   /* 물보라 양이 많으면 한 번에 더 많이 흩어진다 */
+        for (var k = 0u; k < nk; k++) {
           let fk = f32(k) * 1.37 + r0 * 9.1;
           let j = vec3f(hh(p + fk), hh(p.yzx + fk * 1.3), hh(p.zxy + fk * 2.1)) - 0.5;
           let ix = atomicAdd(&sc[0], 1u) % max(u32(U.i.z), 1u);
@@ -1192,7 +1194,7 @@ async function init(){
 
   B.cam=dev.createBuffer({size:512,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
   const mod=dev.createShaderModule({code:WGSL});
-  B.spr=dev.createBuffer({size:524288*32,usage:SB});
+  B.spr=dev.createBuffer({size:2097152*32,usage:SB});
   B.ind=dev.createBuffer({size:16,usage:GPUBufferUsage.INDIRECT|GPUBufferUsage.COPY_DST}); dev.queue.writeBuffer(B.ind,0,new Uint32Array([0,1,1,0]));
   const bgl=dev.createBindGroupLayout({entries:[0,1,2,3,4,5,6,7,8].map(b=>({binding:b,visibility:GPUShaderStage.COMPUTE,buffer:b?{type:"storage"}:{type:"uniform",hasDynamicOffset:true}}))});
   { const sm=dev.createShaderModule({code:SORTWGSL}); for(const e of ["sClear","sCount","sScan","sScanSums","sDest","sMoveA","sMoveB"]) PL[e]=dev.createComputePipeline({layout:"auto",compute:{module:sm,entryPoint:e}});
