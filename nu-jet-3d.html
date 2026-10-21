@@ -146,7 +146,7 @@ const CTL=[
  ["secTank","시작 폭","tz",16,640,4,40,"칸","파도가 시작되는 쪽(파도 판)에서 보이는 앞뒤 폭. 계산 폭을 그만큼 늘여 보여 줍니다 (계산량은 그대로).",0],
  ["secTank","끝 폭","tz1",8,640,4,40,"칸","해변 쪽 끝에서 보이는 앞뒤 폭. 시작 폭보다 좁으면 부채꼴처럼 좁아져 보입니다 (계산량은 그대로).",0],
  ["secTank","앞바다 바닥","obed",0,0.6,0.05,0.35,"%","파도 판 쪽 깊은 앞바다의 바닥을 올립니다. 깊은 곳 아래쪽 물은 파도를 실어 나르기만 해서, 올리면 알갱이 수가 크게 줄어 그만큼 알갱이를 더 작게 할 수 있습니다. 너무 올리면 파도가 앞바다에서부터 얕은 물결처럼 바뀝니다. 바꾸면 다시 채웁니다.",2],
- ["secWave","파도 판 쪽 누르기","padg",0,1,0.05,0.6,"%","파도 판 가까이에서 지나치게 일렁이는 물을 화면에서만 낮춰 그립니다. 실제 물의 움직임과 힘은 그대로예요. 0이면 끄기.",0],
+ ["secWave","파도 판 쪽 누르기","padg",0,2,0.05,0.6,"%","파도 판 가까이에서 지나치게 일렁이는 물을 화면에서만 낮춰 그립니다. 실제 물의 움직임과 힘은 그대로예요. 100%면 솟은 물이 잔잔한 높이까지 눌리고, 100~200%는 꽉 누르는 범위를 구간 끝까지 넓히고 움푹 꺼진 곳도 메워 더 판판해집니다. 0이면 끄기.",0],
  ["secWave","누르는 구간","padz",0.05,0.7,0.01,0.25,"","파도 판에서 이만큼(수조 길이 비율)까지 누릅니다. 끝에서 서서히 약해집니다.",0],
  ["secTank","튈 공간","head",8,96,2,24,"칸","물 위로 물보라가 튈 수 있는 높이. 계산은 물 높이에 이 높이를 더한 데까지만 합니다. 낮을수록 가볍고 알갱이를 더 작게 할 수 있지만, 너무 높이 튄 물은 천장에 막힙니다. 바꾸면 다시 채웁니다.",2],
  ["secTank","높이","ty",24,192,4,40,"칸","수조의 높이. 높을수록 물보라가 높이 튈 공간이 생깁니다. 바꾸면 다시 채웁니다.",2],
@@ -764,8 +764,10 @@ fn wmap(q0: vec3f) -> vec3f {
   var q = q0;
   if (K.ex14.x > 0.0) {
     let rest = K.sand.x - 0.3 + K.prm.z * 0.5; let tz = (q.x - 3.0) / max(K.prm.y - 7.0, 1.0);
-    let wz = 1.0 - smoothstep(K.ex14.y * 0.6, K.ex14.y + 0.001, tz);
-    if (q.y > rest) { q.y = rest + (q.y - rest) * (1.0 - K.ex14.x * wz); }
+    let sA = min(K.ex14.x, 1.0); let sB = clamp(K.ex14.x - 1.0, 0.0, 1.0);   /* 100%까지: 솟은 물을 낮춤 / 100~200%: 꽉 누르는 범위를 구간 끝까지 넓히고, 움푹 꺼진 곳도 메움 */
+    let wz = 1.0 - smoothstep(K.ex14.y * (0.6 + 0.38 * sB), K.ex14.y + 0.001, tz);
+    if (q.y > rest) { q.y = rest + (q.y - rest) * (1.0 - sA * wz); }
+    else if (sB > 0.0 && q.y > rest - 3.0) { q.y = mix(q.y, rest, sB * wz * smoothstep(rest - 3.0, rest - 0.5, q.y)); }
   }
   return vec3f(q.x, q.y, K.ex5.z + (q.z - K.ex5.z) * wfac(q.x)); }
 struct VO { @builtin(position) p: vec4f, @location(0) uv: vec2f, @location(1) s: f32, @location(2) dz: f32 };
@@ -922,8 +924,10 @@ fn wmap(q0: vec3f) -> vec3f {
   var q = q0;
   if (K.ex14.x > 0.0) {
     let rest = K.sand.x - 0.3 + K.prm.z * 0.5; let tz = (q.x - 3.0) / max(K.prm.y - 7.0, 1.0);
-    let wz = 1.0 - smoothstep(K.ex14.y * 0.6, K.ex14.y + 0.001, tz);
-    if (q.y > rest) { q.y = rest + (q.y - rest) * (1.0 - K.ex14.x * wz); }
+    let sA = min(K.ex14.x, 1.0); let sB = clamp(K.ex14.x - 1.0, 0.0, 1.0);   /* 100%까지: 솟은 물을 낮춤 / 100~200%: 꽉 누르는 범위를 구간 끝까지 넓히고, 움푹 꺼진 곳도 메움 */
+    let wz = 1.0 - smoothstep(K.ex14.y * (0.6 + 0.38 * sB), K.ex14.y + 0.001, tz);
+    if (q.y > rest) { q.y = rest + (q.y - rest) * (1.0 - sA * wz); }
+    else if (sB > 0.0 && q.y > rest - 3.0) { q.y = mix(q.y, rest, sB * wz * smoothstep(rest - 3.0, rest - 0.5, q.y)); }
   }
   return vec3f(q.x, q.y, K.ex5.z + (q.z - K.ex5.z) * wfac(q.x)); }
 
