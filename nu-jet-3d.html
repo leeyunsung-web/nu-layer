@@ -134,16 +134,18 @@ const CTL=[
 const SKIES={
   day:{n:"낮",hz:[198,232,255],zn:[86,162,238],cw:[255,255,255],cs:[190,208,240],mode:1,sun:[-0.45,0.55,-0.7],g0:[150,208,242],g1:[46,128,200]},
   dusk:{n:"노을",hz:[255,186,150],zn:[118,84,170],cw:[255,228,214],cs:[220,126,156],mode:2,sun:[-0.6,0.07,-0.8],g0:[238,160,150],g1:[110,70,140]},
+  off:{n:"끄기",hz:[0,1,42],zn:[0,1,42],cw:[0,1,42],cs:[0,1,42],mode:0,sun:[0,1,0],g0:[0,1,42],g1:[0,1,42]},
   night:{n:"밤",hz:[22,20,74],zn:[0,1,42],cw:[84,76,148],cs:[46,40,104],mode:0,sun:[0.5,0.45,-0.75],g0:[30,28,88],g1:[4,6,40]},
 };
 const COLORS={
+  maldives:{n:"몰디브",c:[[86,218,206],[24,172,184],[236,255,250],[6,104,128]]},
   water:{n:"물",c:[[44,156,224],[22,104,176],[222,246,255],[12,58,120]]},
   jelly:{n:"핑크 젤리",c:[[246,104,142],[221,62,116],[255,244,247],[160,36,104]]},
   milk:{n:"우유",c:[[248,241,228],[222,204,178],[255,255,255],[206,150,30]]},
   blood:{n:"핏빛",c:[[226,60,96],[176,32,74],[255,222,230],[122,22,60]]},
 };
 /* 윤성이 정한 처음 값 (2026-10-21, 설정 복사로 받은 값) */
-const SAVED={"col":"water","rmode":0,"mat":0,"scene":0,"sky":"day","cyaw":-10.8,"cpit":-0.5,"czoom":1.205,"spd":0.25,"tx":256,"tz":160,"ty":48,"level":0.19,"amp":16,"per":1,"skew":0.55,"beach":0.14,"dint":0.7,"dsize":2.5,"dh":0.85,"dthrow":0.15,"dspread":0.6,"dfade":0.6,"grav":0.3,"visc":0.1,"stiff":2,"jmu":0.45,"coh":0.4,"melt":0.58,"pcount":500000,"cloud":0.72,"cspd":0.35,"smooth":1,"foam":0.85,"px":1,"psize":0.5};
+const SAVED={"col":"maldives","rmode":0,"mat":0,"scene":0,"sky":"day","cyaw":-10.8,"cpit":-0.5,"czoom":1.205,"spd":0.25,"tx":256,"tz":160,"ty":48,"level":0.19,"amp":16,"per":1,"skew":0.55,"beach":0.14,"dint":0.7,"dsize":2.5,"dh":0.85,"dthrow":0.15,"dspread":0.6,"dfade":0.6,"grav":0.3,"visc":0.1,"stiff":2,"jmu":0.45,"coh":0.4,"melt":0.58,"pcount":500000,"cloud":0.72,"cspd":0.35,"smooth":1,"foam":0.85,"px":1,"psize":0.5};
 const DEF=(()=>{ const o={col:"water",rmode:0,mat:0,scene:0,sky:"day",cyaw:-38,cpit:24,czoom:1}; for(const c of CTL) o[c[2]]=c[6]; return Object.assign(o,SAVED); })();
 const KEY="nu-jet-3d-v4";
 let S=Object.assign({},DEF); try{ const v=JSON.parse(localStorage.getItem(KEY)||"null"); if(v) for(const k in DEF) if(k in v) S[k]=v[k]; }catch(_){}
@@ -156,7 +158,7 @@ for(const c of CTL){ const w=document.createElement("label"); w.className="ctl";
   r.addEventListener("input",()=>{ S[c[2]]=+r.value; o.textContent=fmt(c,S[c[2]]); save(); if(c[9]){ clearTimeout(refillT); refillT=setTimeout(()=>{ if(!E.ok) return; if(c[9]===2) resizeTank(); fill(); },350); } });
   w.append(sp,r,o,d); $(c[0]).appendChild(w); inputs[c[2]]=[r,o,c]; }
 for(const k in COLORS){ const b=document.createElement("button"); b.type="button"; b.dataset.c=k; b.textContent=COLORS[k].n; b.addEventListener("click",()=>{ S.col=k; save(); colUI(); }); $("colors").appendChild(b); }
-for(const b of document.querySelectorAll("#mats button")) b.addEventListener("click",()=>{ if(E.ok && N) dev.queue.writeBuffer(B.F,0,ident(N)); S.mat=+b.dataset.m; if(S.mat===1){ S.col="jelly"; S.smooth=Math.max(S.smooth,0.75); } else if(S.col==="jelly") S.col="water"; save(); syncUI(); });
+for(const b of document.querySelectorAll("#mats button")) b.addEventListener("click",()=>{ if(E.ok && N) dev.queue.writeBuffer(B.F,0,ident(N)); S.mat=+b.dataset.m; if(S.mat===1){ S.col="jelly"; S.smooth=Math.max(S.smooth,0.75); } else if(S.col==="jelly") S.col="maldives"; save(); syncUI(); });
 for(const k in SKIES){ const b=document.createElement("button"); b.type="button"; b.dataset.k=k; b.textContent=SKIES[k].n; b.addEventListener("click",()=>{ S.sky=k; save(); colUI(); }); $("skies").appendChild(b); }
 for(const b of document.querySelectorAll("#rmodes button")) b.addEventListener("click",()=>{ S.rmode=+b.dataset.r; save(); colUI(); });
 function colUI(){ for(const b of document.querySelectorAll("#mats button")) b.setAttribute("aria-pressed",+b.dataset.m===S.mat?"true":"false"); for(const b of document.querySelectorAll("#rmodes button")) b.setAttribute("aria-pressed",+b.dataset.r===S.rmode?"true":"false"); for(const b of document.querySelectorAll("#colors button")) b.setAttribute("aria-pressed",b.dataset.c===S.col?"true":"false"); for(const b of document.querySelectorAll("#skies button")) b.setAttribute("aria-pressed",b.dataset.k===S.sky?"true":"false"); }
@@ -359,7 +361,7 @@ fn beachX() -> f32 { return 3.0 + 0.45 * (f32(U.g.x) - 7.0); }
     if (!(abs(sq) < 5.0) || !(abs(sv) < 5.0) || dot(ax, ax) < 0.25 || W[2].z != 7.0) { vp = v; ax = vec3f(0.0, 1.0, 0.0); sq = 0.0; sv = 0.0; }
     let dv = v - vp - vec3f(0.0, U.a.x * U.a.y, 0.0);
     let dl = length(dv);
-    if (dl > 0.02) { var dd = dv; if (dot(dd, ax) < 0.0) { dd = -dd; } ax = normalize(mix(ax * max(abs(sq), 0.05), dd, 0.6) + vec3f(1e-5)); sv -= min(dl, 3.0) * 0.07; }
+    if (dl > 0.02) { var dd = dv; if (dot(dd, ax) < 0.0) { dd = -dd; } ax = normalize(mix(ax * max(abs(sq), 0.05), dd, 0.6) + vec3f(1e-5)); sv -= min(dl, 3.0) * 0.12; }
     let K = 0.085; let Cd = 0.055;
     sv += (-K * sq - Cd * sv) * U.a.x; sq += sv * U.a.x; sq = clamp(sq, -0.55, 1.1);
     F = mat3x3f(v, normalize(ax), vec3f(sq, sv, 7.0));
@@ -460,8 +462,10 @@ struct SDV { @builtin(position) p: vec4f, @location(0) w: vec3f };
   let g = h21(floor(i.w.xz * 2.0) + vec2f(floor(i.w.y * 2.0) * 7.13, 0.0));
   if (g > 0.9) { col = col * mix(0.95, 0.84, K.sand.y); } else if (g < 0.05) { col = min(col * 1.06, vec3f(1.0)); }   /* 모래 알갱이 (흰 모래는 옅게) */
   if (abs(i.w.y - K.sand.x) < 0.35) { col = mix(col, vec3f(1.0), 0.35); }   /* 물이 닿는 선 (거품 자국) */
-  let lum = dot(K.s0.rgb, vec3f(0.3, 0.6, 0.1));
-  col = col * mix(0.32, 1.0, clamp(lum * 1.25, 0.0, 1.0)) * mix(vec3f(1.0), K.s0.rgb * 1.15, 0.18);
+  if (K.sand.z < 0.5) {   /* 하늘을 켰을 때만 하늘빛에 물든다 */
+    let lum = dot(K.s0.rgb, vec3f(0.3, 0.6, 0.1));
+    col = col * mix(0.32, 1.0, clamp(lum * 1.25, 0.0, 1.0)) * mix(vec3f(1.0), K.s0.rgb * 1.15, 0.18);
+  }
   return vec4f(col, 1.0);
 }
 struct LV { @builtin(position) p: vec4f, @location(0) c: vec3f };
@@ -493,7 +497,7 @@ fn sprite(vi: u32, ii: u32, scale: f32) -> SV {
   let st = 1.0 + clamp((spd - 0.6) * 0.7, 0.0, 2.4);
   var ax = vec2f(1.0, 0.0); if (spd > 1e-4) { ax = vs / spd; }
   /* 파도 장면: 느려져 홀로 남은 작은 물방울은 바닥에 스며들 듯 작아져 사라져 보인다 (계산에서는 남아 있다가 물에 합쳐지면 다시 보인다) */
-  if (K.ext3.w > 0.0 && length(vv.xyz) < 0.5) { r *= smoothstep(0.06, 0.24, vv.w / K.ext3.w); }
+  if (K.ext3.w > 0.0 && length(vv.xyz) < 0.2) { r *= smoothstep(0.06, 0.24, vv.w / K.ext3.w); }
   let iv = inverseSqrt(st);
   /* 몽실몽실: 무리에서 떨어진 작은 물방울일수록, 빠를수록 테두리가 출렁인다 (공 모양을 그대로 두지 않는다).
      출렁이는 박자는 방울이 있는 자리에 따라 정해져, 움직이는 동안 모양이 계속 바뀐다 */
@@ -737,7 +741,7 @@ function step(c,k){
   pF[4]=DT; pF[5]=-S.grav; pF[6]=E5; pF[7]=1/pVol; pF[8]=S.visc*0.5; pF[9]=PADX; pF[10]=PADV; pF[11]=BX0; pF[12]=DROP?0:S.beach;
   pF[13]=JEL?1.5+3.5*S.jmu:0; pF[14]=JEL?0.003+0.08*S.melt*S.melt:1; pF[15]=JEL?0.02+0.08*S.coh:0.0005+0.006*S.coh;   /* 물: 뭉침은 아주 약하게 (세면 떨어진 물이 공처럼 말린다) */
   /* 물방울 장면: 바닥에 닿은 뒤 (1.2~9초에 걸쳐) 사라지고, 바닥에서 덜 미끄러지고, 공처럼 튀지 않게 */
-  pF[16]=DROP&&S.dfade>0?1/(72*(9-7.8*S.dfade)):0; pF[17]=DROP?0.015+0.1*(1-S.dspread):0; pF[18]=JEL?0.04:0.25; pF[19]=S.flare;
+  pF[16]=DROP&&S.dfade>0?1/(72*(9-7.8*S.dfade)):0; pF[17]=DROP?0.015+0.1*(1-S.dspread):0; pF[18]=JEL?0.04:DROP?0.25:0.06;   /* 파도 장면은 약하게: 세면 물보라가 덩어리째 눌려 따로 튀어 나가지 못한다 */ pF[19]=S.flare;
   c.setBindGroup(0,BG0,[256*k]);
   const gC=Math.ceil(CELLS/WG), gP=Math.ceil(N/WG);
   c.setPipeline(PL.clearGrid); c.dispatchWorkgroups(gC);
@@ -818,7 +822,7 @@ function frame(now){
   camData.set(Pm,0); camData.set(V,16); camData.set([...cc(C[0]),1],32); camData.set([...cc(C[1]),1],36); camData.set([...cc(C[2]),1],40); camData.set([...cc(C[3]),1.6],44);
   camData.set([spacing()*0.95*S.psize,GX,GY,GZ],48);
   const tf=1/Math.tan(0.31); camData.set([w,h,tf,w/h],52); camData.set([spacing()*1.05,2.6-1.8*S.foam,0.5,dist*0.9],56); camData.set([S.smooth,1,S.mat===0?2:1,S.scene===0&&S.mat===0?1/pVol:0],60);
-  { const K=SKIES[S.sky]||SKIES.day, f=c=>c.map(v=>v/255); camData.set([...f(K.hz),(now/1000)%3600],64); camData.set([...f(K.zn),S.cloud],68); camData.set([...f(K.cw),S.cspd],72); camData.set([...f(K.cs),K.mode],76); camData.set([...K.sun,1/pVol],80); camData.set([...f(K.g0),1],84); camData.set([...f(K.g1),1],88); camData.set([S.scene===1?-1e6:2+S.level*(GY-5)-GY/2+0.3,S.sandc,0,0],92); }
+  { const K=SKIES[S.sky]||SKIES.day, f=c=>c.map(v=>v/255); camData.set([...f(K.hz),(now/1000)%3600],64); camData.set([...f(K.zn),S.cloud],68); camData.set([...f(K.cw),S.cspd],72); camData.set([...f(K.cs),K.mode],76); camData.set([...K.sun,1/pVol],80); camData.set([...f(K.g0),1],84); camData.set([...f(K.g1),1],88); camData.set([S.scene===1?-1e6:2+S.level*(GY-5)-GY/2+0.3,S.sandc,S.sky==="off"?1:0,0],92); }
   dev.queue.writeBuffer(B.cam,0,camData,0,96); sandMesh(); lines();
   const SURF=S.rmode===0 && N>0; if(SURF) surfTargets(w,h);
   const e=dev.createCommandEncoder();
@@ -828,7 +832,7 @@ function frame(now){
     rp(T.tmp.createView(),1e6,T.bgH2,PL.sBH,3,1); rp(T.sm.createView(),1e6,T.bgV,PL.sBV,3,1);
     rp(T.fo.createView(),0,T.bgFoam,PL.sFoam,6,N); }
   const p=e.beginRenderPass({colorAttachments:[{view:OFF?offTex.createView():ctx.getCurrentTexture().createView(),clearValue:{r:0,g:1/255,b:42/255,a:1},loadOp:"clear",storeOp:"store"}],depthStencilAttachment:{view:depth.createView(),depthClearValue:1,depthLoadOp:"clear",depthStoreOp:"store"}});
-  p.setBindGroup(0,BGR); p.setPipeline(PL.sky); p.draw(3);
+  p.setBindGroup(0,BGR); if(S.sky!=="off"){ p.setPipeline(PL.sky); p.draw(3); }
   if(sandN){ p.setPipeline(PL.sand); p.setVertexBuffer(0,sandBuf); p.draw(sandN); }
   if(SURF){ p.setPipeline(PL.sComp); p.setBindGroup(0,T.bgComp); p.draw(3); p.setBindGroup(0,BGR); }
   else if(N){ p.setPipeline(PL.draw); p.draw(6,N); }
