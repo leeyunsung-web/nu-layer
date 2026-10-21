@@ -130,6 +130,15 @@ function makeWave(P,seed){
     const t=Math.min(1,Math.max(0,(Db[j]-0.12*D)/(0.45*D))); nl[j]=1-t*t*(3-2*t); }
   /* 파도 판: 빠르게 밀고 천천히 돌아오는 모양. 옆으로 조금씩 엇갈리게 (불규칙) */
   /* 옆 흔들림: 파도 판이 자리마다 조금씩 다른 타이밍·세기로 민다. 그 무늬는 파도마다 천천히 바뀌고, 가끔 비스듬히 들어온다 */
+  /* 앞끝 흔들림: 모래·물결의 거칠기가 자리마다 다르고 천천히 옆으로 떠돈다 → 밀려온 물 끝이 손가락처럼 갈라지고 넘실댄다 */
+  const rn=new Float32Array(N), rnP=[rnd()*6.3,rnd()*6.3,rnd()*6.3,rnd()*6.3], rnV=[0,0,0,0], rnA=[rnd()*0.6-0.3,rnd()*0.6-0.3,rnd()*0.6-0.3];
+  function rnTargets(){ for(let q=0;q<4;q++) rnV[q]=(rnd()*2-1)*(0.4+0.4*q); }
+  rnTargets();
+  function rnField(dtF){ const P=S.P, sp=P.swsp===undefined?0.5:P.swsp, sz=0.4+1.6*(P.swsz===undefined?0.5:P.swsz);
+    for(let q=0;q<4;q++) rnP[q]+=dtF*sp*1.6*rnV[q];
+    const k1=6.283/(13*sz), k2=6.283/(6*sz), k3=6.283/(2.8*sz), k4=6.283/(22*sz);
+    for(let k=0;k<NZ;k++){ const z=k*dx; for(let i=0;i<NX;i++){ const x=i*dx;
+      rn[k*NX+i]=0.42*Math.sin(z*k1+x*k1*rnA[0]+rnP[0])+0.28*Math.sin(z*k2+x*k2*rnA[1]+rnP[1]+0.6*Math.sin(z*k4+rnP[3]))+0.18*Math.sin(z*k3+x*k3*rnA[2]+rnP[2])+0.12*Math.sin((z+x*0.5)*k4*1.7-rnP[3]); } } }
   const zph=new Float32Array(NZ), zam=new Float32Array(NZ).fill(1), zphT=new Float32Array(NZ), zamT=new Float32Array(NZ).fill(1);
   function zTargets(){ const lat=P.lat===undefined?0.6:P.lat, a=[rnd()*6.3,rnd()*6.3,rnd()*6.3,rnd()*6.3], f=[0.5+rnd()*0.7,1.4+rnd()*1.2,2.8+rnd()*1.5], obl=(rnd()-0.5)*2;
     for(let k=0;k<NZ;k++){ const z=k/NZ;
@@ -142,7 +151,7 @@ function makeWave(P,seed){
   const bil=(F,nx,ny,x,y)=>{ x=Math.min(Math.max(x,0),nx-1.001); y=Math.min(Math.max(y,0),ny-1.001); const i=x|0, j=y|0, a=x-i, c=y-j, o=j*nx+i; return (F[o]*(1-a)+F[o+1]*a)*(1-c)+(F[o+nx]*(1-a)+F[o+nx+1]*a)*c; };
   function step(dt){
     const P=S.P, eps=1e-3;
-    for(let j=0;j<N;j++) eta[j]=h[j]+b[j];
+    { const sw=P.swob||0; for(let j=0;j<N;j++){ let e=h[j]+b[j]; if(sw>0 && b[j]>D-1.5) e+=1.4*sw*rn[j]*Math.min(1,(b[j]-D+1.5)/1.5); eta[j]=e; } }   /* 앞끝 흔들림: 백사장 쪽 바닥이 자리마다 살짝 다르게 느껴진다 (떠도는 모래 물결) */
     /* ① 흐름을 흐름 따라 옮기기 (되짚어 가서 가져오기) */
     for(let k=0;k<NZ;k++) for(let i=1;i<NX;i++){ const o=k*(NX+1)+i;
       const wl=0.25*(w[k*NX+i-1]+w[k*NX+i]+w[(k+1)*NX+i-1]+w[(k+1)*NX+i]);
@@ -155,7 +164,7 @@ function makeWave(P,seed){
     for(let k=0;k<NZ;k++){ for(let i=1;i<NX;i++){ const o=k*(NX+1)+i, l=k*NX+i-1, r=l+1; let v=u2[o];
         if(h[l]<eps && h[r]<eps){ u[o]=0; continue; }
         v-=g*dt*(eta[r]-eta[l])/dx; const hf=v>0?h[l]:h[r]; if(hf<eps){ u[o]=0; continue; }
-        v/=1+dt*cf*Math.abs(v)/Math.max(hf,0.05); v*=vk;
+        { const sw=P.swob||0, rf=sw>0&&hf<0.8&&b[r]>D-1.5?Math.max(0.15,1+2.2*sw*0.5*(rn[l]+rn[r])):1; v/=1+dt*cf*rf*Math.abs(v)/Math.max(hf,0.05); if(rf>1&&v>0&&hf<0.4) v/=1+dt*sw*6*(rf-1)*(1-hf/0.4); } v*=vk;
         if(v<0 && P.bback>0 && b[r]>D-0.6) v/=1+dt*P.bback*10;   /* 되밀림 줄이기: 백사장 위에서 바다 쪽으로 되돌아가는 물을 약하게 */
         u[o]=Math.max(-vmax,Math.min(vmax,v)); }
       u[k*(NX+1)]=padVel(k,dt); u[k*(NX+1)+NX]=0; }
@@ -163,6 +172,7 @@ function makeWave(P,seed){
     for(let k=1;k<NZ;k++) for(let i=0;i<NX;i++){ const o=k*NX+i, l=(k-1)*NX+i, r=k*NX+i; let v=w2[o];
       if(h[l]<eps && h[r]<eps){ w[o]=0; continue; }
       v-=g*dt*(eta[r]-eta[l])/dx; const hf=v>0?h[l]:h[r]; if(hf<eps){ w[o]=0; continue; }
+      { const sw=P.swob||0; if(sw>0 && hf<0.8 && b[r]>D-1.5){ const th=1-hf/0.8; v-=dt*sw*3.2*th*(rn[r]-rn[l])/dx; } }   /* 얇은 물은 미끄러운 쪽으로 옆으로 쏠린다 → 혀가 갈라지고 넘실댄다 */
       v/=1+dt*cf*Math.abs(v)/Math.max(hf,0.05); v*=vk; w[o]=Math.max(-vmax,Math.min(vmax,v)); }
     /* ③ 물 옮기기 (깊이가 0 아래로 내려가지 않게 나가는 양을 줄인다) */
     for(let k=0;k<NZ;k++) for(let i=0;i<=NX;i++){ const o=k*(NX+1)+i, v=u[o]; const up=k*NX+(v>0?(i>0?i-1:0):(i<NX?i:NX-1)); fx[o]=v*(Db[up]+(h[up]-Db[up])*nl[up]); }
@@ -180,7 +190,7 @@ function makeWave(P,seed){
       h[j]=nh; }
     if(lost>0){ let n=0; for(let j=0;j<N;j++) if(b[j]===0) n++; const add=lost/Math.max(1,n); for(let j=0;j<N;j++) if(b[j]===0) h[j]+=add; }
     S.t+=dt; S.slap*=Math.exp(-dt*1.2); { const P=S.P; S.padX=padX(S.t,P,P.amp*S.cycAmp*(S.waveOn?1:0)+P.amp*1.3*S.slap); }
-    if(Math.floor(S.t/P.per)!==S.cyc){ S.cyc=Math.floor(S.t/P.per); S.cycAmp=1+P.irr*(rnd()-0.5)*0.8; zTargets(); }
+    if(Math.floor(S.t/P.per)!==S.cyc){ S.cyc=Math.floor(S.t/P.per); S.cycAmp=1+P.irr*(rnd()-0.5)*0.8; zTargets(); rnTargets(); }
     { const a=Math.min(1,dt*0.35/Math.max(0.5,P.per*0.3)); for(let k=0;k<NZ;k++){ zph[k]+=(zphT[k]-zph[k])*a; zam[k]+=(zamT[k]-zam[k])*a; } }
   }
   /* 부서짐: 파도 앞면이 가팔라지고 앞으로 달리는 곳 */
@@ -189,7 +199,7 @@ function makeWave(P,seed){
     for(let k=0;k<NZ;k++) for(let i=1;i<NX-1;i++){ const j=k*NX+i;
       const e0=h[j-1]+b[j-1], e1=h[j+1]+b[j+1], s=(e0-e1)/(2*dx), uc=0.5*(u[k*(NX+1)+i]+u[k*(NX+1)+i+1]);
       const Hc=h[j]+b[j]-D; let B=0;
-      if(h[j]>0.05 && uc>0.15 && Hc>0){ const t=Math.min(1,Math.max(0,(s-P.cth)/0.3)); B=t*t*(3-2*t)*Math.min(1,Hc/(0.15*D+0.05))*Math.min(1,nl[j]*2.5); }   /* 부서짐은 얕아지는 곳에서만 */
+      if(h[j]>0.05 && uc>0.15 && Hc>0){ const t=Math.min(1,Math.max(0,(s-P.cth*(1+0.35*(P.swob||0)*rn[j]))/0.3)); B=t*t*(3-2*t)*Math.min(1,Hc/(0.15*D+0.05))*Math.min(1,nl[j]*2.5); }   /* 부서짐은 얕아지는 곳에서만 */
       brk[j]=B; const a=B>brkS[j]?rise:fall; brkS[j]+=(B-brkS[j])*a; }
   }
   /* 거품: 자기 속도를 가진 2D 그림. 물을 따라 흐르다가, 물이 뒤로 빠져도 앞으로 가던 힘으로 모래 위까지 미끄러져 스며들어 사라진다 */
@@ -238,6 +248,7 @@ function makeWave(P,seed){
     const P=S.P; let c=0; for(let j=0;j<N;j+=7){ c=Math.max(c,Math.sqrt(g*h[j])); }
     let vm=0; for(let o=0;o<u.length;o+=5) vm=Math.max(vm,Math.abs(u[o])); for(let o=0;o<w.length;o+=5) vm=Math.max(vm,Math.abs(w[o]));
     const dtMax=0.42*dx/Math.max(1e-3,c+vm), n=Math.min(24,Math.max(1,Math.ceil(simT/dtMax))), dt=simT/n;
+    rnField(simT);
     for(let s=0;s<n;s++) step(dt);
     /* 물 양 지키기: 파도 판이 밀 때와 당길 때 드나드는 양이 조금씩 어긋나 물이 늘거나 줄지 않게, 바다 쪽 깊은 물에서 고르게 맞춘다 */
     { let m=0, n0=0; for(let j=0;j<N;j++){ m+=h[j]; if(b[j]===0) n0++; } const d=(S.m0-m)/Math.max(1,n0); for(let j=0;j<N;j++) if(b[j]===0) h[j]=Math.max(0,h[j]+d); }
@@ -308,6 +319,9 @@ const CTL=[
  ["secWater","바닥 마찰","fric",0,1,0.05,0.15,"","얕은 물이 바닥에 끌리는 정도. 높이면 백사장 위 물이 빨리 멈춥니다.",0],
  ["secWater","끈적임","visc",0,0.5,0.01,0.02,"","물결이 잦아드는 빠르기.",0],
  ["secWater","스며듦","soak",0,1,0.05,0.65,"","백사장으로 올라간 얇은 물이 모래에 스며들며 점점 사라지는 빠르기와 깊이 (스며든 만큼 바다 쪽에서 다시 채워집니다).",0],
+ ["secWater","앞끝 흔들림","swob",0,1,0.05,0.5,"%","밀려 올라오는 물 끝과 부서지는 마루가 자리마다 달라집니다: 모래 거칠기가 고르지 않고 천천히 옆으로 떠돌아, 물 끝이 혀·손가락처럼 갈라지고 옆으로 쏠리며 넘실댑니다. 0이면 일자.",0],
+ ["secWater","흔들림 크기","swsz",0,1,0.05,0.5,"%","갈라지는 혀 하나의 폭. 작으면 잘게, 크면 굵직하게.",0],
+ ["secWater","흔들림 빠르기","swsp",0,1,0.05,0.5,"%","무늬가 옆으로 떠도는 빠르기. 파도마다 방향이 바뀝니다.",0],
  ["secWater","되밀림 줄이기","bback",0,1,0.05,0.8,"","백사장까지 올라간 물이 바다 쪽으로 되밀려 내려가는 것을 약하게 합니다. 높일수록 되돌아가지 않고 그 자리에서 스며들며 사라집니다.",0],
  ["secLook","선 색","lcol",0,1,0.05,0,"%","물 테두리 선의 색. 0 = 물 색에 맞춘 진한 선, 1 = 또렷한 파란 선.",0],
  ["secLook","얕은 물빛","shal",0,1,0.05,0.6,"%","얕은 곳일수록 밝은 물빛 (몰디브처럼).",0],
@@ -332,7 +346,7 @@ const VIEWS={ side:{n:"비스듬히",y:-32,p:22,z:1,t:0}, near:{n:"백사장 가
 const SHAPE0={S:[-2.4,-0.3],A:[0,0.32],L:[0.95,0.05],E:[0.72,-0.75],B:[0.1,-1]};   /* 마루 꼭대기 = (0,0), 단위 = 파도 높이 */
 const CURVES=[["fspd","거품 속도"],["foam","거품 양"],["lift","떠 있는 높이"],["curl","거품 말림"],["steep","앞면 세우기"]];
 /* 윤성이 정한 처음 값 (2026-10-21, 설정 복사로 받은 값) */
-const SAVED={"col":"maldives","sky":"day","cyaw":125.15546874999994,"cpit":26.1015625,"czoom":1.107413588177411,"ctx":0,"shape":{"S":[-2.1206135936661297,-0.34271001073537316],"A":[-0.2346266103059582,0.2271873322597961],"L":[0.633009594739667,0.10347893183038112],"E":[1.1346366747181964,-0.28781702898550715],"B":[0,-1]},"curves":{"fspd":[1,1,1,1,1],"foam":[1,1,1,1,1],"lift":[1,1,1,1,1],"curl":[1,1,1,1,1],"steep":[1,1,1,1,1]},"amp":4.5,"per":6,"skew":0.25,"irr":0.35,"spd":1,"fcurl":1,"curl":0.85,"cth":0.5,"foam":1.1,"fsurge":0.55,"fswirl":0.4,"flift":0.9,"flife":0.5,"fsz":0.5,"flace":0,"fwig":0.08,"flsz":0.4,"frim":0.5,"frc":0.25,"tx":180,"tz":70,"level":11,"bstart":0.4,"beach":0.13,"res":1,"grav":1,"fric":0.15,"visc":0.02,"soak":0.65,"bback":0.8,"rev":0.5,"revc":0.35,"revhue":0,"revsat":1,"revbri":1,"revop":1,"revsoft":0.3,"revdir":-1,"lcol":0,"shal":0.6,"cloud":0.6,"cspd":0.35,"sandc":0,"px":2};
+const SAVED={"col":"maldives","sky":"day","cyaw":125.15546874999994,"cpit":26.1015625,"czoom":1.107413588177411,"ctx":0,"shape":{"S":[-2.1206135936661297,-0.34271001073537316],"A":[-0.2346266103059582,0.2271873322597961],"L":[0.633009594739667,0.10347893183038112],"E":[1.1346366747181964,-0.28781702898550715],"B":[0,-1]},"curves":{"fspd":[1,1,1,1,1],"foam":[1,1,1,1,1],"lift":[1,1,1,1,1],"curl":[1,1,1,1,1],"steep":[1,1,1,1,1]},"amp":4.5,"per":6,"skew":0.25,"irr":0.35,"spd":1,"fcurl":1,"curl":0.85,"cth":0.5,"foam":1.1,"fsurge":0.55,"fswirl":0.4,"flift":0.9,"flife":0.5,"fsz":0.5,"flace":0,"fwig":0.08,"flsz":0.4,"frim":0.5,"frc":0.25,"tx":180,"tz":70,"level":11,"bstart":0.4,"beach":0.13,"res":1,"grav":1,"fric":0.15,"visc":0.02,"soak":0.65,"bback":0.8,"swob":0.5,"swsz":0.5,"swsp":0.5,"rev":0.5,"revc":0.35,"revhue":0,"revsat":1,"revbri":1,"revop":1,"revsoft":0.3,"revdir":-1,"lcol":0,"shal":0.6,"cloud":0.6,"cspd":0.35,"sandc":0,"px":2};
 const DEF=(()=>{ const o={col:"maldives",sky:"day",cyaw:-32,cpit:22,czoom:1,ctx:0,shape:JSON.parse(JSON.stringify(SHAPE0)),curves:{}}; for(const [k] of CURVES) o.curves[k]=[1,1,1,1,1]; for(const c of CTL) o[c[2]]=c[6]; return Object.assign(o,JSON.parse(JSON.stringify(SAVED))); })();
 const clone=o=>JSON.parse(JSON.stringify(o));
 const KEY="nu-wave-3d-v1";
