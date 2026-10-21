@@ -22,7 +22,8 @@ header p{margin:0;color:var(--soft);font-size:13px;max-width:70ch}
 header a{color:var(--line);font-weight:800}
 .main{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
 @media (max-width:980px){ .main{grid-template-columns:minmax(0,1fr)} }
-.stagebox{display:flex;flex-direction:column;gap:10px;min-width:0}
+.stagebox{display:flex;flex-direction:column;gap:10px;min-width:0;position:sticky;top:8px;z-index:5;background:var(--bg);padding-bottom:6px}   /* 메뉴를 내려도 파도 화면은 그 자리에 */
+@media (max-width:980px){ .stagebox{top:0;padding-top:6px} .stage{max-height:52vh} }
 .stage{position:relative;border:3px solid var(--line);border-radius:14px;overflow:hidden;background:var(--night);aspect-ratio:16/10;width:100%;touch-action:none;cursor:grab}
 .stage canvas{position:absolute;inset:0;display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges}
 .stage:fullscreen{border:0;border-radius:0;aspect-ratio:auto;width:100vw;height:100vh}
@@ -179,7 +180,7 @@ const COLORS={
   blood:{n:"핏빛",c:[[226,60,96],[176,32,74],[255,222,230],[122,22,60]]},
 };
 /* 윤성이 정한 처음 값 (2026-10-21, 설정 복사로 받은 값) */
-const SAVED={"dsz":0.38,"obed":0.45,"cull":0.6,"fdraw":0,"ppc":3,"tz1":104,"col":"maldives","rmode":0,"mat":0,"scene":0,"sky":"day","cyaw":-10.8,"cpit":-0.5,"czoom":1.205,"spd":0.25,"tx":256,"tz":160,"ty":48,"level":0.19,"amp":16,"per":1,"skew":0.55,"beach":0.14,"dint":0.7,"dsize":2.5,"dh":0.85,"dthrow":0.15,"dspread":0.6,"dfade":0.6,"grav":0.3,"visc":0.1,"stiff":2,"jmu":0.45,"coh":0.4,"melt":0.58,"pcount":3000000,"cloud":0.72,"cspd":0.35,"smooth":1,"foam":0.85,"px":1,"psize":0.5};
+const SAVED={"dsz":0.38,"obed":0.45,"cull":0.6,"fdraw":0,"ppc":3,"tz1":104,"col":"maldives","rmode":0,"mat":2,"mball":0.7,"scene":0,"sky":"day","cyaw":-10.8,"cpit":-0.5,"czoom":1.205,"spd":0.25,"tx":256,"tz":160,"ty":48,"level":0.19,"amp":16,"per":1,"skew":0.55,"beach":0.14,"dint":0.7,"dsize":2.5,"dh":0.85,"dthrow":0.15,"dspread":0.6,"dfade":0.6,"grav":0.3,"visc":0.1,"stiff":2,"jmu":0.45,"coh":0.4,"melt":0.58,"pcount":3000000,"cloud":0.72,"cspd":0.35,"smooth":1,"foam":0.85,"px":1,"psize":0.5};
 const DEF=(()=>{ const o={col:"water",fstyle:1,fdraw:0,rmode:0,mat:0,scene:0,sky:"day",cyaw:-38,cpit:24,czoom:1}; for(const c of CTL) o[c[2]]=c[6]; return Object.assign(o,SAVED); })();
 const KEY="nu-jet-3d-v6";
 /* 예전 설정은 이어받되, 알갱이 크기·칸당 알갱이·방울 수 한도는 가장 작은 알갱이가 나오는 새 처음 값으로 */
