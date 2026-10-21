@@ -201,14 +201,13 @@ const COLORS={
   blood:{n:"핏빛",c:[[226,60,96],[176,32,74],[255,222,230],[122,22,60]]},
 };
 /* 윤성이 정한 처음 값 (2026-10-21, 설정 복사로 받은 값) */
-const RECO={"spd":0.25,"amp":18,"per":1.8,"skew":0.35,"level":0.19,"beach":0.1,"mat":0,"visc":0.2,"dsz":0.38,"ppc":2,"spray":0.3,"btr":0.5,"bwh":0.5,"px":2,"mball":0.4,"cull":0.7,"grav":1,"stiff":6,"obed":0.4,"ftile":1};
-const SAVED={"dsz":0.38,"obed":0.4,"cull":0.7,"fdraw":0,"ppc":2,"tz1":104,"col":"maldives","rmode":0,"mat":0,"mball":0.4,"scene":0,"sky":"day","cyaw":-10.8,"cpit":-0.5,"czoom":1.205,"spd":0.25,"tx":256,"tz":160,"ty":48,"level":0.19,"amp":18,"per":1.8,"skew":0.35,"beach":0.1,"dint":0.7,"dsize":2.5,"dh":0.85,"dthrow":0.15,"dspread":0.6,"dfade":0.6,"grav":1,"visc":0.2,"stiff":6,"jmu":0.45,"coh":0.4,"melt":0.58,"pcount":3000000,"cloud":0.72,"cspd":0.35,"smooth":1,"foam":0.85,"px":2,"psize":0.5,"spray":0.3,"btr":0.5,"bwh":0.5,"ftile":1};
+const SAVED={"dsz":0.38,"obed":0.45,"cull":0.6,"fdraw":0,"ppc":3,"tz1":104,"col":"maldives","rmode":0,"mat":2,"mball":0.7,"scene":0,"sky":"day","cyaw":-10.8,"cpit":-0.5,"czoom":1.205,"spd":0.25,"tx":256,"tz":160,"ty":48,"level":0.19,"amp":16,"per":1,"skew":0.55,"beach":0.14,"dint":0.7,"dsize":2.5,"dh":0.85,"dthrow":0.15,"dspread":0.6,"dfade":0.6,"grav":0.3,"visc":0.1,"stiff":2,"jmu":0.45,"coh":0.4,"melt":0.58,"pcount":3000000,"cloud":0.72,"cspd":0.35,"smooth":1,"foam":0.85,"px":1,"psize":0.5};
 const DEF=(()=>{ const o={col:"water",fstyle:1,fdraw:0,ftile:1,rmode:0,mat:0,scene:0,sky:"day",cyaw:-38,cpit:24,czoom:1}; for(const c of CTL) o[c[2]]=c[6]; return Object.assign(o,SAVED); })();
 const KEY="nu-jet-3d-v6";
 /* 예전 설정은 이어받되, 알갱이 크기·칸당 알갱이·방울 수 한도는 가장 작은 알갱이가 나오는 새 처음 값으로 */
 let S=Object.assign({},DEF); try{ let v=JSON.parse(localStorage.getItem(KEY)||"null"); if(!v){ v=JSON.parse(localStorage.getItem("nu-jet-3d-v5")||localStorage.getItem("nu-jet-3d-v4")||"null"); if(v){ delete v.pcount; delete v.dsz; delete v.ppc; } } if(v) for(const k in DEF) if(k in v) S[k]=v[k];
-  /* 추천 파도 설정(2026-10-21)을 한 번만 덮어 쓴다: 묵직하게 밀려와 부서지는 바다 파도 (나머지 내 설정은 그대로) */
-  if(v && v.reco!==1){ Object.assign(S,RECO); } S.reco=1; }catch(_){}
+  /* 잠깐 넣었던 추천 파도 설정을 받은 브라우저는 그 값들만 전 처음값으로 되돌린다 (한 번만) */
+  if(v && v.reco===1){ for(const k of ["spd", "amp", "per", "skew", "level", "beach", "mat", "visc", "dsz", "ppc", "spray", "btr", "bwh", "px", "mball", "cull", "grav", "stiff", "obed", "ftile"]) S[k]=DEF[k]; delete S.reco; try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(_){} } }catch(_){}
 const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(_){} };
 const fmt=(c,v)=>c[7]==="도"?Math.round(v)+"°":c[7]==="%"?Math.round(v*100)+"%":c[7]==="초"?(+v).toFixed(1)+"초":c[7]==="칸"?(+v).toFixed(1)+"칸":c[7]==="px"?v+"px":c[7]==="알"?(v>=1000?Math.round(v/1000)+"천 알":Math.round(v)+"알"):c[7]==="배"?(+v).toFixed(2)+"배":(+v).toFixed(2);
 const inputs={}; let refillT=0;
