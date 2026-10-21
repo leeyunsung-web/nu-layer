@@ -948,9 +948,14 @@ fn samp(p: vec2f) -> f32 { let q = p - 0.5; let i = vec2i(floor(q)); let f = q -
     var f = samp(b) * 0.8 + (samp(b + vec2f(1.0, 0.0)) + samp(b - vec2f(1.0, 0.0)) + samp(b + vec2f(0.0, 1.0)) + samp(b - vec2f(0.0, 1.0))) * 0.05;   /* 살짝 번져 낱알 대신 덩어리로 */
     /* 흐름이 모이는 곳(밀려 올라가다 느려지는 백사장 끝)에는 거품이 몰리고, 퍼지는 곳에서는 옅어진다 */
     let dv = (cl(ix + 1, iz).y - cl(ix - 1, iz).y + cl(ix, iz + 1).z - cl(ix, iz - 1).z) * 0.5 * R;
-    f = f * clamp(exp(-dv * dt), 0.8, 1.2);
-    f = f * F.a.z + g * F.b.z * F.a.w * F.b.x * R * R;
-    out = vec4f(clamp(f, 0.0, 1.2), v, 0.0);
+    let spd = length(v) * F.b.y;                                /* 바깥 세상 기준 빠르기 */
+    let moving = smoothstep(0.1, 0.5, spd);
+    f = f * mix(1.0, clamp(exp(-dv * dt), 0.85, 1.15), moving);   /* 움직이는 물이 모이는 곳에만 몰린다 (멈춘 곳에 계속 쌓이지 않게) */
+    /* 얇게 퍼져 거의 멈춘 물 (파도가 다 올라온 백사장 끝) = 거품이 스르륵 스며들어 사라진다 */
+    let depth = W * F.b.x * R * R * F.b.y;                      /* 물 깊이 (바깥 세상) */
+    let soak = (1.0 - smoothstep(0.4, 1.4, depth)) * (1.0 - moving);
+    f = f * pow(F.a.z, 1.0 + 8.0 * soak) + g * F.b.z * F.a.w * F.b.x * R * R;
+    out = vec4f(clamp(f, 0.0, 1.0), v, 0.0);
   } else {
     out = vec4f(fo[id.x].x * F.b.w, 0.0, 0.0, 0.0);           /* 물이 빠진 자리: 모래에 남은 거품이 서서히 스며들어 사라진다 */
   }
@@ -1164,8 +1169,8 @@ let frameNo=0;
 const foamSurf=()=>S.fstyle===1 && S.scene===0 && S.mat===0;
 function runSteps(n){ if(n<=0) return; const e=dev.createCommandEncoder(); const rd=frameNo%4===0 && sortPass(e), n0=N, FS=foamSurf();
   for(let k=0;k<n;k++){ step(e,k); if(FS && k===n-1){ pF[31]=1; } }   /* 마지막 박자만 거품 지도에 모은다 */
-  if(FS){ const tS=n*DT, keep=Math.exp(-(tS/72)/(0.8+7*S.flife));
-    const u=new ArrayBuffer(48), ui=new Uint32Array(u), uf=new Float32Array(u); ui[0]=FX; ui[1]=FZ; uf[4]=FR; uf[5]=tS; uf[6]=keep; uf[7]=1.6*S.foam; uf[8]=pVol; uf[9]=0; uf[10]=n; uf[11]=Math.exp(-(tS/72)/(0.3+1.5*S.flife));
+  if(FS){ const tS=n*DT, tR=tS/(72*Math.max(0.05,S.spd)), keep=Math.exp(-tR/(0.8+7*S.flife));   /* 사라지는 시간은 실제 시간 기준 (빠르기를 낮춰도 그대로) */
+    const u=new ArrayBuffer(48), ui=new Uint32Array(u), uf=new Float32Array(u); ui[0]=FX; ui[1]=FZ; uf[4]=FR; uf[5]=tS; uf[6]=keep; uf[7]=1.6*S.foam; uf[8]=pVol; uf[9]=DS; uf[10]=n; uf[11]=Math.exp(-tR/(0.3+1.5*S.flife));
     dev.queue.writeBuffer(B.FU,0,u); const c=e.beginComputePass(); c.setPipeline(PL.foamStep); c.setBindGroup(0,E.fbg); c.dispatchWorkgroups(Math.ceil(FX*FZ/64)); c.end(); e.copyBufferToBuffer(B.fmB,0,B.fmA,0,FX*FZ*16); }
   dev.queue.writeBuffer(B.U,0,params,0,256*n); dev.queue.submit([e.finish()]); if(rd) readAlive(n0); }
 
