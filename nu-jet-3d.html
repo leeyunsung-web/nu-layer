@@ -91,6 +91,7 @@ h3{margin:4px 0 0;font-size:12px;letter-spacing:.08em;color:var(--soft)}
       <h3>화면</h3>
       <div class="row" id="rmodes"><span class="lab">그리기</span><button type="button" data-r="0">물 표면</button><button type="button" data-r="1">방울 점</button></div>
       <div class="row" id="fstyles"><span class="lab">표면 무늬</span><button type="button" data-f="1">더하기</button><button type="button" data-f="0">끄기</button></div>
+      <div class="row" id="ftiles" title="알갱이 움직임을 격자에 모을 때, 이웃 알갱이끼리 작은 판에 먼저 모은 뒤 한 번에 더합니다. 결과는 똑같고 계산만 빨라집니다. 껐다 켜며 fps를 비교해 보세요."><span class="lab">빠른 계산</span><button type="button" data-q="1">켜기</button><button type="button" data-q="0">끄기</button></div>
       <div class="row" id="fdraws"><span class="lab">거품 그림</span><button type="button" data-g="1">켜기</button><button type="button" data-g="0">끄기</button></div>
       <div class="row" id="colors"><span class="lab">색</span></div>
       <div class="row" id="skies"><span class="lab">하늘</span></div>
@@ -190,7 +191,7 @@ const COLORS={
 };
 /* 윤성이 정한 처음 값 (2026-10-21, 설정 복사로 받은 값) */
 const SAVED={"dsz":0.38,"obed":0.45,"cull":0.6,"fdraw":0,"ppc":3,"tz1":104,"col":"maldives","rmode":0,"mat":2,"mball":0.7,"scene":0,"sky":"day","cyaw":-10.8,"cpit":-0.5,"czoom":1.205,"spd":0.25,"tx":256,"tz":160,"ty":48,"level":0.19,"amp":16,"per":1,"skew":0.55,"beach":0.14,"dint":0.7,"dsize":2.5,"dh":0.85,"dthrow":0.15,"dspread":0.6,"dfade":0.6,"grav":0.3,"visc":0.1,"stiff":2,"jmu":0.45,"coh":0.4,"melt":0.58,"pcount":3000000,"cloud":0.72,"cspd":0.35,"smooth":1,"foam":0.85,"px":1,"psize":0.5};
-const DEF=(()=>{ const o={col:"water",fstyle:1,fdraw:0,rmode:0,mat:0,scene:0,sky:"day",cyaw:-38,cpit:24,czoom:1}; for(const c of CTL) o[c[2]]=c[6]; return Object.assign(o,SAVED); })();
+const DEF=(()=>{ const o={col:"water",fstyle:1,fdraw:0,ftile:1,rmode:0,mat:0,scene:0,sky:"day",cyaw:-38,cpit:24,czoom:1}; for(const c of CTL) o[c[2]]=c[6]; return Object.assign(o,SAVED); })();
 const KEY="nu-jet-3d-v6";
 /* 예전 설정은 이어받되, 알갱이 크기·칸당 알갱이·방울 수 한도는 가장 작은 알갱이가 나오는 새 처음 값으로 */
 let S=Object.assign({},DEF); try{ let v=JSON.parse(localStorage.getItem(KEY)||"null"); if(!v){ v=JSON.parse(localStorage.getItem("nu-jet-3d-v5")||localStorage.getItem("nu-jet-3d-v4")||"null"); if(v){ delete v.pcount; delete v.dsz; delete v.ppc; } } if(v) for(const k in DEF) if(k in v) S[k]=v[k]; }catch(_){}
@@ -221,9 +222,10 @@ for(const k in COLORS){ const b=document.createElement("button"); b.type="button
 for(const b of document.querySelectorAll("#mats button")) b.addEventListener("click",()=>{ S.mat=+b.dataset.m; ensureF(); if(E.ok && N) writeF(0,N); if(S.mat===1){ S.col="jelly"; S.smooth=Math.max(S.smooth,0.75); } else if(S.col==="jelly") S.col="maldives"; if(S.mat===2){ S.mball=Math.max(S.mball,0.7); S.smooth=Math.max(S.smooth,0.75); }   /* 쫀득한 물: 방울 사이를 부드럽게 이어 실처럼 보이게 */ save(); syncUI(); });
 for(const k in SKIES){ const b=document.createElement("button"); b.type="button"; b.dataset.k=k; b.textContent=SKIES[k].n; b.addEventListener("click",()=>{ S.sky=k; save(); colUI(); }); $("skies").appendChild(b); }
 for(const b of document.querySelectorAll("#rmodes button")) b.addEventListener("click",()=>{ S.rmode=+b.dataset.r; save(); colUI(); });
-function fstUI(){ for(const b of document.querySelectorAll("#fstyles button")) b.setAttribute("aria-pressed",+b.dataset.f===S.fstyle?"true":"false"); for(const b of document.querySelectorAll("#fdraws button")) b.setAttribute("aria-pressed",+b.dataset.g===S.fdraw?"true":"false"); }
+function fstUI(){ for(const b of document.querySelectorAll("#fstyles button")) b.setAttribute("aria-pressed",+b.dataset.f===S.fstyle?"true":"false"); for(const b of document.querySelectorAll("#fdraws button")) b.setAttribute("aria-pressed",+b.dataset.g===S.fdraw?"true":"false"); for(const b of document.querySelectorAll("#ftiles button")) b.setAttribute("aria-pressed",+b.dataset.q===(S.ftile===0?0:1)?"true":"false"); }
 /* 거품 그림: 끄면 하얀 거품(알갱이 거품·표면 무늬)을 그리지 않는다. 물보라는 그대로 */
 for(const b of document.querySelectorAll("#fdraws button")) b.addEventListener("click",()=>{ S.fdraw=+b.dataset.g; save(); fstUI(); });
+for(const b of document.querySelectorAll("#ftiles button")) b.addEventListener("click",()=>{ S.ftile=+b.dataset.q; save(); fstUI(); });
 for(const b of document.querySelectorAll("#fstyles button")) b.addEventListener("click",()=>{ S.fstyle=+b.dataset.f; save(); fstUI(); });
 fstUI();
 function colUI(){ for(const b of document.querySelectorAll("#mats button")) b.setAttribute("aria-pressed",+b.dataset.m===S.mat?"true":"false"); for(const b of document.querySelectorAll("#rmodes button")) b.setAttribute("aria-pressed",+b.dataset.r===S.rmode?"true":"false"); for(const b of document.querySelectorAll("#colors button")) b.setAttribute("aria-pressed",b.dataset.c===S.col?"true":"false"); for(const b of document.querySelectorAll("#skies button")) b.setAttribute("aria-pressed",b.dataset.k===S.sky?"true":"false"); }
@@ -367,19 +369,43 @@ fn floorY(x: f32) -> f32 { var f = 2.0 + U.i.x; if (U.c.x > 0.0 && x > beachX())
   let i = gidx(vec3i(c.xyz)) * 4u; atomicStore(&gi[i],0); atomicStore(&gi[i+1u],0); atomicStore(&gi[i+2u],0); atomicStore(&gi[i+3u],0);
 }
 /* 방울 → 격자 (한 번에): 질량, 운동량, 그리고 '모양 기억'에서 나온 누르는 힘·당기는 힘을 함께 뿌린다 */
+/* 빠르게 모으기: 알갱이는 칸 순서로 줄 서 있어서, 한 무리(64알)는 대개 한 줄(x 방향)의 이웃 칸들에 모여 있다.
+   무리마다 작은 판(앞뒤 32칸 × 위아래 3칸 × 옆 3칸)에 먼저 모은 뒤, 판에 모인 값만 큰 격자에 한 번씩 더한다
+   (큰 격자에 더하는 횟수가 크게 줄어든다). 판을 벗어나는 알갱이는 예전처럼 바로 큰 격자에 더한다. 더하는 값이 정수라 결과는 똑같다 */
+const TX: i32 = 32; const TN: u32 = 288u;
+var<workgroup> tl: array<atomic<i32>, 864>;
+fn tOrg(wg: u32) -> vec3i { let k = min(wg * 64u, max(U.g.w, 1u) - 1u); return vec3i(floor(pos[k].xyz)) - vec3i(1); }
+fn tIn(lo: vec3i) -> bool { return U.i.y > 0.5 && lo.x >= 0 && lo.x + 2 < TX && lo.y == 0 && lo.z == 0; }
+fn tCell(org: vec3i, t: u32) -> vec3i { return org + vec3i(i32(t % 32u), i32((t / 32u) % 3u), i32(t / 96u)); }
 /* 1단계: 무게만 격자에 모은다 (칸마다 1번만 더하기) */
-@compute @workgroup_size(64) fn p2gMass(@builtin(global_invocation_id) id: vec3u) {
-  let pi = id.x; if (pi >= U.g.w) { return; }
-  let q = pos[pi]; if (q.w <= 0.0) { return; }        /* 사라진 방울 */
-  let p = q.xyz; let m = 1.0;                          /* 무게는 그대로 (사라지는 중인 방울은 보이는 크기만 줄고, 다 줄면 빠진다) */
-  let cell = vec3i(floor(p)); let d = p - vec3f(cell) - 0.5; let w = wts(d);
-  for (var gx = 0; gx < 3; gx++) { for (var gy = 0; gy < 3; gy++) { for (var gz = 0; gz < 3; gz++) {
-    atomicAdd(&gi[gidx(cell + vec3i(gx-1, gy-1, gz-1)) * 4u], enc(m * w[gx].x * w[gy].y * w[gz].z));
-  }}}
+@compute @workgroup_size(64) fn p2gMass(@builtin(global_invocation_id) id: vec3u, @builtin(local_invocation_index) li: u32, @builtin(workgroup_id) wg: vec3u) {
+  for (var t = li; t < TN; t += 64u) { atomicStore(&tl[t], 0); }
+  workgroupBarrier();
+  let org = tOrg(wg.x); let pi = id.x;
+  if (pi < U.g.w) { let q = pos[pi]; if (q.w > 0.0) {        /* 사라진 방울은 빼고 */
+    let p = q.xyz; let m = 1.0;                          /* 무게는 그대로 (사라지는 중인 방울은 보이는 크기만 줄고, 다 줄면 빠진다) */
+    let cell = vec3i(floor(p)); let d = p - vec3f(cell) - 0.5; let w = wts(d);
+    let lo = cell - vec3i(1) - org; let inT = tIn(lo);
+    for (var gx = 0; gx < 3; gx++) { for (var gy = 0; gy < 3; gy++) { for (var gz = 0; gz < 3; gz++) {
+      let v = enc(m * w[gx].x * w[gy].y * w[gz].z);
+      if (inT) { atomicAdd(&tl[u32((lo.x + gx) + TX * (gy + 3 * gz))], v); }
+      else { atomicAdd(&gi[gidx(cell + vec3i(gx-1, gy-1, gz-1)) * 4u], v); }
+    }}}
+  } }
+  workgroupBarrier();
+  for (var t = li; t < TN; t += 64u) { let v = atomicLoad(&tl[t]); if (v != 0) { atomicAdd(&gi[gidx(tCell(org, t)) * 4u], v); } }
 }
 /* 2단계: 지금 이 순간의 밀도를 읽고, 움직임과 힘을 함께 모은다 */
-@compute @workgroup_size(64) fn p2g(@builtin(global_invocation_id) id: vec3u) {
-  let pi = id.x; if (pi >= U.g.w) { return; }
+@compute @workgroup_size(64) fn p2g(@builtin(global_invocation_id) id: vec3u, @builtin(local_invocation_index) li: u32, @builtin(workgroup_id) wg: vec3u) {
+  for (var t = li; t < TN * 3u; t += 64u) { atomicStore(&tl[t], 0); }
+  workgroupBarrier();
+  let org = tOrg(wg.x);
+  p2gOne(id.x, org);
+  workgroupBarrier();
+  for (var t = li; t < TN * 3u; t += 64u) { let v = atomicLoad(&tl[t]); if (v != 0) { atomicAdd(&gi[gidx(tCell(org, t / 3u)) * 4u + 1u + t % 3u], v); } }
+}
+fn p2gOne(pi: u32, org: vec3i) {
+  if (pi >= U.g.w) { return; }
   let q = pos[pi]; if (q.w <= 0.0) { return; }
   let p = q.xyz; let m = 1.0; let v = vel[pi].xyz; let C = loadC(pi); var F = I3; if (U.c.y > 0.0) { F = Fm[pi]; }
   let cell = vec3i(floor(p)); let d = p - vec3f(cell) - 0.5; let w = wts(d);
@@ -399,12 +425,13 @@ fn floorY(x: f32) -> f32 { var f = 2.0 + U.i.x; if (U.c.x > 0.0 && x > beachX())
   st += (C + transpose(C)) * U.b.x;                            /* 끈적임 */
   st += I3 * ((C[0][0] + C[1][1] + C[2][2]) * U.d.z);          /* 튕김 막기: 눌렸다 펴지는 움직임을 삭인다 (바닥에 닿아도 공처럼 튀지 않게) */
   let A = st * (-vol * 4.0 * U.a.x) + C * m;
+  let lo = cell - vec3i(1) - org; let inT = tIn(lo);
   for (var gx = 0; gx < 3; gx++) { for (var gy = 0; gy < 3; gy++) { for (var gz = 0; gz < 3; gz++) {
     let wt = w[gx].x * w[gy].y * w[gz].z;
     let c = cell + vec3i(gx-1, gy-1, gz-1);
     let mv = (v * m + A * (vec3f(c) - p + 0.5)) * wt;
-    let i = gidx(c) * 4u;
-    atomicAdd(&gi[i+1u], enc(mv.x)); atomicAdd(&gi[i+2u], enc(mv.y)); atomicAdd(&gi[i+3u], enc(mv.z));
+    if (inT) { let t = u32((lo.x + gx) + TX * (gy + 3 * gz)) * 3u; atomicAdd(&tl[t], enc(mv.x)); atomicAdd(&tl[t+1u], enc(mv.y)); atomicAdd(&tl[t+2u], enc(mv.z)); }
+    else { let i = gidx(c) * 4u; atomicAdd(&gi[i+1u], enc(mv.x)); atomicAdd(&gi[i+2u], enc(mv.y)); atomicAdd(&gi[i+3u], enc(mv.z)); }
   }}}
 }
 @compute @workgroup_size(64) fn updGrid(@builtin(global_invocation_id) id: vec3u) {
@@ -1190,7 +1217,7 @@ function step(e,k){
   const POOL=DROP&&S.dpool>0; pF[16]=DROP&&!POOL&&S.dfade>0?1/(72*(9-7.8*S.dfade)):0; pF[17]=DROP&&!POOL?0.015+0.1*(1-S.dspread):0;   /* 웅덩이가 있으면 사라지지 않고 바닥에서 끌리지도 않는다 */ pF[18]=JEL?0.04:STK?Math.max(DROP?0.25:0,0.06+0.2*stk):DROP?0.25:0.06;   /* 파도 장면은 약하게: 세면 물보라가 덩어리째 눌려 따로 튀어 나가지 못한다 */ pF[19]=HW1;
   pF[20]=DS; pF[21]=DROP?0:S.foam*2; pF[22]=!DROP&&S.soak>0?S.soak/(72*0.4):0; pF[23]=S.mat===0?S.spray*0.35:0;
   pF[24]=EYEG[0]; pF[25]=EYEG[1]; pF[26]=EYEG[2]; pF[27]=EYEG[3];
-  pF[32]=bedR(); pF[33]=0; pF[34]=0; pF[35]=0; pF[28]=TOPG; pF[29]=!DROP?S.soak*0.06:0; pF[30]=FR; pF[31]=S.scene===0?S.latd:0;   /* 옆 출렁임 줄이기 (+10 = 거품 지도에 모으는 박자) */
+  pF[32]=bedR(); pF[33]=S.ftile===0?0:1; pF[34]=0; pF[35]=0; pF[28]=TOPG; pF[29]=!DROP?S.soak*0.06:0; pF[30]=FR; pF[31]=S.scene===0?S.latd:0;   /* 옆 출렁임 줄이기 (+10 = 거품 지도에 모으는 박자) */
   const gB=Math.ceil(NBLK/WG), gP=Math.ceil(N/WG);
   /* ① 알갱이가 있는 칸 묶음(과 이웃)만 골라 목록을 만들고 → ② 그 묶음만 비우고 계산한다 (빈 공기는 건너뛴다) */
   let c=e.beginComputePass(); c.setBindGroup(0,BG0,[256*k]);
@@ -1345,7 +1372,7 @@ $("bFull").addEventListener("click",()=>{ try{ if(document.fullscreenElement) do
 document.addEventListener("keydown",e=>{ if(e.target.tagName==="INPUT") return; if(e.code==="Space"){ e.preventDefault(); if(S.scene===1) spawnDrop(); else SLAP=1; } else if(e.key==="f"||e.key==="F") $("bFull").click(); });
 
 /* 점검용: 방울 위치를 읽어 온다 */
-window.__nj3={ async snap(){ const w=cv.width, h=cv.height, bpr=Math.ceil(w*4/256)*256, rb=dev.createBuffer({size:bpr*h,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}); const e=dev.createCommandEncoder(); e.copyTextureToBuffer({texture:offTex},{buffer:rb,bytesPerRow:bpr},[w,h]); dev.queue.submit([e.finish()]); await rb.mapAsync(GPUMapMode.READ); const a=new Uint8Array(rb.getMappedRange()); let c=document.getElementById("snap"); if(!c){ c=document.createElement("canvas"); c.id="snap"; c.style.cssText="position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated"; $("stage").appendChild(c); } c.width=w; c.height=h; const g=c.getContext("2d"), im=g.createImageData(w,h); for(let y=0;y<h;y++) im.data.set(a.subarray(y*bpr,y*bpr+w*4),y*w*4); g.putImageData(im,0,0); rb.unmap(); rb.destroy(); }, get n(){ return N; }, set sort(v){ sortOn=!!v; }, get S(){ return S; }, slap(){ SLAP=1; }, fill:()=>fill(), async probe(){ const k=Math.min(N,20000), rb=dev.createBuffer({size:k*16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}); const e=dev.createCommandEncoder(); e.copyBufferToBuffer(B.pos,0,rb,0,k*16); dev.queue.submit([e.finish()]); await rb.mapAsync(GPUMapMode.READ); const a=new Float32Array(rb.getMappedRange().slice(0)); rb.unmap(); rb.destroy();
+window.__nj3={ idle(){ return dev.queue.onSubmittedWorkDone(); }, async snap(){ const w=cv.width, h=cv.height, bpr=Math.ceil(w*4/256)*256, rb=dev.createBuffer({size:bpr*h,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}); const e=dev.createCommandEncoder(); e.copyTextureToBuffer({texture:offTex},{buffer:rb,bytesPerRow:bpr},[w,h]); dev.queue.submit([e.finish()]); await rb.mapAsync(GPUMapMode.READ); const a=new Uint8Array(rb.getMappedRange()); let c=document.getElementById("snap"); if(!c){ c=document.createElement("canvas"); c.id="snap"; c.style.cssText="position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated"; $("stage").appendChild(c); } c.width=w; c.height=h; const g=c.getContext("2d"), im=g.createImageData(w,h); for(let y=0;y<h;y++) im.data.set(a.subarray(y*bpr,y*bpr+w*4),y*w*4); g.putImageData(im,0,0); rb.unmap(); rb.destroy(); }, get n(){ return N; }, set sort(v){ sortOn=!!v; }, get S(){ return S; }, slap(){ SLAP=1; }, fill:()=>fill(), async probe(){ const k=Math.min(N,20000), rb=dev.createBuffer({size:k*16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}); const e=dev.createCommandEncoder(); e.copyBufferToBuffer(B.pos,0,rb,0,k*16); dev.queue.submit([e.finish()]); await rb.mapAsync(GPUMapMode.READ); const a=new Float32Array(rb.getMappedRange().slice(0)); rb.unmap(); rb.destroy();
   let bad=0, my=0, mxy=-1e9, mx=0; for(let i=0;i<k;i++){ const x=a[i*4], y=a[i*4+1], z=a[i*4+2]; if(!isFinite(x)||!isFinite(y)||!isFinite(z)) bad++; else { my+=y; mx+=x; if(y>mxy) mxy=y; } } return {k,bad,meanY:my/k,maxY:mxy,meanX:mx/k,padX:PADX}; } };
 init().catch(e=>{ $("msg").hidden=false; $("msg").textContent="그래픽카드를 준비하지 못했어요: "+e.message; console.error(e); });
 })();
