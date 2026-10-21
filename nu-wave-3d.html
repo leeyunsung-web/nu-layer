@@ -446,15 +446,21 @@ vec3 rimCol(){ return mix(mix(vec3(1.0),uC1,0.45),uLine,uFoamQ.x); }
 float vn2(vec2 p){ vec2 i=floor(p), f=fract(p), u=f*f*(3.0-2.0*f); vec2 a=fhash(i), b=fhash(i+vec2(1,0)), c=fhash(i+vec2(0,1)), d=fhash(i+vec2(1,1)); return mix(mix(a.x,b.x,u.x),mix(c.x,d.x,u.x),u.y); }
 /* 거품이 스스로 움직이는 모양: ① 앞 가장자리가 삐죽삐죽 혀를 내밀며 앞으로 쏟아지고 ② 속은 소용돌이친다.
    거품 그림을 읽는 자리를 뒤쪽·옆으로 비틀어 읽으면, 거품 모양이 앞으로 늘어나고 휘감겨 보인다 */
-vec2 foamWarp(vec2 q, vec2 v){
-  float t=uTime;
-  vec2 dir=length(v)>0.2?normalize(v):vec2(1.0,0.0);
-  float n=vn2(vec2(q.y*0.32, q.x*0.06-t*0.9))*0.65+vn2(vec2(q.y*0.9+7.0, q.x*0.15-t*1.7))*0.35;   /* 옆으로 바뀌는 혀 길이, 앞으로 흘러간다 */
-  float tongue=uFoamS.x*6.0*(0.15+1.4*n*n);
-  float e=0.6; vec2 qs=q*0.18-vec2(t*0.3,t*0.04);   /* 소용돌이 무늬도 백사장 쪽(+x)으로 흘러간다 */
+/* 무늬 하나: 혀 길이(옆으로 바뀜)와 휘감는 흐름. 시간에 따른 변화는 아주 느리게만 */
+vec3 warpAt(vec2 q){
+  float m=uTime*0.12;
+  float n=vn2(vec2(q.y*0.32, q.x*0.06+m))*0.65+vn2(vec2(q.y*0.9+7.0, q.x*0.15-m*1.3))*0.35;
+  float e=0.6; vec2 qs=q*0.18+vec2(m*0.5,0.0);
   float a0=vn2(qs+vec2(0.0,e)), a1=vn2(qs-vec2(0.0,e)), b0=vn2(qs+vec2(e,0.0)), b1=vn2(qs-vec2(e,0.0));
-  vec2 swirl=vec2(a0-a1, -(b0-b1))*uFoamS.y*9.0;                                   /* 휘감는 흐름 (회전만 하고 모이거나 퍼지지 않는다) */
-  return q-dir*tongue+swirl;
+  return vec3(n, a0-a1, -(b0-b1));
+}
+/* 무늬는 거품과 함께 실려 간다: 그 자리 거품 속도로 두 겹을 번갈아 밀어 준다 (무늬가 거품 위에서 뒤로 미끄러져 거꾸로 감겨 보이지 않게) */
+vec2 foamWarp(vec2 q, vec2 v){
+  vec2 vs=v*uFoamQ.y; float P=1.6, t=uTime/P, p0=fract(t), p1=fract(t+0.5), w0=smoothstep(0.0,1.0,1.0-abs(2.0*p0-1.0));
+  vec3 A=warpAt(q-vs*p0*P), B=warpAt(q-vs*p1*P+vec2(17.3,5.1)), W=A*w0+B*(1.0-w0);
+  vec2 dir=length(v)>0.2?normalize(v):vec2(1.0,0.0);
+  float tongue=uFoamS.x*6.0*(0.15+1.4*W.x*W.x);
+  return q-dir*tongue+W.yz*uFoamS.y*9.0;
 }
 vec4 foamAt(vec2 xz){ vec4 t=texture(uFoam, xz/uTank.xy); return vec4(t.r, t.g, (t.b-0.5)*12.5, (t.a-0.5)*12.5); }
 `;
@@ -495,11 +501,12 @@ layout(location=0) out vec4 oC; layout(location=1) out vec4 oId;
 void main(){
   if(vH.x<0.02) discard;
   vec4 fm0=foamAt(vQ); vec4 fm=foamAt(foamWarp(vQ, fm0.ba));
-  float sf=foamLace(max(fm.r, vH.y), vQ, fm.ba), thr=uFoamP.x, band=uFoamP.y;   /* 부서지는 마루는 언제나 하얀 거품 */
+  float fmap=foamLace(fm.r, vQ, fm.ba);
+  float sf=max(fmap, vH.y), thr=uFoamP.x, band=uFoamP.y;   /* 부서지는 마루(호)는 언제나 매끈한 하얀 거품 */
   /* 가장자리 구멍: 가장자리 쪽일수록 송송. 무늬는 거품 속도를 따라 두 겹으로 천천히 흘러 깜빡이지 않는다 */
   bool hole=false;
-  if(uFoamE.y>0.01 && sf>thr-band){ float P=6.0, t=uTime/P, p0=fract(t), p1=fract(t+0.5), sc=0.55; vec2 vv=clamp(fm.ba*P*uFoamQ.y,vec2(-0.45/sc),vec2(0.45/sc))*0.35;
-    float n=mix(bub((vQ-vv*p1)*sc+31.7), bub((vQ-vv*p0)*sc), smoothstep(0.0,1.0,1.0-abs(2.0*p0-1.0)));
+  if(uFoamE.y>0.01 && sf>thr-band && fmap>vH.y){ float P=1.6, t=uTime/P, p0=fract(t), p1=fract(t+0.5), sc=0.55; vec2 vs=fm0.ba*uFoamQ.y;   /* 구멍 무늬도 거품과 함께 실려 간다 */
+    float n=mix(bub((vQ-vs*p1*P)*sc+31.7), bub((vQ-vs*p0*P)*sc), smoothstep(0.0,1.0,1.0-abs(2.0*p0-1.0)));
     float edgeIn=1.0-smoothstep(thr, thr+0.25+0.35*uFoamE.y, sf);
     hole = n < uFoamE.y*0.55*edgeIn; }
   if(sf<=thr-band) discard;
@@ -555,7 +562,7 @@ void main(){
   bool top=n.y>0.5 && vP.x>0.01 && vP.x<uTank.x-0.01 && vP.z>0.01 && vP.z<uTank.y-0.01;
   float g=h21(floor(vP.xz*2.0)+floor(vP.y*2.0)*7.13); if(g>0.9) col*=mix(0.95,0.84,uFoamQ.w); else if(g<0.05) col=min(col*1.06,vec3(1.0));
   if(top){
-    vec4 fm=foamAt(foamWarp(vP.xz, vec2(1.0,0.0)));
+    vec4 fm=foamAt(foamWarp(vP.xz, vec2(0.0)));
     col*=mix(vec3(1.0), mix(vec3(0.84,0.87,0.89),vec3(0.86,0.79,0.73),uFoamQ.w), fm.g);   /* 젖은 모래 */
     float sv=foamLace(fm.r, vP.xz, vec2(0.0));                                             /* 모래 위에 남아 스며드는 거품 */
     if(sv>uFoamP.x) col=mix(col,vec3(1.0),0.9); else if(sv>uFoamP.x-uFoamP.y) col=mix(col,vec3(1.0),0.45);
