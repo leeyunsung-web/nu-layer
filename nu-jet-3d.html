@@ -201,10 +201,6 @@ const CTL=[
  ["secLook","백사장에 남는 정도","fstay",0,1,0.05,0.5,"%","백사장·얇은 물 위에 무늬가 얼마나 오래 남을지. 낮추면 빨리 스며들어 백사장에 쌓이지 않습니다.",0],
  ["secLook","튀어 오름 감도","wsens",0,1,0.05,0.5,"%","높일수록 덜 빠르게 솟는 물도 거품색이 됩니다.",0],
  ["secLook","백사장 물 거품색","bwf",0,2,0.05,1,"배","백사장으로 촥 밀려 올라가는 물이 거품색이 되었다가, 스며들며 사라집니다. 빠르게 밀려가는 얇은 물일수록 더 하얗게. 스며드는 빠르기는 파도 탭 '스며들기'로.",0],
- ["secLook","거품색 시작","bw0",0,1,0.01,0.62,"","백사장 물이 거품색이 되기 시작하는 곳. 0 = 파도 판, 0.45 = 해변 비탈 시작, 1 = 백사장 끝. 올릴수록 백사장 끝 쪽 좁은 곳만 하얘집니다. ('백사장 물 하얘짐'과 '백사장 물 거품색' 둘 다)",0],
- ["secLook","거품색 번짐","bwg",0,0.6,0.01,0.12,"","시작 위치에서 점점 하얘지는 구간의 길이. 작을수록 경계가 또렷합니다.",0],
- ["secLook","거품색 구멍","bwhole",0,1,0.05,0.5,"%","하얘진 물에 물거품처럼 구멍이 뻥뻥 뚫려 아래 물색이 보입니다. 높일수록 구멍이 많고 큽니다. 0이면 끄기.",0],
- ["secLook","구멍 크기","bwhsz",0,1,0.05,0.4,"%","거품색 구멍 하나하나의 크기.",0],
  ["secLook","속 구슬 건너뛰기","cull",0,1,0.05,0.6,"%","물 표면을 그릴 때 사방이 꽉 찬 속 구슬은 보이지 않으니 그리지 않아 화면 그리기가 가벼워집니다. 높일수록 더 많이 건너뛰고, 너무 높이면 물 표면에 작은 구멍·움푹한 곳이 생길 수 있습니다. 0이면 끄기.",0],
  ["secLook","튀어 오르는 물 거품색","wgr",0,2,0.05,0.7,"배","파도가 치며 위로 튀어 오르는 물이 물색에서 거품색(흰색)으로 바뀌는 정도. 0이면 끄기.",0],
  ["secLook","거품 덩어리","fsz",0,1,0.05,0.5,"%","(표면 그림) 거품 덩어리의 굵기. 높이면 거품이 넓고 통통하게 퍼지고, 낮추면 가늘게 갈라진 무늬만 남습니다.",0],
@@ -252,7 +248,7 @@ for(const c of CTL){ const w=document.createElement("label"); w.className="ctl";
 /* 탭 나누기: 자주 쓰는 메뉴만 앞 세 탭으로 옮기고, 남은 것은 모두 '세부' 탭에 그대로 둔다 */
 { const TABS={tWave:["#scenes","#views","cfx","spd","amp","per","skew","level","beach","soak","h3[data-sc='1']","#secDrop"],
     tWater:["#mats","stick","coh","visc","dsz","ppc","spray","spkick","bspr","bsst","spnear","spgrav"],
-    tLook:["#colors","#skies","wgr","wsens","bwf","bw0","bwg","bwhole","bwhsz","fsamt","flsz","fsx0","fsgw","fspr","fstay","btr","bwh","px","mball","cull","smooth","conn","whue","wsat","wbri"]};
+    tLook:["#colors","#skies","wgr","wsens","bwf","fsamt","flsz","fsx0","fsgw","fspr","fstay","btr","bwh","px","mball","cull","smooth","conn","whue","wsat","wbri"]};
   const el=k=>k[0]==="#"||k.includes("[")?document.querySelector(k):(inputs[k]&&inputs[k][0].closest(".ctl"));
   for(const t in TABS) for(const k of TABS[t]){ const e=el(k); if(e) $(t).appendChild(e); }
   const pn=$("panel"), more=$("tMore"), stop=$("bReset").closest(".row");
@@ -716,7 +712,7 @@ fn updAt(cid: u32) {
 
 /* 그리기: 방울마다 화면을 향한 작은 원판. 둥근 공처럼 빛을 나눠 칠한다(1단계 미리보기) */
 const RWGSL=/* wgsl */`
-struct Cam { vp: mat4x4f, view: mat4x4f, c0: vec4f, c1: vec4f, c2: vec4f, c3: vec4f, prm: vec4f, ext: vec4f, ext2: vec4f, ext3: vec4f, s0: vec4f, s1: vec4f, s2: vec4f, s3: vec4f, sun: vec4f, g0: vec4f, g1: vec4f, sand: vec4f, ex4: vec4f, ex5: vec4f, ex6: vec4f, ex7: vec4f, ex8: vec4f, ex9: vec4f, ex10: vec4f, ex11: vec4f, ex12: vec4f, ex13: vec4f };
+struct Cam { vp: mat4x4f, view: mat4x4f, c0: vec4f, c1: vec4f, c2: vec4f, c3: vec4f, prm: vec4f, ext: vec4f, ext2: vec4f, ext3: vec4f, s0: vec4f, s1: vec4f, s2: vec4f, s3: vec4f, sun: vec4f, g0: vec4f, g1: vec4f, sand: vec4f, ex4: vec4f, ex5: vec4f, ex6: vec4f, ex7: vec4f, ex8: vec4f, ex9: vec4f, ex10: vec4f, ex11: vec4f, ex12: vec4f };
 @group(0) @binding(0) var<uniform> K: Cam;
 @group(0) @binding(1) var<storage, read> pos: array<vec4f>;
 @group(0) @binding(2) var<storage, read> vel: array<vec4f>;
@@ -862,7 +858,7 @@ struct LV { @builtin(position) p: vec4f, @location(0) c: vec3f };
 /* 물 표면: ① 방울을 작은 공으로 그려 화면 깊이만 남기고 ② 깊이를 가로·세로로 두 번씩 녹여 잇고(가장자리는 지킨다)
    ③ 빠른 방울로 거품 자리를 표시한 뒤 ④ 녹인 깊이에서 면의 방향을 구해 셀 채색·외곽선·하이라이트를 칠한다 */
 const SWGSL=/* wgsl */`
-struct Cam { vp: mat4x4f, view: mat4x4f, c0: vec4f, c1: vec4f, c2: vec4f, c3: vec4f, prm: vec4f, ext: vec4f, ext2: vec4f, ext3: vec4f, s0: vec4f, s1: vec4f, s2: vec4f, s3: vec4f, sun: vec4f, g0: vec4f, g1: vec4f, sand: vec4f, ex4: vec4f, ex5: vec4f, ex6: vec4f, ex7: vec4f, ex8: vec4f, ex9: vec4f, ex10: vec4f, ex11: vec4f, ex12: vec4f, ex13: vec4f };
+struct Cam { vp: mat4x4f, view: mat4x4f, c0: vec4f, c1: vec4f, c2: vec4f, c3: vec4f, prm: vec4f, ext: vec4f, ext2: vec4f, ext3: vec4f, s0: vec4f, s1: vec4f, s2: vec4f, s3: vec4f, sun: vec4f, g0: vec4f, g1: vec4f, sand: vec4f, ex4: vec4f, ex5: vec4f, ex6: vec4f, ex7: vec4f, ex8: vec4f, ex9: vec4f, ex10: vec4f, ex11: vec4f, ex12: vec4f };
 @group(0) @binding(0) var<uniform> K: Cam;
 @group(0) @binding(1) var<storage, read> pos: array<vec4f>;
 @group(0) @binding(2) var<storage, read> vel: array<vec4f>;
@@ -1029,10 +1025,9 @@ fn fblur(p: vec2f, dir: vec2i) -> vec4f {
   /* 백사장으로 촥 밀려 올라가는 물: 거품색이 되었다가, 스며들며 사라진다 */
   let q0 = pos[ii]; let bxw = 3.0 + 0.45 * (K.prm.y - 7.0);
   if (K.ex12.x > 0.0 && q0.x > bxw) {
-    let tp0 = clamp((q0.x - 3.0) / max(K.prm.y - 7.0, 1.0), 0.0, 1.0);
-    let tb = smoothstep(K.ex12.z - 0.001, K.ex12.z + K.ex12.w + 0.001, tp0);   /* 거품색 구간 */
+    let tb = clamp((q0.x - bxw) / max(K.prm.y - 4.0 - bxw, 1.0), 0.0, 1.0);
     let mv = smoothstep(0.1, 0.7, length(vw.xyz) * K.ex4.y);
-    wt = max(wt, K.ex12.x * tb * (0.35 + 0.65 * mv) * (0.45 + 0.55 * thin));
+    wt = max(wt, K.ex12.x * smoothstep(0.0, 0.25, tb) * (0.35 + 0.65 * mv) * (0.45 + 0.55 * thin));
   }
   if (K.ext3.z > 1.5) { wt = max(wt, auxFoam(vw.w) * 1.4); }
   o.ph = clamp(wt, 0.0, 1.0);
@@ -1076,17 +1071,6 @@ struct CO { @location(0) c: vec4f, @builtin(frag_depth) z: f32 };
   let du = textureLoad(src, clamp(ip - vec2i(0,1), vec2i(0), sz-1), 0).r;
   let dd = textureLoad(src, clamp(ip + vec2i(0,1), vec2i(0), sz-1), 0).r;
   let P = vpos(ip, d);
-  /* 거품색 자리·구멍: 수조 안 자리(0 = 파도 판, 1 = 백사장 끝)와, 하얘진 물에 물거품처럼 뚫리는 구멍 */
-  let rvW = mat3x3f(K.view[0].xyz, K.view[1].xyz, K.view[2].xyz);
-  let wpW = transpose(rvW) * (P - K.view[3].xyz) + vec3f(K.prm.y, K.prm.z, K.prm.w) * 0.5;
-  let tpW = clamp((wpW.x - 3.0) / max(K.prm.y - 7.0, 1.0), 0.0, 1.0);
-  let bmask = smoothstep(K.ex12.z - 0.001, K.ex12.z + K.ex12.w + 0.001, tpW);
-  var holeW = 0.0;
-  if (K.ex13.x > 0.0) {
-    let qq = vec2f(wpW.x - K.s0.w * 0.6, K.ex5.z + (wpW.z - K.ex5.z) / wfac(wpW.x));   /* 구멍 무늬는 백사장 쪽으로 천천히 흘러간다 */
-    let nbw = bub(qq * K.ex13.y); let hsw = mix(0.12, 0.55, K.ex13.x);
-    holeW = 1.0 - smoothstep(hsw - 0.06, hsw, nbw);
-  }
   var ex = vpos(ip + vec2i(1,0), dr) - P; if (dr >= BIG || (dl < BIG && abs(dl - d) < abs(dr - d))) { ex = P - vpos(ip - vec2i(1,0), dl); }
   var ey = vpos(ip - vec2i(0,1), du) - P; if (du >= BIG || (dd < BIG && abs(dd - d) < abs(du - d))) { ey = P - vpos(ip + vec2i(0,1), dd); }
   if (dl >= BIG && dr >= BIG) { ex = vec3f(1.0, 0.0, 0.0); }
@@ -1099,7 +1083,7 @@ struct CO { @location(0) c: vec4f, @builtin(frag_depth) z: f32 };
   if (ndl < 0.28) { col = K.c1.rgb; } else if (ndl > 0.82) { col = mix(K.c0.rgb, K.c2.rgb, 0.3); }
   let f4 = textureLoad(fom, ip, 0); let fo = f4.r;
   /* 솟구치는 물은 물색에서 흰색으로 부드럽게 (그라데이션) */
-  if (K.ex9.z > 0.0 && f4.b > 0.02) { let wh = clamp(f4.g / f4.b, 0.0, 1.0) * K.ex9.z * (1.0 - holeW); col = mix(col, select(vec3f(1.0), vec3f(0.88, 0.95, 0.98), ndl < 0.32), smoothstep(0.0, 1.0, wh)); }
+  if (K.ex9.z > 0.0 && f4.b > 0.02) { let wh = clamp(f4.g / f4.b, 0.0, 1.0) * K.ex9.z; col = mix(col, select(vec3f(1.0), vec3f(0.88, 0.95, 0.98), ndl < 0.32), smoothstep(0.0, 1.0, wh)); }
   let fthr = select(K.ext2.z, 0.3, K.ex6.z >= 0.01);   /* 이어짐을 켜면 '이만큼 진한 곳부터 거품' */
   let isFp = fo > fthr;
   /* 표면 거품: 이 픽셀의 물 표면 자리를 수조 안 자리로 되돌려, 위에서 본 거품 지도를 읽는다 (위를 향한 면에만) */
@@ -1134,7 +1118,7 @@ struct CO { @location(0) c: vec4f, @builtin(frag_depth) z: f32 };
     let t = clamp((wx - bx) / max(K.prm.y - 4.0 - bx, 1.0), 0.0, 1.0);
     al = 1.0 - K.ex10.z * smoothstep(0.0, 1.0, t);
     /* 백사장으로 올라간 물은 거품이 섞여 허옇게 (비탈 앞쪽부터 빨리 하얘지고, 끝으로 갈수록 투명해지며 사라진다) */
-    let wh = K.ex10.w * bmask * (1.0 - holeW);
+    let wh = K.ex10.w * smoothstep(0.0, 0.55, t);
     col = mix(col, select(vec3f(1.0), vec3f(0.86, 0.93, 0.97), ndl < 0.32), wh);
   }
   let cp = K.vp * vec4f(P, 1.0);
@@ -1416,7 +1400,7 @@ function tint(c){ let [r,g,b]=c.map(v=>v/255); const mx=Math.max(r,g,b), mn=Math
 const m4={ persp(f,a,n,fa){ const t=1/Math.tan(f/2); return [t/a,0,0,0, 0,t,0,0, 0,0,fa/(n-fa),-1, 0,0,n*fa/(n-fa),0]; },
   look(e,c,u){ const z=nrm(sub(e,c)), x=nrm(crs(u,z)), y=crs(z,x); return [x[0],y[0],z[0],0, x[1],y[1],z[1],0, x[2],y[2],z[2],0, -dot(x,e),-dot(y,e),-dot(z,e),1]; } };
 const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]], dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2], crs=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]], nrm=a=>{ const l=Math.hypot(...a)||1; return [a[0]/l,a[1]/l,a[2]/l]; };
-const camData=new Float32Array(136);
+const camData=new Float32Array(132);
 const T={w:0,h:0};   /* 물 표면용 화면 크기 그림판 */
 function surfTargets(w,h){ if(T.w===w && T.h===h) return; for(const k of ["dep","tmp","sm","fo","fo2","mb","hw"]) if(T[k]) T[k].destroy();
   const RT=GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING;
@@ -1476,10 +1460,9 @@ function frame(now){
   EYEG[0]=eye[0]+GX/2; EYEG[1]=eye[1]+GY/2; EYEG[2]=zcG()+(eye[2]+GZ/2-zcG())/Math.max(0.2,visF(EYEG[0])); EYEG[3]=dist*0.45;
   camData.set([FR,FX,FZ,foamSurf()?1:0],108); camData.set([0.62-0.5*S.fsz,0.02+0.16*S.frim,0.8*72*S.spd,S.flace],112); camData.set([S.frc,DS/(0.12+3.45*S.flsz),S.mat!==1&&wOn()?1:0,S.lcol],116);
   camData.set([S.fsamt===undefined?0.7:S.fsamt,S.fsx0===undefined?0.45:S.fsx0,S.fsgw===undefined?0.15:S.fsgw,S.wsens===undefined?0.5:S.wsens],124);
-  camData.set([S.scene===0?(S.bwf===undefined?1:S.bwf):0,S.wgr,S.bw0===undefined?0.62:S.bw0,S.bwg===undefined?0.12:S.bwg],128);
-  camData.set([S.bwhole===undefined?0.5:S.bwhole,DS/(0.25+2.0*(S.bwhsz===undefined?0.4:S.bwhsz)),0,0],132);   /* 거품색 구멍: 크기(비율), 무늬 크기 */   /* 백사장 물 거품색(움직임), 튀어 오르는 물 거품색 */   /* 표면 무늬 양 */
+  camData.set([S.scene===0?(S.bwf===undefined?1:S.bwf):0,S.wgr,0,0],128);   /* 백사장 물 거품색(움직임), 튀어 오르는 물 거품색 */   /* 표면 무늬 양 */
   camData.set([1.5+1.7*S.mball,0.3,S.scene===0?(S.btr||0):0,S.scene===0?(S.bwh===undefined?0.5:S.bwh):0],120);
-  dev.queue.writeBuffer(B.cam,0,camData,0,136); sandMesh(); lines();
+  dev.queue.writeBuffer(B.cam,0,camData,0,132); sandMesh(); lines();
   const SURF=S.rmode===0; if(SURF) surfTargets(w,h);
   const e=dev.createCommandEncoder();
   if(SURF){ const rp=(view,clear,bg,pl,count,inst,depthTex)=>{ const q=e.beginRenderPass({colorAttachments:[{view,clearValue:{r:clear,g:0,b:0,a:0},loadOp:"clear",storeOp:"store"}],...(depthTex?{depthStencilAttachment:{view:depthTex.createView(),depthClearValue:1,depthLoadOp:"clear",depthStoreOp:"store"}}:{})}); q.setPipeline(pl); q.setBindGroup(0,bg); q.draw(count,inst); q.end(); };
