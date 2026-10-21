@@ -80,7 +80,7 @@ h3{margin:4px 0 0;font-size:12px;letter-spacing:.08em;color:var(--soft)}
       <div id="secLiq"></div>
       <h3>화면</h3>
       <div class="row" id="rmodes"><span class="lab">그리기</span><button type="button" data-r="0">물 표면</button><button type="button" data-r="1">방울 점</button></div>
-      <div class="row" id="fstyles"><span class="lab">거품 방식</span><button type="button" data-f="1">표면 그림</button><button type="button" data-f="0">알갱이</button></div>
+      <div class="row" id="fstyles"><span class="lab">표면 무늬</span><button type="button" data-f="1">더하기</button><button type="button" data-f="0">끄기</button></div>
       <div class="row" id="colors"><span class="lab">색</span></div>
       <div class="row" id="skies"><span class="lab">하늘</span></div>
       <div id="secLook"></div>
@@ -1271,7 +1271,7 @@ function frame(now){
     rp(T.tmp.createView(),1e6,T.bgH1,PL.sBH,3,1); rp(T.sm.createView(),1e6,T.bgV,PL.sBV,3,1);
     rp(T.tmp.createView(),1e6,T.bgH2,PL.sBH,3,1); rp(T.sm.createView(),1e6,T.bgV,PL.sBV,3,1);
     { const q=e.beginRenderPass({colorAttachments:[{view:T.fo.createView(),clearValue:{r:0,g:0,b:0,a:0},loadOp:"clear",storeOp:"store"}]}); q.setBindGroup(0,T.bgFoam);
-      if(N && !foamSurf()){ q.setPipeline(PL.sFoam); q.draw(6,N); } if(N && S.wgr>0 && S.mat===0){ q.setPipeline(PL.sWhite); q.draw(6,N); } if(S.mat===0){ q.setPipeline(PL.sFoamS); q.draw(6,262144); } q.end(); }   /* 거품 + 물보라 */
+      if(N){ q.setPipeline(PL.sFoam); q.draw(6,N); }   /* 알갱이 거품은 언제나: 부서지는 파도 앞이 하얘지고, 물과 함께 백사장에 스며들어 사라진다 */ if(N && S.wgr>0 && S.mat===0){ q.setPipeline(PL.sWhite); q.draw(6,N); } if(S.mat===0){ q.setPipeline(PL.sFoamS); q.draw(6,262144); } q.end(); }   /* 거품 + 물보라 */
     if(S.fcon>=0.01 || (S.wgr>0 && S.mat===0)){ rp(T.fo2.createView(),0,T.bgComp,PL.sFBH,3,1); rp(T.fo.createView(),0,T.bgFB2,PL.sFBV,3,1); } }   /* 거품 이어 붙이기: 가로·세로로 살짝 번지게 */
   const p=e.beginRenderPass({colorAttachments:[{view:OFF?offTex.createView():ctx.getCurrentTexture().createView(),clearValue:S.sky==="off"?{r:1,g:1,b:1,a:1}:{r:0,g:1/255,b:42/255,a:1},loadOp:"clear",storeOp:"store"}],depthStencilAttachment:{view:depth.createView(),depthClearValue:1,depthLoadOp:"clear",depthStoreOp:"store"}});
   p.setBindGroup(0,BGR); if(S.sky!=="off"){ p.setPipeline(PL.sky); p.draw(3); }
