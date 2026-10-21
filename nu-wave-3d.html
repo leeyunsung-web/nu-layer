@@ -196,7 +196,7 @@ function makeWave(P,seed){
       const wetNow=h[j]>eps; let vx=fu[j], vz=fw[j];
       if(!wetNow && vx*vx+vz*vz<1e-6){ const a=i>0?j-1:j, c=i<NX-1?j+1:j, d=k>0?j-NX:j, e=k<NZ-1?j+NX:j; vx=0.25*(fu[a]+fu[c]+fu[d]+fu[e]); vz=0.25*(fw[a]+fw[c]+fw[d]+fw[e]); }
       const bx=i-vx*cell, bz=k-vz*cell;
-      let f=bil(foam,NX,NZ,bx,bz)*0.72+(bil(foam,NX,NZ,bx+1,bz)+bil(foam,NX,NZ,bx-1,bz)+bil(foam,NX,NZ,bx,bz+1)+bil(foam,NX,NZ,bx,bz-1))*0.07;   /* 살짝 번져 낱알 대신 둥근 덩어리로 */
+      let f=bil(foam,NX,NZ,bx,bz)*0.92+(bil(foam,NX,NZ,bx+1,bz)+bil(foam,NX,NZ,bx-1,bz)+bil(foam,NX,NZ,bx,bz+1)+bil(foam,NX,NZ,bx,bz-1))*0.02;   /* 번짐은 아주 조금만: 거품 덩어리 모양이 백사장 끝까지 유지되게 */
       let ax=bil(fu,NX,NZ,bx,bz), az=bil(fw,NX,NZ,bx,bz);
       if(wetNow){
         let wx=0.5*(u[k*(NX+1)+i]+u[k*(NX+1)+i+1]); const wz=0.5*(w[k*NX+i]+w[(k+1)*NX+i]);
@@ -220,7 +220,7 @@ function makeWave(P,seed){
           else { f*=Math.pow(keep,1+3*back); } }   /* 뒤에 남은 거품은 처지며 옅어진다 */
         if(b[j]>0) ax=Math.max(ax,(0.5+1.2*shallow)*ms);   /* 백사장 비탈 위 거품은 뒤로 가지 않고 늘 백사장 쪽으로 */
         const thin=1-Math.min(1,Math.max(0,(h[j]-0.08)/0.4)), slow=1-Math.min(1,Math.max(0,(Math.hypot(ax,az)-0.3)/1.2));
-        f=f*Math.pow(keep,1+8*thin*slow);
+        f=f*Math.pow(keep,1+3*thin*slow*slow);   /* 얇은 물 위에서는 거의 멈춘 끝에서만 스며든다 */
         const sw=(h[j]<0.5 && wx>0.6 && b[j]>D-1.5)?Math.min(1,(wx-0.6)*0.5):0;   /* 백사장으로 밀려 올라가는 얇은 물도 거품을 만든다 */
         f+=P.foam*cvAt(P,"foam",(i+0.5)/NX)*(brk[j]*3.2+sw*1.2)*dtF*3;   /* 부서지는 마루의 거품은 흐르는 거품 그림으로 남아 백사장까지 실려 간다 */
       } else { ax*=sandV; az*=sandV;   /* 마른 모래 위: 앞으로 미끄러지다(퍼지는 거리) 멈추며 */
@@ -499,6 +499,10 @@ void main(){
   if(uFoamEdge>0.01){ float wdt=0.08+0.7*uFoamEdge, nz=vn2(vec2(vQ.y*0.55, uTime*0.35+vQ.x*0.12))*0.6+vn2(vec2(vQ.y*1.7+3.0, uTime*0.6))*0.4;
     float fr=1.0-smoothstep(wdt*(0.45+0.9*nz), wdt*(0.75+0.9*nz), vH.x);
     if(fr>0.5){ col=fr>0.8?vec3(1.0):mix(vec3(0.84,0.95,0.98),vec3(1.0),0.4); idv=0.75; } }   /* 거품 표시라 테두리 선이 그려지지 않는다 */
+  /* 백사장 끝: 물이 얇아질수록 젖은 모래 빛으로 녹아들어, 물과 거품이 함께 스르륵 사라진다 */
+  { float th=1.0-smoothstep(0.03,0.32,vH.x);
+    if(th>0.0){ vec3 wetSand=mix(vec3(0.99,0.98,0.94),vec3(0.97,0.87,0.67),uFoamQ.w)*mix(vec3(0.84,0.86,0.88),vec3(0.86,0.79,0.73),uFoamQ.w);
+      float st=th<0.34?0.0:(th<0.67?0.45:0.85); col=mix(col,wetSand,st); idv=0.75; } }
   col=mix(col,uHz,clamp((dist-uTank.x*1.4)/(uTank.x*3.0),0.0,0.45));
   oC=vec4(col,1.0); oId=vec4(idv,0.0,0.0,1.0);
 }`;
