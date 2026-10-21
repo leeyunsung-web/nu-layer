@@ -172,6 +172,7 @@ const CTL=[
  ["secLook","부드러운 이음","mball",0,1,0.05,0,"%","방울과 물이 메타볼처럼 부드럽게 이어집니다. 떨어지는 방울이 수면에 가까워지면 사이가 차오르고, 솟는 물기둥에 가는 목이 생깁니다. 0이면 끄기 (지금 방식). 높일수록 더 멀리서 이어지고 조금 무거워집니다.",0],
  ["secLook","선 색","lcol",0,1,0.05,0,"%","물 테두리 선의 색. 0 = 물 색에 맞춘 진한 선, 1 = 또렷한 파란 선.",0],
  ["secLook","백사장 물 투명","btr",0,1,0.05,0.5,"%","해변 비탈이 시작되는 곳부터 백사장 끝으로 갈수록 물이 점점 비쳐 모래가 보입니다. 백사장 끝에서 이만큼 투명해집니다. 0이면 끄기.",0],
+ ["secLook","백사장 물 하얘짐","bwh",0,1,0.05,0.5,"%","백사장으로 올라간 물이 거품이 섞인 것처럼 허옇게 됩니다. 해변 비탈 앞쪽부터 하얘지고, 끝으로 갈수록 '백사장 물 투명'만큼 비치며 사라집니다. 0이면 끄기.",0],
  ["secLook","속 구슬 건너뛰기","cull",0,1,0.05,0.6,"%","물 표면을 그릴 때 사방이 꽉 찬 속 구슬은 보이지 않으니 그리지 않아 화면 그리기가 가벼워집니다. 높일수록 더 많이 건너뛰고, 너무 높이면 물 표면에 작은 구멍·움푹한 곳이 생길 수 있습니다. 0이면 끄기.",0],
  ["secLook","하얘짐","wgr",0,1,0.05,0.7,"%","위로 솟구치는 물기둥·물보라 끝이 물색에서 흰색으로 부드럽게 바뀌는 정도. 떨어지는 방울은 하얘지지 않습니다. 0이면 끄기 (조금 가벼워짐).",0],
  ["secLook","거품 덩어리","fsz",0,1,0.05,0.5,"%","(표면 그림) 거품 덩어리의 굵기. 높이면 거품이 넓고 통통하게 퍼지고, 낮추면 가늘게 갈라진 무늬만 남습니다.",0],
@@ -216,7 +217,7 @@ for(const c of CTL){ const w=document.createElement("label"); w.className="ctl";
 /* 탭 나누기: 자주 쓰는 메뉴만 앞 세 탭으로 옮기고, 남은 것은 모두 '세부' 탭에 그대로 둔다 */
 { const TABS={tWave:["#scenes","#views","spd","amp","per","skew","level","beach","h3[data-sc='1']","#secDrop"],
     tWater:["#mats","stick","coh","visc","dsz","ppc","spray"],
-    tLook:["#colors","#skies","btr","px","mball","cull","smooth","conn","whue","wsat","wbri"]};
+    tLook:["#colors","#skies","btr","bwh","px","mball","cull","smooth","conn","whue","wsat","wbri"]};
   const el=k=>k[0]==="#"||k.includes("[")?document.querySelector(k):(inputs[k]&&inputs[k][0].closest(".ctl"));
   for(const t in TABS) for(const k of TABS[t]){ const e=el(k); if(e) $(t).appendChild(e); }
   const pn=$("panel"), more=$("tMore"), stop=$("bReset").closest(".row");
@@ -1029,12 +1030,15 @@ struct CO { @location(0) c: vec4f, @builtin(frag_depth) z: f32 };
   col = mix(col, K.s0.rgb, fg);   /* 멀수록 하늘 지평선 색으로 */
   /* 백사장 물 투명: 해변 비탈이 시작되는 곳부터 백사장 끝으로 갈수록 점점 비쳐 모래가 보인다 */
   var al = 1.0;
-  if (K.ex10.z > 0.001) {
+  if (K.ex10.z > 0.001 || K.ex10.w > 0.001) {
     let rv2 = mat3x3f(K.view[0].xyz, K.view[1].xyz, K.view[2].xyz);
     let wx = (transpose(rv2) * (P - K.view[3].xyz)).x + K.prm.y * 0.5;
     let bx = 3.0 + 0.45 * (K.prm.y - 7.0);
     let t = clamp((wx - bx) / max(K.prm.y - 4.0 - bx, 1.0), 0.0, 1.0);
     al = 1.0 - K.ex10.z * smoothstep(0.0, 1.0, t);
+    /* 백사장으로 올라간 물은 거품이 섞여 허옇게 (비탈 앞쪽부터 빨리 하얘지고, 끝으로 갈수록 투명해지며 사라진다) */
+    let wh = K.ex10.w * smoothstep(0.0, 0.55, t);
+    col = mix(col, select(vec3f(1.0), vec3f(0.86, 0.93, 0.97), ndl < 0.32), wh);
   }
   let cp = K.vp * vec4f(P, 1.0);
   var o: CO; o.c = vec4f(col, al); o.z = clamp(cp.z / cp.w, 0.0, 1.0); return o;
@@ -1371,7 +1375,7 @@ function frame(now){
   camData.set([S.conn,DS,0.45,S.spsz],96); camData.set([visF(3),visF(GX-4),zcG(),S.cull>0?1.35-0.4*S.cull:0],100); camData.set([S.brd*spacing(),S.brt*spacing(),S.fcon,0],104);
   EYEG[0]=eye[0]+GX/2; EYEG[1]=eye[1]+GY/2; EYEG[2]=zcG()+(eye[2]+GZ/2-zcG())/Math.max(0.2,visF(EYEG[0])); EYEG[3]=dist*0.45;
   camData.set([FR,FX,FZ,foamSurf()?1:0],108); camData.set([0.62-0.5*S.fsz,0.02+0.16*S.frim,0.8*72*S.spd,S.flace],112); camData.set([S.frc,DS/(0.5+2.5*S.flsz),S.mat!==1?S.wgr:0,S.lcol],116);
-  camData.set([1.5+1.7*S.mball,0.3,S.scene===0?(S.btr||0):0,0],120);
+  camData.set([1.5+1.7*S.mball,0.3,S.scene===0?(S.btr||0):0,S.scene===0?(S.bwh===undefined?0.5:S.bwh):0],120);
   dev.queue.writeBuffer(B.cam,0,camData,0,124); sandMesh(); lines();
   const SURF=S.rmode===0; if(SURF) surfTargets(w,h);
   const e=dev.createCommandEncoder();
