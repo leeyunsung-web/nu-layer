@@ -144,6 +144,7 @@ const CTL=[
  ["secLook","구름 양","cloud",0,1,0.02,0.55,"%","하늘을 덮는 구름의 양. 0이면 맑은 하늘.",0],
  ["secLook","구름 빠르기","cspd",0,2,0.02,0.35,"%","구름이 바람에 흘러가는 빠르기.",0],
  ["secLook","부드러움","smooth",0,1,0.05,0.6,"%","물 표면을 얼마나 매끈하게 녹여 이을지. 낮추면 방울 알갱이가 보입니다.",0],
+ ["secLook","선 색","lcol",0,1,0.05,0,"%","물 테두리 선의 색. 0 = 물 색에 맞춘 진한 선, 1 = 또렷한 파란 선.",0],
  ["secLook","하얘짐","wgr",0,1,0.05,0.7,"%","위로 솟구치는 물기둥·물보라 끝이 물색에서 흰색으로 부드럽게 바뀌는 정도. 떨어지는 방울은 하얘지지 않습니다. 0이면 끄기 (조금 가벼워짐).",0],
  ["secLook","거품 덩어리","fsz",0,1,0.05,0.5,"%","(표면 그림) 거품 덩어리의 굵기. 높이면 거품이 넓고 통통하게 퍼지고, 낮추면 가늘게 갈라진 무늬만 남습니다.",0],
  ["secLook","거품 테두리","frim",0,1,0.05,0.4,"%","(표면 그림) 거품 가장자리 선의 두께. 0이면 선 없이 흰색만.",0],
@@ -558,7 +559,8 @@ fn foamLace(f: f32, q: vec2f, v: vec2f) -> f32 {
   let hole = 1.0 - smoothstep(hs - 0.07, hs, n);
   return f - hole * 1.2 - (0.45 - n) * 0.15 * K.ex8.w;
 }
-fn rimCol() -> vec3f { return mix(mix(vec3f(1.0), K.c1.rgb, 0.45), K.c3.rgb, K.ex9.x); }
+fn lineCol() -> vec3f { return mix(K.c3.rgb, vec3f(0.16, 0.22, 0.95), K.ex9.w); }   /* 물 테두리 선: 0 = 물 색 그대로, 1 = 파란 선 */
+fn rimCol() -> vec3f { return mix(mix(vec3f(1.0), K.c1.rgb, 0.45), lineCol(), K.ex9.x); }
 /* 보이는 자리: 계산한 자리의 앞뒤(z)를 x에 따라 시작 폭→끝 폭 비율로 늘인다 (계산량은 그대로) */
 fn auxDens(w: f32) -> f32 { return unpack2x16float(bitcast<u32>(w) & 0xFFFFu).x; }
 fn auxFoam(w: f32) -> f32 { return f32((bitcast<u32>(w) >> 23u) & 127u) / 127.0; }
@@ -594,7 +596,7 @@ struct VO { @builtin(position) p: vec4f, @location(0) uv: vec2f, @location(1) s:
   if (ndl < 0.35) { col = K.c1.rgb; }
   if (ndl > 0.93) { col = K.c2.rgb; }
   if (i.s > K.c3.w) { col = mix(col, vec3f(1.0), 0.75); }
-  if (r2 > 0.8) { col = K.c3.rgb; }
+  if (r2 > 0.8) { col = lineCol(); }
   return vec4f(col, 1.0);
 }
 /* 하늘: 화면 칸마다 바라보는 방향을 구해, 높이에 따라 띠로 나눈 하늘색 + 해 + 별 + 흘러가는 구름(높은 구름판에 비친 무늬) */
@@ -705,7 +707,8 @@ fn foamLace(f: f32, q: vec2f, v: vec2f) -> f32 {
   let hole = 1.0 - smoothstep(hs - 0.07, hs, n);
   return f - hole * 1.2 - (0.45 - n) * 0.15 * K.ex8.w;
 }
-fn rimCol() -> vec3f { return mix(mix(vec3f(1.0), K.c1.rgb, 0.45), K.c3.rgb, K.ex9.x); }
+fn lineCol() -> vec3f { return mix(K.c3.rgb, vec3f(0.16, 0.22, 0.95), K.ex9.w); }   /* 물 테두리 선: 0 = 물 색 그대로, 1 = 파란 선 */
+fn rimCol() -> vec3f { return mix(mix(vec3f(1.0), K.c1.rgb, 0.45), lineCol(), K.ex9.x); }
 @group(0) @binding(6) var<storage, read> sp: array<vec4f>;   /* 물보라 알갱이: [2i] = 자리·남은 시간, [2i+1] = 속도·크기 */
 const BIG: f32 = 100000.0;
 /* 보이는 자리: 계산한 자리의 앞뒤(z)를 x에 따라 시작 폭→끝 폭 비율로 늘인다 (계산량은 그대로) */
@@ -892,7 +895,7 @@ struct CO { @location(0) c: vec4f, @builtin(frag_depth) z: f32 };
   if (!isF && K.ex7.w > 0.5 && sf > K.ex8.x - K.ex8.y) { col = rimCol(); }   /* 표면 거품 테두리: 흰 덩어리 바깥을 옅은 물빛 선으로 두른다 (옅은 거품은 레이스처럼) */
   if (K.ext3.y > 0.5 && sp > 0.988) { col = K.c2.rgb; }
   let jump = K.ext2.x * 4.0 + d * 0.02;
-  if (K.ext3.z > 0.5 && (dl >= BIG || dr >= BIG || du >= BIG || dd >= BIG || dl - d > jump || dr - d > jump || du - d > jump || dd - d > jump)) { col = select(K.c3.rgb, vec3f(0.72, 0.86, 0.94), isF); }   /* 거품 테두리는 옅은 하늘색 */
+  if (K.ext3.z > 0.5 && (dl >= BIG || dr >= BIG || du >= BIG || dd >= BIG || dl - d > jump || dr - d > jump || du - d > jump || dd - d > jump)) { col = select(lineCol(), mix(vec3f(0.72, 0.86, 0.94), lineCol(), K.ex9.w), isF); }   /* 거품 테두리는 옅은 하늘색 (선 색을 올리면 같이 파랗게) */
   let fg = clamp((d - K.ext2.w) / (K.ext2.w * 2.5), 0.0, 1.0) * 0.45;
   col = mix(col, K.s0.rgb, fg);   /* 멀수록 하늘 지평선 색으로 */
   let cp = K.vp * vec4f(P, 1.0);
@@ -1209,7 +1212,7 @@ function frame(now){
   { const K=SKIES[S.sky]||SKIES.day, f=c=>c.map(v=>v/255); camData.set([...f(K.hz),(now/1000)%3600],64); camData.set([...f(K.zn),S.cloud],68); camData.set([...f(K.cw),S.cspd],72); camData.set([...f(K.cs),K.mode],76); camData.set([...K.sun,1/pVol],80); camData.set([...f(K.g0),1],84); camData.set([...f(K.g1),1],88); camData.set([S.scene===1?-1e6:TOPG-GY/2+0.3,S.sandc,S.sky==="off"?1:0,0],92); }
   camData.set([S.conn,DS,0.45,S.spsz],96); camData.set([visF(3),visF(GX-4),zcG(),0],100); camData.set([S.brd*spacing(),S.brt*spacing(),S.fcon,0],104);
   EYEG[0]=eye[0]+GX/2; EYEG[1]=eye[1]+GY/2; EYEG[2]=zcG()+(eye[2]+GZ/2-zcG())/Math.max(0.2,visF(EYEG[0])); EYEG[3]=dist*0.45;
-  camData.set([FR,FX,FZ,foamSurf()?1:0],108); camData.set([0.62-0.5*S.fsz,0.02+0.16*S.frim,0.8*72*S.spd,S.flace],112); camData.set([S.frc,DS/(0.5+2.5*S.flsz),S.mat===0?S.wgr:0,0],116);
+  camData.set([FR,FX,FZ,foamSurf()?1:0],108); camData.set([0.62-0.5*S.fsz,0.02+0.16*S.frim,0.8*72*S.spd,S.flace],112); camData.set([S.frc,DS/(0.5+2.5*S.flsz),S.mat===0?S.wgr:0,S.lcol],116);
   dev.queue.writeBuffer(B.cam,0,camData,0,120); sandMesh(); lines();
   const SURF=S.rmode===0; if(SURF) surfTargets(w,h);
   const e=dev.createCommandEncoder();
