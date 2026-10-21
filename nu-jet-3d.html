@@ -42,6 +42,7 @@ button:focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
 .lab{font-size:13px;font-weight:700;margin-right:4px}
 h3{margin:4px 0 0;font-size:12px;letter-spacing:.08em;color:var(--soft)}
 .note{font-size:11.5px;color:var(--soft);margin:0}
+#cfgTxt{width:100%;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;color:var(--ink);background:var(--bg);border:2px solid var(--line);border-radius:10px;padding:8px;resize:vertical}
 </style>
 </head>
 <body>
@@ -82,7 +83,11 @@ h3{margin:4px 0 0;font-size:12px;letter-spacing:.08em;color:var(--soft)}
       <div class="row" id="colors"><span class="lab">색</span></div>
       <div class="row" id="skies"><span class="lab">하늘</span></div>
       <div id="secLook"></div>
-      <div class="row"><button id="bReset" type="button">처음 값으로</button></div>
+      <div class="row"><button id="bReset" type="button">처음 값으로</button><button id="bCopy" type="button">설정 복사</button><button id="bPasteOpen" type="button">설정 붙여넣기</button></div>
+      <div id="cfgBox" hidden>
+        <textarea id="cfgTxt" rows="5" spellcheck="false" aria-label="설정 글"></textarea>
+        <div class="row"><button id="bApply" type="button">이 설정 적용</button><span class="note" id="cfgMsg"></span></div>
+      </div>
       <p class="note">물 표면: 가까운 방울끼리 깊이를 녹여 이은 매끈한 면에 셀 채색을 입힙니다. 붙어 있는 물은 한 덩어리로, 떨어져 나간 방울은 따로 보입니다. 방울 점: 계산 그대로를 점으로 봅니다.</p>
     </aside>
   </div>
@@ -95,10 +100,10 @@ const $=id=>document.getElementById(id);
 /* ── 조절값 ── [칸, 이름, 키, 최소, 최대, 간격, 처음 값, 단위, 설명, 다시 채우기] */
 const CTL=[
  ["secTank","빠르기","spd",0.1,2,0.05,1,"배","물이 움직이는 빠르기. 화면이 몇 프레임으로 돌든 같은 빠르기로 흐릅니다. 낮추면 슬로모션.",0],
- ["secTank","가로","tx",48,180,4,112,"칸","수조의 가로 길이. 넓을수록 파도가 길게 달려갑니다. 바꾸면 다시 채웁니다.",2],
- ["secTank","깊이","tz",16,120,4,56,"칸","수조의 앞뒤 깊이. 바꾸면 다시 채웁니다.",2],
- ["secTank","높이","ty",24,72,4,44,"칸","수조의 높이. 높을수록 물보라가 높이 튈 공간이 생깁니다. 바꾸면 다시 채웁니다.",2],
- ["secWave","물 높이","level",0.15,0.6,0.01,0.34,"%","수조에 채울 물의 높이. 바꾸면 다시 채웁니다.",1],
+ ["secTank","가로","tx",32,256,4,96,"칸","수조의 가로(좌우) 길이. 넓을수록 파도가 길게 달려갑니다. 바꾸면 다시 채웁니다.",2],
+ ["secTank","깊이","tz",16,160,4,40,"칸","수조의 앞뒤 길이. 바꾸면 다시 채웁니다.",2],
+ ["secTank","높이","ty",24,96,4,40,"칸","수조의 높이. 높을수록 물보라가 높이 튈 공간이 생깁니다. 바꾸면 다시 채웁니다.",2],
+ ["secWave","물 높이","level",0.15,0.6,0.01,0.3,"%","수조에 채울 물의 높이. 바꾸면 다시 채웁니다.",1],
  ["secWave","파도 세기","amp",0,30,0.5,8,"칸","파도 판이 밀고 나가는 거리(격자 칸).",0],
  ["secWave","파도 주기","per",0.6,6,0.1,2.2,"초","한 번 밀었다 돌아오는 시간.",0],
  ["secWave","밀어치기","skew",0,1,0.05,0.4,"%","빠르게 밀고 천천히 돌아오는 정도. 높이면 파도 앞이 가팔라집니다.",0],
@@ -111,11 +116,11 @@ const CTL=[
  ["secDrop","사라지는 빠르기","dfade",0,1,0.02,0.6,"%","바닥에 닿은 물이 스르륵 사라지는 빠르기. 0이면 사라지지 않고 고입니다.",0],
  ["secLiq","중력","grav",0,0.6,0.01,0.3,"","아래로 당기는 힘.",0],
  ["secLiq","끈적임","visc",0,0.6,0.01,0.1,"","높을수록 꿀처럼 무겁게 흐릅니다.",0],
- ["secLiq","단단함","stiff",2,16,0.5,10,"","눌리지 않으려는 힘. 높이면 철썩 튀고, 낮추면 출렁출렁 눌립니다.",0],
+ ["secLiq","단단함","stiff",2,40,0.5,16,"","눌리지 않으려는 힘. 높이면 철썩 튀고 깊은 바닥도 덜 눌리지만 계산이 무거워지고, 낮추면 출렁출렁 눌립니다.",0],
  ["secLiq","말랑함","jmu",0,1,0.02,0.45,"%","젤리일 때 원래 모양으로 돌아가려는 탄력. 높이면 탱탱하게 튀고, 낮추면 흐물흐물합니다.",0],
- ["secLiq","뭉침","coh",0,1,0.02,0.6,"%","방울끼리 붙는 힘. 높이면 떨어진 물이 동글동글 맺힙니다.",0],
+ ["secLiq","뭉침","coh",0,1,0.02,0.3,"%","방울끼리 붙는 힘. 높이면 떨어진 물이 동글동글 맺힙니다.",0],
  ["secLiq","녹아 붙기","melt",0,1,0.02,0.3,"%","젤리가 모양을 잊는 빠르기. 높이면 물처럼 흘러 합쳐지고, 낮추면 오래 출렁입니다.",0],
- ["secLiq","방울 수","pcount",40000,420000,10000,150000,"알","물을 이루는 방울 수. 많을수록 섬세하지만 무거워집니다. 프레임이 떨어지면 줄이세요. 바꾸면 다시 채웁니다.",1],
+ ["secLiq","방울 수 한도","pcount",40000,500000,10000,300000,"알","물을 이루는 방울 수의 한도. 방울은 촘촘한 간격(한 칸에 8알)으로 채우고, 수조가 커서 한도를 넘을 때만 간격을 넓힙니다. 간격이 넓어지면 물보라가 공처럼 뭉쳐 보이니, 프레임이 떨어지면 한도보다 수조 크기를 줄이세요. 바꾸면 다시 채웁니다.",1],
  ["secLook","구름 양","cloud",0,1,0.02,0.55,"%","하늘을 덮는 구름의 양. 0이면 맑은 하늘.",0],
  ["secLook","구름 빠르기","cspd",0,1,0.02,0.35,"%","구름이 바람에 흘러가는 빠르기.",0],
  ["secLook","부드러움","smooth",0,1,0.05,0.6,"%","물 표면을 얼마나 매끈하게 녹여 이을지. 낮추면 방울 알갱이가 보입니다.",0],
@@ -136,7 +141,7 @@ const COLORS={
   blood:{n:"핏빛",c:[[226,60,96],[176,32,74],[255,222,230],[122,22,60]]},
 };
 const DEF=(()=>{ const o={col:"water",rmode:0,mat:0,scene:0,sky:"day",cyaw:-38,cpit:24,czoom:1}; for(const c of CTL) o[c[2]]=c[6]; return o; })();
-const KEY="nu-jet-3d-v3";
+const KEY="nu-jet-3d-v4";
 let S=Object.assign({},DEF); try{ const v=JSON.parse(localStorage.getItem(KEY)||"null"); if(v) for(const k in DEF) if(k in v) S[k]=v[k]; }catch(_){}
 const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(_){} };
 const fmt=(c,v)=>c[7]==="%"?Math.round(v*100)+"%":c[7]==="초"?(+v).toFixed(1)+"초":c[7]==="칸"?(+v).toFixed(1)+"칸":c[7]==="px"?v+"px":c[7]==="알"?Math.round(v/1000)+"천 알":c[7]==="배"?(+v).toFixed(2)+"배":(+v).toFixed(2);
@@ -157,6 +162,14 @@ for(const b of document.querySelectorAll("#scenes button")) b.addEventListener("
 function sceneUI(){ for(const b of document.querySelectorAll("#scenes button")) b.setAttribute("aria-pressed",+b.dataset.s===S.scene?"true":"false"); for(const el of document.querySelectorAll("[data-sc]")) el.hidden=+el.dataset.sc!==S.scene; }
 sceneUI();
 colUI();
+/* 설정 복사·붙여넣기: 지금 손잡이 값을 글로 옮겨 두었다가 그대로 되살린다 */
+const cfgText=()=>JSON.stringify(Object.fromEntries(Object.keys(DEF).map(k=>[k,typeof S[k]==="number"?Math.round(S[k]*1000)/1000:S[k]])));
+$("bCopy").addEventListener("click",async()=>{ const t=cfgText(); $("cfgBox").hidden=false; $("cfgTxt").value=t; $("cfgTxt").select();
+  try{ await navigator.clipboard.writeText(t); $("cfgMsg").textContent="복사했어요. 이 글을 그대로 붙여 보내 주면 됩니다."; }catch(_){ $("cfgMsg").textContent="위 글을 직접 복사해 주세요."; } });
+$("bPasteOpen").addEventListener("click",()=>{ $("cfgBox").hidden=false; $("cfgTxt").value=""; $("cfgTxt").focus(); $("cfgMsg").textContent="복사해 둔 설정 글을 붙여 넣고 '이 설정 적용'을 누르세요."; });
+$("bApply").addEventListener("click",()=>{ let v; try{ v=JSON.parse($("cfgTxt").value.trim()); }catch(_){ $("cfgMsg").textContent="설정 글이 아니에요. 복사한 글 전체를 붙여 넣어 주세요."; return; }
+  const sc=S.scene, tk=[S.tx,S.ty,S.tz]; for(const k in DEF) if(k in v && typeof v[k]===typeof DEF[k]) S[k]=v[k]; save(); syncUI(); sceneUI();
+  if(E.ok){ if(tk[0]!==S.tx||tk[1]!==S.ty||tk[2]!==S.tz) resizeTank(); fill(); } $("cfgMsg").textContent="적용했어요."; });
 $("bReset").addEventListener("click",()=>{ S=Object.assign({},DEF,{scene:S.scene}); save(); syncUI(); if(E.ok){ resizeTank(); fill(); } });
 
 /* ── 격자와 방울 ──
@@ -165,9 +178,11 @@ $("bReset").addEventListener("click",()=>{ S=Object.assign({},DEF,{scene:S.scene
 const Q=new URLSearchParams(location.search);
 const SMALL=Q.get("small")==="1", OFF=Q.get("off")==="1";   /* off=1: 점검용 — 화면 대신 보이지 않는 그림판에 그린다 */
 let GX=72, GY=40, GZ=36, CELLS=GX*GY*GZ;
-const MAXP=SMALL?40000:420000, WG=64, SUB=3;
+const MAXP=SMALL?40000:500000, WG=64, SUB=3;
 let DT=0.2;   /* 한 박자 길이. 젤리는 탱탱한 만큼 잘게 쪼개야 터지지 않는다 */
-const stepDT=()=>S.mat===1?(S.stiff>10?0.11:0.14):0.2;
+/* 박자 길이: 물이 가장 세게 눌렸을 때 소리(압력)가 퍼지는 빠르기보다 한 박자에 덜 가도록 정한다. 단단함을 높이면 저절로 잘게 나눠 계산 */
+const cMax=()=>Math.sqrt(S.stiff*0.5*1.728)*1.0;
+const stepDT=()=>{ const d=Math.min(0.2,0.72/cMax()); return S.mat===1?Math.min(d,S.stiff>10?0.11:0.14):d; };
 function tankSize(){ if(SMALL){ GX=40; GY=24; GZ=20; } else { GX=Math.round(S.tx); GY=Math.round(S.ty); GZ=Math.round(S.tz); } CELLS=GX*GY*GZ; }
 tankSize();
 const E={ok:false};
@@ -219,7 +234,11 @@ fn wts(d: vec3f) -> array<vec3f,3> { return array<vec3f,3>(0.5*(0.5-d)*(0.5-d), 
     dens += dec(atomicLoad(&gi[gidx(cell + vec3i(gx-1, gy-1, gz-1)) * 4u])) * (w[gx].x * w[gy].y * w[gz].z);
   }}}
   dens = max(dens, 0.0001); let vol = m / max(dens, U.a.w * 0.6);   /* 외톨이 방울이 부피를 크게 착각해 튀어 나가지 않게 */
-  var pr = U.a.z * (pow(dens / U.a.w, 4.0) - 1.0);            /* 빽빽하면 밀어낸다 */
+  /* 빽빽하면 밀어낸다. 1.2배보다 더 눌리면 미는 힘을 곧게(직선으로) 늘린다:
+     깊은 물 바닥이 눌릴수록 힘이 4제곱으로 치솟아 계산이 따라가지 못하고 터지던 것을 막는다 */
+  let rr = dens / U.a.w;
+  var pr = U.a.z * (pow(min(rr, 1.2), 4.0) - 1.0);
+  if (rr > 1.2) { pr += U.a.z * 6.912 * (rr - 1.2); }
   pr = max(pr, -U.a.z * U.c.w);                                /* 뭉침: 성긴 곳이 당기는 힘의 한도 */
   var st = I3 * (-pr);
   if (U.c.y > 0.0) { let s2 = pow(max(determinant(F), 1e-6), 1.0/3.0); st += (F - I3 * s2) * U.c.y; }   /* 말랑함: 늘어난 만큼 되돌아가려는 힘 */
@@ -408,8 +427,16 @@ fn sprite(vi: u32, ii: u32, scale: f32) -> SV {
   let q = pos[ii];
   let vc = (K.view * vec4f(q.xyz - vec3f(K.prm.y, K.prm.z, K.prm.w) * 0.5, 1.0)).xyz;
   let d = max(0.5, -vc.z);
-  let r = max(K.ext2.x, 1.25 * d / (K.ext.y * 0.5 * K.ext.z)) * scale * (0.2 + 0.8 * smoothstep(0.0, 0.45, q.w));   /* 사라지는 방울은 작아진다 */
-  var o: SV; o.p = K.vp * vec4f(vc.xy + c * r, vc.z, 1.0); o.uv = c; o.c = vc; o.r = r;
+  var r = max(K.ext2.x, 1.25 * d / (K.ext.y * 0.5 * K.ext.z)) * scale * (0.2 + 0.8 * smoothstep(0.0, 0.45, q.w));   /* 사라지는 방울은 작아진다 */
+  /* 빠르게 날아가는 방울은 날아가는 쪽으로 길게 늘여 그린다 (물줄기·물보라처럼). 넓이는 그대로 두고 길이만 바꾼다 */
+  let vv = vel[ii]; let vs = (K.view * vec4f(vv.xyz, 0.0)).xy; let spd = length(vs);
+  let st = 1.0 + clamp((spd - 0.6) * 0.7, 0.0, 2.4);
+  var ax = vec2f(1.0, 0.0); if (spd > 1e-4) { ax = vs / spd; }
+  /* 파도 장면: 느려져 홀로 남은 작은 물방울은 바닥에 스며들 듯 작아져 사라져 보인다 (계산에서는 남아 있다가 물에 합쳐지면 다시 보인다) */
+  if (K.ext3.w > 0.0 && length(vv.xyz) < 0.5) { r *= smoothstep(0.06, 0.24, vv.w / K.ext3.w); }
+  let iv = inverseSqrt(st);
+  let off = (ax * c.x * st + vec2f(-ax.y, ax.x) * c.y) * r * iv;
+  var o: SV; o.p = K.vp * vec4f(vc.xy + off, vc.z, 1.0); o.uv = c; o.c = vc; o.r = r * iv;
   if (q.w <= 0.0) { o.p = vec4f(9.0, 9.0, 9.0, 1.0); }
   return o;
 }
@@ -590,7 +617,7 @@ function resizeTank(){ tankSize(); BX0=GX*0.45; const SB=GPUBufferUsage.STORAGE|
 /* 물 채우기: 물 높이까지 방울을 고르게 (살짝 흔들어) 놓는다. 수조가 커서 방울이 한도를 넘으면 간격을 조금 넓힌다 */
 let SPC=0.5; function spacing(){ return SPC; }
 function fill(){ PEND.length=0; dripT=0; if(S.scene===1){ SPC=0.5; pVol=0.125; N=0; stepNo=0; PADX=2.5; PADV=0; return; }
-  const top=2+S.level*(GY-5), vol=Math.max(1,(GX-PADX-4.4)*(top-3.2)*(GZ-6.4)); SPC=Math.max(0.38,Math.cbrt(vol/Math.min(MAXP*0.97,S.pcount)));   /* 정한 방울 수에 맞춰 간격을 정한다 */ const sp=SPC, P=new Float32Array(MAXP*4); let n=0;
+  const top=2+S.level*(GY-5), vol=Math.max(1,(GX-PADX-4.4)*(top-3.2)*(GZ-6.4)); SPC=Math.max(0.5,Math.cbrt(vol/Math.min(MAXP*0.97,S.pcount)));   /* 정한 방울 수에 맞춰 간격을 정한다 */ const sp=SPC, P=new Float32Array(MAXP*4); let n=0;
   for(let z=3.2;z<GZ-3.2;z+=sp) for(let y=3.2;y<top;y+=sp) for(let x=PADX+1.2;x<GX-3.2;x+=sp){ if(y<floorAt(x)+1.3) continue; if(n>=MAXP) break;
     P[n*4]=x+(Math.random()-.5)*sp*0.3; P[n*4+1]=y+(Math.random()-.5)*sp*0.3; P[n*4+2]=z+(Math.random()-.5)*sp*0.3; P[n*4+3]=1; n++; }
   N=n; dev.queue.writeBuffer(B.pos,0,P,0,n*4); { const V0=new Float32Array(n*4), d0=1/(sp*sp*sp); for(let i=0;i<n;i++) V0[i*4+3]=d0; dev.queue.writeBuffer(B.vel,0,V0); } dev.queue.writeBuffer(B.C,0,new Float32Array(n*12)); dev.queue.writeBuffer(B.F,0,ident(n));
@@ -618,11 +645,11 @@ function padStep(){ const sps=SPS*0.2/DT; WPH+=1/(S.per*sps); const ph=WPH%1, p=
 
 function step(c,k){
   const DROP=S.scene===1; if(DROP){ PADX=2.5; PADV=0; } else padStep(); slot(k);
-  pU[0]=GX; pU[1]=GY; pU[2]=GZ; pU[3]=N; const E5=S.stiff, JEL=S.mat===1;
+  pU[0]=GX; pU[1]=GY; pU[2]=GZ; pU[3]=N; const E5=S.stiff*(1/pVol)/8, JEL=S.mat===1;   /* 방울 간격이 달라져도 물의 단단함(소리 빠르기)은 같게 */
   pF[4]=DT; pF[5]=-S.grav; pF[6]=E5; pF[7]=1/pVol; pF[8]=S.visc*0.5; pF[9]=PADX; pF[10]=PADV; pF[11]=BX0; pF[12]=DROP?0:S.beach;
-  pF[13]=JEL?1.5+3.5*S.jmu:0; pF[14]=JEL?0.003+0.08*S.melt*S.melt:1; pF[15]=JEL?0.02+0.08*S.coh:DROP?0.0005+0.006*S.coh:0.002+0.02*S.coh;
+  pF[13]=JEL?1.5+3.5*S.jmu:0; pF[14]=JEL?0.003+0.08*S.melt*S.melt:1; pF[15]=JEL?0.02+0.08*S.coh:0.0005+0.006*S.coh;   /* 물: 뭉침은 아주 약하게 (세면 떨어진 물이 공처럼 말린다) */
   /* 물방울 장면: 바닥에 닿은 뒤 (1.2~9초에 걸쳐) 사라지고, 바닥에서 덜 미끄러지고, 공처럼 튀지 않게 */
-  pF[16]=DROP&&S.dfade>0?1/(72*(9-7.8*S.dfade)):0; pF[17]=DROP?0.015+0.1*(1-S.dspread):0; pF[18]=DROP?0.28:0.04; pF[19]=0;
+  pF[16]=DROP&&S.dfade>0?1/(72*(9-7.8*S.dfade)):0; pF[17]=DROP?0.015+0.1*(1-S.dspread):0; pF[18]=JEL?0.04:0.25; pF[19]=0;
   c.setBindGroup(0,BG0,[256*k]);
   const gC=Math.ceil(CELLS/WG), gP=Math.ceil(N/WG);
   c.setPipeline(PL.clearGrid); c.dispatchWorkgroups(gC);
@@ -689,7 +716,7 @@ function frame(now){
   const C=COLORS[S.col].c, cc=c=>[c[0]/255,c[1]/255,c[2]/255];
   camData.set(Pm,0); camData.set(V,16); camData.set([...cc(C[0]),1],32); camData.set([...cc(C[1]),1],36); camData.set([...cc(C[2]),1],40); camData.set([...cc(C[3]),1.6],44);
   camData.set([spacing()*0.95*S.psize,GX,GY,GZ],48);
-  const tf=1/Math.tan(0.31); camData.set([w,h,tf,w/h],52); camData.set([spacing()*1.05,2.6-1.8*S.foam,0.5,dist*0.9],56); camData.set([S.smooth,1,1,0],60);
+  const tf=1/Math.tan(0.31); camData.set([w,h,tf,w/h],52); camData.set([spacing()*1.05,2.6-1.8*S.foam,0.5,dist*0.9],56); camData.set([S.smooth,1,1,S.scene===0&&S.mat===0?1/pVol:0],60);
   { const K=SKIES[S.sky]||SKIES.day, f=c=>c.map(v=>v/255); camData.set([...f(K.hz),(now/1000)%3600],64); camData.set([...f(K.zn),S.cloud],68); camData.set([...f(K.cw),S.cspd],72); camData.set([...f(K.cs),K.mode],76); camData.set([...K.sun,0],80); camData.set([...f(K.g0),1],84); camData.set([...f(K.g1),1],88); }
   dev.queue.writeBuffer(B.cam,0,camData,0,92); lines();
   const SURF=S.rmode===0 && N>0; if(SURF) surfTargets(w,h);
