@@ -148,6 +148,7 @@ const CTL=[
  ["secTank","앞바다 바닥","obed",0,0.6,0.05,0.35,"%","파도 판 쪽 깊은 앞바다의 바닥을 올립니다. 깊은 곳 아래쪽 물은 파도를 실어 나르기만 해서, 올리면 알갱이 수가 크게 줄어 그만큼 알갱이를 더 작게 할 수 있습니다. 너무 올리면 파도가 앞바다에서부터 얕은 물결처럼 바뀝니다. 바꾸면 다시 채웁니다.",2],
  ["secWave","파도 판 쪽 누르기","padg",0,3,0.05,0.6,"%","파도 판 가까이에서 지나치게 일렁이는 물을 화면에서만 낮춰 그립니다. 실제 물의 움직임과 힘은 그대로예요. 100%면 솟은 물이 잔잔한 높이까지 눌리고, 100~200%는 꽉 누르는 범위를 구간 끝까지 넓히고 움푹 꺼진 곳도 메워 더 판판해지고, 200~300%는 구간 밖으로 더 길게, 더 깊은 골까지 메웁니다. 0이면 끄기.",0],
  ["secWave","누르는 구간","padz",0.05,0.7,0.01,0.25,"","파도 판에서 이만큼(수조 길이 비율)까지 누릅니다. 끝에서 서서히 약해집니다.",0],
+ ["secWave","숨기는 구간","hidez",0,0.7,0.01,0,"","파도 판 쪽 이만큼(수조 길이 비율)은 화면에 아예 그리지 않습니다 (물·물보라·모래·수조 선·파도 판). 계산은 그대로라 파도는 똑같이 밀려옵니다. 0이면 다 보임.",0],
  ["secTank","튈 공간","head",8,96,2,24,"칸","물 위로 물보라가 튈 수 있는 높이. 계산은 물 높이에 이 높이를 더한 데까지만 합니다. 낮을수록 가볍고 알갱이를 더 작게 할 수 있지만, 너무 높이 튄 물은 천장에 막힙니다. 바꾸면 다시 채웁니다.",2],
  ["secTank","높이","ty",24,192,4,40,"칸","수조의 높이. 높을수록 물보라가 높이 튈 공간이 생깁니다. 바꾸면 다시 채웁니다.",2],
  ["secWave","물 높이","level",0.05,0.9,0.01,0.3,"%","수조에 채울 물의 높이. 바꾸면 다시 채웁니다.",2],
@@ -254,7 +255,7 @@ for(const c of CTL){ const w=document.createElement("label"); w.className="ctl";
   r.addEventListener("input",()=>{ S[c[2]]=+r.value; o.textContent=fmt(c,S[c[2]]); save(); if(c[9]){ clearTimeout(refillT); refillT=setTimeout(()=>{ if(!E.ok) return; if(c[9]===2) resizeTank(); fill(); },350); } });
   w.append(sp,r,o,d); $(c[0]).appendChild(w); inputs[c[2]]=[r,o,c]; }
 /* 탭 나누기: 자주 쓰는 메뉴만 앞 세 탭으로 옮기고, 남은 것은 모두 '세부' 탭에 그대로 둔다 */
-{ const TABS={tWave:["#scenes","#views","cfx","spd","amp","per","skew","level","beach","soak","padg","padz","h3[data-sc='1']","#secDrop"],
+{ const TABS={tWave:["#scenes","#views","cfx","spd","amp","per","skew","level","beach","soak","hidez","padg","padz","h3[data-sc='1']","#secDrop"],
     tWater:["#mats","stick","coh","visc","dsz","ppc","spray","spkick","bspr","bsst","spnear","spgrav"],
     tLook:["#colors","#skies","wgr","wsens","bwf","bw0","bwg","bbump","olw","olf","lcol","btr","bwh","px","mball","cull","smooth","conn","whue","wsat","wbri"]};
   const el=k=>k[0]==="#"||k.includes("[")?document.querySelector(k):(inputs[k]&&inputs[k][0].closest(".ctl"));
@@ -361,6 +362,8 @@ const E={ok:false};
 const wOn=()=>S.wgr>0||(S.scene===0&&(S.bwf===undefined?1:S.bwf)>0);   /* 거품색 바꾸기가 하나라도 켜져 있나 */
 /* 하얘지는 구간 시작: 수조 안 위치 (0 = 파도 판, 0.45 = 해변 비탈 시작, 1 = 백사장 끝) */
 const bwStart=()=>S.bw0===undefined?0.5:S.bw0;
+/* 숨기는 구간: 파도 판 쪽 이만큼(수조 길이 비율)은 화면에 그리지 않는다 (계산은 그대로) */
+const hideX=()=>S.scene===0&&S.hidez>0?3+S.hidez*(GX-7):-1e9;
 const SPCAP=()=>262144*Math.min(8,Math.max(1,Math.ceil(S.spray)));   /* 물보라 양만큼 물보라 통을 키운다 (1배 = 26만, 최대 8배 = 210만) */
 let N=0, stepNo=0, PADX=2.5, PADV=0, SLAP=0, waveOn=true, paused=false, AMPc=0, WPH=0;
 let BX0=GX*0.45;
@@ -782,7 +785,7 @@ struct VO { @builtin(position) p: vec4f, @location(0) uv: vec2f, @location(1) s:
   let lf = pos[ii].w;
   vp = vec4f(vp.xy + c * K.prm.x * (0.2 + 0.8 * smoothstep(0.0, 0.45, lf)), vp.z, 1.0);
   var o: VO; o.p = K.vp * vp; o.uv = c; o.s = length(vel[ii].xyz); o.dz = -vp.z;
-  if (lf <= 0.0) { o.p = vec4f(9.0, 9.0, 9.0, 1.0); }
+  if (lf <= 0.0 || pos[ii].x < K.ex14.z) { o.p = vec4f(9.0, 9.0, 9.0, 1.0); }   /* 숨기는 구간 */
   return o;
 }
 @vertex fn vsSp(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VO {
@@ -791,7 +794,7 @@ struct VO { @builtin(position) p: vec4f, @location(0) uv: vec2f, @location(1) s:
   var vp = K.view * vec4f(wmap(q.xyz) - vec3f(K.prm.y, K.prm.z, K.prm.w) * 0.5, 1.0);
   vp = vec4f(vp.xy + c * K.prm.x * K.ex4.w * w.w, vp.z, 1.0);
   var o: VO; o.p = K.vp * vp; o.uv = c; o.s = 0.0; o.dz = -vp.z;
-  if (q.w <= 0.0) { o.p = vec4f(9.0, 9.0, 9.0, 1.0); }
+  if (q.w <= 0.0 || q.x < K.ex14.z) { o.p = vec4f(9.0, 9.0, 9.0, 1.0); }   /* 숨기는 구간 */
   return o;
 }
 @fragment fn fs(i: VO) -> @location(0) vec4f {
@@ -952,7 +955,7 @@ fn sprite(vi: u32, ii: u32, scale: f32) -> SV {
   var inner = false; if (K.ext3.w > 0.0 && K.ex5.w > 0.0 && auxDens(vv.w) / K.ext3.w > K.ex5.w) { inner = true; }
   /* 방울은 동그란 공. 이어짐(ex4.x)만큼 크게 그려, 가까운 방울끼리는 겹쳐 한 덩어리로 이어지고 멀리 떨어진 방울은 따로 남는다 */
   var o: SV; o.p = K.vp * vec4f(vc.xy + c * r, vc.z, 1.0); o.uv = c; o.c = vc; o.r = r; o.ph = 0.0; o.wb = 0.0;
-  if (q.w <= 0.0 || inner) { o.p = vec4f(9.0, 9.0, 9.0, 1.0); }
+  if (q.w <= 0.0 || inner || q.x < K.ex14.z) { o.p = vec4f(9.0, 9.0, 9.0, 1.0); }   /* 숨기는 구간 */
   return o;
 }
 @vertex fn vsD(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> SV { return sprite(vi, ii, K.ex4.x); }
@@ -965,7 +968,7 @@ fn sprS(vi: u32, ii: u32, k: f32) -> SV {
   let d = max(0.5, -vc.z);
   let r = max(0.75 * d / (K.ext.y * 0.5 * K.ext.z), K.ext2.x * K.ex4.w * w.w) * min(1.0, q.w * 8.0) * mix(1.0, K.ex4.x, 0.5) * k;
   var o: SV; o.p = K.vp * vec4f(vc.xy + c * r, vc.z, 1.0); o.uv = c; o.c = vc; o.r = r; o.ph = 0.0; o.wb = 0.0;
-  if (q.w <= 0.0) { o.p = vec4f(9.0, 9.0, 9.0, 1.0); }
+  if (q.w <= 0.0 || q.x < K.ex14.z) { o.p = vec4f(9.0, 9.0, 9.0, 1.0); }   /* 숨기는 구간 */
   return o;
 }
 /* 물보라도 거품 그림에 넣는다: 잘게 부서져 공기가 섞인 물은 하얗게 보이니까 */
@@ -1487,8 +1490,8 @@ function surfTargets(w,h){ if(T.w===w && T.h===h) return; for(const k of ["dep",
   const bg=(a,b)=>dev.createBindGroup({layout:E.sbgl,entries:[{binding:0,resource:{buffer:B.cam}},{binding:1,resource:{buffer:B.pos}},{binding:2,resource:{buffer:B.vel}},{binding:3,resource:a.createView()},{binding:4,resource:b.createView()},{binding:5,resource:{buffer:B.F}},{binding:6,resource:{buffer:B.spr}},{binding:7,resource:{buffer:B.fmA}}]});
   T.bgDep=bg(T.sm,E.dummy); T.bgH1=bg(T.dep,E.dummy); T.bgV=bg(T.tmp,E.dummy); T.bgH2=bg(T.sm,E.dummy); T.bgFoam=bg(T.sm,E.dummy); T.bgComp=bg(T.sm,T.fo); T.bgFB2=bg(T.sm,T.fo2); T.bgMR=bg(T.sm,T.mb); T.w=w; T.h=h; }
 /* 백사장 모양 (바뀔 때만 다시 만든다): 바닥 + 해변 비탈 + 비탈의 앞·뒤·옆 면 */
-function sandMesh(){ const key=[GX,GY,GZ,HW0,HW1,S.beach,S.scene,S.tz,S.tz1,S.tzc,bedR()].join(","); if(key===sandKey) return; sandKey=key;
-  const V=[], X=x=>x-GX/2, Y=y=>y-GY/2, Z=z=>z-GZ/2, fy=2.5, top=GY-4, beach=S.beach>0 && S.scene!==1, bx=beachX(), x0=2, x1=GX-2;
+function sandMesh(){ const key=[GX,GY,GZ,HW0,HW1,S.beach,S.scene,S.tz,S.tz1,S.tzc,bedR(),hideX()].join(","); if(key===sandKey) return; sandKey=key;
+  const V=[], X=x=>x-GX/2, Y=y=>y-GY/2, Z=z=>z-GZ/2, fy=2.5, top=GY-4, beach=S.beach>0 && S.scene!==1, bx=beachX(), x0=Math.max(2,hideX()), x1=GX-2;
   const tri=(a,b,c)=>V.push(...a,...b,...c), quad=(a,b,c,d)=>{ tri(a,b,c); tri(a,c,d); };
   const fb=fy+bedR(), hy=x=>Math.max(fb,beach&&x>bx?Math.min(top,fy+S.beach*(x-bx)):fy), zw=x=>{ const xx=Math.min(GX-4,Math.max(3,x)), w=zwallsJS(xx), zc=zcG(), f=visF(xx); return [zc+(w[0]-1-zc)*f, zc+(w[1]+2-zc)*f]; };
   const xs=[]; for(let k=0;k<=24;k++) xs.push(x0+(x1-x0)*k/24); if(beach) xs.push(bx); xs.sort((a,b)=>a-b);
@@ -1498,13 +1501,13 @@ function sandMesh(){ const key=[GX,GY,GZ,HW0,HW1,S.beach,S.scene,S.tz,S.tz1,S.tz
   if(fb>fy+1e-3){ const z=zw(x0); quad([X(x0),Y(fy),Z(z[0])],[X(x0),Y(fb),Z(z[0])],[X(x0),Y(fb),Z(z[1])],[X(x0),Y(fy),Z(z[1])]); }   /* 올린 바닥의 파도 판 쪽 면 */
   if(beach){ const z=zw(x1), y=hy(x1); quad([X(x1),Y(fy),Z(z[0])],[X(x1),Y(y),Z(z[0])],[X(x1),Y(y),Z(z[1])],[X(x1),Y(fy),Z(z[1])]); }
   sandN=V.length/3; dev.queue.writeBuffer(sandBuf,0,new Float32Array(V)); }
-function lines(){ const hy=GY/2-2, L=[], X=x=>x-GX/2, Z=z=>z-GZ/2, xa=2, xb=GX-2, zc=zcG(), vw=(x)=>{ const w=zwallsJS(x), f=visF(x); return [zc+(w[0]-1-zc)*f-0, zc+(w[1]+2-zc)*f]; }, za=vw(3), zb=vw(GX-4);
+function lines(){ const hy=GY/2-2, L=[], X=x=>x-GX/2, Z=z=>z-GZ/2, xa=Math.max(2,hideX()), xb=GX-2, zc=zcG(), vw=(x)=>{ const w=zwallsJS(x), f=visF(x); return [zc+(w[0]-1-zc)*f-0, zc+(w[1]+2-zc)*f]; }, za=vw(Math.max(3,xa)), zb=vw(GX-4);
   /* 벌어진 수조 테두리: 파도 판 쪽(왼쪽)이 앞뒤로 넓고 해변 쪽이 좁다. 벽 안쪽 선보다 한 칸 바깥에 그린다 */
   const zs=(w,s)=>s?Z(w[1]):Z(w[0]), P=[[X(xa),-hy,zs(za,0)],[X(xb),-hy,zs(zb,0)],[X(xb),hy,zs(zb,0)],[X(xa),hy,zs(za,0)],[X(xa),-hy,zs(za,1)],[X(xb),-hy,zs(zb,1)],[X(xb),hy,zs(zb,1)],[X(xa),hy,zs(za,1)]],
     Eg=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
   const gl=[0.75,0.66,1], ye=[0.98,0.88,0.12];
   for(const [a,b] of Eg) L.push(...P[a],...gl,...P[b],...gl);
-  if(S.scene!==1){ const zp=vw(Math.max(3,PADX)), px=X(PADX), a=[px,-hy,zs(zp,0)], b=[px,-hy,zs(zp,1)], c=[px,hy*0.5,zs(zp,1)], d=[px,hy*0.5,zs(zp,0)];
+  if(S.scene!==1 && PADX>=xa){ const zp=vw(Math.max(3,PADX)), px=X(PADX), a=[px,-hy,zs(zp,0)], b=[px,-hy,zs(zp,1)], c=[px,hy*0.5,zs(zp,1)], d=[px,hy*0.5,zs(zp,0)];
     for(const [u,v] of [[a,b],[b,c],[c,d],[d,a]]) L.push(...u,...ye,...v,...ye); }
   lineN=L.length/6; dev.queue.writeBuffer(lineBuf,0,new Float32Array(L)); }
 
@@ -1538,7 +1541,7 @@ function frame(now){
   EYEG[0]=eye[0]+GX/2; EYEG[1]=eye[1]+GY/2; EYEG[2]=zcG()+(eye[2]+GZ/2-zcG())/Math.max(0.2,visF(EYEG[0])); EYEG[3]=dist*0.45;
   camData.set([FR,FX,FZ,foamSurf()?1:0],108); camData.set([0.62-0.5*S.fsz,0.02+0.16*S.frim,0.8*72*S.spd,S.flace],112); camData.set([S.frc,DS/(0.12+3.45*S.flsz),S.mat!==1&&wOn()?1:0,S.lcol],116);
   camData.set([S.fsamt===undefined?0.7:S.fsamt,S.fsx0===undefined?0.45:S.fsx0,S.fsgw===undefined?0.15:S.fsgw,S.wsens===undefined?0.5:S.wsens],124);
-  camData.set([S.scene===0?(S.padg===undefined?0.6:S.padg):0,S.padz===undefined?0.25:S.padz,0,0],136);   /* 파도 판 쪽 누르기 (보이는 것만) */
+  camData.set([S.scene===0?(S.padg===undefined?0.6:S.padg):0,S.padz===undefined?0.25:S.padz,hideX(),0],136);   /* 파도 판 쪽 누르기 (보이는 것만) */
   camData.set([S.scene===0?(S.bbump===undefined?1:S.bbump):0,DS*2.1,S.olw===undefined?1:S.olw,S.olf===undefined?0.8:S.olf],132);   /* + 윤곽선 굵기, 거품 윤곽선 진하기 */   /* 백사장 물결 굴곡: 세기, 물결 촘촘함 */
   camData.set([S.scene===0?(S.bwf===undefined?1:S.bwf):0,S.wgr,bwStart(),S.bwg===undefined?0.12:S.bwg],128);   /* 백사장 물 거품색(움직임), 튀어 오르는 물 거품색 */   /* 표면 무늬 양 */
   camData.set([1.5+1.7*S.mball,0.3,S.scene===0?(S.btr||0):0,S.scene===0?(S.bwh===undefined?0.5:S.bwh):0],120);
