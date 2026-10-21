@@ -34,7 +34,7 @@ button.hot{background:var(--yellow);color:#33123A;border-color:#9C2F86;font-size
 button:focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
 #stat{margin-left:auto;font-size:12px;color:var(--soft);font-variant-numeric:tabular-nums}
 .panel{background:var(--panel);border:2px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:12px;min-width:0}
-.ctl{display:grid;grid-template-columns:5.6em minmax(0,1fr) 4.2em;gap:2px 8px;align-items:center;font-size:13px;font-weight:700}
+.ctl{display:grid;grid-template-columns:5.6em minmax(0,1fr) auto;gap:2px 8px;align-items:center;font-size:13px;font-weight:700}
 .ctl output{text-align:right;font-variant-numeric:tabular-nums}
 .ctl input[type=range]{width:100%;accent-color:var(--line)}
 .desc{grid-column:1/-1;font-size:11.5px;line-height:1.4;color:var(--soft);font-weight:500}
@@ -728,7 +728,10 @@ function fill(){ PEND.length=0; dripT=0; if(S.scene===1){ SPC=0.5; pVol=0.125; N
   for(let z=3.2;z<GZ-3.2;z+=sp){ for(let y=3.2;y<top;y+=sp) for(let x=PADX+1.2;x<GX-3.2;x+=sp){ if(y<floorAt(x)+1.3) continue; const zw=zwallsJS(x); if(z<zw[0]+0.2||z>zw[1]+0.8) continue; if(n>=MAXP) break;
     P[n*4]=x+(Math.random()-.5)*sp*0.3; P[n*4+1]=y+(Math.random()-.5)*sp*0.3; P[n*4+2]=z+(Math.random()-.5)*sp*0.3; P[n*4+3]=1; n++; } }
   N=n; dev.queue.writeBuffer(B.pos,0,P,0,n*4); { const V0=new Float32Array(n*4), d0=1/(sp*sp*sp); for(let i=0;i<n;i++) V0[i*4+3]=d0; dev.queue.writeBuffer(B.vel,0,V0); } dev.queue.writeBuffer(B.C,0,new Float32Array(n*12)); dev.queue.writeBuffer(B.F,0,ident(n));
-  stepNo=0; WPH=0; PADX=2.5; pVol=sp*sp*sp; }
+  stepNo=0; WPH=0; PADX=2.5; pVol=sp*sp*sp; realSize(); }
+/* 알갱이 실제 크기 알려 주기: 수조가 크면 칸 수 한도·방울 수 한도 때문에 정한 크기보다 커진다 */
+function realSize(){ const o=inputs.dsz&&inputs.dsz[1]; if(!o) return; const real=SPC*DS/0.5, why=SPC>0.5+1e-6?"방울 수 한도":DS>S.dsz+1e-6?"칸 수 한도":"";
+  o.textContent=S.dsz.toFixed(2)+"배"+(why?" → 실제 "+real.toFixed(2)+"배":""); o.title=why?"수조가 커서 "+why+"에 걸려 알갱이가 더 커졌어요. 수조를 줄이거나 방울 수 한도를 올리세요.":""; }
 let pVol=0.125;
 function ident(n){ const a=new Float32Array(n*12); for(let i=0;i<n;i++){ a[i*12]=1; a[i*12+5]=1; a[i*12+10]=1; } return a; }
 function dropBlob(){ if(!E.ok) return; const sp=spacing(), R=Math.min(GY,GZ)*0.16, cx=GX*(0.3+0.4*Math.random()), cy=GY-R-4, cz=GZ/2+(Math.random()-.5)*GZ*0.3, A=[];
