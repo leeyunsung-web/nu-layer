@@ -641,7 +641,7 @@ function blobsUpdate(dt){
     const e=(j)=>h[j]>0.02?h[j]+b[j]:b[j]; return {y:(e(o)*(1-a)+e(o+1)*a)*(1-c)+(e(o+NX)*(1-a)+e(o+NX+1)*a)*c, wet:h[o]>0.05, bed:b[o], dep:h[o], u:h[o]>0.05?0.5*(u[k*(NX+1)+i]+u[k*(NX+1)+i+1]):0}; };
   /* 생기기: 줄마다 부서지는 마루를 찾아 말린 끝에서 떼어 낸다 */
   if(S.brate>0){ const step=Math.max(1,Math.round(3/dx));
-    for(let k=1;k<NZ-1;k+=step){ BL.cool[k]-=dt; if(BL.cool[k]>0) continue; const r0=k*NX; let bi=-1, bb=0.35;
+    for(let k=1;k<NZ-1;k+=step){ BL.cool[k]-=dt; if(BL.cool[k]>0) continue; const r0=k*NX; let bi=-1, bb=0.62;   /* 부서짐이 충분히 커진 뒤에야 떨어져 나온다 */
       for(let i=2;i<NX-2;i++){ const B=brk[r0+i]; if(B>bb && h[r0+i]>0.6){ bb=B; bi=i; } }
       if(bi<0 || BL.n>=BL.max) continue;
       let ic=bi, cr=-9; for(let q=Math.max(0,bi-12);q<=bi;q++){ const e=h[r0+q]+b[r0+q]-D; if(e>cr){ cr=e; ic=q; } } if(cr<0.3) continue;
@@ -717,21 +717,24 @@ function meshUpdate(fdt){
         const Hc=Hrow[i];
         if(Bc>0.01 && crest>0.3){
           /* 모양 편집기의 모양 × 파도 높이 × 거리별 곡선. 부서짐이 커질수록 모양이 자라난다 */
-          const xc=(ic+0.5)*dx, ytop=crest+D, xf01=x/L, kb=Math.min(1,Bc*1.8), Hs=crest*fcurl*cvAt(S,"curl",xf01)*kb+0.05;
+          /* 거품이 생기는 순간: 마루 꼭대기에서 먼저 일어나고, 부서짐이 커지는 만큼 앞끝으로 펼쳐져 말려 나간다 (한 번에 툭 나타나지 않게) */
+          const gr0=Math.min(1,Math.max(0,(Bc-0.05)/0.8)), grow=gr0*gr0*(3-2*gr0);
+          const xc=(ic+0.5)*dx, ytop=crest+D, xf01=x/L, Hs=crest*fcurl*cvAt(S,"curl",xf01)*(0.35+0.65*grow)+0.05;
           if(i>ic){   /* 앞면: 물은 앞면 바닥점을 향해 곧게 서고, 거품은 호의 앞부분(꼭대기→앞끝→끝)을 따라 말려 내려간다 */
             const f=Math.max(0,Math.min(1,Hc/crest)), steep=Math.min(1,curl*cvAt(S,"steep",xf01)*Bc*1.2);
             s=(xc+(1-f)*SC.B[0]*crest-x)*steep;
             let ib=ic+1; while(ib<NX-1 && ib<ic+R*2 && Hrow[ib]>0.2*crest) ib++;
             const t=Math.min(1,(i-ic)/Math.max(1,ib-ic)), pnt=frontPt(SC,t);
-            sf=xc+pnt[0]*Hs-x; dyf=y-(ytop+pnt[1]*Hs); cw=Math.min(1,Bc*2.2); arc=1;
+            const reach=grow*1.15, rv=Math.min(1,Math.max(0,(reach-t)/0.25));
+            sf=xc+pnt[0]*Hs-x; dyf=y-(ytop+pnt[1]*Hs); cw=grow*rv*rv*(3-2*rv); arc=1;
           } else {     /* 뒤쪽: 호의 시작→꼭대기 부분. 물 위에 떠 있게 */
             const xr=(x-xc)/Hs, yr=backY(SC,xr);
             if(yr!==null){ const yArc=Math.max(y+0.12, ytop+yr*Hs); dyf=y-yArc;
-              const x0=SC.pts[0][0], xa=SC.pts[SC.iA][0], tb=(xr-x0)/((xa-x0)||1), c=Math.min(1,Math.max(0,(tb-0.15)/0.4)); cw=Math.min(1,Bc*2.2)*c*c*(3-2*c); arc=1; }
+              const x0=SC.pts[0][0], xa=SC.pts[SC.iA][0], tb=(xr-x0)/((xa-x0)||1), c=Math.min(1,Math.max(0,(tb-1+grow*0.85)/0.35)); cw=grow*c*c*(3-2*c); arc=1; }   /* 뒤쪽도 꼭대기에서부터 차츰 */
           } } }
       /* 화면에 그리는 말림·흰 마루는 프레임 사이를 부드럽게 이어 준다 (부서짐 판정이 순간순간 바뀌어도 떨리지 않게) */
       /* 생길 때는 빨리, 사라질 때는 천천히: 파도가 낮아지면 말린 거품이 물 위로 스르륵 내려앉아 흐르는 거품으로 이어진다 */
-      const sm=G.sm, ac=Math.abs(sf)>Math.abs(sm.sf[j])?aC:aC*0.35; s=sm.s[j]+=(s-sm.s[j])*ac; dy=sm.dy[j]+=(dy-sm.dy[j])*ac; sf=sm.sf[j]+=(sf-sm.sf[j])*ac; dyf=sm.dyf[j]+=(dyf-sm.dyf[j])*ac; cw=sm.cw[j]+=(cw-sm.cw[j])*(cw>sm.cw[j]?aC:aC*0.35);
+      const sm=G.sm, ac=Math.abs(sf)>Math.abs(sm.sf[j])?aC:aC*0.35; s=sm.s[j]+=(s-sm.s[j])*ac; dy=sm.dy[j]+=(dy-sm.dy[j])*ac; sf=sm.sf[j]+=(sf-sm.sf[j])*ac; dyf=sm.dyf[j]+=(dyf-sm.dyf[j])*ac; cw=sm.cw[j]+=(cw-sm.cw[j])*(cw>sm.cw[j]?aC*0.45:aC*0.35);
       /* 거품은 물과 다른 층: 물 위로 떠서, 진한 곳일수록 도톰하게 솟는다 */
       const fv=Math.max(sm.f[j]+(G.cf&&G.cf.length===NN?G.cf[j]:0),cw), lift=S.flift*cvAt(S,"lift",x/L)*(0.35+0.65*Math.min(1,fv*1.4))*(1-Math.min(1,cw));   /* 호가 된 곳은 호 높이를 따른다 */
       px[j]=x+s; py[j]=y-dy; pz[j]=z; qx[j]=x+sf; qy[j]=y-dyf+0.06+lift; qc[j]=cw; } }
