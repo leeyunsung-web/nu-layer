@@ -143,6 +143,7 @@ const CTL=[
  ["secLook","구름 양","cloud",0,1,0.02,0.55,"%","하늘을 덮는 구름의 양. 0이면 맑은 하늘.",0],
  ["secLook","구름 빠르기","cspd",0,2,0.02,0.35,"%","구름이 바람에 흘러가는 빠르기.",0],
  ["secLook","부드러움","smooth",0,1,0.05,0.6,"%","물 표면을 얼마나 매끈하게 녹여 이을지. 낮추면 방울 알갱이가 보입니다.",0],
+ ["secLook","거품 이어짐","fcon",0,1,0.05,0.6,"%","가까운 거품끼리 엉겨 붙어 한 덩어리로 이어지는 정도. 0이면 거품 알갱이가 하나하나 동그랗게, 높이면 띠·덩어리·실 모양으로 이어집니다.",0],
  ["secLook","거품","foam",0,1,0.05,0.5,"%","거품이 생기는 정도. 부서지는 물결, 물보라, 백사장으로 얇게 밀려 올라가는 물이 하얗게 거품이 됩니다.",0],
  ["secLook","픽셀 크기","px",1,6,1,3,"px","한 칸의 크기. 클수록 굵은 픽셀 그림이 됩니다.",0],
  ["secLook","점 크기","psize",0.25,4,0.05,1,"배","'방울 점'으로 볼 때 점의 크기.",0],
@@ -722,7 +723,7 @@ fn bridge(p: vec2f, dir: vec2i) -> f32 {
 @fragment fn fsBH(i: FV) -> @location(0) f32 { return blur(i.p.xy, vec2i(1, 0)); }
 @fragment fn fsBV(i: FV) -> @location(0) f32 { return blur(i.p.xy, vec2i(0, 1)); }
 @vertex fn vsF(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> SV {
-  var o = sprite(vi, ii, K.ex4.x);   /* 물 알갱이와 같은 크기로 통째로 하얗게 */
+  var o = sprite(vi, ii, K.ex4.x * (1.0 + 0.9 * K.ex6.z));   /* 물 알갱이 크기로, 이어짐을 높이면 더 크게 번져 옆 거품과 겹친다 */
   /* 거품: 방울마다 기억한 거품 양이 넘치면 하얗게 (젤리는 빠른 방울만) */
   let vw = vel[ii];
   var show = length(vw.xyz) * K.ex4.y > K.ext2.y;            /* 젤리: 빠른 방울만 */
@@ -735,8 +736,20 @@ fn bridge(p: vec2f, dir: vec2i) -> f32 {
   let vz = i.c.z + sqrt(1.0 - r2) * i.r;
   let ds = textureLoad(src, vec2i(i.p.xy), 0).r;
   if (-vz > ds + i.r * 3.0) { discard; }   /* 물 뒤에 가려진 거품은 빼고 */
-  return 1.0;
+  if (K.ex6.z < 0.01) { return 1.0; }
+  return (1.0 - r2) * (1.0 - r2);   /* 가운데 진하고 가장자리 옅은 값 → 가까운 거품끼리 더해져 사이가 채워진다 */
 }
+/* 거품 번지기: 더한 값을 살짝 번지게 한 뒤 일정 진하기 이상만 거품으로 칠하면 물방울처럼 엉겨 붙는다 */
+fn fblur(p: vec2f, dir: vec2i) -> f32 {
+  let ip = vec2i(p); let sz = vec2i(textureDimensions(fom));
+  let R = max(1.0, K.ex6.z * K.ext.y * 0.007);
+  var s = 0.0; var w = 0.0;
+  for (var k = -6; k <= 6; k++) { let t = f32(k) / 6.0; let g = exp(-2.5 * t * t);
+    s += textureLoad(fom, clamp(ip + dir * i32(round(t * R)), vec2i(0), sz - vec2i(1)), 0).r * g; w += g; }
+  return s / w;
+}
+@fragment fn fsFBH(i: FV) -> @location(0) f32 { return fblur(i.p.xy, vec2i(1, 0)); }
+@fragment fn fsFBV(i: FV) -> @location(0) f32 { return fblur(i.p.xy, vec2i(0, 1)); }
 fn vpos(ip: vec2i, d: f32) -> vec3f {
   let nx = (f32(ip.x) + 0.5) / K.ext.x * 2.0 - 1.0; let ny = 1.0 - (f32(ip.y) + 0.5) / K.ext.y * 2.0;
   return vec3f(nx * d * K.ext.w / K.ext.z, ny * d / K.ext.z, -d);
@@ -761,8 +774,10 @@ struct CO { @location(0) c: vec4f, @builtin(frag_depth) z: f32 };
   var col = K.c0.rgb;
   if (ndl < 0.28) { col = K.c1.rgb; } else if (ndl > 0.82) { col = mix(K.c0.rgb, K.c2.rgb, 0.3); }
   let fo = textureLoad(fom, ip, 0).r;
-  let isF = fo > K.ext2.z;
+  let fthr = select(K.ext2.z, 0.3, K.ex6.z >= 0.01);   /* 이어짐을 켜면 '이만큼 진한 곳부터 거품' */
+  let isF = fo > fthr;
   if (isF) { col = select(vec3f(1.0), vec3f(0.86, 0.93, 0.97), ndl < 0.32); }   /* 거품: 흰색, 그늘만 아주 옅게 */
+  if (isF && K.ex6.z >= 0.01 && fo < fthr + 0.06) { col = vec3f(0.74, 0.88, 0.94); }   /* 거품 덩어리 가장자리에 아주 옅은 하늘색 테두리 */
   if (K.ext3.y > 0.5 && sp > 0.988) { col = K.c2.rgb; }
   let jump = K.ext2.x * 4.0 + d * 0.02;
   if (K.ext3.z > 0.5 && (dl >= BIG || dr >= BIG || du >= BIG || dd >= BIG || dl - d > jump || dr - d > jump || du - d > jump || dd - d > jump)) { col = select(K.c3.rgb, vec3f(0.72, 0.86, 0.94), isF); }   /* 거품 테두리는 옅은 하늘색 */
@@ -862,6 +877,8 @@ async function init(){
     PL.sBV=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsQ"},fragment:{module:sm,entryPoint:"fsBV",targets:[{format:"r32float"}]}});
     const add={color:{srcFactor:"one",dstFactor:"one",operation:"add"},alpha:{srcFactor:"one",dstFactor:"one",operation:"add"}};
     PL.sFoam=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsF"},fragment:{module:sm,entryPoint:"fsF",targets:[{format:"r16float",blend:add}]},primitive:{topology:"triangle-list"}});
+    PL.sFBH=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsQ"},fragment:{module:sm,entryPoint:"fsFBH",targets:[{format:"r16float"}]}});
+    PL.sFBV=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsQ"},fragment:{module:sm,entryPoint:"fsFBV",targets:[{format:"r16float"}]}});
     PL.sComp=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsQ"},fragment:{module:sm,entryPoint:"fsC",targets:[{format:fmtTex}]},depthStencil:ds});
     E.dummy=dev.createTexture({size:[1,1],format:"r16float",usage:GPUTextureUsage.TEXTURE_BINDING}); }
   E.rbgl=rbgl; BGR=dev.createBindGroup({layout:rbgl,entries:[{binding:0,resource:{buffer:B.cam}},{binding:1,resource:{buffer:B.pos}},{binding:2,resource:{buffer:B.vel}},{binding:3,resource:{buffer:B.spr}}]});
@@ -982,12 +999,12 @@ const m4={ persp(f,a,n,fa){ const t=1/Math.tan(f/2); return [t/a,0,0,0, 0,t,0,0,
 const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]], dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2], crs=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]], nrm=a=>{ const l=Math.hypot(...a)||1; return [a[0]/l,a[1]/l,a[2]/l]; };
 const camData=new Float32Array(128);
 const T={w:0,h:0};   /* 물 표면용 화면 크기 그림판 */
-function surfTargets(w,h){ if(T.w===w && T.h===h) return; for(const k of ["dep","tmp","sm","fo","hw"]) if(T[k]) T[k].destroy();
+function surfTargets(w,h){ if(T.w===w && T.h===h) return; for(const k of ["dep","tmp","sm","fo","fo2","hw"]) if(T[k]) T[k].destroy();
   const RT=GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING;
-  T.dep=dev.createTexture({size:[w,h],format:"r32float",usage:RT}); T.tmp=dev.createTexture({size:[w,h],format:"r32float",usage:RT}); T.sm=dev.createTexture({size:[w,h],format:"r32float",usage:RT}); T.fo=dev.createTexture({size:[w,h],format:"r16float",usage:RT});
+  T.dep=dev.createTexture({size:[w,h],format:"r32float",usage:RT}); T.tmp=dev.createTexture({size:[w,h],format:"r32float",usage:RT}); T.sm=dev.createTexture({size:[w,h],format:"r32float",usage:RT}); T.fo=dev.createTexture({size:[w,h],format:"r16float",usage:RT}); T.fo2=dev.createTexture({size:[w,h],format:"r16float",usage:RT});
   T.hw=dev.createTexture({size:[w,h],format:"depth24plus",usage:GPUTextureUsage.RENDER_ATTACHMENT});
   const bg=(a,b)=>dev.createBindGroup({layout:E.sbgl,entries:[{binding:0,resource:{buffer:B.cam}},{binding:1,resource:{buffer:B.pos}},{binding:2,resource:{buffer:B.vel}},{binding:3,resource:a.createView()},{binding:4,resource:b.createView()},{binding:5,resource:{buffer:B.F}},{binding:6,resource:{buffer:B.spr}}]});
-  T.bgDep=bg(T.sm,E.dummy); T.bgH1=bg(T.dep,E.dummy); T.bgV=bg(T.tmp,E.dummy); T.bgH2=bg(T.sm,E.dummy); T.bgFoam=bg(T.sm,E.dummy); T.bgComp=bg(T.sm,T.fo); T.w=w; T.h=h; }
+  T.bgDep=bg(T.sm,E.dummy); T.bgH1=bg(T.dep,E.dummy); T.bgV=bg(T.tmp,E.dummy); T.bgH2=bg(T.sm,E.dummy); T.bgFoam=bg(T.sm,E.dummy); T.bgComp=bg(T.sm,T.fo); T.bgFB2=bg(T.sm,T.fo2); T.w=w; T.h=h; }
 /* 백사장 모양 (바뀔 때만 다시 만든다): 바닥 + 해변 비탈 + 비탈의 앞·뒤·옆 면 */
 function sandMesh(){ const key=[GX,GY,GZ,HW0,HW1,S.beach,S.scene,S.tz,S.tz1,S.tzc].join(","); if(key===sandKey) return; sandKey=key;
   const V=[], X=x=>x-GX/2, Y=y=>y-GY/2, Z=z=>z-GZ/2, fy=2.5, top=GY-4, beach=S.beach>0 && S.scene!==1, bx=beachX(), x0=2, x1=GX-2;
@@ -1034,7 +1051,7 @@ function frame(now){
   camData.set([spacing()*0.95*S.psize,GX,GY,GZ],48);
   const tf=1/Math.tan(0.31); camData.set([w,h,tf,w/h],52); camData.set([spacing()*1.05,(2.6-1.8*S.foam)/DS,0.5,dist*0.9],56); camData.set([S.smooth,1,S.mat===0?2:1,S.scene===0&&S.mat===0?1/pVol:0],60);
   { const K=SKIES[S.sky]||SKIES.day, f=c=>c.map(v=>v/255); camData.set([...f(K.hz),(now/1000)%3600],64); camData.set([...f(K.zn),S.cloud],68); camData.set([...f(K.cw),S.cspd],72); camData.set([...f(K.cs),K.mode],76); camData.set([...K.sun,1/pVol],80); camData.set([...f(K.g0),1],84); camData.set([...f(K.g1),1],88); camData.set([S.scene===1?-1e6:TOPG-GY/2+0.3,S.sandc,S.sky==="off"?1:0,0],92); }
-  camData.set([S.conn,DS,0.45,S.spsz],96); camData.set([visF(3),visF(GX-4),zcG(),0],100); camData.set([S.brd*spacing(),S.brt*spacing(),0,0],104);
+  camData.set([S.conn,DS,0.45,S.spsz],96); camData.set([visF(3),visF(GX-4),zcG(),0],100); camData.set([S.brd*spacing(),S.brt*spacing(),S.fcon,0],104);
   EYEG[0]=eye[0]+GX/2; EYEG[1]=eye[1]+GY/2; EYEG[2]=zcG()+(eye[2]+GZ/2-zcG())/Math.max(0.2,visF(EYEG[0])); EYEG[3]=dist*0.45;
   dev.queue.writeBuffer(B.cam,0,camData,0,108); sandMesh(); lines();
   const SURF=S.rmode===0; if(SURF) surfTargets(w,h);
@@ -1045,7 +1062,8 @@ function frame(now){
     if(S.brd>0){ rp(T.sm.createView(),1e6,T.bgH1,PL.sBrH,3,1); rp(T.dep.createView(),1e6,T.bgH2,PL.sBrV,3,1); }   /* 알갱이 잇기: 깊이 → 가로 잇기 → 세로 잇기 → 다시 깊이 그림 */
     rp(T.tmp.createView(),1e6,T.bgH1,PL.sBH,3,1); rp(T.sm.createView(),1e6,T.bgV,PL.sBV,3,1);
     rp(T.tmp.createView(),1e6,T.bgH2,PL.sBH,3,1); rp(T.sm.createView(),1e6,T.bgV,PL.sBV,3,1);
-    rp(T.fo.createView(),0,T.bgFoam,PL.sFoam,6,N); }
+    rp(T.fo.createView(),0,T.bgFoam,PL.sFoam,6,N);
+    if(S.fcon>=0.01){ rp(T.fo2.createView(),0,T.bgComp,PL.sFBH,3,1); rp(T.fo.createView(),0,T.bgFB2,PL.sFBV,3,1); } }   /* 거품 이어 붙이기: 가로·세로로 살짝 번지게 */
   const p=e.beginRenderPass({colorAttachments:[{view:OFF?offTex.createView():ctx.getCurrentTexture().createView(),clearValue:S.sky==="off"?{r:1,g:1,b:1,a:1}:{r:0,g:1/255,b:42/255,a:1},loadOp:"clear",storeOp:"store"}],depthStencilAttachment:{view:depth.createView(),depthClearValue:1,depthLoadOp:"clear",depthStoreOp:"store"}});
   p.setBindGroup(0,BGR); if(S.sky!=="off"){ p.setPipeline(PL.sky); p.draw(3); }
   if(sandN){ p.setPipeline(PL.sand); p.setVertexBuffer(0,sandBuf); p.draw(sandN); }
