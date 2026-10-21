@@ -310,9 +310,9 @@ fn enc(x: f32) -> i32 { return i32(clamp(x, -20000.0, 20000.0) * FP); }
 fn dec(x: i32) -> f32 { return f32(x) / FP; }
 fn gidx(c: vec3i) -> u32 { return u32(c.x) + U.g.x * (u32(c.y) + U.g.y * u32(c.z)); }
 fn gread(c: vec3i) -> vec4f { let i = gidx(c) * 4u; return vec4f(bitcast<f32>(atomicLoad(&gi[i])), bitcast<f32>(atomicLoad(&gi[i+1u])), bitcast<f32>(atomicLoad(&gi[i+2u])), bitcast<f32>(atomicLoad(&gi[i+3u]))); }
-fn h2(a: f32, b: f32) -> u32 { return pack2x16float(clamp(vec2f(a, b), vec2f(-60000.0), vec2f(60000.0))); }
+fn h2(a: f32, b: f32) -> u32 { return pack2x16float(clamp(vec2f(a, b) * 256.0, vec2f(-60000.0), vec2f(60000.0))); }   /* 256배로 키워 담는다: 느리고 얇은 물의 작은 기울기도 반 정밀도에서 사라지지 않게 */
 fn loadC(k: u32) -> mat3x3f { let b = k * 5u; let a0 = unpack2x16float(Cm[b]); let a1 = unpack2x16float(Cm[b+1u]); let a2 = unpack2x16float(Cm[b+2u]); let a3 = unpack2x16float(Cm[b+3u]); let a4 = unpack2x16float(Cm[b+4u]);
-  return mat3x3f(a0.x, a0.y, a1.x, a1.y, a2.x, a2.y, a3.x, a3.y, a4.x); }
+  return mat3x3f(a0.x, a0.y, a1.x, a1.y, a2.x, a2.y, a3.x, a3.y, a4.x) * (1.0 / 256.0); }
 fn storeC(k: u32, m: mat3x3f) { let b = k * 5u; Cm[b] = h2(m[0][0], m[0][1]); Cm[b+1u] = h2(m[0][2], m[1][0]); Cm[b+2u] = h2(m[1][1], m[1][2]); Cm[b+3u] = h2(m[2][0], m[2][1]); Cm[b+4u] = h2(m[2][2], 0.0); }
 fn wts(d: vec3f) -> array<vec3f,3> { return array<vec3f,3>(0.5*(0.5-d)*(0.5-d), 0.75-d*d, 0.5*(0.5+d)*(0.5+d)); }
 /* 벌어진 수조: 파도가 시작되는 쪽(파도 판, x가 작은 쪽)이 앞뒤로 가장 넓고, 해변 쪽으로 갈수록 좁아진다. d.w = 해변 쪽을 좁히는 정도 */
@@ -497,8 +497,12 @@ fn updAt(cid: u32) {
     /* 표면 거품: 프레임의 마지막 박자에만, 위에서 내려다본 칸에 물 양·흐름·새 거품을 모은다 */
     if (U.h.w > 0.0 && life > 0.0) {
       let R = U.h.z; let FX = u32(f32(U.g.x) * R) + 2u;
-      let fi = (u32(p.z * R) * FX + u32(p.x * R)) * 4u;
-      atomicAdd(&fa[fi], 1000); atomicAdd(&fa[fi + 1u], i32(v.x * 1000.0)); atomicAdd(&fa[fi + 2u], i32(v.z * 1000.0)); atomicAdd(&fa[fi + 3u], i32((gen + select(0.0, 0.03 * U.e.y * min(sw, 2.0), onBeach && sw > 0.15)) * 100000.0));   /* 백사장으로 밀려 올라가는 물은 거품을 더 만든다 */
+      let fi = (u32(p.z * R) * FX + u32(p.x * R)) * 8u;
+      /* 거품은 물 위에 떠 있으니, 흐름은 위쪽 물일수록 크게 쳐서 모은다 (밑물은 반대로 흐르기도 해서 평균하면 멈춰 보인다) */
+      let sw8 = exp2(clamp((p.y - U.h.x) * 0.5, -5.0, 5.0));
+      atomicAdd(&fa[fi], 1000); atomicAdd(&fa[fi + 1u], i32(sw8 * 1000.0));
+      atomicAdd(&fa[fi + 2u], i32(v.x * sw8 * 1000.0)); atomicAdd(&fa[fi + 3u], i32(v.z * sw8 * 1000.0));
+      atomicAdd(&fa[fi + 4u], i32((gen + select(0.0, 0.03 * U.e.y * min(sw, 2.0), onBeach && sw > 0.15)) * 100000.0));   /* 백사장으로 밀려 올라가는 물은 거품을 더 만든다 */
     }
     fo = clamp(fo * (1.0 - 0.0075 * U.a.x) - 0.004 * U.a.x, 0.0, 1.0);    /* 1~2초에 걸쳐 꺼진다 */
     /* 물보라 만들기: 성긴 곳에서 빠르게 튀어 나가는 물이 작은 알갱이를 흩뿌린다. 카메라에 가까울수록 많이 */
@@ -933,33 +937,42 @@ struct FU { d: vec4u, a: vec4f, b: vec4f };   /* d: 가로 칸, 세로 칸 / a: 
 fn cl(x: i32, z: i32) -> vec4f { let X = i32(F.d.x); let Z = i32(F.d.y); return fo[u32(clamp(z, 0, Z - 1) * X + clamp(x, 0, X - 1))]; }
 fn samp(p: vec2f) -> f32 { let q = p - 0.5; let i = vec2i(floor(q)); let f = q - floor(q);
   return mix(mix(cl(i.x, i.y).x, cl(i.x + 1, i.y).x, f.x), mix(cl(i.x, i.y + 1).x, cl(i.x + 1, i.y + 1).x, f.x), f.y); }
+fn sampv(p: vec2f) -> vec2f { let q = p - 0.5; let i = vec2i(floor(q)); let f = q - floor(q);
+  return mix(mix(cl(i.x, i.y).yz, cl(i.x + 1, i.y).yz, f.x), mix(cl(i.x, i.y + 1).yz, cl(i.x + 1, i.y + 1).yz, f.x), f.y); }
+/* 거품은 자기 속도를 가진다: 물이 밀고 가면 따라가지만, 물이 뒤로 빠질 때는 앞으로 가던 힘으로 계속 가다가 모래 위에서 멈추며 스며든다 */
 @compute @workgroup_size(64) fn foamStep(@builtin(global_invocation_id) id: vec3u) {
   let X = F.d.x; if (id.x >= X * F.d.y) { return; }
-  let k = id.x * 4u; let R = F.a.x; let dt = F.a.y;
-  let W = f32(atomicExchange(&fa[k], 0)) / 1000.0;
-  let vx = f32(atomicExchange(&fa[k + 1u], 0)) / 1000.0; let vz = f32(atomicExchange(&fa[k + 2u], 0)) / 1000.0;
-  let g = f32(atomicExchange(&fa[k + 3u], 0)) / 100000.0;
+  let k = id.x * 8u; let R = F.a.x; let dt = F.a.y;
+  let W = f32(atomicExchange(&fa[k], 0)) / 1000.0;              /* 이 칸 위아래로 쌓인 방울 수 */
+  let Ws = f32(atomicExchange(&fa[k + 1u], 0)) / 1000.0;        /* 위쪽일수록 크게 친 무게 */
+  let vx = f32(atomicExchange(&fa[k + 2u], 0)) / 1000.0; let vz = f32(atomicExchange(&fa[k + 3u], 0)) / 1000.0;
+  let g = f32(atomicExchange(&fa[k + 4u], 0)) / 100000.0;
   let ix = i32(id.x % X); let iz = i32(id.x / X);
   let c = vec2f(f32(ix) + 0.5, f32(iz) + 0.5);
-  var out = vec4f(0.0);
-  if (W > 0.0) {
-    let v = vec2f(vx, vz) / W;                                 /* 이 칸 물의 평균 흐름 (격자 칸/시간) */
-    let b = c - v * R * dt;                                    /* 흐름을 거슬러 올라간 자리의 거품을 가져온다 = 거품이 물을 따라 흐른다 */
-    var f = samp(b) * 0.8 + (samp(b + vec2f(1.0, 0.0)) + samp(b - vec2f(1.0, 0.0)) + samp(b + vec2f(0.0, 1.0)) + samp(b - vec2f(0.0, 1.0))) * 0.05;   /* 살짝 번져 낱알 대신 덩어리로 */
-    /* 흐름이 모이는 곳(밀려 올라가다 느려지는 백사장 끝)에는 거품이 몰리고, 퍼지는 곳에서는 옅어진다 */
-    let dv = (cl(ix + 1, iz).y - cl(ix - 1, iz).y + cl(ix, iz + 1).z - cl(ix, iz - 1).z) * 0.5 * R;
-    let spd = length(v) * F.b.y;                                /* 바깥 세상 기준 빠르기 */
-    let moving = smoothstep(0.1, 0.5, spd);
-    f = f * mix(1.0, clamp(exp(-dv * dt), 0.85, 1.15), moving);   /* 움직이는 물이 모이는 곳에만 몰린다 (멈춘 곳에 계속 쌓이지 않게) */
-    /* 얇게 퍼져 거의 멈춘 물 (파도가 다 올라온 백사장 끝) = 거품이 스르륵 스며들어 사라진다 */
-    let depth = W * F.b.x * R * R * F.b.y;                      /* 물 깊이 (바깥 세상) */
-    let soak = (1.0 - smoothstep(0.4, 1.4, depth)) * (1.0 - moving);
-    f = f * pow(F.a.z, 1.0 + 8.0 * soak) + g * F.b.z * F.a.w * F.b.x * R * R;
-    out = vec4f(clamp(f, 0.0, 1.0), v, 0.0);
-  } else {
-    out = vec4f(fo[id.x].x * F.b.w, 0.0, 0.0, 0.0);           /* 물이 빠진 자리: 모래에 남은 거품이 서서히 스며들어 사라진다 */
+  /* 이 자리로 오는 거품의 속도: 마른 모래 칸은 이웃 거품 속도를 빌려 와서, 거품 앞머리가 모래 위로 올라올 수 있게 */
+  var vd = cl(ix, iz).yz;
+  if (W <= 0.0 && dot(vd, vd) < 1e-6) {
+    let n4 = cl(ix - 1, iz).yz + cl(ix + 1, iz).yz + cl(ix, iz - 1).yz + cl(ix, iz + 1).yz; vd = n4 * 0.25;
   }
-  fw[id.x] = out;
+  let b = c - vd * R * dt;
+  var f = samp(b) * 0.8 + (samp(b + vec2f(1.0, 0.0)) + samp(b - vec2f(1.0, 0.0)) + samp(b + vec2f(0.0, 1.0)) + samp(b - vec2f(0.0, 1.0))) * 0.05;   /* 살짝 번져 낱알 대신 덩어리로 */
+  var vf = sampv(b);
+  if (W > 0.0) {
+    let vw = vec2f(vx, vz) / max(Ws, 1e-4);                     /* 물 윗부분의 흐름 */
+    /* 물을 따라가되, 물이 뒤로 빠질 때(앞으로 가던 거품보다 물이 뒤로 갈 때)는 아주 조금만 끌려간다 */
+    let back = vw.x < vf.x - 0.02 && vf.x > 0.0;
+    vf = mix(vf, vw, select(0.45, 0.025, back));
+    let spd = length(vw) * F.b.y; let moving = smoothstep(0.1, 0.5, spd);
+    let dv = (cl(ix + 1, iz).y - cl(ix - 1, iz).y + cl(ix, iz + 1).z - cl(ix, iz - 1).z) * 0.5 * R;
+    f = f * mix(1.0, clamp(exp(-dv * dt), 0.85, 1.15), moving);   /* 움직이는 물이 모이는 곳에만 몰린다 */
+    let depth = W * F.b.x * R * R * F.b.y;                      /* 물 깊이 (바깥 세상) */
+    let soak = (1.0 - smoothstep(0.4, 1.4, depth)) * (1.0 - smoothstep(0.05, 0.25, length(vf) * F.b.y));   /* 얇은 물 위에서 거품이 멈추면 스며든다 */
+    f = f * pow(F.a.z, 1.0 + 8.0 * soak) + g * F.b.z * F.a.w * F.b.x * R * R;
+  } else {
+    vf = vf * 0.9;                                              /* 마른 모래 위: 앞으로 미끄러지다 점점 느려지고 */
+    f = f * F.b.w;                                              /* 모래에 스며들며 사라진다 */
+  }
+  fw[id.x] = vec4f(clamp(f, 0.0, 1.0), vf, 0.0);
 }`;
 const SORTWGSL=/* wgsl */`
 struct Q { g: vec4u };
@@ -1083,7 +1096,7 @@ function mkBGR(){ if(!E.rbgl||!B.fmA) return; BGR=dev.createBindGroup({layout:E.
 function resizeTank(){ tankSize(); BX0=GX*0.45; const SB=GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST|GPUBufferUsage.COPY_SRC;
   if(B.gi) B.gi.destroy(); if(B.gv) B.gv.destroy(); if(B.fmA){ B.fmA.destroy(); B.fmB.destroy(); }
   FR=GX*GZ<=400000?1:GX*GZ<=1600000?0.5:0.25; FX=Math.floor(GX*FR)+2; FZ=Math.floor(GZ*FR)+2;   /* 표면 거품 지도: 격자 칸과 같거나 2·4칸에 하나 */
-  B.gi=dev.createBuffer({size:CELLS*16,usage:SB}); B.gv=dev.createBuffer({size:FX*FZ*16,usage:SB});   /* gv 자리는 이제 거품 지도에 모으는 칸 */
+  B.gi=dev.createBuffer({size:CELLS*16,usage:SB}); B.gv=dev.createBuffer({size:FX*FZ*32,usage:SB});   /* gv 자리는 이제 거품 지도에 모으는 칸 */
   B.fmA=dev.createBuffer({size:FX*FZ*16,usage:SB}); B.fmB=dev.createBuffer({size:FX*FZ*16,usage:SB});
   E.fbg=dev.createBindGroup({layout:PL.foamStep.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:B.FU}},{binding:1,resource:{buffer:B.gv}},{binding:2,resource:{buffer:B.fmA}},{binding:3,resource:{buffer:B.fmB}}]}); T.w=0; mkBGR();
   if(B.cnt) B.cnt.destroy(); if(B.offs) B.offs.destroy(); if(B.bs) B.bs.destroy(); if(B.sc) B.sc.destroy();
