@@ -144,6 +144,7 @@ const CTL=[
  ["secLook","구름 양","cloud",0,1,0.02,0.55,"%","하늘을 덮는 구름의 양. 0이면 맑은 하늘.",0],
  ["secLook","구름 빠르기","cspd",0,2,0.02,0.35,"%","구름이 바람에 흘러가는 빠르기.",0],
  ["secLook","부드러움","smooth",0,1,0.05,0.6,"%","물 표면을 얼마나 매끈하게 녹여 이을지. 낮추면 방울 알갱이가 보입니다.",0],
+ ["secLook","하얘짐","wgr",0,1,0.05,0.7,"%","위로 솟구치는 물기둥·물보라 끝이 물색에서 흰색으로 부드럽게 바뀌는 정도. 떨어지는 방울은 하얘지지 않습니다. 0이면 끄기 (조금 가벼워짐).",0],
  ["secLook","거품 덩어리","fsz",0,1,0.05,0.5,"%","(표면 그림) 거품 덩어리의 굵기. 높이면 거품이 넓고 통통하게 퍼지고, 낮추면 가늘게 갈라진 무늬만 남습니다.",0],
  ["secLook","거품 테두리","frim",0,1,0.05,0.4,"%","(표면 그림) 거품 가장자리 선의 두께. 0이면 선 없이 흰색만.",0],
  ["secLook","거품 지속","flife",0,1,0.05,0.4,"%","(표면 그림) 거품이 물 위에 남아 있는 시간, 그리고 물이 빠진 모래 위에서 스며들어 사라지는 시간.",0],
@@ -807,7 +808,8 @@ fn bridge(p: vec2f, dir: vec2i) -> f32 {
   if (!show) { o.p = vec4f(9.0, 9.0, 9.0, 1.0); }
   return o;
 }
-@fragment fn fsF(i: SV) -> @location(0) f32 {
+@fragment fn fsF(i: SV) -> @location(0) vec4f { return vec4f(foamV(i), 0.0, 0.0, 0.0); }
+fn foamV(i: SV) -> f32 {
   let r2 = blob(i); if (r2 > 1.0) { discard; }
   let vz = i.c.z + sqrt(1.0 - r2) * i.r;
   let ds = textureLoad(src, vec2i(i.p.xy), 0).r;
@@ -816,16 +818,35 @@ fn bridge(p: vec2f, dir: vec2i) -> f32 {
   return (1.0 - r2) * (1.0 - r2);   /* 가운데 진하고 가장자리 옅은 값 → 가까운 거품끼리 더해져 사이가 채워진다 */
 }
 /* 거품 번지기: 더한 값을 살짝 번지게 한 뒤 일정 진하기 이상만 거품으로 칠하면 물방울처럼 엉겨 붙는다 */
-fn fblur(p: vec2f, dir: vec2i) -> f32 {
+fn fblur(p: vec2f, dir: vec2i) -> vec4f {
   let ip = vec2i(p); let sz = vec2i(textureDimensions(fom));
-  let R = max(1.0, K.ex6.z * K.ext.y * 0.007);
-  var s = 0.0; var w = 0.0;
+  let R = max(1.0, max(K.ex6.z, K.ex9.z * 0.8) * K.ext.y * 0.007);
+  var s = vec4f(0.0); var w = 0.0;
   for (var k = -6; k <= 6; k++) { let t = f32(k) / 6.0; let g = exp(-2.5 * t * t);
-    s += textureLoad(fom, clamp(ip + dir * i32(round(t * R)), vec2i(0), sz - vec2i(1)), 0).r * g; w += g; }
+    s += textureLoad(fom, clamp(ip + dir * i32(round(t * R)), vec2i(0), sz - vec2i(1)), 0) * g; w += g; }
   return s / w;
 }
-@fragment fn fsFBH(i: FV) -> @location(0) f32 { return fblur(i.p.xy, vec2i(1, 0)); }
-@fragment fn fsFBV(i: FV) -> @location(0) f32 { return fblur(i.p.xy, vec2i(0, 1)); }
+@fragment fn fsFBH(i: FV) -> @location(0) vec4f { return fblur(i.p.xy, vec2i(1, 0)); }
+@fragment fn fsFBV(i: FV) -> @location(0) vec4f { return fblur(i.p.xy, vec2i(0, 1)); }
+/* 하얘지는 정도: 위로 솟구치는 성긴 물(물기둥·물보라 끝)과 거품을 머금은 물일수록 하얗다. 떨어지는 방울은 하얘지지 않는다 */
+@vertex fn vsW(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> SV {
+  var o = sprite(vi, ii, K.ex4.x * 1.5);
+  let vw = vel[ii];
+  let up = smoothstep(0.25, 1.1, vw.y * K.ex4.y);
+  let thin = 1.0 - smoothstep(0.45, 0.95, auxDens(vw.w) / max(K.sun.w, 1e-6));
+  var wt = up * (0.35 + 0.65 * thin);
+  if (K.ext3.z > 1.5) { wt = max(wt, auxFoam(vw.w) * 1.4); }
+  o.ph = clamp(wt, 0.0, 1.0);
+  return o;
+}
+@fragment fn fsW(i: SV) -> @location(0) vec4f {
+  let r2 = dot(i.uv, i.uv); if (r2 > 1.0) { discard; }
+  let vz = i.c.z + sqrt(1.0 - r2) * i.r;
+  let ds = textureLoad(src, vec2i(i.p.xy), 0).r;
+  if (-vz > ds + i.r * 1.5) { discard; }   /* 겉에 보이는 방울만 */
+  let k = (1.0 - r2) * (1.0 - r2);
+  return vec4f(0.0, i.ph * k, k, 0.0);
+}
 fn vpos(ip: vec2i, d: f32) -> vec3f {
   let nx = (f32(ip.x) + 0.5) / K.ext.x * 2.0 - 1.0; let ny = 1.0 - (f32(ip.y) + 0.5) / K.ext.y * 2.0;
   return vec3f(nx * d * K.ext.w / K.ext.z, ny * d / K.ext.z, -d);
@@ -849,7 +870,9 @@ struct CO { @location(0) c: vec4f, @builtin(frag_depth) z: f32 };
   let ndl = dot(n, L); let sp = dot(n, normalize(L + V));
   var col = K.c0.rgb;
   if (ndl < 0.28) { col = K.c1.rgb; } else if (ndl > 0.82) { col = mix(K.c0.rgb, K.c2.rgb, 0.3); }
-  let fo = textureLoad(fom, ip, 0).r;
+  let f4 = textureLoad(fom, ip, 0); let fo = f4.r;
+  /* 솟구치는 물은 물색에서 흰색으로 부드럽게 (그라데이션) */
+  if (K.ex9.z > 0.0 && f4.b > 0.02) { let wh = clamp(f4.g / f4.b, 0.0, 1.0) * K.ex9.z; col = mix(col, select(vec3f(1.0), vec3f(0.88, 0.95, 0.98), ndl < 0.32), smoothstep(0.0, 1.0, wh)); }
   let fthr = select(K.ext2.z, 0.3, K.ex6.z >= 0.01);   /* 이어짐을 켜면 '이만큼 진한 곳부터 거품' */
   let isFp = fo > fthr;
   /* 표면 거품: 이 픽셀의 물 표면 자리를 수조 안 자리로 되돌려, 위에서 본 거품 지도를 읽는다 (위를 향한 면에만) */
@@ -999,10 +1022,11 @@ async function init(){
     PL.sBH=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsQ"},fragment:{module:sm,entryPoint:"fsBH",targets:[{format:"r32float"}]}});
     PL.sBV=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsQ"},fragment:{module:sm,entryPoint:"fsBV",targets:[{format:"r32float"}]}});
     const add={color:{srcFactor:"one",dstFactor:"one",operation:"add"},alpha:{srcFactor:"one",dstFactor:"one",operation:"add"}};
-    PL.sFoam=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsF"},fragment:{module:sm,entryPoint:"fsF",targets:[{format:"r16float",blend:add}]},primitive:{topology:"triangle-list"}});
-    PL.sFoamS=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsFS"},fragment:{module:sm,entryPoint:"fsF",targets:[{format:"r16float",blend:add}]},primitive:{topology:"triangle-list"}});
-    PL.sFBH=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsQ"},fragment:{module:sm,entryPoint:"fsFBH",targets:[{format:"r16float"}]}});
-    PL.sFBV=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsQ"},fragment:{module:sm,entryPoint:"fsFBV",targets:[{format:"r16float"}]}});
+    PL.sFoam=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsF"},fragment:{module:sm,entryPoint:"fsF",targets:[{format:"rgba16float",blend:add}]},primitive:{topology:"triangle-list"}});
+    PL.sFoamS=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsFS"},fragment:{module:sm,entryPoint:"fsF",targets:[{format:"rgba16float",blend:add}]},primitive:{topology:"triangle-list"}});
+    PL.sFBH=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsQ"},fragment:{module:sm,entryPoint:"fsFBH",targets:[{format:"rgba16float"}]}});
+    PL.sFBV=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsQ"},fragment:{module:sm,entryPoint:"fsFBV",targets:[{format:"rgba16float"}]}});
+    PL.sWhite=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsW"},fragment:{module:sm,entryPoint:"fsW",targets:[{format:"rgba16float",blend:add}]},primitive:{topology:"triangle-list"}});
     PL.sComp=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsQ"},fragment:{module:sm,entryPoint:"fsC",targets:[{format:fmtTex}]},depthStencil:ds});
     E.dummy=dev.createTexture({size:[1,1],format:"r16float",usage:GPUTextureUsage.TEXTURE_BINDING}); }
   E.rbgl=rbgl; mkBGR();
@@ -1133,7 +1157,7 @@ const camData=new Float32Array(128);
 const T={w:0,h:0};   /* 물 표면용 화면 크기 그림판 */
 function surfTargets(w,h){ if(T.w===w && T.h===h) return; for(const k of ["dep","tmp","sm","fo","fo2","hw"]) if(T[k]) T[k].destroy();
   const RT=GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING;
-  T.dep=dev.createTexture({size:[w,h],format:"r32float",usage:RT}); T.tmp=dev.createTexture({size:[w,h],format:"r32float",usage:RT}); T.sm=dev.createTexture({size:[w,h],format:"r32float",usage:RT}); T.fo=dev.createTexture({size:[w,h],format:"r16float",usage:RT}); T.fo2=dev.createTexture({size:[w,h],format:"r16float",usage:RT});
+  T.dep=dev.createTexture({size:[w,h],format:"r32float",usage:RT}); T.tmp=dev.createTexture({size:[w,h],format:"r32float",usage:RT}); T.sm=dev.createTexture({size:[w,h],format:"r32float",usage:RT}); T.fo=dev.createTexture({size:[w,h],format:"rgba16float",usage:RT}); T.fo2=dev.createTexture({size:[w,h],format:"rgba16float",usage:RT});
   T.hw=dev.createTexture({size:[w,h],format:"depth24plus",usage:GPUTextureUsage.RENDER_ATTACHMENT});
   const bg=(a,b)=>dev.createBindGroup({layout:E.sbgl,entries:[{binding:0,resource:{buffer:B.cam}},{binding:1,resource:{buffer:B.pos}},{binding:2,resource:{buffer:B.vel}},{binding:3,resource:a.createView()},{binding:4,resource:b.createView()},{binding:5,resource:{buffer:B.F}},{binding:6,resource:{buffer:B.spr}},{binding:7,resource:{buffer:B.fmA}}]});
   T.bgDep=bg(T.sm,E.dummy); T.bgH1=bg(T.dep,E.dummy); T.bgV=bg(T.tmp,E.dummy); T.bgH2=bg(T.sm,E.dummy); T.bgFoam=bg(T.sm,E.dummy); T.bgComp=bg(T.sm,T.fo); T.bgFB2=bg(T.sm,T.fo2); T.w=w; T.h=h; }
@@ -1185,7 +1209,7 @@ function frame(now){
   { const K=SKIES[S.sky]||SKIES.day, f=c=>c.map(v=>v/255); camData.set([...f(K.hz),(now/1000)%3600],64); camData.set([...f(K.zn),S.cloud],68); camData.set([...f(K.cw),S.cspd],72); camData.set([...f(K.cs),K.mode],76); camData.set([...K.sun,1/pVol],80); camData.set([...f(K.g0),1],84); camData.set([...f(K.g1),1],88); camData.set([S.scene===1?-1e6:TOPG-GY/2+0.3,S.sandc,S.sky==="off"?1:0,0],92); }
   camData.set([S.conn,DS,0.45,S.spsz],96); camData.set([visF(3),visF(GX-4),zcG(),0],100); camData.set([S.brd*spacing(),S.brt*spacing(),S.fcon,0],104);
   EYEG[0]=eye[0]+GX/2; EYEG[1]=eye[1]+GY/2; EYEG[2]=zcG()+(eye[2]+GZ/2-zcG())/Math.max(0.2,visF(EYEG[0])); EYEG[3]=dist*0.45;
-  camData.set([FR,FX,FZ,foamSurf()?1:0],108); camData.set([0.62-0.5*S.fsz,0.02+0.16*S.frim,0.8*72*S.spd,S.flace],112); camData.set([S.frc,DS/(0.5+2.5*S.flsz),0,0],116);
+  camData.set([FR,FX,FZ,foamSurf()?1:0],108); camData.set([0.62-0.5*S.fsz,0.02+0.16*S.frim,0.8*72*S.spd,S.flace],112); camData.set([S.frc,DS/(0.5+2.5*S.flsz),S.mat===0?S.wgr:0,0],116);
   dev.queue.writeBuffer(B.cam,0,camData,0,120); sandMesh(); lines();
   const SURF=S.rmode===0; if(SURF) surfTargets(w,h);
   const e=dev.createCommandEncoder();
@@ -1196,8 +1220,8 @@ function frame(now){
     rp(T.tmp.createView(),1e6,T.bgH1,PL.sBH,3,1); rp(T.sm.createView(),1e6,T.bgV,PL.sBV,3,1);
     rp(T.tmp.createView(),1e6,T.bgH2,PL.sBH,3,1); rp(T.sm.createView(),1e6,T.bgV,PL.sBV,3,1);
     { const q=e.beginRenderPass({colorAttachments:[{view:T.fo.createView(),clearValue:{r:0,g:0,b:0,a:0},loadOp:"clear",storeOp:"store"}]}); q.setBindGroup(0,T.bgFoam);
-      if(N && !foamSurf()){ q.setPipeline(PL.sFoam); q.draw(6,N); } if(S.mat===0){ q.setPipeline(PL.sFoamS); q.draw(6,262144); } q.end(); }   /* 거품 + 물보라 */
-    if(S.fcon>=0.01){ rp(T.fo2.createView(),0,T.bgComp,PL.sFBH,3,1); rp(T.fo.createView(),0,T.bgFB2,PL.sFBV,3,1); } }   /* 거품 이어 붙이기: 가로·세로로 살짝 번지게 */
+      if(N && !foamSurf()){ q.setPipeline(PL.sFoam); q.draw(6,N); } if(N && S.wgr>0 && S.mat===0){ q.setPipeline(PL.sWhite); q.draw(6,N); } if(S.mat===0){ q.setPipeline(PL.sFoamS); q.draw(6,262144); } q.end(); }   /* 거품 + 물보라 */
+    if(S.fcon>=0.01 || (S.wgr>0 && S.mat===0)){ rp(T.fo2.createView(),0,T.bgComp,PL.sFBH,3,1); rp(T.fo.createView(),0,T.bgFB2,PL.sFBV,3,1); } }   /* 거품 이어 붙이기: 가로·세로로 살짝 번지게 */
   const p=e.beginRenderPass({colorAttachments:[{view:OFF?offTex.createView():ctx.getCurrentTexture().createView(),clearValue:S.sky==="off"?{r:1,g:1,b:1,a:1}:{r:0,g:1/255,b:42/255,a:1},loadOp:"clear",storeOp:"store"}],depthStencilAttachment:{view:depth.createView(),depthClearValue:1,depthLoadOp:"clear",depthStoreOp:"store"}});
   p.setBindGroup(0,BGR); if(S.sky!=="off"){ p.setPipeline(PL.sky); p.draw(3); }
   if(sandN){ p.setPipeline(PL.sand); p.setVertexBuffer(0,sandBuf); p.draw(sandN); }
