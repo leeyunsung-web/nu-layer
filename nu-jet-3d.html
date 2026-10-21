@@ -1309,7 +1309,7 @@ function step(e,k){
   const POOL=DROP&&S.dpool>0; pF[16]=DROP&&!POOL&&S.dfade>0?1/(72*(9-7.8*S.dfade)):0; pF[17]=DROP&&!POOL?0.015+0.1*(1-S.dspread):0;   /* 웅덩이가 있으면 사라지지 않고 바닥에서 끌리지도 않는다 */ pF[18]=JEL?0.04:STK?Math.max(DROP?0.25:0,0.06+0.2*stk):DROP?0.25:0.06;   /* 파도 장면은 약하게: 세면 물보라가 덩어리째 눌려 따로 튀어 나가지 못한다 */ pF[19]=HW1;
   pF[20]=DS; pF[21]=DROP?0:S.foam*2; pF[22]=!DROP&&S.soak>0?S.soak/(72*0.4):0; pF[23]=S.mat!==1?S.spray*0.35:0;
   pF[24]=EYEG[0]; pF[25]=EYEG[1]; pF[26]=EYEG[2]; pF[27]=EYEG[3];
-  pF[32]=bedR(); pF[33]=S.ftile===0?0:1; pF[34]=SPCAP(); pF[35]=S.spgrav===undefined?2.5:S.spgrav; pF[34]=0; pF[35]=0; pF[28]=TOPG; pF[29]=!DROP?S.soak*0.06:0; pF[30]=FR; pF[31]=S.scene===0?S.latd:0;   /* 옆 출렁임 줄이기 (+10 = 거품 지도에 모으는 박자) */
+  pF[32]=bedR(); pF[33]=S.ftile===0?0:1; pF[34]=SPCAP(); pF[35]=S.spgrav===undefined?2.5:S.spgrav; pF[28]=TOPG; pF[29]=!DROP?S.soak*0.06:0; pF[30]=FR; pF[31]=S.scene===0?S.latd:0;   /* 옆 출렁임 줄이기 (+10 = 거품 지도에 모으는 박자) */
   const gB=Math.ceil(NBLK/WG), gP=Math.ceil(N/WG);
   /* ① 알갱이가 있는 칸 묶음(과 이웃)만 골라 목록을 만들고 → ② 그 묶음만 비우고 계산한다 (빈 공기는 건너뛴다) */
   let c=e.beginComputePass(); c.setBindGroup(0,BG0,[256*k]);
