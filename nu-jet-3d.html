@@ -128,13 +128,14 @@ const CTL=[
  ["secLiq","물보라 양","spray",0,1,0.02,0.5,"%","부서지며 튀는 물에서 흩어지는 작은 물보라 알갱이의 양. 작은 알갱이는 따로 가볍게 계산해 무겁지 않습니다. 카메라에 가까운 곳일수록 많이 생깁니다. 0이면 끔.",0],
  ["secLiq","물보라 크기","spsz",0.15,0.9,0.01,0.4,"배","작은 물보라 알갱이의 크기 (본체 알갱이 대비).",0],
  ["secLiq","칸당 알갱이","ppc",2,8,1,4,"알","격자 한 칸에 넣는 알갱이 수. 적을수록 가볍고(4알이면 8알의 절반), 많을수록 물 표면이 고와집니다. 바꾸면 다시 채웁니다.",1],
+ ["secWave","옆 출렁임 줄이기","latd",0,1,0.05,0.5,"","좁은 수조 옆벽에 부딪혀 좌우로 오가는 물결을 잠재웁니다. 앞뒤로 밀려오는 파도는 그대로입니다. 0이면 끄기, 높일수록 좌우 움직임이 빨리 멎습니다.",0],
  ["secLiq","중력","grav",0,1.2,0.01,0.3,"","아래로 당기는 힘.",0],
  ["secLiq","끈적임","visc",0,1.2,0.01,0.1,"","높을수록 꿀처럼 무겁게 흐릅니다.",0],
  ["secLiq","단단함","stiff",1,80,0.5,16,"","눌리지 않으려는 힘. 높이면 철썩 튀고 깊은 바닥도 덜 눌리지만 계산이 무거워지고, 낮추면 출렁출렁 눌립니다.",0],
  ["secLiq","말랑함","jmu",0,1,0.02,0.45,"%","젤리일 때 원래 모양으로 돌아가려는 탄력. 높이면 탱탱하게 튀고, 낮추면 흐물흐물합니다.",0],
  ["secLiq","뭉침","coh",0,1,0.02,0.3,"%","방울끼리 붙는 힘. 높이면 떨어진 물이 동글동글 맺힙니다.",0],
  ["secLiq","녹아 붙기","melt",0,1,0.02,0.3,"%","젤리가 모양을 잊는 빠르기. 높이면 물처럼 흘러 합쳐지고, 낮추면 오래 출렁입니다.",0],
- ["secLiq","방울 수 한도","pcount",20000,4000000,10000,3000000,"알","물을 이루는 알갱이 수의 한도 (그래픽카드가 버티는 만큼만). 알갱이 크기를 줄이면 이 한도 안에서 알갱이 수가 저절로 늘어납니다. 알갱이는 촘촘한 간격(한 칸에 8알)으로 채우고, 수조가 커서 한도를 넘을 때만 간격을 넓힙니다. 간격이 넓어지면 물보라가 굵어지니, 프레임이 떨어지면 수조 크기나 알갱이 크기를 조절하세요. 바꾸면 다시 채웁니다.",1],
+ ["secLiq","방울 수 한도","pcount",20000,3000000,10000,3000000,"알","물을 이루는 알갱이 수의 한도 (그래픽카드가 버티는 만큼만). 알갱이 크기를 줄이면 이 한도 안에서 알갱이 수가 저절로 늘어납니다. 알갱이는 촘촘한 간격(한 칸에 8알)으로 채우고, 수조가 커서 한도를 넘을 때만 간격을 넓힙니다. 간격이 넓어지면 물보라가 굵어지니, 프레임이 떨어지면 수조 크기나 알갱이 크기를 조절하세요. 바꾸면 다시 채웁니다.",1],
  ["secLook","물 색조","whue",-180,180,1,0,"도","물 색의 빛깔을 돌립니다. 몰디브 청록에서 −는 초록 쪽, +는 파랑 쪽.",0],
  ["secLook","물 채도","wsat",0,2,0.02,1,"배","물 색이 얼마나 짙고 선명한지.",0],
  ["secLook","물 밝기","wbri",0.5,1.5,0.01,1,"배","물 색의 밝기.",0],
@@ -255,7 +256,7 @@ struct P { g: vec4u, a: vec4f, b: vec4f, c: vec4f, d: vec4f, e: vec4f, f: vec4f,
 @group(0) @binding(0) var<uniform> U: P;
 @group(0) @binding(1) var<storage, read_write> pos: array<vec4f>;
 @group(0) @binding(2) var<storage, read_write> vel: array<vec4f>;
-@group(0) @binding(3) var<storage, read_write> Cm: array<u32>;   /* 알갱이 속도 기울기(3×3)를 반 정밀도로 5칸에 담는다 (메모리 절약) */
+@group(0) @binding(3) var<storage, read_write> Cm: array<mat3x3f>;   /* 알갱이 속도 기울기(3×3), 원래 정밀도 그대로 (압축하면 잔잔한 물의 작은 소용돌이가 사라져 움직임이 경직된다) */
 @group(0) @binding(4) var<storage, read_write> gi: array<atomic<i32>>;
 @group(0) @binding(5) var<storage, read_write> fa: array<atomic<i32>>;   /* 표면 거품 지도에 모으는 칸: [물 양, 앞뒤 속도, 옆 속도, 새 거품] */
 @group(0) @binding(6) var<storage, read_write> Fm: array<mat3x3f>;
@@ -310,10 +311,8 @@ fn enc(x: f32) -> i32 { return i32(clamp(x, -20000.0, 20000.0) * FP); }
 fn dec(x: i32) -> f32 { return f32(x) / FP; }
 fn gidx(c: vec3i) -> u32 { return u32(c.x) + U.g.x * (u32(c.y) + U.g.y * u32(c.z)); }
 fn gread(c: vec3i) -> vec4f { let i = gidx(c) * 4u; return vec4f(bitcast<f32>(atomicLoad(&gi[i])), bitcast<f32>(atomicLoad(&gi[i+1u])), bitcast<f32>(atomicLoad(&gi[i+2u])), bitcast<f32>(atomicLoad(&gi[i+3u]))); }
-fn h2(a: f32, b: f32) -> u32 { return pack2x16float(clamp(vec2f(a, b) * 256.0, vec2f(-60000.0), vec2f(60000.0))); }   /* 256배로 키워 담는다: 느리고 얇은 물의 작은 기울기도 반 정밀도에서 사라지지 않게 */
-fn loadC(k: u32) -> mat3x3f { let b = k * 5u; let a0 = unpack2x16float(Cm[b]); let a1 = unpack2x16float(Cm[b+1u]); let a2 = unpack2x16float(Cm[b+2u]); let a3 = unpack2x16float(Cm[b+3u]); let a4 = unpack2x16float(Cm[b+4u]);
-  return mat3x3f(a0.x, a0.y, a1.x, a1.y, a2.x, a2.y, a3.x, a3.y, a4.x) * (1.0 / 256.0); }
-fn storeC(k: u32, m: mat3x3f) { let b = k * 5u; Cm[b] = h2(m[0][0], m[0][1]); Cm[b+1u] = h2(m[0][2], m[1][0]); Cm[b+2u] = h2(m[1][1], m[1][2]); Cm[b+3u] = h2(m[2][0], m[2][1]); Cm[b+4u] = h2(m[2][2], 0.0); }
+fn loadC(k: u32) -> mat3x3f { return Cm[k]; }
+fn storeC(k: u32, m: mat3x3f) { Cm[k] = m; }
 fn wts(d: vec3f) -> array<vec3f,3> { return array<vec3f,3>(0.5*(0.5-d)*(0.5-d), 0.75-d*d, 0.5*(0.5+d)*(0.5+d)); }
 /* 벌어진 수조: 파도가 시작되는 쪽(파도 판, x가 작은 쪽)이 앞뒤로 가장 넓고, 해변 쪽으로 갈수록 좁아진다. d.w = 해변 쪽을 좁히는 정도 */
 fn zwalls(x: f32) -> vec2f {   /* 파도 판 쪽 폭(b.w)에서 해변 쪽 폭(d.w)으로 곧게 바뀐다 (둘 다 절반 값) */
@@ -387,6 +386,9 @@ fn updAt(cid: u32) {
   if (m > 0.0) {
     v = vec3f(dec(atomicLoad(&gi[i+1u])), dec(atomicLoad(&gi[i+2u])), dec(atomicLoad(&gi[i+3u]))) / m;
     v.y += U.a.x * U.a.y;
+    /* 옆 출렁임 줄이기: 좁은 수조 옆벽에 부딪혀 좌우로 오가는 물결을 잠재운다 (앞뒤로 밀려오는 파도는 그대로) */
+    let lat = U.h.w - select(0.0, 10.0, U.h.w >= 9.5);
+    if (lat > 0.0) { v.z *= exp(-lat * 0.1 * U.a.x); }
     let x = cid % U.g.x; let y = (cid / U.g.x) % U.g.y; let z = cid / (U.g.x*U.g.y);
     let fx = f32(x);
     if (x < 2u || x > U.g.x-3u) { v.x = 0.0; }
@@ -495,7 +497,7 @@ fn updAt(cid: u32) {
     let gen = U.e.y * (max(0.0, curl * U.e.x - 1.0) * 0.02 + select(0.0, max(0.0, sw - 1.6) * 0.03, thin) + select(0.0, 0.03, onBeach && thin && sw > 0.2));
     fo += gen;
     /* 표면 거품: 프레임의 마지막 박자에만, 위에서 내려다본 칸에 물 양·흐름·새 거품을 모은다 */
-    if (U.h.w > 0.0 && life > 0.0) {
+    if (U.h.w >= 9.5 && life > 0.0) {   /* 10 이상 = 이번 박자에 거품 지도에 모은다 */
       let R = U.h.z; let FX = u32(f32(U.g.x) * R) + 2u;
       let fi = (u32(p.z * R) * FX + u32(p.x * R)) * 8u;
       /* 거품은 물 위에 떠 있으니, 흐름은 위쪽 물일수록 크게 쳐서 모은다 (밑물은 반대로 흐르기도 해서 평균하면 멈춰 보인다) */
@@ -979,11 +981,11 @@ struct Q { g: vec4u };
 @group(0) @binding(0) var<uniform> Uq: Q;
 @group(0) @binding(1) var<storage, read_write> pos: array<vec4f>;
 @group(0) @binding(2) var<storage, read_write> vel: array<vec4f>;
-@group(0) @binding(3) var<storage, read_write> Cm: array<u32>;
+@group(0) @binding(3) var<storage, read_write> Cm: array<mat3x3f>;
 @group(0) @binding(4) var<storage, read_write> Fm: array<mat3x3f>;
 @group(0) @binding(5) var<storage, read_write> pos2: array<vec4f>;
 @group(0) @binding(6) var<storage, read_write> vel2: array<vec4f>;
-@group(0) @binding(7) var<storage, read_write> C2: array<u32>;
+@group(0) @binding(7) var<storage, read_write> C2: array<mat3x3f>;
 @group(0) @binding(8) var<storage, read_write> F2: array<mat3x3f>;
 @group(0) @binding(9) var<storage, read_write> cnt: array<atomic<u32>>;
 @group(0) @binding(10) var<storage, read_write> loc: array<u32>;
@@ -1013,7 +1015,7 @@ fn ncell() -> u32 { return Uq.g.x * Uq.g.y * Uq.g.z + 1u; }   /* 마지막 한 �
 }
 @compute @workgroup_size(256) fn sDest(@builtin(global_invocation_id) id: vec3u) { if (id.x >= Uq.g.w) { return; } let c = cellOf(pos[id.x]); loc[id.x] = offs[c] + bs[c / 256u] + loc[id.x]; }
 @compute @workgroup_size(256) fn sMoveA(@builtin(global_invocation_id) id: vec3u) { if (id.x >= Uq.g.w) { return; } let d = loc[id.x]; pos2[d] = pos[id.x]; vel2[d] = vel[id.x]; }
-@compute @workgroup_size(256) fn sMoveB(@builtin(global_invocation_id) id: vec3u) { if (id.x >= Uq.g.w) { return; } let d = loc[id.x]; for (var k = 0u; k < 5u; k++) { C2[d * 5u + k] = Cm[id.x * 5u + k]; } F2[d] = Fm[id.x]; }
+@compute @workgroup_size(256) fn sMoveB(@builtin(global_invocation_id) id: vec3u) { if (id.x >= Uq.g.w) { return; } let d = loc[id.x]; C2[d] = Cm[id.x]; F2[d] = Fm[id.x]; }
 `;
 const cv=$("cv"); let dev=null, ctx=null, fmtTex=null, depth=null;
 let offTex=null, B={}, PL={}, BG0=null, BGR=null, BGL=null, lineBuf=null, lineN=0, sandBuf=null, sandN=0, sandKey="";
@@ -1078,11 +1080,11 @@ async function init(){
 }
 
 /* 알갱이 통: 방울 수 한도에 맞춰 만든다 (한도를 바꾸면 다시 만든다). 처음에는 그리기 묶음이 아직 없으니 통만 */
-function allocParticles(first,want){ const cap=SMALL?40000:Math.min(4000000,Math.max(60000,want||Math.min(S.pcount,300000))); if(cap===MAXP) return false; MAXP=cap; FFULL=S.mat===1; const fsz=FFULL?MAXP*48:48*256;   /* 모양 기억 칸은 젤리일 때만 다 만든다 (물은 쓰지 않음) */
+function allocParticles(first,want){ const cap=SMALL?40000:Math.min(3000000,Math.max(60000,want||Math.min(S.pcount,300000))); if(cap===MAXP) return false; MAXP=cap; FFULL=S.mat===1; const fsz=FFULL?MAXP*48:48*256;   /* 모양 기억 칸은 젤리일 때만 다 만든다 (물은 쓰지 않음) */
   const SB=GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST|GPUBufferUsage.COPY_SRC;
   for(const k of ["pos","vel","C","F","pos2","vel2","C2","F2","loc"]) if(B[k]) B[k].destroy();
-  B.pos=dev.createBuffer({size:MAXP*16,usage:SB}); B.vel=dev.createBuffer({size:MAXP*16,usage:SB}); B.C=dev.createBuffer({size:MAXP*20,usage:SB}); B.F=dev.createBuffer({size:fsz,usage:SB});
-  B.pos2=dev.createBuffer({size:MAXP*16,usage:SB}); B.vel2=dev.createBuffer({size:MAXP*16,usage:SB}); B.C2=dev.createBuffer({size:MAXP*20,usage:SB}); B.F2=dev.createBuffer({size:fsz,usage:SB}); B.loc=dev.createBuffer({size:MAXP*4,usage:SB});
+  B.pos=dev.createBuffer({size:MAXP*16,usage:SB}); B.vel=dev.createBuffer({size:MAXP*16,usage:SB}); B.C=dev.createBuffer({size:MAXP*48,usage:SB}); B.F=dev.createBuffer({size:fsz,usage:SB});
+  B.pos2=dev.createBuffer({size:MAXP*16,usage:SB}); B.vel2=dev.createBuffer({size:MAXP*16,usage:SB}); B.C2=dev.createBuffer({size:MAXP*48,usage:SB}); B.F2=dev.createBuffer({size:fsz,usage:SB}); B.loc=dev.createBuffer({size:MAXP*4,usage:SB});
   if(!first){ const n0=N; resizeTank(); mkBGR(); T.w=0; N=Math.min(n0,MAXP); }
   return true; }
 let FFULL=false;
@@ -1114,7 +1116,7 @@ function fill(){ PEND.length=0; dripT=0; if(B.spr){ const e=dev.createCommandEnc
   if(!SMALL){ const need=Math.ceil(vol*S.ppc*1.05)+30000, want=Math.min(S.pcount,need); if(want>MAXP || want<MAXP*0.5) allocParticles(false,want); } SPC=Math.max(Math.cbrt(1/S.ppc),Math.cbrt(vol/Math.min(MAXP*0.97,S.pcount)));   /* 정한 방울 수에 맞춰 간격을 정한다 */ const sp=SPC, P=new Float32Array(MAXP*4); let n=0;
   for(let z=3.2;z<GZ-3.2;z+=sp){ for(let y=3.2;y<top;y+=sp) for(let x=PADX+1.2;x<GX-3.2;x+=sp){ if(y<floorAt(x)+1.3) continue; const zw=zwallsJS(x); if(z<zw[0]+0.2||z>zw[1]+0.8) continue; if(n>=MAXP) break;
     P[n*4]=x+(Math.random()-.5)*sp*0.3; P[n*4+1]=y+(Math.random()-.5)*sp*0.3; P[n*4+2]=z+(Math.random()-.5)*sp*0.3; P[n*4+3]=1; n++; } }
-  N=n; dev.queue.writeBuffer(B.pos,0,P,0,n*4); dev.queue.writeBuffer(B.vel,0,new Float32Array(n*4)); dev.queue.writeBuffer(B.C,0,new Uint32Array(n*5)); writeF(0,n);
+  N=n; dev.queue.writeBuffer(B.pos,0,P,0,n*4); dev.queue.writeBuffer(B.vel,0,new Float32Array(n*4)); dev.queue.writeBuffer(B.C,0,new Float32Array(n*12)); writeF(0,n);
   stepNo=0; WPH=0; PADX=2.5; pVol=sp*sp*sp; realSize(); }
 /* 알갱이 실제 크기 알려 주기: 수조가 크면 칸 수 한도·방울 수 한도 때문에 정한 크기보다 커진다 */
 function realSize(){ const o=inputs.dsz&&inputs.dsz[1]; if(!o) return; const b0=Math.cbrt(1/S.ppc), real=SPC*DS/b0, why=SPC>b0+1e-6?"방울 수 한도":DS>S.dsz+1e-6?"칸 수 한도":"";
@@ -1123,7 +1125,7 @@ let pVol=0.125;
 function ident(n){ const a=new Float32Array(n*12); for(let i=0;i<n;i++){ a[i*12]=1; a[i*12+5]=1; a[i*12+10]=1; } return a; }
 function dropBlob(){ if(!E.ok) return; const sp=spacing(), R=Math.min(GY,GZ)*0.16, cx=GX*(0.3+0.4*Math.random()), cy=GY-R-4, cz=GZ/2+(Math.random()-.5)*GZ*0.3, A=[];
   for(let z=-R;z<=R;z+=sp) for(let y=-R;y<=R;y+=sp) for(let x=-R;x<=R;x+=sp){ if(x*x+y*y+z*z>R*R || N+A.length/4>=MAXP) continue; A.push(cx+x,cy+y,cz+z,1); }
-  const k=A.length/4; if(!k) return; dev.queue.writeBuffer(B.pos,N*16,new Float32Array(A)); const V=new Float32Array(k*4); for(let i=0;i<k;i++){ V[i*4+1]=-0.5/DS; } dev.queue.writeBuffer(B.vel,N*16,V); dev.queue.writeBuffer(B.C,N*20,new Uint32Array(k*5)); writeF(N,k); N+=k; }
+  const k=A.length/4; if(!k) return; dev.queue.writeBuffer(B.pos,N*16,new Float32Array(A)); const V=new Float32Array(k*4); for(let i=0;i<k;i++){ V[i*4+1]=-0.5/DS; } dev.queue.writeBuffer(B.vel,N*16,V); dev.queue.writeBuffer(B.C,N*48,new Float32Array(k*12)); writeF(N,k); N+=k; }
 
 /* 물방울 하나: 공 모양으로 방울을 채워 아래(와 옆)로 던진다. 줄 세우며 사라진 방울을 정리하는 동안에는 잠깐 기다렸다 넣는다 */
 const PEND=[]; let dripT=0, autoDrip=true, compacting=false;
@@ -1133,7 +1135,7 @@ function spawnDrop(){ if(!E.ok) return; const sp=SPC, R=S.dsize/DS, m=R+4, cx=GX
   PEND.push({A,vx,vz}); flushDrops(); }
 function flushDrops(){ if(compacting) return; while(PEND.length){ const {A,vx,vz}=PEND.shift(); let k=Math.min(A.length/4,MAXP-N); if(k<=0) break;
     dev.queue.writeBuffer(B.pos,N*16,new Float32Array(A.slice(0,k*4))); const V=new Float32Array(k*4); for(let i=0;i<k;i++){ V[i*4]=vx; V[i*4+1]=-0.35/DS; V[i*4+2]=vz; }
-    dev.queue.writeBuffer(B.vel,N*16,V); dev.queue.writeBuffer(B.C,N*20,new Uint32Array(k*5)); writeF(N,k); N+=k; } }
+    dev.queue.writeBuffer(B.vel,N*16,V); dev.queue.writeBuffer(B.C,N*48,new Float32Array(k*12)); writeF(N,k); N+=k; } }
 
 /* 파도 판 위치: 빠르게 밀고 천천히 돌아오는 모양. 한 박자에 움직이는 거리는 제한 */
 function padStep(){ const sps=SPS*0.2/DT; WPH+=1/(S.per*sps); const ph=WPH%1, p=0.5-0.35*S.skew, w=ph<p?0.5*ph/p:0.5+0.5*(ph-p)/(1-p), f=0.5-0.5*Math.cos(w*Math.PI*2);
@@ -1149,7 +1151,7 @@ function step(e,k){
   const POOL=DROP&&S.dpool>0; pF[16]=DROP&&!POOL&&S.dfade>0?1/(72*(9-7.8*S.dfade)):0; pF[17]=DROP&&!POOL?0.015+0.1*(1-S.dspread):0;   /* 웅덩이가 있으면 사라지지 않고 바닥에서 끌리지도 않는다 */ pF[18]=JEL?0.04:DROP?0.25:0.06;   /* 파도 장면은 약하게: 세면 물보라가 덩어리째 눌려 따로 튀어 나가지 못한다 */ pF[19]=HW1;
   pF[20]=DS; pF[21]=DROP?0:S.foam*2; pF[22]=!DROP&&S.soak>0?S.soak/(72*0.4):0; pF[23]=S.mat===0?S.spray*0.35:0;
   pF[24]=EYEG[0]; pF[25]=EYEG[1]; pF[26]=EYEG[2]; pF[27]=EYEG[3];
-  pF[28]=TOPG; pF[29]=!DROP?S.soak*0.06:0; pF[30]=FR; pF[31]=0;
+  pF[28]=TOPG; pF[29]=!DROP?S.soak*0.06:0; pF[30]=FR; pF[31]=S.scene===0?S.latd:0;   /* 옆 출렁임 줄이기 (+10 = 거품 지도에 모으는 박자) */
   const gB=Math.ceil(NBLK/WG), gP=Math.ceil(N/WG);
   /* ① 알갱이가 있는 칸 묶음(과 이웃)만 골라 목록을 만들고 → ② 그 묶음만 비우고 계산한다 (빈 공기는 건너뛴다) */
   let c=e.beginComputePass(); c.setBindGroup(0,BG0,[256*k]);
@@ -1170,7 +1172,7 @@ let sortOn=Q.get("sort")!=="0";
 function sortPass(e){ if(!N || (!sortOn && S.scene!==1) || compacting) return false; dev.queue.writeBuffer(B.SU,0,new Uint32Array([GX,GY,GZ,N]));
   const c=e.beginComputePass(), nP=Math.ceil(N/256), nC=Math.ceil((CELLS+1)/256), run=(k,n)=>{ c.setPipeline(PL[k]); c.setBindGroup(0,E.sbg[k]); c.dispatchWorkgroups(n); };
   run("sClear",nC); run("sCount",nP); run("sScan",nC); run("sScanSums",1); run("sDest",nP); run("sMoveA",nP); run("sMoveB",nP); c.end();
-  e.copyBufferToBuffer(B.pos2,0,B.pos,0,N*16); e.copyBufferToBuffer(B.vel2,0,B.vel,0,N*16); e.copyBufferToBuffer(B.C2,0,B.C,0,N*20); if(FFULL) e.copyBufferToBuffer(B.F2,0,B.F,0,N*48);
+  e.copyBufferToBuffer(B.pos2,0,B.pos,0,N*16); e.copyBufferToBuffer(B.vel2,0,B.vel,0,N*16); e.copyBufferToBuffer(B.C2,0,B.C,0,N*48); if(FFULL) e.copyBufferToBuffer(B.F2,0,B.F,0,N*48);
   if(S.scene!==1) return false;
   /* 사라진 방울은 줄 맨 뒤에 모였다: 살아 있는 수 = 마지막 칸 앞까지의 수. 그만큼만 남긴다 */
   if(!B.rd) B.rd=dev.createBuffer({size:16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
@@ -1181,7 +1183,7 @@ function readAlive(n0){ compacting=true; const sc=S.scene; B.rd.mapAsync(GPUMapM
 let frameNo=0;
 const foamSurf=()=>S.fstyle===1 && S.scene===0 && S.mat===0;
 function runSteps(n){ if(n<=0) return; const e=dev.createCommandEncoder(); const rd=frameNo%4===0 && sortPass(e), n0=N, FS=foamSurf();
-  for(let k=0;k<n;k++){ step(e,k); if(FS && k===n-1){ pF[31]=1; } }   /* 마지막 박자만 거품 지도에 모은다 */
+  for(let k=0;k<n;k++){ step(e,k); if(FS && k===n-1){ pF[31]+=10; } }   /* 마지막 박자만 거품 지도에 모은다 */
   if(FS){ const tS=n*DT, tR=tS/(72*Math.max(0.05,S.spd)), keep=Math.exp(-tR/(0.8+7*S.flife));   /* 사라지는 시간은 실제 시간 기준 (빠르기를 낮춰도 그대로) */
     const u=new ArrayBuffer(48), ui=new Uint32Array(u), uf=new Float32Array(u); ui[0]=FX; ui[1]=FZ; uf[4]=FR; uf[5]=tS; uf[6]=keep; uf[7]=1.6*S.foam; uf[8]=pVol; uf[9]=DS; uf[10]=n; uf[11]=Math.exp(-tR/(0.3+1.5*S.flife));
     dev.queue.writeBuffer(B.FU,0,u); const c=e.beginComputePass(); c.setPipeline(PL.foamStep); c.setBindGroup(0,E.fbg); c.dispatchWorkgroups(Math.ceil(FX*FZ/64)); c.end(); e.copyBufferToBuffer(B.fmB,0,B.fmA,0,FX*FZ*16); }
