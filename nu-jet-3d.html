@@ -173,7 +173,6 @@ const CTL=[
  ["secLook","선 색","lcol",0,1,0.05,0,"%","물 테두리 선의 색. 0 = 물 색에 맞춘 진한 선, 1 = 또렷한 파란 선.",0],
  ["secLook","백사장 물 투명","btr",0,1,0.05,0.5,"%","해변 비탈이 시작되는 곳부터 백사장 끝으로 갈수록 물이 점점 비쳐 모래가 보입니다. 백사장 끝에서 이만큼 투명해집니다. 0이면 끄기.",0],
  ["secLook","백사장 물 하얘짐","bwh",0,1,0.05,0.5,"%","백사장으로 올라간 물이 거품이 섞인 것처럼 허옇게 됩니다. 해변 비탈 앞쪽부터 하얘지고, 끝으로 갈수록 '백사장 물 투명'만큼 비치며 사라집니다. 0이면 끄기.",0],
- ["secLook","하얘짐 단계","bstep",0,5,1,3,"","백사장 물의 하얘짐·비침을 몇 단계 색 띠로 끊을지. 0이면 매끈하게 바뀌고, 2~3이면 만화처럼 띠가 생깁니다.",0],
  ["secLook","속 구슬 건너뛰기","cull",0,1,0.05,0.6,"%","물 표면을 그릴 때 사방이 꽉 찬 속 구슬은 보이지 않으니 그리지 않아 화면 그리기가 가벼워집니다. 높일수록 더 많이 건너뛰고, 너무 높이면 물 표면에 작은 구멍·움푹한 곳이 생길 수 있습니다. 0이면 끄기.",0],
  ["secLook","하얘짐","wgr",0,1,0.05,0.7,"%","위로 솟구치는 물기둥·물보라 끝이 물색에서 흰색으로 부드럽게 바뀌는 정도. 떨어지는 방울은 하얘지지 않습니다. 0이면 끄기 (조금 가벼워짐).",0],
  ["secLook","거품 덩어리","fsz",0,1,0.05,0.5,"%","(표면 그림) 거품 덩어리의 굵기. 높이면 거품이 넓고 통통하게 퍼지고, 낮추면 가늘게 갈라진 무늬만 남습니다.",0],
@@ -218,7 +217,7 @@ for(const c of CTL){ const w=document.createElement("label"); w.className="ctl";
 /* 탭 나누기: 자주 쓰는 메뉴만 앞 세 탭으로 옮기고, 남은 것은 모두 '세부' 탭에 그대로 둔다 */
 { const TABS={tWave:["#scenes","#views","spd","amp","per","skew","level","beach","h3[data-sc='1']","#secDrop"],
     tWater:["#mats","stick","coh","visc","dsz","ppc","spray"],
-    tLook:["#colors","#skies","btr","bwh","bstep","px","mball","cull","smooth","conn","whue","wsat","wbri"]};
+    tLook:["#colors","#skies","btr","bwh","px","mball","cull","smooth","conn","whue","wsat","wbri"]};
   const el=k=>k[0]==="#"||k.includes("[")?document.querySelector(k):(inputs[k]&&inputs[k][0].closest(".ctl"));
   for(const t in TABS) for(const k of TABS[t]){ const e=el(k); if(e) $(t).appendChild(e); }
   const pn=$("panel"), more=$("tMore"), stop=$("bReset").closest(".row");
@@ -643,7 +642,7 @@ fn updAt(cid: u32) {
 
 /* 그리기: 방울마다 화면을 향한 작은 원판. 둥근 공처럼 빛을 나눠 칠한다(1단계 미리보기) */
 const RWGSL=/* wgsl */`
-struct Cam { vp: mat4x4f, view: mat4x4f, c0: vec4f, c1: vec4f, c2: vec4f, c3: vec4f, prm: vec4f, ext: vec4f, ext2: vec4f, ext3: vec4f, s0: vec4f, s1: vec4f, s2: vec4f, s3: vec4f, sun: vec4f, g0: vec4f, g1: vec4f, sand: vec4f, ex4: vec4f, ex5: vec4f, ex6: vec4f, ex7: vec4f, ex8: vec4f, ex9: vec4f, ex10: vec4f, ex11: vec4f };
+struct Cam { vp: mat4x4f, view: mat4x4f, c0: vec4f, c1: vec4f, c2: vec4f, c3: vec4f, prm: vec4f, ext: vec4f, ext2: vec4f, ext3: vec4f, s0: vec4f, s1: vec4f, s2: vec4f, s3: vec4f, sun: vec4f, g0: vec4f, g1: vec4f, sand: vec4f, ex4: vec4f, ex5: vec4f, ex6: vec4f, ex7: vec4f, ex8: vec4f, ex9: vec4f, ex10: vec4f };
 @group(0) @binding(0) var<uniform> K: Cam;
 @group(0) @binding(1) var<storage, read> pos: array<vec4f>;
 @group(0) @binding(2) var<storage, read> vel: array<vec4f>;
@@ -789,7 +788,7 @@ struct LV { @builtin(position) p: vec4f, @location(0) c: vec3f };
 /* 물 표면: ① 방울을 작은 공으로 그려 화면 깊이만 남기고 ② 깊이를 가로·세로로 두 번씩 녹여 잇고(가장자리는 지킨다)
    ③ 빠른 방울로 거품 자리를 표시한 뒤 ④ 녹인 깊이에서 면의 방향을 구해 셀 채색·외곽선·하이라이트를 칠한다 */
 const SWGSL=/* wgsl */`
-struct Cam { vp: mat4x4f, view: mat4x4f, c0: vec4f, c1: vec4f, c2: vec4f, c3: vec4f, prm: vec4f, ext: vec4f, ext2: vec4f, ext3: vec4f, s0: vec4f, s1: vec4f, s2: vec4f, s3: vec4f, sun: vec4f, g0: vec4f, g1: vec4f, sand: vec4f, ex4: vec4f, ex5: vec4f, ex6: vec4f, ex7: vec4f, ex8: vec4f, ex9: vec4f, ex10: vec4f, ex11: vec4f };
+struct Cam { vp: mat4x4f, view: mat4x4f, c0: vec4f, c1: vec4f, c2: vec4f, c3: vec4f, prm: vec4f, ext: vec4f, ext2: vec4f, ext3: vec4f, s0: vec4f, s1: vec4f, s2: vec4f, s3: vec4f, sun: vec4f, g0: vec4f, g1: vec4f, sand: vec4f, ex4: vec4f, ex5: vec4f, ex6: vec4f, ex7: vec4f, ex8: vec4f, ex9: vec4f, ex10: vec4f };
 @group(0) @binding(0) var<uniform> K: Cam;
 @group(0) @binding(1) var<storage, read> pos: array<vec4f>;
 @group(0) @binding(2) var<storage, read> vel: array<vec4f>;
@@ -1038,9 +1037,7 @@ struct CO { @location(0) c: vec4f, @builtin(frag_depth) z: f32 };
     let t = clamp((wx - bx) / max(K.prm.y - 4.0 - bx, 1.0), 0.0, 1.0);
     al = 1.0 - K.ex10.z * smoothstep(0.0, 1.0, t);
     /* 백사장으로 올라간 물은 거품이 섞여 허옇게 (비탈 앞쪽부터 빨리 하얘지고, 끝으로 갈수록 투명해지며 사라진다) */
-    var wh = K.ex10.w * smoothstep(0.0, 0.55, t);
-    /* 단계: 하얘짐과 비침을 몇 단계 색 띠로 끊어 셀 채색처럼 */
-    let ns = K.ex11.x; if (ns >= 1.0) { wh = floor(wh * ns + 0.5) / ns; al = 1.0 - floor((1.0 - al) * ns + 0.5) / ns; }
+    let wh = K.ex10.w * smoothstep(0.0, 0.55, t);
     col = mix(col, select(vec3f(1.0), vec3f(0.86, 0.93, 0.97), ndl < 0.32), wh);
   }
   let cp = K.vp * vec4f(P, 1.0);
@@ -1378,9 +1375,8 @@ function frame(now){
   camData.set([S.conn,DS,0.45,S.spsz],96); camData.set([visF(3),visF(GX-4),zcG(),S.cull>0?1.35-0.4*S.cull:0],100); camData.set([S.brd*spacing(),S.brt*spacing(),S.fcon,0],104);
   EYEG[0]=eye[0]+GX/2; EYEG[1]=eye[1]+GY/2; EYEG[2]=zcG()+(eye[2]+GZ/2-zcG())/Math.max(0.2,visF(EYEG[0])); EYEG[3]=dist*0.45;
   camData.set([FR,FX,FZ,foamSurf()?1:0],108); camData.set([0.62-0.5*S.fsz,0.02+0.16*S.frim,0.8*72*S.spd,S.flace],112); camData.set([S.frc,DS/(0.5+2.5*S.flsz),S.mat!==1?S.wgr:0,S.lcol],116);
-  camData.set([S.bstep||0,0,0,0],124);   /* 백사장 하얘짐 단계 (0 = 매끈하게) */
   camData.set([1.5+1.7*S.mball,0.3,S.scene===0?(S.btr||0):0,S.scene===0?(S.bwh===undefined?0.5:S.bwh):0],120);
-  dev.queue.writeBuffer(B.cam,0,camData,0,128); sandMesh(); lines();
+  dev.queue.writeBuffer(B.cam,0,camData,0,124); sandMesh(); lines();
   const SURF=S.rmode===0; if(SURF) surfTargets(w,h);
   const e=dev.createCommandEncoder();
   if(SURF){ const rp=(view,clear,bg,pl,count,inst,depthTex)=>{ const q=e.beginRenderPass({colorAttachments:[{view,clearValue:{r:clear,g:0,b:0,a:0},loadOp:"clear",storeOp:"store"}],...(depthTex?{depthStencilAttachment:{view:depthTex.createView(),depthClearValue:1,depthLoadOp:"clear",depthStoreOp:"store"}}:{})}); q.setPipeline(pl); q.setBindGroup(0,bg); q.draw(count,inst); q.end(); };
