@@ -645,12 +645,10 @@ fn sprite(vi: u32, ii: u32, scale: f32) -> SV {
   var r = mix(1.0, max(1.0, wfac(q.xyz.x)), 0.8) * max(K.ext2.x, 1.25 * d / (K.ext.y * 0.5 * K.ext.z)) * scale * (0.2 + 0.8 * smoothstep(0.0, 0.45, q.w));   /* 사라지는 방울은 작아진다 */
   /* 파도 장면: 멈춰서 홀로 남은 작은 물방울은 바닥에 스며들 듯 작아져 사라져 보인다 (계산에서는 남아 있다가 물에 합쳐지면 다시 보인다) */
   let vv = vel[ii];
-  /* 물속 깊이 묻힌 알갱이(주변이 꽉 찬 것)는 겉에서 보이지 않으니 그리지 않는다 → 그리는 양이 크게 준다 */
-  let buried = K.ext3.z > 1.5 && K.sun.w > 0.0 && auxDens(vv.w) > 0.95 * K.sun.w;
   if (K.ext3.w > 0.0 && length(vv.xyz) * K.ex4.y < 0.2) { r *= smoothstep(0.06, 0.24, auxDens(vv.w) / K.ext3.w); }
   /* 방울은 동그란 공. 이어짐(ex4.x)만큼 크게 그려, 가까운 방울끼리는 겹쳐 한 덩어리로 이어지고 멀리 떨어진 방울은 따로 남는다 */
   var o: SV; o.p = K.vp * vec4f(vc.xy + c * r, vc.z, 1.0); o.uv = c; o.c = vc; o.r = r; o.ph = 0.0; o.wb = 0.0;
-  if (q.w <= 0.0 || buried) { o.p = vec4f(9.0, 9.0, 9.0, 1.0); }
+  if (q.w <= 0.0) { o.p = vec4f(9.0, 9.0, 9.0, 1.0); }
   return o;
 }
 @vertex fn vsD(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> SV { return sprite(vi, ii, K.ex4.x); }
@@ -819,10 +817,7 @@ async function init(){
   const slow=setTimeout(()=>{ if(!E.ok) $("msg").textContent="그래픽카드가 대답하지 않아요. 브라우저(또는 앱)를 완전히 닫았다 다시 열어 주세요. 다른 창에서 이 페이지가 돌고 있다면 먼저 닫아 주세요."; },12000);
   if(!navigator.gpu){ $("msg").textContent="이 브라우저는 WebGPU(그래픽카드 계산)를 지원하지 않아요. 최신 크롬이나 엣지에서 열어 주세요."; return; }
   const ad=await navigator.gpu.requestAdapter({powerPreference:"high-performance"}); E.adapter=ad;   /* 어댑터를 붙잡아 둔다 (놓치면 일부 브라우저에서 연결이 끊긴다) */ if(!ad){ $("msg").textContent="그래픽카드를 찾지 못했어요."; return; }
-  const TS=ad.features.has("timestamp-query");
-  dev=await ad.requestDevice({requiredFeatures:TS?["timestamp-query"]:[],requiredLimits:{maxStorageBufferBindingSize:Math.min(ad.limits.maxStorageBufferBindingSize,256*1024*1024)}});
-  try{ const inf=ad.info||{}; GPUNAME=(inf.description||inf.vendor||"")+(inf.architecture?" "+inf.architecture:""); }catch(_){}
-  if(TS){ E.qs=dev.createQuerySet({type:"timestamp",count:4}); E.qb=dev.createBuffer({size:32,usage:GPUBufferUsage.QUERY_RESOLVE|GPUBufferUsage.COPY_SRC}); E.qr=dev.createBuffer({size:32,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}); } dev.addEventListener("uncapturederror",ev=>showErr("GPU: "+ev.error.message));
+  dev=await ad.requestDevice({requiredLimits:{maxStorageBufferBindingSize:Math.min(ad.limits.maxStorageBufferBindingSize,256*1024*1024)}}); dev.addEventListener("uncapturederror",ev=>showErr("GPU: "+ev.error.message));
   dev.lost.then(i=>{ $("msg").hidden=false; $("msg").textContent="그래픽카드 연결이 끊겼어요. 새로고침해 주세요. ("+(i.message||"")+")"; });
   if(OFF) fmtTex="rgba8unorm"; else { ctx=cv.getContext("webgpu"); fmtTex=navigator.gpu.getPreferredCanvasFormat(); ctx.configure({device:dev,format:fmtTex,alphaMode:"opaque"}); }
   const SB=GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST|GPUBufferUsage.COPY_SRC;
@@ -894,7 +889,7 @@ function resizeTank(){ tankSize(); BX0=GX*0.45; const SB=GPUBufferUsage.STORAGE|
   BG0=dev.createBindGroup({layout:E.bgl,entries:[{binding:0,resource:{buffer:B.U,size:128}},{binding:1,resource:{buffer:B.pos}},{binding:2,resource:{buffer:B.vel}},{binding:3,resource:{buffer:B.C}},{binding:4,resource:{buffer:B.gi}},{binding:5,resource:{buffer:B.gv}},{binding:6,resource:{buffer:B.F}},{binding:7,resource:{buffer:B.spr}},{binding:8,resource:{buffer:B.sc}}]}); }
 /* 물 채우기: 물 높이까지 방울을 고르게 (살짝 흔들어) 놓는다. 수조가 커서 방울이 한도를 넘으면 간격을 조금 넓힌다 */
 let SPC=0.5; function spacing(){ return SPC; }
-function fill(){ PEND.length=0; dripT=0; if(B.spr){ const e=dev.createCommandEncoder(); e.clearBuffer(B.spr); dev.queue.submit([e.finish()]); spDraw=0; } if(S.scene===1){ SPC=Math.cbrt(1/S.ppc); pVol=SPC**3; N=0; stepNo=0; PADX=2.5; PADV=0; return; }
+function fill(){ PEND.length=0; dripT=0; if(B.spr){ const e=dev.createCommandEncoder(); e.clearBuffer(B.spr); dev.queue.submit([e.finish()]); } if(S.scene===1){ SPC=Math.cbrt(1/S.ppc); pVol=SPC**3; N=0; stepNo=0; PADX=2.5; PADV=0; return; }
   const top=TOPG, vol=(()=>{ let v=0; for(let x=PADX+1.2;x<GX-3.2;x+=0.5){ const zw=zwallsJS(x); v+=0.5*(zw[1]-zw[0]+0.6)*Math.max(0,top-Math.max(3.2,floorAt(x)+1.3)); } return Math.max(1,v); })();   /* 물 부피(칸): 백사장 비탈만큼 빼고 셈 */
   /* 알갱이 통은 필요한 만큼만 (한도 안에서): 알갱이 크기를 줄이면 저절로 늘어난다 */
   if(!SMALL){ const need=Math.ceil(vol*S.ppc*1.05)+30000, want=Math.min(S.pcount,need); if(want>MAXP || want<MAXP*0.5) allocParticles(false,want); } SPC=Math.max(Math.cbrt(1/S.ppc),Math.cbrt(vol/Math.min(MAXP*0.97,S.pcount)));   /* 정한 방울 수에 맞춰 간격을 정한다 */ const sp=SPC, P=new Float32Array(MAXP*4); let n=0;
@@ -965,11 +960,8 @@ function readAlive(n0){ compacting=true; const sc=S.scene; B.rd.mapAsync(GPUMapM
     if(sc===S.scene && N===n0 && alive<=N) N=alive; compacting=false; flushDrops(); }).catch(()=>{ compacting=false; }); }
 /* 한 프레임의 박자들을 한 주문서에 담아 한 번에 보낸다 */
 let frameNo=0;
-/* 그래픽카드가 실제로 얼마나 걸리는지 재기 (지원하는 경우): 계산 처음·끝, 그리기 처음·끝 */
-const mark=(e,i)=>{ if(E.qs) e.beginComputePass({timestampWrites:{querySet:E.qs,[i%2?"endOfPassWriteIndex":"beginningOfPassWriteIndex"]:i}}).end(); };
-let GPUNAME="", TMS=null, tBusy=false;
-function runSteps(n){ if(n<=0) return; const e=dev.createCommandEncoder(); mark(e,0); const rd=frameNo%4===0 && sortPass(e), n0=N;
-  for(let k=0;k<n;k++) step(e,k); mark(e,1);
+function runSteps(n){ if(n<=0) return; const e=dev.createCommandEncoder(); const rd=frameNo%4===0 && sortPass(e), n0=N;
+  for(let k=0;k<n;k++) step(e,k);
   dev.queue.writeBuffer(B.U,0,params,0,256*n); dev.queue.submit([e.finish()]); if(rd) readAlive(n0); }
 
 /* 물 색 미세 조절: 색조를 돌리고, 채도·밝기를 곱한다 */
@@ -1016,7 +1008,7 @@ let last=performance.now(), fT=0, fN=0, acc=0, slowF=0;
 const SPS=360, MAXSTEP=12;   /* 빠르기 1배 = 1초에 360박자. 한 프레임에 최대 12박자까지만 (넘치면 그만큼 느려진다) */
 let stepsN=0;
 let inflight=0;   /* (화면 밖 시험용) 그래픽카드가 아직 못 끝낸 프레임 수 */
-let lastDraw=0, spDraw=0, spAsk=false, spBusy=false;
+let lastDraw=0;
 function frame(now){
   if(OFF && inflight>=2){ slowF=1; requestAnimationFrame(frame); return; }
   if(now-lastDraw<15.5){ requestAnimationFrame(frame); return; }   /* 화면은 1초에 60번까지만 그린다 (남는 힘은 계산에) */
@@ -1040,10 +1032,10 @@ function frame(now){
   EYEG[0]=eye[0]+GX/2; EYEG[1]=eye[1]+GY/2; EYEG[2]=zcG()+(eye[2]+GZ/2-zcG())/Math.max(0.2,visF(EYEG[0])); EYEG[3]=dist*0.45;
   dev.queue.writeBuffer(B.cam,0,camData,0,108); sandMesh(); lines();
   const SURF=S.rmode===0; if(SURF) surfTargets(w,h);
-  const e=dev.createCommandEncoder(); mark(e,2);
+  const e=dev.createCommandEncoder();
   if(SURF){ const rp=(view,clear,bg,pl,count,inst,depthTex)=>{ const q=e.beginRenderPass({colorAttachments:[{view,clearValue:{r:clear,g:0,b:0,a:0},loadOp:"clear",storeOp:"store"}],...(depthTex?{depthStencilAttachment:{view:depthTex.createView(),depthClearValue:1,depthLoadOp:"clear",depthStoreOp:"store"}}:{})}); q.setPipeline(pl); q.setBindGroup(0,bg); q.draw(count,inst); q.end(); };
     { const q=e.beginRenderPass({colorAttachments:[{view:T.dep.createView(),clearValue:{r:1e6,g:0,b:0,a:0},loadOp:"clear",storeOp:"store"}],depthStencilAttachment:{view:T.hw.createView(),depthClearValue:1,depthLoadOp:"clear",depthStoreOp:"store"}});
-      q.setBindGroup(0,T.bgDep); if(N){ q.setPipeline(PL.sDepth); q.draw(6,N); } if(S.mat===0&&spDraw){ q.setPipeline(PL.sDepthS); q.draw(6,spDraw); } q.end(); }
+      q.setBindGroup(0,T.bgDep); if(N){ q.setPipeline(PL.sDepth); q.draw(6,N); } if(S.mat===0){ q.setPipeline(PL.sDepthS); q.draw(6,262144); } q.end(); }
     if(S.brd>0){ rp(T.sm.createView(),1e6,T.bgH1,PL.sBrH,3,1); rp(T.dep.createView(),1e6,T.bgH2,PL.sBrV,3,1); }   /* 알갱이 잇기: 깊이 → 가로 잇기 → 세로 잇기 → 다시 깊이 그림 */
     rp(T.tmp.createView(),1e6,T.bgH1,PL.sBH,3,1); rp(T.sm.createView(),1e6,T.bgV,PL.sBV,3,1);
     rp(T.tmp.createView(),1e6,T.bgH2,PL.sBH,3,1); rp(T.sm.createView(),1e6,T.bgV,PL.sBV,3,1);
@@ -1052,17 +1044,10 @@ function frame(now){
   p.setBindGroup(0,BGR); if(S.sky!=="off"){ p.setPipeline(PL.sky); p.draw(3); }
   if(sandN){ p.setPipeline(PL.sand); p.setVertexBuffer(0,sandBuf); p.draw(sandN); }
   if(SURF){ p.setPipeline(PL.sComp); p.setBindGroup(0,T.bgComp); p.draw(3); p.setBindGroup(0,BGR); }
-  else { if(N){ p.setPipeline(PL.draw); p.draw(6,N); } if(S.mat===0&&spDraw){ p.setPipeline(PL.drawS); p.draw(6,spDraw); } }
+  else { if(N){ p.setPipeline(PL.draw); p.draw(6,N); } if(S.mat===0){ p.setPipeline(PL.drawS); p.draw(6,262144); } }
   p.setPipeline(PL.line); p.setVertexBuffer(0,lineBuf); p.draw(lineN);
-  p.end(); mark(e,3);
-  let ask=false; if(E.qs && !tBusy && frameNo%30===0 && stepsN>0){ e.resolveQuerySet(E.qs,0,4,E.qb,0); e.copyBufferToBuffer(E.qb,0,E.qr,0,32); ask=true; }
-  if(!spBusy && frameNo%15===0 && B.sc){ if(!B.spr_rd) B.spr_rd=dev.createBuffer({size:16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}); e.copyBufferToBuffer(B.sc,0,B.spr_rd,0,4); spAsk=true; }
-  dev.queue.submit([e.finish()]);
-  if(ask){ tBusy=true; E.qr.mapAsync(GPUMapMode.READ).then(()=>{ const t=new BigInt64Array(E.qr.getMappedRange()); const c=Number(t[1]-t[0])/1e6, r=Number(t[3]-t[2])/1e6; E.qr.unmap(); if(c>=0&&c<1000&&r>=0&&r<1000) TMS=[c,r]; tBusy=false; }).catch(()=>{ tBusy=false; }); }
-  /* 물보라를 몇 개 만들었는지 가끔 읽어 와 그만큼만 그린다 */
-  if(spAsk){ spAsk=false; spBusy=true; B.spr_rd.mapAsync(GPUMapMode.READ).then(()=>{ const n=new Uint32Array(B.spr_rd.getMappedRange())[0]; B.spr_rd.unmap(); spDraw=Math.min(262144,n+4096); spBusy=false; }).catch(()=>{ spBusy=false; }); }
-  if(OFF){ inflight++; dev.queue.onSubmittedWorkDone().then(()=>{ inflight--; }); }
-  fN++; fT+=dt; if(fT>=0.5){ $("stat").textContent=N.toLocaleString()+"알 · "+Math.round(fN/fT)+"fps · 1초 "+Math.round(stepsN/fT)+"박자"+(TMS?" · 계산 "+TMS[0].toFixed(1)+"ms · 그리기 "+TMS[1].toFixed(1)+"ms":"")+(GPUNAME?" · "+GPUNAME:"")+(slowF>0?" · 그래픽카드가 따라가지 못해 조금 느리게 흐르는 중":""); fN=0; fT=0; stepsN=0; }
+  p.end(); dev.queue.submit([e.finish()]); if(OFF){ inflight++; dev.queue.onSubmittedWorkDone().then(()=>{ inflight--; }); }
+  fN++; fT+=dt; if(fT>=0.5){ $("stat").textContent=N.toLocaleString()+"알 · "+Math.round(fN/fT)+"fps · 1초 "+Math.round(stepsN/fT)+"박자"+(slowF>0?" · 그래픽카드가 따라가지 못해 조금 느리게 흐르는 중":""); fN=0; fT=0; stepsN=0; }
   requestAnimationFrame(frame);
 }
 
