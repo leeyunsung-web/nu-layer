@@ -27,6 +27,15 @@ header a{color:var(--line);font-weight:800}
 .stage{position:relative;border:3px solid var(--line);border-radius:14px;overflow:hidden;background:var(--night);aspect-ratio:16/10;width:100%;touch-action:none;cursor:grab}
 .stage canvas{position:absolute;inset:0;display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges}
 .stage:fullscreen{border:0;border-radius:0;aspect-ratio:auto;width:100vw;height:100vh}
+/* 집중 바: 전체 화면일 때 아래에 떠서, 어디를 화면 가운데 둘지·확대·높이를 조절한다. 가만히 두면 흐려진다 */
+.fsbar{display:none;position:absolute;left:50%;bottom:14px;transform:translateX(-50%);gap:14px;align-items:center;flex-wrap:wrap;justify-content:center;
+  background:rgba(20,16,40,.62);color:#F3ECFA;padding:8px 14px;border-radius:12px;font-size:13px;font-weight:700;cursor:default;transition:opacity .4s;max-width:calc(100% - 32px)}
+.fsbar label{display:flex;align-items:center;gap:6px}
+.fsbar small{font-weight:500;opacity:.8}
+.fsbar input{width:140px}
+.fsbar button{font-size:12px;padding:4px 10px}
+.stage:fullscreen .fsbar{display:flex}
+.stage:fullscreen .fsbar.idle{opacity:.12}
 .msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;color:#E9DDF5;font-size:14px;line-height:1.6}
 .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 button{font:inherit;font-size:13px;font-weight:800;color:var(--ink);background:var(--panel);border:2px solid var(--line);border-radius:999px;min-height:40px;padding:6px 15px;cursor:pointer;white-space:nowrap}
@@ -70,7 +79,13 @@ h3{margin:4px 0 0;font-size:12px;letter-spacing:.08em;color:var(--soft)}
   </header>
   <div class="main">
     <div class="stagebox">
-      <div class="stage" id="stage"><canvas id="cv" aria-label="3D 수조 화면"></canvas><div class="msg" id="msg">그래픽카드를 준비하는 중…</div></div>
+      <div class="stage" id="stage"><canvas id="cv" aria-label="3D 수조 화면"></canvas><div class="msg" id="msg">그래픽카드를 준비하는 중…</div>
+        <div class="fsbar" id="fsbar" aria-label="집중 조절">
+          <label>집중 위치 <small>파도 판</small><input type="range" id="fb_cfx" min="-1" max="1" step="0.01"><small>백사장</small></label>
+          <label>확대<input type="range" id="fb_czoom" min="0.4" max="4" step="0.01"></label>
+          <label>높이<input type="range" id="fb_cpit" min="-5" max="85" step="0.5"></label>
+          <button type="button" id="fb_full">전체 화면 끝</button>
+        </div></div>
       <div class="bar">
         <button id="bSlap" class="hot" type="button" title="파도 판을 한 번 세게 밉니다 (스페이스 키)" data-sc="0">철썩!</button>
         <button id="bWave" type="button" aria-pressed="true" data-sc="0">파도 판 움직이기</button>
@@ -173,6 +188,7 @@ const CTL=[
  ["secLook","선 색","lcol",0,1,0.05,0,"%","물 테두리 선의 색. 0 = 물 색에 맞춘 진한 선, 1 = 또렷한 파란 선.",0],
  ["secLook","백사장 물 투명","btr",0,1,0.05,0.5,"%","해변 비탈이 시작되는 곳부터 백사장 끝으로 갈수록 물이 점점 비쳐 모래가 보입니다. 백사장 끝에서 이만큼 투명해집니다. 0이면 끄기.",0],
  ["secLook","백사장 물 하얘짐","bwh",0,1,0.05,0.5,"%","백사장으로 올라간 물이 거품이 섞인 것처럼 허옇게 됩니다. 해변 비탈 앞쪽부터 하얘지고, 끝으로 갈수록 '백사장 물 투명'만큼 비치며 사라집니다. 0이면 끄기.",0],
+ ["secLook","집중 위치","cfx",-1,1,0.01,0,"","화면 가운데에 둘 곳. -1 = 파도 판 쪽, 0 = 수조 가운데, 1 = 백사장 쪽. 전체 화면에서는 아래 바로 조절합니다.",0],
  ["secLook","속 구슬 건너뛰기","cull",0,1,0.05,0.6,"%","물 표면을 그릴 때 사방이 꽉 찬 속 구슬은 보이지 않으니 그리지 않아 화면 그리기가 가벼워집니다. 높일수록 더 많이 건너뛰고, 너무 높이면 물 표면에 작은 구멍·움푹한 곳이 생길 수 있습니다. 0이면 끄기.",0],
  ["secLook","하얘짐","wgr",0,1,0.05,0.7,"%","위로 솟구치는 물기둥·물보라 끝이 물색에서 흰색으로 부드럽게 바뀌는 정도. 떨어지는 방울은 하얘지지 않습니다. 0이면 끄기 (조금 가벼워짐).",0],
  ["secLook","거품 덩어리","fsz",0,1,0.05,0.5,"%","(표면 그림) 거품 덩어리의 굵기. 높이면 거품이 넓고 통통하게 퍼지고, 낮추면 가늘게 갈라진 무늬만 남습니다.",0],
@@ -202,11 +218,12 @@ const COLORS={
 };
 /* 윤성이 정한 처음 값 (2026-10-21, 설정 복사로 받은 값) */
 const SAVED={"dsz":0.38,"obed":0.45,"cull":0.6,"fdraw":0,"ppc":3,"tz1":104,"col":"maldives","rmode":0,"mat":2,"mball":0.7,"scene":0,"sky":"day","cyaw":-10.8,"cpit":-0.5,"czoom":1.205,"spd":0.25,"tx":256,"tz":160,"ty":48,"level":0.19,"amp":16,"per":1,"skew":0.55,"beach":0.14,"dint":0.7,"dsize":2.5,"dh":0.85,"dthrow":0.15,"dspread":0.6,"dfade":0.6,"grav":0.3,"visc":0.1,"stiff":2,"jmu":0.45,"coh":0.4,"melt":0.58,"pcount":3000000,"cloud":0.72,"cspd":0.35,"smooth":1,"foam":0.85,"px":1,"psize":0.5};
-const DEF=(()=>{ const o={col:"water",fstyle:1,fdraw:0,ftile:1,rmode:0,mat:0,scene:0,sky:"day",cyaw:-38,cpit:24,czoom:1}; for(const c of CTL) o[c[2]]=c[6]; return Object.assign(o,SAVED); })();
+const DEF=(()=>{ const o={col:"water",fstyle:1,fs2:1,fdraw:0,ftile:1,rmode:0,mat:0,scene:0,sky:"day",cyaw:-38,cpit:24,czoom:1}; for(const c of CTL) o[c[2]]=c[6]; return Object.assign(o,SAVED); })();
 const KEY="nu-jet-3d-v6";
 /* 예전 설정은 이어받되, 알갱이 크기·칸당 알갱이·방울 수 한도는 가장 작은 알갱이가 나오는 새 처음 값으로 */
 let S=Object.assign({},DEF); try{ let v=JSON.parse(localStorage.getItem(KEY)||"null"); if(!v){ v=JSON.parse(localStorage.getItem("nu-jet-3d-v5")||localStorage.getItem("nu-jet-3d-v4")||"null"); if(v){ delete v.pcount; delete v.dsz; delete v.ppc; } } if(v) for(const k in DEF) if(k in v) S[k]=v[k];
   /* 잠깐 넣었던 추천 파도 설정을 받은 브라우저는 그 값들만 전 처음값으로 되돌린다 (한 번만) */
+  if(v && v.fs2!==1){ S.fstyle=1; S.fs2=1; try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(_){} }   /* 표면 무늬 켜기 (한 번만) */
   if(v && v.reco===1){ for(const k of ["spd", "amp", "per", "skew", "level", "beach", "mat", "visc", "dsz", "ppc", "spray", "btr", "bwh", "px", "mball", "cull", "grav", "stiff", "obed", "ftile"]) S[k]=DEF[k]; delete S.reco; try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(_){} } }catch(_){}
 const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(_){} };
 const fmt=(c,v)=>c[7]==="도"?Math.round(v)+"°":c[7]==="%"?Math.round(v*100)+"%":c[7]==="초"?(+v).toFixed(1)+"초":c[7]==="칸"?(+v).toFixed(1)+"칸":c[7]==="px"?v+"px":c[7]==="알"?(v>=1000?Math.round(v/1000)+"천 알":Math.round(v)+"알"):c[7]==="배"?(+v).toFixed(2)+"배":(+v).toFixed(2);
@@ -217,7 +234,7 @@ for(const c of CTL){ const w=document.createElement("label"); w.className="ctl";
   r.addEventListener("input",()=>{ S[c[2]]=+r.value; o.textContent=fmt(c,S[c[2]]); save(); if(c[9]){ clearTimeout(refillT); refillT=setTimeout(()=>{ if(!E.ok) return; if(c[9]===2) resizeTank(); fill(); },350); } });
   w.append(sp,r,o,d); $(c[0]).appendChild(w); inputs[c[2]]=[r,o,c]; }
 /* 탭 나누기: 자주 쓰는 메뉴만 앞 세 탭으로 옮기고, 남은 것은 모두 '세부' 탭에 그대로 둔다 */
-{ const TABS={tWave:["#scenes","#views","spd","amp","per","skew","level","beach","h3[data-sc='1']","#secDrop"],
+{ const TABS={tWave:["#scenes","#views","cfx","spd","amp","per","skew","level","beach","h3[data-sc='1']","#secDrop"],
     tWater:["#mats","stick","coh","visc","dsz","ppc","spray"],
     tLook:["#colors","#skies","btr","bwh","px","mball","cull","smooth","conn","whue","wsat","wbri"]};
   const el=k=>k[0]==="#"||k.includes("[")?document.querySelector(k):(inputs[k]&&inputs[k][0].closest(".ctl"));
@@ -271,7 +288,16 @@ for(const b of document.querySelectorAll("#fstyles button")) b.addEventListener(
 fstUI();
 function colUI(){ for(const b of document.querySelectorAll("#mats button")) b.setAttribute("aria-pressed",+b.dataset.m===S.mat?"true":"false"); for(const b of document.querySelectorAll("#rmodes button")) b.setAttribute("aria-pressed",+b.dataset.r===S.rmode?"true":"false"); for(const b of document.querySelectorAll("#colors button")) b.setAttribute("aria-pressed",b.dataset.c===S.col?"true":"false"); for(const b of document.querySelectorAll("#skies button")) b.setAttribute("aria-pressed",b.dataset.k===S.sky?"true":"false"); }
 for(const [nm,y,p] of [["비스듬히",-38,24],["옆모습",0,3],["위에서",-20,62],["물가에서",-88,12]]){ const b=document.createElement("button"); b.type="button"; b.textContent=nm; b.addEventListener("click",()=>{ S.cyaw=y; S.cpit=p; S.czoom=1; save(); }); $("views").appendChild(b); }
-function syncUI(){ for(const k in inputs){ const [r,o,c]=inputs[k]; r.value=S[k]; o.textContent=fmt(c,S[k]); } colUI(); }
+function syncUI(){ for(const k in inputs){ const [r,o,c]=inputs[k]; r.value=S[k]; o.textContent=fmt(c,S[k]); } colUI(); fbSync(); }
+/* 집중 바 */
+function fbSync(){ for(const k of ["cfx","czoom","cpit"]){ const e=document.getElementById("fb_"+k); if(e && document.activeElement!==e) e.value=S[k]||0; } }
+{ const bar=document.getElementById("fsbar");
+  for(const k of ["cfx","czoom","cpit"]){ const e=document.getElementById("fb_"+k); e.addEventListener("input",()=>{ S[k]=+e.value; if(inputs[k]){ inputs[k][0].value=S[k]; inputs[k][1].textContent=fmt(inputs[k][2],S[k]); } save(); }); }
+  for(const ev of ["pointerdown","pointermove","wheel","dblclick"]) bar.addEventListener(ev,e=>e.stopPropagation());   /* 바를 만질 때는 화면이 돌지 않게 */
+  document.getElementById("fb_full").addEventListener("click",()=>{ try{ document.exitFullscreen(); }catch(_){} });
+  let tm=0; const wake=()=>{ bar.classList.remove("idle"); clearTimeout(tm); tm=setTimeout(()=>bar.classList.add("idle"),2500); };
+  document.getElementById("stage").addEventListener("pointermove",wake); bar.addEventListener("pointermove",wake); document.addEventListener("fullscreenchange",()=>{ fbSync(); wake(); });
+  setInterval(()=>{ if(document.fullscreenElement) fbSync(); },300); }
 for(const b of document.querySelectorAll("#scenes button")) b.addEventListener("click",()=>{ if(S.scene===+b.dataset.s) return; S.scene=+b.dataset.s; save(); sceneUI(); if(E.ok) fill(); });
 function sceneUI(){ for(const b of document.querySelectorAll("#scenes button")) b.setAttribute("aria-pressed",+b.dataset.s===S.scene?"true":"false"); for(const el of document.querySelectorAll("[data-sc]")) el.hidden=+el.dataset.sc!==S.scene; }
 sceneUI();
@@ -1301,7 +1327,7 @@ function readAlive(n0){ compacting=true; const sc=S.scene; B.rd.mapAsync(GPUMapM
     if(sc===S.scene && N===n0 && alive<=N) N=alive; compacting=false; flushDrops(); }).catch(()=>{ compacting=false; }); }
 /* 한 프레임의 박자들을 한 주문서에 담아 한 번에 보낸다 */
 let frameNo=0;
-const foamSurf=()=>S.fdraw===1 && S.fstyle===1 && S.scene===0 && S.mat!==1;
+const foamSurf=()=>S.fstyle===1 && S.scene===0 && S.mat!==1;   /* 표면 무늬는 거품 그림과 따로 켜고 끈다 */
 function runSteps(n){ if(n<=0) return; const e=dev.createCommandEncoder(); const rd=frameNo%4===0 && sortPass(e), n0=N, FS=foamSurf();
   for(let k=0;k<n;k++){ step(e,k); if(FS && k===n-1){ pF[31]+=10; } }   /* 마지막 박자만 거품 지도에 모은다 */
   if(FS){ const tS=n*DT, tR=tS/(72*Math.max(0.05,S.spd)), keep=Math.exp(-tR/(0.8+7*S.flife));   /* 사라지는 시간은 실제 시간 기준 (빠르기를 낮춰도 그대로) */
@@ -1368,7 +1394,8 @@ function frame(now){
   if(cv.width!==w || cv.height!==h || !depth){ cv.width=w; cv.height=h; if(depth) depth.destroy(); depth=dev.createTexture({size:[w,h],format:"depth24plus",usage:GPUTextureUsage.RENDER_ATTACHMENT}); if(OFF){ if(offTex) offTex.destroy(); offTex=dev.createTexture({size:[w,h],format:fmtTex,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC}); } }
   const yaw=S.cyaw*Math.PI/180, pit=S.cpit*Math.PI/180, dist=Math.max(GX,GZ*Math.max(visF(3),visF(GX-4)))*1.55/S.czoom;
   const eye=[Math.sin(yaw)*Math.cos(pit)*dist, Math.sin(pit)*dist-2, Math.cos(yaw)*Math.cos(pit)*dist];
-  const V=m4.look(eye,[0,-GY*0.12,0],[0,1,0]), Pm=m4.persp(0.62,w/h,0.5,1000);
+  const fx=(S.cfx||0)*GX*0.42; eye[0]+=fx;   /* 집중 위치: 바라보는 곳을 수조 앞뒤로 옮긴다 */
+  const V=m4.look(eye,[fx,-GY*0.12,0],[0,1,0]), Pm=m4.persp(0.62,w/h,0.5,1000);
   const C=COLORS[S.col].c.map(c=>tint(c)), cc=c=>[c[0]/255,c[1]/255,c[2]/255];
   camData.set(Pm,0); camData.set(V,16); camData.set([...cc(C[0]),1],32); camData.set([...cc(C[1]),1],36); camData.set([...cc(C[2]),1],40); camData.set([...cc(C[3]),1.6],44);
   camData.set([spacing()*0.95*S.psize,GX,GY,GZ],48);
