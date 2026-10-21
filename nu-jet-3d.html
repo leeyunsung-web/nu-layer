@@ -120,6 +120,7 @@ const CTL=[
  ["secLiq","알갱이 크기","dsz",0.25,1,0.05,1,"배","물을 이루는 알갱이 하나의 크기. 수조 크기는 그대로 두고 알갱이만 작게 만들어 물보라가 더 잘게 부서집니다. 작게 할수록 알갱이 수가 크게 늘고(절반이면 8배) 계산이 무거워집니다. 바꾸면 다시 채웁니다.",2],
  ["secLiq","물보라 양","spray",0,1,0.02,0.5,"%","부서지며 튀는 물에서 흩어지는 작은 물보라 알갱이의 양. 작은 알갱이는 따로 가볍게 계산해 무겁지 않습니다. 카메라에 가까운 곳일수록 많이 생깁니다. 0이면 끔.",0],
  ["secLiq","물보라 크기","spsz",0.15,0.9,0.01,0.4,"배","작은 물보라 알갱이의 크기 (본체 알갱이 대비).",0],
+ ["secLiq","칸당 알갱이","ppc",2,8,1,4,"알","격자 한 칸에 넣는 알갱이 수. 적을수록 가볍고(4알이면 8알의 절반), 많을수록 물 표면이 고와집니다. 바꾸면 다시 채웁니다.",1],
  ["secLiq","중력","grav",0,1.2,0.01,0.3,"","아래로 당기는 힘.",0],
  ["secLiq","끈적임","visc",0,1.2,0.01,0.1,"","높을수록 꿀처럼 무겁게 흐릅니다.",0],
  ["secLiq","단단함","stiff",1,80,0.5,16,"","눌리지 않으려는 힘. 높이면 철썩 튀고 깊은 바닥도 덜 눌리지만 계산이 무거워지고, 낮추면 출렁출렁 눌립니다.",0],
@@ -131,6 +132,8 @@ const CTL=[
  ["secLook","물 채도","wsat",0,2,0.02,1,"배","물 색이 얼마나 짙고 선명한지.",0],
  ["secLook","물 밝기","wbri",0.5,1.5,0.01,1,"배","물 색의 밝기.",0],
  ["secLook","이어짐","conn",1,2.5,0.05,1.5,"배","방울끼리 이어 보이는 거리. 높이면 가까운 방울이 한 덩어리로 이어지고, 낮추면 떨어진 방울이 하나하나 따로 보입니다.",0],
+ ["secLook","잇는 거리","brd",0,8,0.1,1.5,"배","가까운 알갱이끼리 사이를 물로 이어 채우는 거리 (알갱이 간격의 몇 배). 높이면 물줄기·물다리·얇은 막이 잘 생기고, 0이면 잇지 않습니다.",0],
+ ["secLook","잇는 앞뒤 차","brt",0.2,8,0.1,2,"배","앞뒤로 얼마나 떨어진 알갱이까지 이을지 (알갱이 간격의 몇 배). 높이면 겹쳐 보이는 먼 알갱이끼리도 이어집니다.",0],
  ["secLook","모래 색","sandc",0,1,0.02,0.08,"%","백사장 모래 색. 0이면 하얀 백사장, 높일수록 노란 모래.",0],
  ["secLook","구름 양","cloud",0,1,0.02,0.55,"%","하늘을 덮는 구름의 양. 0이면 맑은 하늘.",0],
  ["secLook","구름 빠르기","cspd",0,2,0.02,0.35,"%","구름이 바람에 흘러가는 빠르기.",0],
@@ -203,7 +206,7 @@ const MAXCELLS=4000000;   /* 격자 칸 수 한도 (그래픽카드 한 번에 �
 function tankSize(){ const W0=SMALL?13:S.tzc, W1=W0, wz=W0;   /* 계산은 언제나 '계산 폭'의 반듯한 상자 */
   if(SMALL){ DS=1; GX=40; GY=24; GZ=20; } else { DS=Math.max(S.dsz,Math.cbrt((S.tx+7)*(S.ty+7)*(wz+7)/MAXCELLS)); GX=Math.round(S.tx/DS)+7; GY=Math.round(S.ty/DS)+7; GZ=Math.round(wz/DS)+7; }
   HW0=(SMALL?6.5:W0/DS)/2; HW1=(SMALL?6.5:W1/DS)/2; CELLS=GX*GY*GZ; }
-let HW0=20, HW1=20; const EYEG=[0,0,0,1];   /* 카메라 자리 (격자 칸)와 가까움 기준 거리 */
+let HW0=20, HW1=20, NBLK=1; const EYEG=[0,0,0,1];   /* 카메라 자리 (격자 칸)와 가까움 기준 거리 */
 tankSize();
 const E={ok:false};
 let N=0, stepNo=0, PADX=2.5, PADV=0, SLAP=0, waveOn=true, paused=false, AMPc=0, WPH=0;
@@ -235,6 +238,45 @@ struct Sp { p: vec4f, v: vec4f };   /* p.w = 남은 시간, v.w = 크기(본체 
 @group(0) @binding(7) var<storage, read_write> spr: array<Sp>;
 @group(0) @binding(8) var<storage, read_write> sc: array<atomic<u32>>;
 const SPMAX: u32 = 262144u;
+/* 빈 공간 건너뛰기: 격자를 4×4×4 칸 묶음으로 나눠, 물 알갱이가 있는 묶음(과 그 이웃)만 비우고 계산한다.
+   sc 칸: [0] 물보라 수, [1] 계산할 묶음 수, [16..] 묶음마다 '알갱이 있음', 그 뒤 '계산할 묶음' 목록, 그 뒤 '계산함' 표시 */
+fn nbx() -> vec3u { return (U.g.xyz + 3u) / 4u; }
+fn nblk() -> u32 { let n = nbx(); return n.x * n.y * n.z; }
+fn bidx(c: vec3u) -> u32 { let b = c / 4u; let n = nbx(); return b.x + n.x * (b.y + n.y * b.z); }
+/* 알갱이 속도 칸의 네 번째 값에 밀도·스며듦·거품을 함께 담는다 (따로 큰 칸을 읽고 쓰지 않게) */
+fn packAux(dn: f32, sk: f32, fo: f32) -> f32 {
+  let d = pack2x16float(vec2f(min(dn, 60000.0), 0.0)) & 0xFFFFu;
+  let a = u32(clamp(sk, 0.0, 1.0) * 127.0 + 0.5); let b = u32(clamp(fo, 0.0, 1.0) * 127.0 + 0.5);
+  return bitcast<f32>(d | (a << 16u) | (b << 23u));
+}
+fn auxSoak(w: f32) -> f32 { return f32((bitcast<u32>(w) >> 16u) & 127u) / 127.0; }
+fn auxFoam(w: f32) -> f32 { return f32((bitcast<u32>(w) >> 23u) & 127u) / 127.0; }
+@compute @workgroup_size(64) fn bClear(@builtin(global_invocation_id) id: vec3u) {
+  if (id.x == 0u) { atomicStore(&sc[1], 0u); }
+  if (id.x < nblk()) { atomicStore(&sc[16u + id.x], 0u); }
+}
+@compute @workgroup_size(64) fn bMark(@builtin(global_invocation_id) id: vec3u) {
+  if (id.x >= U.g.w) { return; } let q = pos[id.x]; if (q.w <= 0.0) { return; }
+  let c = vec3u(clamp(vec3i(floor(q.xyz)), vec3i(0), vec3i(U.g.xyz) - 1));
+  atomicStore(&sc[16u + bidx(c)], 1u);
+}
+@compute @workgroup_size(64) fn bBuild(@builtin(global_invocation_id) id: vec3u) {
+  let nb = nblk(); if (id.x >= nb) { return; }
+  let n = nbx(); let b = vec3i(i32(id.x % n.x), i32((id.x / n.x) % n.y), i32(id.x / (n.x * n.y)));
+  var on = 0u;
+  for (var dz = -1; dz <= 1; dz++) { for (var dy = -1; dy <= 1; dy++) { for (var dx = -1; dx <= 1; dx++) {
+    let o = b + vec3i(dx, dy, dz);
+    if (all(o >= vec3i(0)) && all(o < vec3i(n))) { on = on | atomicLoad(&sc[16u + u32(o.x) + n.x * (u32(o.y) + n.y * u32(o.z))]); }
+  }}}
+  atomicStore(&sc[16u + 2u * nb + id.x], on);
+  if (on != 0u) { let k = atomicAdd(&sc[1], 1u); atomicStore(&sc[16u + nb + k], id.x); }
+}
+/* 계산할 묶음 하나 = 일꾼 64명(4×4×4 칸) */
+fn blkCell(wg: u32, l: u32) -> vec4u {
+  let nb = nblk(); let b = atomicLoad(&sc[16u + nb + wg]); let n = nbx();
+  let c = vec3u(b % n.x, (b / n.x) % n.y, b / (n.x * n.y)) * 4u + vec3u(l % 4u, (l / 4u) % 4u, l / 16u);
+  return vec4u(c, select(0u, 1u, all(c < U.g.xyz)));
+}
 const FP: f32 = 1e5;
 const I3 = mat3x3f(1,0,0, 0,1,0, 0,0,1);
 fn enc(x: f32) -> i32 { return i32(clamp(x, -20000.0, 20000.0) * FP); }
@@ -255,6 +297,10 @@ fn floorY(x: f32) -> f32 { if (U.c.x > 0.0 && x > beachX()) { return 2.0 + U.c.x
   let n = U.g.x*U.g.y*U.g.z; if (id.x >= n) { return; }
   let i = id.x*4u; atomicStore(&gi[i],0); atomicStore(&gi[i+1u],0); atomicStore(&gi[i+2u],0); atomicStore(&gi[i+3u],0);
 }
+@compute @workgroup_size(64) fn clearGridS(@builtin(workgroup_id) w: vec3u, @builtin(local_invocation_index) l: u32) {
+  let c = blkCell(w.x, l); if (c.w == 0u) { return; }
+  let i = gidx(vec3i(c.xyz)) * 4u; atomicStore(&gi[i],0); atomicStore(&gi[i+1u],0); atomicStore(&gi[i+2u],0); atomicStore(&gi[i+3u],0);
+}
 /* 방울 → 격자 (한 번에): 질량, 운동량, 그리고 '모양 기억'에서 나온 누르는 힘·당기는 힘을 함께 뿌린다 */
 /* 1단계: 무게만 격자에 모은다 (칸마다 1번만 더하기) */
 @compute @workgroup_size(64) fn p2gMass(@builtin(global_invocation_id) id: vec3u) {
@@ -270,7 +316,7 @@ fn floorY(x: f32) -> f32 { if (U.c.x > 0.0 && x > beachX()) { return 2.0 + U.c.x
 @compute @workgroup_size(64) fn p2g(@builtin(global_invocation_id) id: vec3u) {
   let pi = id.x; if (pi >= U.g.w) { return; }
   let q = pos[pi]; if (q.w <= 0.0) { return; }
-  let p = q.xyz; let m = 1.0; let v = vel[pi].xyz; let C = Cm[pi]; let F = Fm[pi];
+  let p = q.xyz; let m = 1.0; let v = vel[pi].xyz; let C = Cm[pi]; var F = I3; if (U.c.y > 0.0) { F = Fm[pi]; }
   let cell = vec3i(floor(p)); let d = p - vec3f(cell) - 0.5; let w = wts(d);
   var dens = 0.0;
   for (var gx = 0; gx < 3; gx++) { for (var gy = 0; gy < 3; gy++) { for (var gz = 0; gz < 3; gz++) {
@@ -297,14 +343,19 @@ fn floorY(x: f32) -> f32 { if (U.c.x > 0.0 && x > beachX()) { return 2.0 + U.c.x
   }}}
 }
 @compute @workgroup_size(64) fn updGrid(@builtin(global_invocation_id) id: vec3u) {
-  let n = U.g.x*U.g.y*U.g.z; if (id.x >= n) { return; }
-  let i = id.x*4u;
+  let n = U.g.x*U.g.y*U.g.z; if (id.x >= n) { return; } updAt(id.x);
+}
+@compute @workgroup_size(64) fn updGridS(@builtin(workgroup_id) w: vec3u, @builtin(local_invocation_index) l: u32) {
+  let c = blkCell(w.x, l); if (c.w == 0u) { return; } updAt(u32(gidx(vec3i(c.xyz))));
+}
+fn updAt(cid: u32) {
+  let i = cid*4u;
   let m = dec(atomicLoad(&gi[i]));
   var v = vec3f(0.0);
   if (m > 0.0) {
     v = vec3f(dec(atomicLoad(&gi[i+1u])), dec(atomicLoad(&gi[i+2u])), dec(atomicLoad(&gi[i+3u]))) / m;
     v.y += U.a.x * U.a.y;
-    let x = id.x % U.g.x; let y = (id.x / U.g.x) % U.g.y; let z = id.x / (U.g.x*U.g.y);
+    let x = cid % U.g.x; let y = (cid / U.g.x) % U.g.y; let z = cid / (U.g.x*U.g.y);
     let fx = f32(x);
     if (x < 2u || x > U.g.x-3u) { v.x = 0.0; }
     if (y < 2u || y > U.g.y-3u) { v.y = 0.0; }
@@ -321,7 +372,7 @@ fn floorY(x: f32) -> f32 { if (U.c.x > 0.0 && x > beachX()) { return 2.0 + U.c.x
       if (f32(y) < fy + 0.5) { let nn = normalize(vec3f(-U.c.x, 1.0, 0.0)); let vn = dot(v, nn); if (vn < 0.0) { v -= vn * nn; } }
     }
   }
-  gv[id.x] = vec4f(v, m);
+  gv[cid] = vec4f(v, m);
 }
 @compute @workgroup_size(64) fn sprayStep(@builtin(global_invocation_id) id: vec3u) {
   if (id.x >= SPMAX) { return; }
@@ -331,7 +382,8 @@ fn floorY(x: f32) -> f32 { if (U.c.x > 0.0 && x > beachX()) { return 2.0 + U.c.x
   let c = vec3i(floor(p));
   if (any(c < vec3i(2)) || any(c >= vec3i(U.g.xyz) - 2)) { life = 0.0; }
   else {
-    if (s.p.w < 0.995 && gv[gidx(c)].w > U.a.w * 0.45) { life = 0.0; }   /* 물에 다시 떨어지면 본체에 흡수 (막 튀어 나온 동안은 봐준다) */
+    let live = atomicLoad(&sc[16u + 2u * nblk() + bidx(vec3u(c))]) != 0u;   /* 계산하지 않은 묶음의 격자 값은 오래된 것이라 보지 않는다 */
+    if (live && s.p.w < 0.995 && gv[gidx(c)].w > U.a.w * 0.45) { life = 0.0; }   /* 물에 다시 떨어지면 본체에 흡수 (막 튀어 나온 동안은 봐준다) */
     if (p.y < floorY(p.x) + 0.7) { life = 0.0; }                     /* 바닥·모래에 닿으면 사라진다 */
     let zw = zwalls(p.x); if (p.z < zw.x - 0.5 || p.z > zw.y + 0.5) { life = 0.0; }
   }
@@ -355,15 +407,18 @@ fn floorY(x: f32) -> f32 { if (U.c.x > 0.0 && x > beachX()) { return 2.0 + U.c.x
   }}}
   let C = B * 4.0;
   /* 모양 기억 = 늘어난 정도 b (돌아가도 변하지 않는 양). b ← (I+dt∇v) b (I+dt∇v)ᵀ 후, 천천히 잊는다 */
-  let Fd = I3 + C * U.a.x;
-  var F = Fd * Fm[id.x] * transpose(Fd);
-  var dB = determinant(F);
-  if (!(dB > 0.01) || !(dB < 50.0)) { F = I3; dB = 1.0; }
-  let s2 = pow(dB, 1.0/3.0);
-  let ex = (F[0][0] + F[1][1] + F[2][2]) / (3.0 * s2);
-  var rl = U.c.z; if (ex > 1.8) { rl = max(rl, 0.4); }   /* 너무 늘어나면 크게 잊는다 (터지지 않게) */
-  F = F + (I3 * s2 - F) * rl;
-  F = F * (1.0 / s2);                                         /* 부피 변화는 밀도가 맡으니 모양만 남긴다 */
+  var F = I3;
+  if (U.c.y > 0.0) {   /* 젤리만: 물은 모양을 기억하지 않으니 읽지도 쓰지도 않는다 */
+    let Fd = I3 + C * U.a.x;
+    F = Fd * Fm[id.x] * transpose(Fd);
+    var dB = determinant(F);
+    if (!(dB > 0.01) || !(dB < 50.0)) { F = I3; dB = 1.0; }
+    let s2 = pow(dB, 1.0/3.0);
+    let ex = (F[0][0] + F[1][1] + F[2][2]) / (3.0 * s2);
+    var rl = U.c.z; if (ex > 1.8) { rl = max(rl, 0.4); }   /* 너무 늘어나면 크게 잊는다 (터지지 않게) */
+    F = F + (I3 * s2 - F) * rl;
+    F = F * (1.0 / s2);                                       /* 부피 변화는 밀도가 맡으니 모양만 남긴다 */
+  }
   p += v * U.a.x;
   let lo = vec3f(3.0, 3.0, 3.0); let hi = vec3f(f32(U.g.x)-4.0, f32(U.g.y)-4.0, f32(U.g.z)-4.0);
   let xn = p + v * U.a.x * 3.0;
@@ -392,14 +447,10 @@ fn floorY(x: f32) -> f32 { if (U.c.x > 0.0 && x > beachX()) { return 2.0 + U.c.x
       if (life <= 0.0) { life = 0.0; v = vec3f(0.0); }
     }
   }
-  /* 물일 때 '모양 기억' 칸은 방울마다 따로 계산하는 말랑한 테두리로 쓴다 (핏방울처럼):
-     열0 = 지난 박자 속도, 열1 = 늘어나는 방향, 열2.x = 늘어난 정도(−면 납작), 열2.y = 그 빠르기.
-     부딪혀 속도가 확 바뀌면 그 방향으로 납작해졌다가 용수철처럼 출렁이며 돌아온다 (그냥 떨어지는 동안은 그대로) */
-  /* 물일 때 '모양 기억' 칸은 거품과 스며들기 기록으로 쓴다: 열0.x = 거품 양(0~1), 열0.y = 모래에 스며든 정도, 열2.z = 9(표시) */
-  var Cout = C;
+  /* 물일 때 거품 양·모래에 스며든 정도는 속도 칸의 네 번째 값에 밀도와 함께 담아 둔다 */
+  var Cout = C; var fo = 0.0; var sk = 0.0;
   if (U.c.y <= 0.0) {
-    let W = Fm[id.x];
-    var fo = 0.0; var sk = 0.0; if (W[2].z == 9.0) { fo = W[0].x; sk = W[0].y; }
+    let w0 = vel[id.x].w; fo = auxFoam(w0); sk = auxSoak(w0);
     let sw = length(v) * U.e.x;                                   /* 바깥 세상 기준 빠르기 */
     let cu = C - transpose(C); let curl = sqrt(cu[0][1]*cu[0][1] + cu[0][2]*cu[0][2] + cu[1][2]*cu[1][2]);
     let fl = floorY(p.x);
@@ -429,23 +480,24 @@ fn floorY(x: f32) -> f32 { if (U.c.x > 0.0 && x > beachX()) { return 2.0 + U.c.x
       let zw = zwalls(xr);
       p = vec3f(xr, 3.3 + h2 * 1.2, mix(zw.x + 0.5, zw.y - 0.5, h3)); v = vec3f(0.0); Cout = mat3x3f(0,0,0,0,0,0,0,0,0); fo = 0.0; sk = 0.0;
     }
-    F = mat3x3f(vec3f(fo, sk, 0.0), vec3f(0.0), vec3f(0.0, 0.0, 9.0));
   }
   pos[id.x] = vec4f(p, life);
-  vel[id.x] = vec4f(v, dens);
+  vel[id.x] = vec4f(v, packAux(dens, sk, fo));
   Cm[id.x] = Cout;
-  Fm[id.x] = F;
+  if (U.c.y > 0.0) { Fm[id.x] = F; }
 }
 `;
 
 /* 그리기: 방울마다 화면을 향한 작은 원판. 둥근 공처럼 빛을 나눠 칠한다(1단계 미리보기) */
 const RWGSL=/* wgsl */`
-struct Cam { vp: mat4x4f, view: mat4x4f, c0: vec4f, c1: vec4f, c2: vec4f, c3: vec4f, prm: vec4f, ext: vec4f, ext2: vec4f, ext3: vec4f, s0: vec4f, s1: vec4f, s2: vec4f, s3: vec4f, sun: vec4f, g0: vec4f, g1: vec4f, sand: vec4f, ex4: vec4f, ex5: vec4f };
+struct Cam { vp: mat4x4f, view: mat4x4f, c0: vec4f, c1: vec4f, c2: vec4f, c3: vec4f, prm: vec4f, ext: vec4f, ext2: vec4f, ext3: vec4f, s0: vec4f, s1: vec4f, s2: vec4f, s3: vec4f, sun: vec4f, g0: vec4f, g1: vec4f, sand: vec4f, ex4: vec4f, ex5: vec4f, ex6: vec4f };
 @group(0) @binding(0) var<uniform> K: Cam;
 @group(0) @binding(1) var<storage, read> pos: array<vec4f>;
 @group(0) @binding(2) var<storage, read> vel: array<vec4f>;
 @group(0) @binding(3) var<storage, read> sp: array<vec4f>;
 /* 보이는 자리: 계산한 자리의 앞뒤(z)를 x에 따라 시작 폭→끝 폭 비율로 늘인다 (계산량은 그대로) */
+fn auxDens(w: f32) -> f32 { return unpack2x16float(bitcast<u32>(w) & 0xFFFFu).x; }
+fn auxFoam(w: f32) -> f32 { return f32((bitcast<u32>(w) >> 23u) & 127u) / 127.0; }
 fn wfac(x: f32) -> f32 { let t = clamp((x - 3.0) / max(K.prm.y - 7.0, 1.0), 0.0, 1.0); return mix(K.ex5.x, K.ex5.y, t); }
 fn wmap(q: vec3f) -> vec3f { return vec3f(q.x, q.y, K.ex5.z + (q.z - K.ex5.z) * wfac(q.x)); }
 struct VO { @builtin(position) p: vec4f, @location(0) uv: vec2f, @location(1) s: f32, @location(2) dz: f32 };
@@ -554,7 +606,7 @@ struct LV { @builtin(position) p: vec4f, @location(0) c: vec3f };
 /* 물 표면: ① 방울을 작은 공으로 그려 화면 깊이만 남기고 ② 깊이를 가로·세로로 두 번씩 녹여 잇고(가장자리는 지킨다)
    ③ 빠른 방울로 거품 자리를 표시한 뒤 ④ 녹인 깊이에서 면의 방향을 구해 셀 채색·외곽선·하이라이트를 칠한다 */
 const SWGSL=/* wgsl */`
-struct Cam { vp: mat4x4f, view: mat4x4f, c0: vec4f, c1: vec4f, c2: vec4f, c3: vec4f, prm: vec4f, ext: vec4f, ext2: vec4f, ext3: vec4f, s0: vec4f, s1: vec4f, s2: vec4f, s3: vec4f, sun: vec4f, g0: vec4f, g1: vec4f, sand: vec4f, ex4: vec4f, ex5: vec4f };
+struct Cam { vp: mat4x4f, view: mat4x4f, c0: vec4f, c1: vec4f, c2: vec4f, c3: vec4f, prm: vec4f, ext: vec4f, ext2: vec4f, ext3: vec4f, s0: vec4f, s1: vec4f, s2: vec4f, s3: vec4f, sun: vec4f, g0: vec4f, g1: vec4f, sand: vec4f, ex4: vec4f, ex5: vec4f, ex6: vec4f };
 @group(0) @binding(0) var<uniform> K: Cam;
 @group(0) @binding(1) var<storage, read> pos: array<vec4f>;
 @group(0) @binding(2) var<storage, read> vel: array<vec4f>;
@@ -564,6 +616,8 @@ struct Cam { vp: mat4x4f, view: mat4x4f, c0: vec4f, c1: vec4f, c2: vec4f, c3: ve
 @group(0) @binding(6) var<storage, read> sp: array<vec4f>;   /* 물보라 알갱이: [2i] = 자리·남은 시간, [2i+1] = 속도·크기 */
 const BIG: f32 = 100000.0;
 /* 보이는 자리: 계산한 자리의 앞뒤(z)를 x에 따라 시작 폭→끝 폭 비율로 늘인다 (계산량은 그대로) */
+fn auxDens(w: f32) -> f32 { return unpack2x16float(bitcast<u32>(w) & 0xFFFFu).x; }
+fn auxFoam(w: f32) -> f32 { return f32((bitcast<u32>(w) >> 23u) & 127u) / 127.0; }
 fn wfac(x: f32) -> f32 { let t = clamp((x - 3.0) / max(K.prm.y - 7.0, 1.0), 0.0, 1.0); return mix(K.ex5.x, K.ex5.y, t); }
 fn wmap(q: vec3f) -> vec3f { return vec3f(q.x, q.y, K.ex5.z + (q.z - K.ex5.z) * wfac(q.x)); }
 
@@ -577,7 +631,7 @@ fn sprite(vi: u32, ii: u32, scale: f32) -> SV {
   var r = mix(1.0, max(1.0, wfac(q.xyz.x)), 0.8) * max(K.ext2.x, 1.25 * d / (K.ext.y * 0.5 * K.ext.z)) * scale * (0.2 + 0.8 * smoothstep(0.0, 0.45, q.w));   /* 사라지는 방울은 작아진다 */
   /* 파도 장면: 멈춰서 홀로 남은 작은 물방울은 바닥에 스며들 듯 작아져 사라져 보인다 (계산에서는 남아 있다가 물에 합쳐지면 다시 보인다) */
   let vv = vel[ii];
-  if (K.ext3.w > 0.0 && length(vv.xyz) * K.ex4.y < 0.2) { r *= smoothstep(0.06, 0.24, vv.w / K.ext3.w); }
+  if (K.ext3.w > 0.0 && length(vv.xyz) * K.ex4.y < 0.2) { r *= smoothstep(0.06, 0.24, auxDens(vv.w) / K.ext3.w); }
   /* 방울은 동그란 공. 이어짐(ex4.x)만큼 크게 그려, 가까운 방울끼리는 겹쳐 한 덩어리로 이어지고 멀리 떨어진 방울은 따로 남는다 */
   var o: SV; o.p = K.vp * vec4f(vc.xy + c * r, vc.z, 1.0); o.uv = c; o.c = vc; o.r = r; o.ph = 0.0; o.wb = 0.0;
   if (q.w <= 0.0) { o.p = vec4f(9.0, 9.0, 9.0, 1.0); }
@@ -630,14 +684,29 @@ fn blur(p: vec2f, dir: vec2i) -> f32 {
   }
   return sum / max(ws, 1e-5);
 }
+/* 알갱이 잇기: 빈 칸 양옆(가로 한 번, 세로 한 번)에 가까운 알갱이가 있으면 그 사이를 물로 채운다 → 물줄기·물다리·얇은 막 */
+fn bridge(p: vec2f, dir: vec2i) -> f32 {
+  let ip = vec2i(p); let sz = vec2i(textureDimensions(src));
+  let d0 = textureLoad(src, ip, 0).r; if (d0 < BIG || K.ex6.x <= 0.0) { return d0; }
+  var zl = BIG; var kl = 0; var zr = BIG; var kr = 0;
+  for (var k = 1; k <= 24; k++) { let q = ip - dir * k; if (any(q < vec2i(0)) || any(q >= sz)) { break; } let d = textureLoad(src, q, 0).r; if (d < BIG) { zl = d; kl = k; break; } }
+  if (zl >= BIG) { return BIG; }
+  for (var k = 1; k <= 24; k++) { let q = ip + dir * k; if (any(q < vec2i(0)) || any(q >= sz)) { break; } let d = textureLoad(src, q, 0).r; if (d < BIG) { zr = d; kr = k; break; } }
+  if (zr >= BIG) { return BIG; }
+  let zm = min(zl, zr); let rpx = K.ex6.x * K.ext.y * 0.5 * K.ext.z / zm;   /* 잇는 거리(바깥 세상) → 화면 칸 */
+  if (f32(kl + kr) > rpx || abs(zl - zr) > K.ex6.y) { return BIG; }
+  return mix(zl, zr, f32(kl) / f32(kl + kr));
+}
+@fragment fn fsBrH(i: FV) -> @location(0) f32 { return bridge(i.p.xy, vec2i(1, 0)); }
+@fragment fn fsBrV(i: FV) -> @location(0) f32 { return bridge(i.p.xy, vec2i(0, 1)); }
 @fragment fn fsBH(i: FV) -> @location(0) f32 { return blur(i.p.xy, vec2i(1, 0)); }
 @fragment fn fsBV(i: FV) -> @location(0) f32 { return blur(i.p.xy, vec2i(0, 1)); }
 @vertex fn vsF(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> SV {
-  var o = sprite(vi, ii, 0.55 * K.ex4.x);
+  var o = sprite(vi, ii, K.ex4.x);   /* 물 알갱이와 같은 크기로 통째로 하얗게 */
   /* 거품: 방울마다 기억한 거품 양이 넘치면 하얗게 (젤리는 빠른 방울만) */
-  let W = Fw[ii];
-  var show = length(vel[ii].xyz) * K.ex4.y > K.ext2.y;
-  if (W[2].z == 9.0) { show = W[0].x > K.ex4.z; }
+  let vw = vel[ii];
+  var show = length(vw.xyz) * K.ex4.y > K.ext2.y;            /* 젤리: 빠른 방울만 */
+  if (K.ext3.z > 1.5) { show = auxFoam(vw.w) > K.ex4.z; }    /* 물: 방울마다 기억한 거품 양 */
   if (!show) { o.p = vec4f(9.0, 9.0, 9.0, 1.0); }
   return o;
 }
@@ -672,10 +741,11 @@ struct CO { @location(0) c: vec4f, @builtin(frag_depth) z: f32 };
   var col = K.c0.rgb;
   if (ndl < 0.28) { col = K.c1.rgb; } else if (ndl > 0.82) { col = mix(K.c0.rgb, K.c2.rgb, 0.3); }
   let fo = textureLoad(fom, ip, 0).r;
-  if (fo > K.ext2.z) { col = select(vec3f(1.0), mix(K.c1.rgb, vec3f(1.0), 0.62), ndl < 0.32); }
+  let isF = fo > K.ext2.z;
+  if (isF) { col = select(vec3f(1.0), vec3f(0.86, 0.93, 0.97), ndl < 0.32); }   /* 거품: 흰색, 그늘만 아주 옅게 */
   if (K.ext3.y > 0.5 && sp > 0.988) { col = K.c2.rgb; }
   let jump = K.ext2.x * 4.0 + d * 0.02;
-  if (K.ext3.z > 0.5 && (dl >= BIG || dr >= BIG || du >= BIG || dd >= BIG || dl - d > jump || dr - d > jump || du - d > jump || dd - d > jump)) { col = K.c3.rgb; }
+  if (K.ext3.z > 0.5 && (dl >= BIG || dr >= BIG || du >= BIG || dd >= BIG || dl - d > jump || dr - d > jump || du - d > jump || dd - d > jump)) { col = select(K.c3.rgb, vec3f(0.72, 0.86, 0.94), isF); }   /* 거품 테두리는 옅은 하늘색 */
   let fg = clamp((d - K.ext2.w) / (K.ext2.w * 2.5), 0.0, 1.0) * 0.45;
   col = mix(col, K.s0.rgb, fg);   /* 멀수록 하늘 지평선 색으로 */
   let cp = K.vp * vec4f(P, 1.0);
@@ -742,12 +812,13 @@ async function init(){
 
   B.cam=dev.createBuffer({size:512,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
   const mod=dev.createShaderModule({code:WGSL});
-  B.spr=dev.createBuffer({size:262144*32,usage:SB}); B.sc=dev.createBuffer({size:16,usage:SB});
+  B.spr=dev.createBuffer({size:262144*32,usage:SB});
+  B.ind=dev.createBuffer({size:16,usage:GPUBufferUsage.INDIRECT|GPUBufferUsage.COPY_DST}); dev.queue.writeBuffer(B.ind,0,new Uint32Array([0,1,1,0]));
   const bgl=dev.createBindGroupLayout({entries:[0,1,2,3,4,5,6,7,8].map(b=>({binding:b,visibility:GPUShaderStage.COMPUTE,buffer:b?{type:"storage"}:{type:"uniform",hasDynamicOffset:true}}))});
   { const sm=dev.createShaderModule({code:SORTWGSL}); for(const e of ["sClear","sCount","sScan","sScanSums","sDest","sMoveA","sMoveB"]) PL[e]=dev.createComputePipeline({layout:"auto",compute:{module:sm,entryPoint:e}});
     B.SU=dev.createBuffer({size:16,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}); }
   const pl=dev.createPipelineLayout({bindGroupLayouts:[bgl]});
-  for(const e of ["clearGrid","p2gMass","p2g","updGrid","g2p","sprayStep"]) PL[e]=dev.createComputePipeline({layout:pl,compute:{module:mod,entryPoint:e}});
+  for(const e of ["clearGrid","p2gMass","p2g","updGrid","g2p","sprayStep","bClear","bMark","bBuild","clearGridS","updGridS"]) PL[e]=dev.createComputePipeline({layout:pl,compute:{module:mod,entryPoint:e}});
   E.bgl=bgl; resizeTank();
   const rmod=dev.createShaderModule({code:RWGSL});
   const rbgl=dev.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.VERTEX|GPUShaderStage.FRAGMENT,buffer:{type:"uniform"}},{binding:1,visibility:GPUShaderStage.VERTEX,buffer:{type:"read-only-storage"}},{binding:2,visibility:GPUShaderStage.VERTEX,buffer:{type:"read-only-storage"}},{binding:3,visibility:GPUShaderStage.VERTEX,buffer:{type:"read-only-storage"}}]});
@@ -765,6 +836,8 @@ async function init(){
     const spl=dev.createPipelineLayout({bindGroupLayouts:[E.sbgl]});
     PL.sDepth=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsD"},fragment:{module:sm,entryPoint:"fsD",targets:[{format:"r32float"}]},primitive:{topology:"triangle-list"},depthStencil:{format:"depth24plus",depthWriteEnabled:true,depthCompare:"less"}});
     PL.sDepthS=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsDS"},fragment:{module:sm,entryPoint:"fsD",targets:[{format:"r32float"}]},primitive:{topology:"triangle-list"},depthStencil:{format:"depth24plus",depthWriteEnabled:true,depthCompare:"less"}});
+    PL.sBrH=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsQ"},fragment:{module:sm,entryPoint:"fsBrH",targets:[{format:"r32float"}]}});
+    PL.sBrV=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsQ"},fragment:{module:sm,entryPoint:"fsBrV",targets:[{format:"r32float"}]}});
     PL.sBH=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsQ"},fragment:{module:sm,entryPoint:"fsBH",targets:[{format:"r32float"}]}});
     PL.sBV=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsQ"},fragment:{module:sm,entryPoint:"fsBV",targets:[{format:"r32float"}]}});
     const add={color:{srcFactor:"one",dstFactor:"one",operation:"add"},alpha:{srcFactor:"one",dstFactor:"one",operation:"add"}};
@@ -788,36 +861,37 @@ function allocParticles(first){ const cap=SMALL?40000:Math.min(1000000,Math.roun
 function resizeTank(){ tankSize(); BX0=GX*0.45; const SB=GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST|GPUBufferUsage.COPY_SRC;
   if(B.gi) B.gi.destroy(); if(B.gv) B.gv.destroy();
   B.gi=dev.createBuffer({size:CELLS*16,usage:SB}); B.gv=dev.createBuffer({size:CELLS*16,usage:SB});
-  if(B.cnt) B.cnt.destroy(); if(B.offs) B.offs.destroy(); if(B.bs) B.bs.destroy();
+  if(B.cnt) B.cnt.destroy(); if(B.offs) B.offs.destroy(); if(B.bs) B.bs.destroy(); if(B.sc) B.sc.destroy();
+  NBLK=Math.ceil(GX/4)*Math.ceil(GY/4)*Math.ceil(GZ/4); B.sc=dev.createBuffer({size:(16+3*NBLK)*4,usage:SB});
   B.cnt=dev.createBuffer({size:(CELLS+1)*4,usage:SB}); B.offs=dev.createBuffer({size:(CELLS+1)*4,usage:SB}); B.bs=dev.createBuffer({size:Math.ceil((CELLS+1)/256)*4+16,usage:SB});
   const SR={0:B.SU,1:B.pos,2:B.vel,3:B.C,4:B.F,5:B.pos2,6:B.vel2,7:B.C2,8:B.F2,9:B.cnt,10:B.loc,11:B.bs,12:B.offs}, USE={sClear:[0,9],sCount:[0,1,9,10],sScan:[0,9,11,12],sScanSums:[0,11],sDest:[0,1,10,11,12],sMoveA:[0,1,2,5,6,10],sMoveB:[0,3,4,7,8,10]};
   E.sbg={}; for(const k in USE) E.sbg[k]=dev.createBindGroup({layout:PL[k].getBindGroupLayout(0),entries:USE[k].map(b=>({binding:b,resource:{buffer:SR[b]}}))});
   BG0=dev.createBindGroup({layout:E.bgl,entries:[{binding:0,resource:{buffer:B.U,size:112}},{binding:1,resource:{buffer:B.pos}},{binding:2,resource:{buffer:B.vel}},{binding:3,resource:{buffer:B.C}},{binding:4,resource:{buffer:B.gi}},{binding:5,resource:{buffer:B.gv}},{binding:6,resource:{buffer:B.F}},{binding:7,resource:{buffer:B.spr}},{binding:8,resource:{buffer:B.sc}}]}); }
 /* 물 채우기: 물 높이까지 방울을 고르게 (살짝 흔들어) 놓는다. 수조가 커서 방울이 한도를 넘으면 간격을 조금 넓힌다 */
 let SPC=0.5; function spacing(){ return SPC; }
-function fill(){ PEND.length=0; dripT=0; if(B.spr){ const e=dev.createCommandEncoder(); e.clearBuffer(B.spr); dev.queue.submit([e.finish()]); } if(S.scene===1){ SPC=0.5; pVol=0.125; N=0; stepNo=0; PADX=2.5; PADV=0; return; }
-  const top=2+S.level*(GY-5), vol=Math.max(1,(GX-PADX-4.4)*(HW0+HW1)*(top-3.2)); SPC=Math.max(0.5,Math.cbrt(vol/Math.min(MAXP*0.97,S.pcount)));   /* 정한 방울 수에 맞춰 간격을 정한다 */ const sp=SPC, P=new Float32Array(MAXP*4); let n=0;
+function fill(){ PEND.length=0; dripT=0; if(B.spr){ const e=dev.createCommandEncoder(); e.clearBuffer(B.spr); dev.queue.submit([e.finish()]); } if(S.scene===1){ SPC=Math.cbrt(1/S.ppc); pVol=SPC**3; N=0; stepNo=0; PADX=2.5; PADV=0; return; }
+  const top=2+S.level*(GY-5), vol=Math.max(1,(GX-PADX-4.4)*(HW0+HW1)*(top-3.2));   /* 물 부피(칸) */ SPC=Math.max(Math.cbrt(1/S.ppc),Math.cbrt(vol/Math.min(MAXP*0.97,S.pcount)));   /* 정한 방울 수에 맞춰 간격을 정한다 */ const sp=SPC, P=new Float32Array(MAXP*4); let n=0;
   for(let z=3.2;z<GZ-3.2;z+=sp){ for(let y=3.2;y<top;y+=sp) for(let x=PADX+1.2;x<GX-3.2;x+=sp){ if(y<floorAt(x)+1.3) continue; const zw=zwallsJS(x); if(z<zw[0]+0.2||z>zw[1]+0.8) continue; if(n>=MAXP) break;
     P[n*4]=x+(Math.random()-.5)*sp*0.3; P[n*4+1]=y+(Math.random()-.5)*sp*0.3; P[n*4+2]=z+(Math.random()-.5)*sp*0.3; P[n*4+3]=1; n++; } }
-  N=n; dev.queue.writeBuffer(B.pos,0,P,0,n*4); { const V0=new Float32Array(n*4), d0=1/(sp*sp*sp); for(let i=0;i<n;i++) V0[i*4+3]=d0; dev.queue.writeBuffer(B.vel,0,V0); } dev.queue.writeBuffer(B.C,0,new Float32Array(n*12)); dev.queue.writeBuffer(B.F,0,ident(n));
+  N=n; dev.queue.writeBuffer(B.pos,0,P,0,n*4); dev.queue.writeBuffer(B.vel,0,new Float32Array(n*4)); dev.queue.writeBuffer(B.C,0,new Float32Array(n*12)); dev.queue.writeBuffer(B.F,0,ident(n));
   stepNo=0; WPH=0; PADX=2.5; pVol=sp*sp*sp; realSize(); }
 /* 알갱이 실제 크기 알려 주기: 수조가 크면 칸 수 한도·방울 수 한도 때문에 정한 크기보다 커진다 */
-function realSize(){ const o=inputs.dsz&&inputs.dsz[1]; if(!o) return; const real=SPC*DS/0.5, why=SPC>0.5+1e-6?"방울 수 한도":DS>S.dsz+1e-6?"칸 수 한도":"";
+function realSize(){ const o=inputs.dsz&&inputs.dsz[1]; if(!o) return; const b0=Math.cbrt(1/S.ppc), real=SPC*DS/b0, why=SPC>b0+1e-6?"방울 수 한도":DS>S.dsz+1e-6?"칸 수 한도":"";
   o.textContent=S.dsz.toFixed(2)+"배"+(why?" → 실제 "+real.toFixed(2)+"배":""); o.title=why?"수조가 커서 "+why+"에 걸려 알갱이가 더 커졌어요. 수조를 줄이거나 방울 수 한도를 올리세요.":""; }
 let pVol=0.125;
 function ident(n){ const a=new Float32Array(n*12); for(let i=0;i<n;i++){ a[i*12]=1; a[i*12+5]=1; a[i*12+10]=1; } return a; }
 function dropBlob(){ if(!E.ok) return; const sp=spacing(), R=Math.min(GY,GZ)*0.16, cx=GX*(0.3+0.4*Math.random()), cy=GY-R-4, cz=GZ/2+(Math.random()-.5)*GZ*0.3, A=[];
   for(let z=-R;z<=R;z+=sp) for(let y=-R;y<=R;y+=sp) for(let x=-R;x<=R;x+=sp){ if(x*x+y*y+z*z>R*R || N+A.length/4>=MAXP) continue; A.push(cx+x,cy+y,cz+z,1); }
-  const k=A.length/4; if(!k) return; dev.queue.writeBuffer(B.pos,N*16,new Float32Array(A)); const V=new Float32Array(k*4); for(let i=0;i<k;i++){ V[i*4+1]=-0.5/DS; V[i*4+3]=1/pVol; } dev.queue.writeBuffer(B.vel,N*16,V); dev.queue.writeBuffer(B.C,N*48,new Float32Array(k*12)); dev.queue.writeBuffer(B.F,N*48,ident(k)); N+=k; }
+  const k=A.length/4; if(!k) return; dev.queue.writeBuffer(B.pos,N*16,new Float32Array(A)); const V=new Float32Array(k*4); for(let i=0;i<k;i++){ V[i*4+1]=-0.5/DS; } dev.queue.writeBuffer(B.vel,N*16,V); dev.queue.writeBuffer(B.C,N*48,new Float32Array(k*12)); dev.queue.writeBuffer(B.F,N*48,ident(k)); N+=k; }
 
 /* 물방울 하나: 공 모양으로 방울을 채워 아래(와 옆)로 던진다. 줄 세우며 사라진 방울을 정리하는 동안에는 잠깐 기다렸다 넣는다 */
 const PEND=[]; let dripT=0, autoDrip=true, compacting=false;
-function spawnDrop(){ if(!E.ok) return; const sp=0.5, R=S.dsize/DS, m=R+4, cx=GX*0.5+(Math.random()-.5)*Math.max(0,GX-2*m)*0.5, zw=zwallsJS(cx), cz=(zw[0]+zw[1])/2+(Math.random()-.5)*Math.max(0,zw[1]-zw[0]-2*m)*0.5,
+function spawnDrop(){ if(!E.ok) return; const sp=SPC, R=S.dsize/DS, m=R+4, cx=GX*0.5+(Math.random()-.5)*Math.max(0,GX-2*m)*0.5, zw=zwallsJS(cx), cz=(zw[0]+zw[1])/2+(Math.random()-.5)*Math.max(0,zw[1]-zw[0]-2*m)*0.5,
     cy=Math.min(GY-R-4.5, 3+R+S.dh*(GY-8-2*R)), an=Math.random()*Math.PI*2, th=S.dthrow*1.4/DS, vx=Math.cos(an)*th, vz=Math.sin(an)*th, A=[];
   for(let z=-R;z<=R;z+=sp) for(let y=-R;y<=R;y+=sp) for(let x=-R;x<=R;x+=sp){ if(x*x+y*y+z*z>R*R) continue; const j=()=>(Math.random()-.5)*sp*0.25; A.push(cx+x+j(),cy+y+j(),cz+z+j(),2+Math.random()*0.999); }
   PEND.push({A,vx,vz}); flushDrops(); }
 function flushDrops(){ if(compacting) return; while(PEND.length){ const {A,vx,vz}=PEND.shift(); let k=Math.min(A.length/4,MAXP-N); if(k<=0) break;
-    dev.queue.writeBuffer(B.pos,N*16,new Float32Array(A.slice(0,k*4))); const V=new Float32Array(k*4); for(let i=0;i<k;i++){ V[i*4]=vx; V[i*4+1]=-0.35/DS; V[i*4+2]=vz; V[i*4+3]=8; }
+    dev.queue.writeBuffer(B.pos,N*16,new Float32Array(A.slice(0,k*4))); const V=new Float32Array(k*4); for(let i=0;i<k;i++){ V[i*4]=vx; V[i*4+1]=-0.35/DS; V[i*4+2]=vz; }
     dev.queue.writeBuffer(B.vel,N*16,V); dev.queue.writeBuffer(B.C,N*48,new Float32Array(k*12)); dev.queue.writeBuffer(B.F,N*48,ident(k)); N+=k; } }
 
 /* 파도 판 위치: 빠르게 밀고 천천히 돌아오는 모양. 한 박자에 움직이는 거리는 제한 */
@@ -825,7 +899,7 @@ function padStep(){ const sps=SPS*0.2/DT; WPH+=1/(S.per*sps); const ph=WPH%1, p=
   AMPc+=((waveOn?S.amp:0)-AMPc)*0.01; SLAP*=0.996; const tgt=2.5+Math.min(GX*0.35,((AMPc+S.amp*1.2*SLAP)*f+S.amp*0.8*SLAP*(1-f))/DS);
   const lim=0.12*DT/0.2/DS, d=Math.max(-lim,Math.min(lim,tgt-PADX)); PADX+=d; PADV=d/DT; }
 
-function step(c,k){
+function step(e,k){
   const DROP=S.scene===1; if(DROP){ PADX=2.5; PADV=0; } else padStep(); slot(k);
   pU[0]=GX; pU[1]=GY; pU[2]=GZ; pU[3]=N; const E5=S.stiff*(1/pVol)/8/(DS*DS), JEL=S.mat===1;   /* 방울 간격이 달라져도 물의 단단함(소리 빠르기)은 같게 */
   pF[4]=DT; pF[5]=-S.grav/DS; pF[6]=E5; pF[7]=1/pVol; pF[8]=S.visc*0.5; pF[9]=PADX; pF[10]=PADV; pF[11]=HW0; pF[12]=DROP?0:S.beach;
@@ -834,13 +908,19 @@ function step(c,k){
   pF[16]=DROP&&S.dfade>0?1/(72*(9-7.8*S.dfade)):0; pF[17]=DROP?0.015+0.1*(1-S.dspread):0; pF[18]=JEL?0.04:DROP?0.25:0.06;   /* 파도 장면은 약하게: 세면 물보라가 덩어리째 눌려 따로 튀어 나가지 못한다 */ pF[19]=HW1;
   pF[20]=DS; pF[21]=DROP?0:S.foam*2; pF[22]=!DROP&&S.soak>0?S.soak/(72*1.2):0; pF[23]=S.mat===0?S.spray*0.35:0;
   pF[24]=EYEG[0]; pF[25]=EYEG[1]; pF[26]=EYEG[2]; pF[27]=EYEG[3];
-  c.setBindGroup(0,BG0,[256*k]);
-  const gC=Math.ceil(CELLS/WG), gP=Math.ceil(N/WG);
-  c.setPipeline(PL.clearGrid); c.dispatchWorkgroups(gC);
+  const gB=Math.ceil(NBLK/WG), gP=Math.ceil(N/WG);
+  /* ① 알갱이가 있는 칸 묶음(과 이웃)만 골라 목록을 만들고 → ② 그 묶음만 비우고 계산한다 (빈 공기는 건너뛴다) */
+  let c=e.beginComputePass(); c.setBindGroup(0,BG0,[256*k]);
+  c.setPipeline(PL.bClear); c.dispatchWorkgroups(gB);
+  if(gP){ c.setPipeline(PL.bMark); c.dispatchWorkgroups(gP); }
+  c.setPipeline(PL.bBuild); c.dispatchWorkgroups(gB); c.end();
+  e.copyBufferToBuffer(B.sc,4,B.ind,0,4);
+  c=e.beginComputePass(); c.setBindGroup(0,BG0,[256*k]);
+  c.setPipeline(PL.clearGridS); c.dispatchWorkgroupsIndirect(B.ind,0);
   if(gP){ c.setPipeline(PL.p2gMass); c.dispatchWorkgroups(gP); c.setPipeline(PL.p2g); c.dispatchWorkgroups(gP); }
-  c.setPipeline(PL.updGrid); c.dispatchWorkgroups(gC);
+  c.setPipeline(PL.updGridS); c.dispatchWorkgroupsIndirect(B.ind,0);
   if(gP){ c.setPipeline(PL.g2p); c.dispatchWorkgroups(gP); }
-  c.setPipeline(PL.sprayStep); c.dispatchWorkgroups(4096);
+  c.setPipeline(PL.sprayStep); c.dispatchWorkgroups(4096); c.end();
   stepNo++;
 }
 /* 줄 세우기 한 번: 세고 → 자리 매기고 → 새 자리로 옮긴 뒤 → 원래 통에 되돌려 담는다 */
@@ -858,7 +938,7 @@ function readAlive(n0){ compacting=true; const sc=S.scene; B.rd.mapAsync(GPUMapM
 /* 한 프레임의 박자들을 한 주문서에 담아 한 번에 보낸다 */
 let frameNo=0;
 function runSteps(n){ if(n<=0) return; const e=dev.createCommandEncoder(); const rd=frameNo%4===0 && sortPass(e), n0=N;
-  const c=e.beginComputePass(); for(let k=0;k<n;k++) step(c,k); c.end();
+  for(let k=0;k<n;k++) step(e,k);
   dev.queue.writeBuffer(B.U,0,params,0,256*n); dev.queue.submit([e.finish()]); if(rd) readAlive(n0); }
 
 /* 물 색 미세 조절: 색조를 돌리고, 채도·밝기를 곱한다 */
@@ -925,14 +1005,15 @@ function frame(now){
   camData.set([spacing()*0.95*S.psize,GX,GY,GZ],48);
   const tf=1/Math.tan(0.31); camData.set([w,h,tf,w/h],52); camData.set([spacing()*1.05,(2.6-1.8*S.foam)/DS,0.5,dist*0.9],56); camData.set([S.smooth,1,S.mat===0?2:1,S.scene===0&&S.mat===0?1/pVol:0],60);
   { const K=SKIES[S.sky]||SKIES.day, f=c=>c.map(v=>v/255); camData.set([...f(K.hz),(now/1000)%3600],64); camData.set([...f(K.zn),S.cloud],68); camData.set([...f(K.cw),S.cspd],72); camData.set([...f(K.cs),K.mode],76); camData.set([...K.sun,1/pVol],80); camData.set([...f(K.g0),1],84); camData.set([...f(K.g1),1],88); camData.set([S.scene===1?-1e6:2+S.level*(GY-5)-GY/2+0.3,S.sandc,S.sky==="off"?1:0,0],92); }
-  camData.set([S.conn,DS,0.45,S.spsz],96); camData.set([visF(3),visF(GX-4),zcG(),0],100);
+  camData.set([S.conn,DS,0.45,S.spsz],96); camData.set([visF(3),visF(GX-4),zcG(),0],100); camData.set([S.brd*spacing(),S.brt*spacing(),0,0],104);
   EYEG[0]=eye[0]+GX/2; EYEG[1]=eye[1]+GY/2; EYEG[2]=zcG()+(eye[2]+GZ/2-zcG())/Math.max(0.2,visF(EYEG[0])); EYEG[3]=dist*0.45;
-  dev.queue.writeBuffer(B.cam,0,camData,0,104); sandMesh(); lines();
+  dev.queue.writeBuffer(B.cam,0,camData,0,108); sandMesh(); lines();
   const SURF=S.rmode===0; if(SURF) surfTargets(w,h);
   const e=dev.createCommandEncoder();
   if(SURF){ const rp=(view,clear,bg,pl,count,inst,depthTex)=>{ const q=e.beginRenderPass({colorAttachments:[{view,clearValue:{r:clear,g:0,b:0,a:0},loadOp:"clear",storeOp:"store"}],...(depthTex?{depthStencilAttachment:{view:depthTex.createView(),depthClearValue:1,depthLoadOp:"clear",depthStoreOp:"store"}}:{})}); q.setPipeline(pl); q.setBindGroup(0,bg); q.draw(count,inst); q.end(); };
     { const q=e.beginRenderPass({colorAttachments:[{view:T.dep.createView(),clearValue:{r:1e6,g:0,b:0,a:0},loadOp:"clear",storeOp:"store"}],depthStencilAttachment:{view:T.hw.createView(),depthClearValue:1,depthLoadOp:"clear",depthStoreOp:"store"}});
       q.setBindGroup(0,T.bgDep); if(N){ q.setPipeline(PL.sDepth); q.draw(6,N); } if(S.mat===0){ q.setPipeline(PL.sDepthS); q.draw(6,262144); } q.end(); }
+    if(S.brd>0){ rp(T.sm.createView(),1e6,T.bgH1,PL.sBrH,3,1); rp(T.dep.createView(),1e6,T.bgH2,PL.sBrV,3,1); }   /* 알갱이 잇기: 깊이 → 가로 잇기 → 세로 잇기 → 다시 깊이 그림 */
     rp(T.tmp.createView(),1e6,T.bgH1,PL.sBH,3,1); rp(T.sm.createView(),1e6,T.bgV,PL.sBV,3,1);
     rp(T.tmp.createView(),1e6,T.bgH2,PL.sBH,3,1); rp(T.sm.createView(),1e6,T.bgV,PL.sBV,3,1);
     rp(T.fo.createView(),0,T.bgFoam,PL.sFoam,6,N); }
