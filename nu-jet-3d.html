@@ -49,6 +49,15 @@ h3{margin:4px 0 0;font-size:12px;letter-spacing:.08em;color:var(--soft)}
 .tab{display:flex;flex-direction:column;gap:12px}
 .tab[hidden]{display:none}
 .panel.nodesc .desc{display:none}
+/* 프레임 올리기 체크 목록 */
+.fpsnow{font-size:13px;font-weight:700;padding:8px 10px;border:2px solid var(--line);border-radius:10px}
+.ck{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 8px;align-items:center;font-size:13px;padding:6px 0;border-bottom:1px dashed var(--line)}
+.ck input{width:18px;height:18px;margin:0}
+.ck .nm{font-weight:700}
+.ck .vv{grid-column:2/4;font-size:12px;color:var(--soft)}
+.ck.done .nm{text-decoration:line-through;opacity:.6}
+.ck button{font-size:12px;padding:4px 10px}
+.ckt{margin:6px 0 0;font-size:12px;letter-spacing:.08em;color:var(--soft)}
 .note{font-size:11.5px;color:var(--soft);margin:0}
 #cfgTxt{width:100%;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;color:var(--ink);background:var(--bg);border:2px solid var(--line);border-radius:10px;padding:8px;resize:vertical}
 </style>
@@ -75,8 +84,8 @@ h3{margin:4px 0 0;font-size:12px;letter-spacing:.08em;color:var(--soft)}
       </div>
     </div>
     <aside class="panel nodesc" id="panel">
-      <div class="tabs" role="tablist" id="tabs"><button type="button" data-t="wave">파도</button><button type="button" data-t="water">물</button><button type="button" data-t="look">화면</button><button type="button" data-t="more">세부</button><button type="button" class="dsc" id="bDesc" aria-pressed="false" title="메뉴마다 붙은 설명 글을 보이거나 숨깁니다">설명</button></div>
-      <div class="tab" data-tab="wave" id="tWave"></div><div class="tab" data-tab="water" id="tWater"></div><div class="tab" data-tab="look" id="tLook"></div><div class="tab" data-tab="more" id="tMore"></div>
+      <div class="tabs" role="tablist" id="tabs"><button type="button" data-t="wave">파도</button><button type="button" data-t="water">물</button><button type="button" data-t="look">화면</button><button type="button" data-t="more">세부</button><button type="button" data-t="fps">프레임</button><button type="button" class="dsc" id="bDesc" aria-pressed="false" title="메뉴마다 붙은 설명 글을 보이거나 숨깁니다">설명</button></div>
+      <div class="tab" data-tab="wave" id="tWave"></div><div class="tab" data-tab="water" id="tWater"></div><div class="tab" data-tab="look" id="tLook"></div><div class="tab" data-tab="more" id="tMore"></div><div class="tab" data-tab="fps" id="tFps"></div>
       <div class="row" id="scenes"><span class="lab">장면</span><button type="button" data-s="0">파도</button><button type="button" data-s="1">물방울</button></div>
       <div class="row" id="views"><span class="lab">시점</span></div>
       <h3>수조</h3>
@@ -219,6 +228,34 @@ for(const c of CTL){ const w=document.createElement("label"); w.className="ctl";
   for(const b of document.querySelectorAll("#tabs button[data-t]")) b.addEventListener("click",()=>show(b.dataset.t));
   $("bDesc").addEventListener("click",()=>{ const on=pn.classList.toggle("nodesc"); $("bDesc").setAttribute("aria-pressed",on?"false":"true"); });
   show(cur); }
+/* 프레임 올리기: 메뉴(탭) 순서대로 하나씩 적용하고 체크한다. 적용하면 이전 값을 기억해 '되돌리기'로 돌아갈 수 있다 */
+{ const box=$("tFps"), now=document.createElement("div"); now.className="fpsnow"; box.appendChild(now);
+  const note=document.createElement("p"); note.className="note"; note.textContent="위에서부터 하나씩 '적용'을 누르고, 위의 fps가 얼마나 오르는지 보며 체크하세요. 마음에 안 들면 '되돌리기'. 물을 다시 채우는 메뉴는 1초쯤 뒤에 숫자가 바뀝니다."; box.appendChild(note);
+  const setK=(k,v)=>{ if(k==="ftile"){ S.ftile=v; save(); fstUI(); return; } const r=inputs[k]&&inputs[k][0]; if(!r) return; r.value=v; r.dispatchEvent(new Event("input")); };
+  const getK=k=>k==="ftile"?(S.ftile===0?0:1):S[k];
+  const show=(k,v)=>k==="ftile"?(v?"켜기":"끄기"):(inputs[k]?fmt(inputs[k][2],v):v);
+  const STEPS=[["파도",[["spd","빠르기",S=>Math.max(0.1,Math.round(S.spd*0.8*20)/20),"1초에 하는 계산이 줄어요. 물이 조금 느리게 움직여요 (마지막에 써도 돼요)"]]],
+    ["물",[["ppc","칸당 알갱이",S=>Math.max(1,Math.min(S.ppc,2)),"구슬 수가 줄어요. 표면이 아주 조금 거칠어져요"],["dsz","알갱이 크기",S=>Math.round(Math.min(1,S.dsz+0.04)*50)/50,"구슬이 조금 커지는 대신 구슬 수와 박자 수가 같이 줄어요"],["spray","물보라 양",S=>Math.min(S.spray,0.2),"물일 때만: 튀는 물보라 알갱이가 줄어요"]]],
+    ["화면",[["px","픽셀 크기",S=>Math.max(S.px,2),"그리는 점이 1/4로 줄어요. 가장 효과가 커요"],["mball","부드러운 이음",S=>0,"그리기 한 단계가 빠져요. 실처럼 이어지는 느낌이 줄어요"],["cull","속 구슬 건너뛰기",S=>Math.max(S.cull,0.8),"안 보이는 속 구슬을 더 건너뛰어요. 표면에 구멍이 보이면 되돌리세요"]]],
+    ["세부",[["ftile","빠른 계산",S=>1,"결과는 같고 계산만 빨라져요"],["obed","앞바다 바닥",S=>Math.max(S.obed,0.55),"구슬 수가 줄어요. 파도가 조금 약해져요"],["tzc","계산 폭",S=>Math.min(S.tzc,48),"구슬 수가 줄어요. 옆으로 조금 늘어나 보여요"]]]];
+  let done={}, prev={}; try{ done=JSON.parse(localStorage.getItem("nu-jet-3d-fpsck")||"{}"); }catch(_){}
+  const keep=()=>{ try{ localStorage.setItem("nu-jet-3d-fpsck",JSON.stringify(done)); }catch(_){} };
+  const rows=[]; let no=0;
+  for(const [tab,list] of STEPS){ const h=document.createElement("h3"); h.className="ckt"; h.textContent=tab+" 탭"; box.appendChild(h);
+    for(const [k,nm,rec,why] of list){ no++; const w=document.createElement("div"); w.className="ck";
+      const cb=document.createElement("input"); cb.type="checkbox"; cb.setAttribute("aria-label",nm+" 했음");
+      const t=document.createElement("span"); t.className="nm"; t.textContent=no+". "+nm;
+      const bt=document.createElement("button"); bt.type="button";
+      const vv=document.createElement("span"); vv.className="vv";
+      w.append(cb,t,bt,vv); box.appendChild(w);
+      const paint=()=>{ const cur=getK(k), r=rec(S); cb.checked=!!done[k]; w.classList.toggle("done",!!done[k]);
+        vv.textContent="지금 "+show(k,cur)+" → 추천 "+show(k,r)+" · "+why; bt.textContent=prev[k]!==undefined?"되돌리기":"적용"; bt.disabled=prev[k]===undefined && cur===r; };
+      bt.addEventListener("click",()=>{ if(prev[k]!==undefined){ setK(k,prev[k]); delete prev[k]; done[k]=false; } else { prev[k]=getK(k); setK(k,rec(S)); done[k]=true; } keep(); for(const f of rows) f(); });
+      cb.addEventListener("change",()=>{ done[k]=cb.checked; keep(); paint(); });
+      rows.push(paint); } }
+  const rs=document.createElement("button"); rs.type="button"; rs.textContent="체크 모두 지우기"; rs.addEventListener("click",()=>{ done={}; keep(); for(const f of rows) f(); }); box.appendChild(rs);
+  setInterval(()=>{ if(box.hidden) return; now.textContent="지금: "+($("stat").textContent||"재는 중…"); for(const f of rows) f(); },700);
+  for(const f of rows) f(); }
 for(const k in COLORS){ const b=document.createElement("button"); b.type="button"; b.dataset.c=k; b.textContent=COLORS[k].n; b.addEventListener("click",()=>{ S.col=k; save(); colUI(); }); $("colors").appendChild(b); }
 for(const b of document.querySelectorAll("#mats button")) b.addEventListener("click",()=>{ S.mat=+b.dataset.m; ensureF(); if(E.ok && N) writeF(0,N); if(S.mat===1){ S.col="jelly"; S.smooth=Math.max(S.smooth,0.75); } else if(S.col==="jelly") S.col="maldives"; if(S.mat===2){ S.mball=Math.max(S.mball,0.7); S.smooth=Math.max(S.smooth,0.75); }   /* 쫀득한 물: 방울 사이를 부드럽게 이어 실처럼 보이게 */ save(); syncUI(); });
 for(const k in SKIES){ const b=document.createElement("button"); b.type="button"; b.dataset.k=k; b.textContent=SKIES[k].n; b.addEventListener("click",()=>{ S.sky=k; save(); colUI(); }); $("skies").appendChild(b); }
