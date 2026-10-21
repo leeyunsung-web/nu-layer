@@ -213,6 +213,7 @@ const CTL=[
  ["secFoam","거품 지속","flife",0,1,0.05,0.5,"%","거품이 물 위에 남는 시간. 물이 빠진 모래 위에서는 이보다 빨리 스며듭니다.",0],
  ["secFoam","거품 덩어리","fsz",0,1,0.05,0.5,"%","높이면 거품이 넓고 통통하게, 낮추면 가늘게 갈라진 무늬만.",0],
  ["secFoam","거품 무늬","flace",0,1,0.05,0.35,"%","거품 속 방울 구멍 (레이스 무늬). 무늬는 물을 따라 흘러갑니다.",0],
+ ["secFoam","무늬 떨림","fwig",0,1,0.05,0.15,"%","거품 속 방울 무늬가 일렁이는 빠르기. 0이면 무늬가 멈춰 있고, 높일수록 빠르게 파르르 떨립니다.",0],
  ["secFoam","무늬 크기","flsz",0,1,0.05,0.4,"%","거품 방울 구멍의 크기.",0],
  ["secFoam","거품 테두리","frim",0,1,0.05,0.5,"%","거품 가장자리 선의 두께.",0],
  ["secFoam","테두리 색","frc",0,1,0.05,0.25,"%","0 = 옅은 물빛, 1 = 로코로코처럼 진한 선.",0],
@@ -288,6 +289,7 @@ uniform vec3 uC0,uC1,uC2,uC3,uLine,uHz,uZn,uCw,uCs;
 uniform vec4 uFoamP;   /* 덩어리 문턱, 테두리 두께, 무늬 양, 무늬 크기(방울 수/칸) */
 uniform vec4 uFoamQ;   /* 테두리 색, 빠르기 배, 얕은 물빛, 모래 색 */
 uniform vec4 uTank;    /* 길이, 폭, 물 깊이, - */
+uniform vec2 uFoamR;   /* 무늬가 바뀌는 주기(초), 움직임 양 */
 uniform sampler2D uFoam;
 vec2 fhash(vec2 p){ return fract(sin(vec2(dot(p,vec2(127.1,311.7)),dot(p,vec2(269.5,183.3))))*43758.5453); }
 float worley(vec2 p){ vec2 i=floor(p), f=p-i; float d=8.0; for(int y=-1;y<=1;y++) for(int x=-1;x<=1;x++){ vec2 g=vec2(float(x),float(y)); vec2 h=fhash(i+g); d=min(d,length(g+h-f)/(0.7+0.6*fract(h.x*7.3))); } return d; }
@@ -296,8 +298,8 @@ float bub(vec2 p){ return min(worley(p), worley(p*2.3+5.1)*1.35); }
 float foamLace(float f, vec2 q, vec2 v){
   if(f<0.02 || uFoamP.z<0.01) return f;
   /* 무늬 두 장을 천천히 번갈아 밀어 준다 (주기를 길게, 한 번에 밀리는 거리는 방울 반 개 이하로 → 거품 끝이 떨리지 않게) */
-  float P=2.6, t=uTime/P, p0=fract(t), p1=fract(t+0.5), sc=uFoamP.w;
-  vec2 vv=clamp(v*P*uFoamQ.y, vec2(-0.45/sc), vec2(0.45/sc));
+  float P=uFoamR.x, t=uTime/P, p0=fract(t), p1=fract(t+0.5), sc=uFoamP.w;
+  vec2 vv=clamp(v*P*uFoamQ.y, vec2(-0.45/sc), vec2(0.45/sc))*uFoamR.y;
   float n0=bub((q-vv*p0)*sc), n1=bub((q-vv*p1)*sc+31.7), w0=smoothstep(0.0,1.0,1.0-abs(2.0*p0-1.0)), n=n0*w0+n1*(1.0-w0);
   float hs=mix(0.62,0.2,clamp(f,0.0,1.0))*(0.4+0.6*uFoamP.z);
   float hole=1.0-smoothstep(hs-0.07,hs,n);
@@ -515,7 +517,7 @@ function frame(now){
     for(let i=0;i<4;i++) if(u["uC"+i]) gl.uniform3fv(u["uC"+i],rgb(C[i])); if(u.uLine) gl.uniform3fv(u.uLine,lineC);
     if(u.uHz) gl.uniform3fv(u.uHz,rgb(K.hz)); if(u.uZn) gl.uniform3fv(u.uZn,rgb(K.zn)); if(u.uCw) gl.uniform3fv(u.uCw,rgb(K.cw)); if(u.uCs) gl.uniform3fv(u.uCs,rgb(K.cs));
     if(u.uFoamP) gl.uniform4f(u.uFoamP,0.62-0.5*S.fsz,0.02+0.07*S.frim,S.flace,1/(1.5+5*S.flsz));
-    if(u.uFoamQ) gl.uniform4f(u.uFoamQ,S.frc,S.spd,S.shal,S.sandc); if(u.uTank) gl.uniform4f(u.uTank,L,Wd,D,0);
+    if(u.uFoamQ) gl.uniform4f(u.uFoamQ,S.frc,S.spd,S.shal,S.sandc); if(u.uTank) gl.uniform4f(u.uTank,L,Wd,D,0); if(u.uFoamR) gl.uniform2f(u.uFoamR,7.0-6.2*S.fwig,Math.min(1,S.fwig*3));
     if(u.uFoam){ gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,G.ftex); gl.uniform1i(u.uFoam,0); } };
   gl.bindFramebuffer(gl.FRAMEBUFFER,T.fb); gl.viewport(0,0,w,h);
   gl.clearBufferfv(gl.COLOR,0,[1,1,1,1]); gl.clearBufferfv(gl.COLOR,1,[0,0,0,0]); gl.clear(gl.DEPTH_BUFFER_BIT);
