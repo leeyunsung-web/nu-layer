@@ -172,13 +172,15 @@ function makeWave(P){
         /* 파도 앞면에 올라탄 거품은 물이 아니라 파도와 함께 앞으로 달린다 (마루를 넘어 앞으로 흘러내림) */
         const e0=i>0?eta[j-1]:eta[j], e1=i<NX-1?eta[j+1]:eta[j], sl=(e0-e1)/(2*dx), Hc=eta[j]-D;
         const ride=Math.min(1,Math.max(0,sl/0.25))*Math.min(1,Math.max(0,(Hc+0.2)/0.6));
-        if(ride>0) wx=Math.max(wx,ride*1.0*Math.sqrt(g*Math.max(h[j],0.05)));   /* 파도보다 조금 더 빨리 → 마루를 넘어 앞으로 */
+        const shallow=Math.min(1,Math.max(0,(b[j]-0.5*D)/(0.5*D)));   /* 백사장 쪽일수록 */
+        if(ride>0) wx=Math.max(wx,ride*(1.0+0.7*shallow)*Math.sqrt(g*Math.max(h[j],0.05)));
+        if(shallow>0 && wx>0.3) wx*=1+0.5*shallow;                         /* 백사장으로 밀려 올라가는 물 위의 거품은 물보다 앞서 미끄러진다 */   /* 파도보다 조금 더 빨리 → 마루를 넘어 앞으로 */
         const back=wx<ax-0.05 && ax>0; const r=back?0.035:0.4; ax+=(wx-ax)*r; az+=(wz-az)*r;
         const thin=1-Math.min(1,Math.max(0,(h[j]-0.08)/0.4)), slow=1-Math.min(1,Math.max(0,(Math.hypot(ax,az)-0.3)/1.2));
         f=f*Math.pow(keep,1+8*thin*slow);
         const sw=(h[j]<0.5 && wx>0.6 && b[j]>D-1.5)?Math.min(1,(wx-0.6)*0.5):0;   /* 백사장으로 밀려 올라가는 얇은 물도 거품을 만든다 */
         f+=P.foam*(brk[j]*3.2+sw*1.2)*dtF*3;   /* 부서지는 마루의 거품은 흐르는 거품 그림으로 남아 백사장까지 실려 간다 */
-      } else { ax*=0.9; az*=0.9; f*=keepS; }
+      } else { ax*=0.965; az*=0.965; f*=keepS; }   /* 마른 모래 위: 앞으로 조금 더 미끄러지다 멈추며 스며든다 */
       foam2[j]=Math.min(1,f); fu2[j]=ax; fw2[j]=az;
       wet[j]=wetNow?1:wet[j]*Math.exp(-dtF/2.5); }
     foam.set(foam2); fu.set(fu2); fw.set(fw2);
@@ -502,8 +504,9 @@ function meshUpdate(fdt){
           } else {     /* 마루 뒤쪽: 비탈에서 시작해 마루 위로 매끈하게 떠오르는 호 */
             let ia=ic; while(ia>0 && ia>ic-R*2 && Hrow[ia]>0.45*crest) ia--;
             if(i>=ia){ const xa=(ia+0.5)*dx, ya=Hrow[ia]+D, tb=Math.min(1,(x-xa)/Math.max(dx,xc-xa));
-              const yArc=ya+0.05+(ytop+gapA-ya-0.05)*Math.sin(tb*1.5708);
-              dyf=y-yArc; cw=Math.min(1,Bc*2.2)*Math.min(1,tb*2.5); arc=1; }
+              /* 호가 시작되는 곳도 물 위에 떠 있게 (물을 뚫고 지나가며 생기던 검은 엉킨 선 없앰), 시작 부분은 흐리게 */
+              const yArc=Math.max(y+0.12, ya+0.25*gapA+(ytop+gapA-ya-0.25*gapA)*Math.sin(tb*1.5708));
+              dyf=y-yArc; const c=Math.min(1,Math.max(0,(tb-0.3)/0.4)); cw=Math.min(1,Bc*2.2)*c*c*(3-2*c); arc=1; }
           } } }
       /* 화면에 그리는 말림·흰 마루는 프레임 사이를 부드럽게 이어 준다 (부서짐 판정이 순간순간 바뀌어도 떨리지 않게) */
       /* 생길 때는 빨리, 사라질 때는 천천히: 파도가 낮아지면 말린 거품이 물 위로 스르륵 내려앉아 흐르는 거품으로 이어진다 */
