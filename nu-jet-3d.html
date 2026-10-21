@@ -189,6 +189,9 @@ const CTL=[
  ["secLook","백사장 물 투명","btr",0,1,0.05,0.5,"%","해변 비탈이 시작되는 곳부터 백사장 끝으로 갈수록 물이 점점 비쳐 모래가 보입니다. 백사장 끝에서 이만큼 투명해집니다. 0이면 끄기.",0],
  ["secLook","백사장 물 하얘짐","bwh",0,1,0.05,0.5,"%","백사장으로 올라간 물이 거품이 섞인 것처럼 허옇게 됩니다. 해변 비탈 앞쪽부터 하얘지고, 끝으로 갈수록 '백사장 물 투명'만큼 비치며 사라집니다. 0이면 끄기.",0],
  ["secLook","집중 위치","cfx",-1,1,0.01,0,"","화면 가운데에 둘 곳. -1 = 파도 판 쪽, 0 = 수조 가운데, 1 = 백사장 쪽. 전체 화면에서는 아래 바로 조절합니다.",0],
+ ["secLook","표면 무늬 양","fsamt",0,2,0.05,0.7,"배","표면 무늬(물 위·모래 위 흰 무늬)가 얼마나 많이 보일지. 낮출수록 진한 곳만 남습니다.",0],
+ ["secLook","표면 무늬 퍼짐","fspr",0,1,0.05,0.5,"%","높일수록 무늬가 한곳에 몰리지 않고 넓게 흩어집니다.",0],
+ ["secLook","백사장에 남는 정도","fstay",0,1,0.05,0.5,"%","백사장·얇은 물 위에 무늬가 얼마나 오래 남을지. 낮추면 빨리 스며들어 백사장에 쌓이지 않습니다.",0],
  ["secLook","속 구슬 건너뛰기","cull",0,1,0.05,0.6,"%","물 표면을 그릴 때 사방이 꽉 찬 속 구슬은 보이지 않으니 그리지 않아 화면 그리기가 가벼워집니다. 높일수록 더 많이 건너뛰고, 너무 높이면 물 표면에 작은 구멍·움푹한 곳이 생길 수 있습니다. 0이면 끄기.",0],
  ["secLook","하얘짐","wgr",0,1,0.05,0.7,"%","위로 솟구치는 물기둥·물보라 끝이 물색에서 흰색으로 부드럽게 바뀌는 정도. 떨어지는 방울은 하얘지지 않습니다. 0이면 끄기 (조금 가벼워짐).",0],
  ["secLook","거품 덩어리","fsz",0,1,0.05,0.5,"%","(표면 그림) 거품 덩어리의 굵기. 높이면 거품이 넓고 통통하게 퍼지고, 낮추면 가늘게 갈라진 무늬만 남습니다.",0],
@@ -236,7 +239,7 @@ for(const c of CTL){ const w=document.createElement("label"); w.className="ctl";
 /* 탭 나누기: 자주 쓰는 메뉴만 앞 세 탭으로 옮기고, 남은 것은 모두 '세부' 탭에 그대로 둔다 */
 { const TABS={tWave:["#scenes","#views","cfx","spd","amp","per","skew","level","beach","h3[data-sc='1']","#secDrop"],
     tWater:["#mats","stick","coh","visc","dsz","ppc","spray"],
-    tLook:["#colors","#skies","btr","bwh","px","mball","cull","smooth","conn","whue","wsat","wbri"]};
+    tLook:["#colors","#skies","fsamt","fspr","fstay","btr","bwh","px","mball","cull","smooth","conn","whue","wsat","wbri"]};
   const el=k=>k[0]==="#"||k.includes("[")?document.querySelector(k):(inputs[k]&&inputs[k][0].closest(".ctl"));
   for(const t in TABS) for(const k of TABS[t]){ const e=el(k); if(e) $(t).appendChild(e); }
   const pn=$("panel"), more=$("tMore"), stop=$("bReset").closest(".row");
@@ -670,7 +673,7 @@ fn updAt(cid: u32) {
 
 /* 그리기: 방울마다 화면을 향한 작은 원판. 둥근 공처럼 빛을 나눠 칠한다(1단계 미리보기) */
 const RWGSL=/* wgsl */`
-struct Cam { vp: mat4x4f, view: mat4x4f, c0: vec4f, c1: vec4f, c2: vec4f, c3: vec4f, prm: vec4f, ext: vec4f, ext2: vec4f, ext3: vec4f, s0: vec4f, s1: vec4f, s2: vec4f, s3: vec4f, sun: vec4f, g0: vec4f, g1: vec4f, sand: vec4f, ex4: vec4f, ex5: vec4f, ex6: vec4f, ex7: vec4f, ex8: vec4f, ex9: vec4f, ex10: vec4f };
+struct Cam { vp: mat4x4f, view: mat4x4f, c0: vec4f, c1: vec4f, c2: vec4f, c3: vec4f, prm: vec4f, ext: vec4f, ext2: vec4f, ext3: vec4f, s0: vec4f, s1: vec4f, s2: vec4f, s3: vec4f, sun: vec4f, g0: vec4f, g1: vec4f, sand: vec4f, ex4: vec4f, ex5: vec4f, ex6: vec4f, ex7: vec4f, ex8: vec4f, ex9: vec4f, ex10: vec4f, ex11: vec4f };
 @group(0) @binding(0) var<uniform> K: Cam;
 @group(0) @binding(1) var<storage, read> pos: array<vec4f>;
 @group(0) @binding(2) var<storage, read> vel: array<vec4f>;
@@ -816,7 +819,7 @@ struct LV { @builtin(position) p: vec4f, @location(0) c: vec3f };
 /* 물 표면: ① 방울을 작은 공으로 그려 화면 깊이만 남기고 ② 깊이를 가로·세로로 두 번씩 녹여 잇고(가장자리는 지킨다)
    ③ 빠른 방울로 거품 자리를 표시한 뒤 ④ 녹인 깊이에서 면의 방향을 구해 셀 채색·외곽선·하이라이트를 칠한다 */
 const SWGSL=/* wgsl */`
-struct Cam { vp: mat4x4f, view: mat4x4f, c0: vec4f, c1: vec4f, c2: vec4f, c3: vec4f, prm: vec4f, ext: vec4f, ext2: vec4f, ext3: vec4f, s0: vec4f, s1: vec4f, s2: vec4f, s3: vec4f, sun: vec4f, g0: vec4f, g1: vec4f, sand: vec4f, ex4: vec4f, ex5: vec4f, ex6: vec4f, ex7: vec4f, ex8: vec4f, ex9: vec4f, ex10: vec4f };
+struct Cam { vp: mat4x4f, view: mat4x4f, c0: vec4f, c1: vec4f, c2: vec4f, c3: vec4f, prm: vec4f, ext: vec4f, ext2: vec4f, ext3: vec4f, s0: vec4f, s1: vec4f, s2: vec4f, s3: vec4f, sun: vec4f, g0: vec4f, g1: vec4f, sand: vec4f, ex4: vec4f, ex5: vec4f, ex6: vec4f, ex7: vec4f, ex8: vec4f, ex9: vec4f, ex10: vec4f, ex11: vec4f };
 @group(0) @binding(0) var<uniform> K: Cam;
 @group(0) @binding(1) var<storage, read> pos: array<vec4f>;
 @group(0) @binding(2) var<storage, read> vel: array<vec4f>;
@@ -1044,7 +1047,7 @@ struct CO { @location(0) c: vec4f, @builtin(frag_depth) z: f32 };
     let qz = K.ex5.z + (wp.z - K.ex5.z) / wfac(wp.x);
     let ny = (transpose(rv) * n).y;
     let q2 = vec2f(wp.x, qz); let fm = fsamp4(q2 * K.ex7.x);
-    sf = foamLace(fm.x, q2, fm.yz) * smoothstep(0.0, 0.4, ny);
+    sf = foamLace(fm.x * K.ex11.x, q2, fm.yz) * smoothstep(0.0, 0.4, ny);   /* 표면 무늬 양 */
   }
   let isS = sf > K.ex8.x;
   let isF = isFp || isS;
@@ -1076,7 +1079,7 @@ struct CO { @location(0) c: vec4f, @builtin(frag_depth) z: f32 };
 /* ── 방울 줄 세우기: 같은 칸에 있는 방울끼리 메모리에 나란히 놓는다 (격자에 더할 때 덜 헤맨다) ── */
 /* 표면 거품 지도: 위에서 내려다본 2D 그림. 물 흐름을 따라 떠밀려 가고, 얕은 곳(백사장)에서는 빨리 스며들어 사라진다 */
 const FOAMWGSL=`
-struct FU { d: vec4u, a: vec4f, b: vec4f };   /* d: 가로 칸, 세로 칸 / a: 칸 비율, 이번 프레임 시간, 남는 비율, 새 거품 세기 / b: 알갱이 부피, -, 박자 수, 모래에 스며드는 비율 */
+struct FU { d: vec4u, a: vec4f, b: vec4f, c: vec4f };   /* c: 퍼짐, 백사장에 남는 정도 */   /* d: 가로 칸, 세로 칸 / a: 칸 비율, 이번 프레임 시간, 남는 비율, 새 거품 세기 / b: 알갱이 부피, -, 박자 수, 모래에 스며드는 비율 */
 @group(0) @binding(0) var<uniform> F: FU;
 @group(0) @binding(1) var<storage, read_write> fa: array<atomic<i32>>;
 @group(0) @binding(2) var<storage, read> fo: array<vec4f>;      /* 지난 프레임: 거품 양, 흐름(앞뒤·옆) */
@@ -1102,7 +1105,9 @@ fn sampv(p: vec2f) -> vec2f { let q = p - 0.5; let i = vec2i(floor(q)); let f = 
     let n4 = cl(ix - 1, iz).yz + cl(ix + 1, iz).yz + cl(ix, iz - 1).yz + cl(ix, iz + 1).yz; vd = n4 * 0.25;
   }
   let b = c - vd * R * dt;
-  var f = samp(b) * 0.8 + (samp(b + vec2f(1.0, 0.0)) + samp(b - vec2f(1.0, 0.0)) + samp(b + vec2f(0.0, 1.0)) + samp(b - vec2f(0.0, 1.0))) * 0.05;   /* 살짝 번져 낱알 대신 덩어리로 */
+  let cw = mix(0.8, 0.36, F.c.x);   /* 퍼짐: 높일수록 이웃으로 더 번져 한곳에 몰리지 않는다 */
+  var f = samp(b) * cw + (samp(b + vec2f(1.0, 0.0)) + samp(b - vec2f(1.0, 0.0)) + samp(b + vec2f(0.0, 1.0)) + samp(b - vec2f(0.0, 1.0))) * ((1.0 - cw) * 0.25);
+  let lose = mix(3.0, 0.3, F.c.y);   /* 백사장에 남는 정도: 낮출수록 얇은 물·모래 위 무늬가 빨리 사라진다 */   /* 살짝 번져 낱알 대신 덩어리로 */
   var vf = sampv(b);
   if (W > 0.0) {
     let vw = vec2f(vx, vz) / max(Ws, 1e-4);                     /* 물 윗부분의 흐름 */
@@ -1110,14 +1115,14 @@ fn sampv(p: vec2f) -> vec2f { let q = p - 0.5; let i = vec2i(floor(q)); let f = 
     let back = vw.x < vf.x - 0.02 && vf.x > 0.0;
     vf = mix(vf, vw, select(0.45, 0.025, back));
     let spd = length(vw) * F.b.y; let moving = smoothstep(0.1, 0.5, spd);
-    let dv = (cl(ix + 1, iz).y - cl(ix - 1, iz).y + cl(ix, iz + 1).z - cl(ix, iz - 1).z) * 0.5 * R;
+    let dv = (cl(ix + 1, iz).y - cl(ix - 1, iz).y + cl(ix, iz + 1).z - cl(ix, iz - 1).z) * 0.5 * R * (1.0 - 0.85 * F.c.x);   /* 퍼짐을 높이면 덜 몰린다 */
     f = f * mix(1.0, clamp(exp(-dv * dt), 0.85, 1.15), moving);   /* 움직이는 물이 모이는 곳에만 몰린다 */
     let depth = W * F.b.x * R * R * F.b.y;                      /* 물 깊이 (바깥 세상) */
     let soak = (1.0 - smoothstep(0.4, 1.4, depth)) * (1.0 - smoothstep(0.05, 0.25, length(vf) * F.b.y));   /* 얇은 물 위에서 거품이 멈추면 스며든다 */
-    f = f * pow(F.a.z, 1.0 + 8.0 * soak) + g * F.b.z * F.a.w * F.b.x * R * R;
+    f = f * pow(F.a.z, 1.0 + 8.0 * soak * lose) + g * F.b.z * F.a.w * F.b.x * R * R;
   } else {
     vf = vf * 0.9;                                              /* 마른 모래 위: 앞으로 미끄러지다 점점 느려지고 */
-    f = f * F.b.w;                                              /* 모래에 스며들며 사라진다 */
+    f = f * pow(F.b.w, lose);                                   /* 모래에 스며들며 사라진다 */
   }
   fw[id.x] = vec4f(clamp(f, 0.0, 1.0), vf, 0.0);
 }`;
@@ -1187,7 +1192,7 @@ async function init(){
     B.SU=dev.createBuffer({size:16,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}); }
   const pl=dev.createPipelineLayout({bindGroupLayouts:[bgl]});
   for(const e of ["clearGrid","p2gMass","p2g","updGrid","g2p","sprayStep","bClear","bMark","bBuild","clearGridS","updGridS"]) PL[e]=dev.createComputePipeline({layout:pl,compute:{module:mod,entryPoint:e}});
-  { const fm=dev.createShaderModule({code:FOAMWGSL}); PL.foamStep=dev.createComputePipeline({layout:"auto",compute:{module:fm,entryPoint:"foamStep"}}); B.FU=dev.createBuffer({size:48,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}); }
+  { const fm=dev.createShaderModule({code:FOAMWGSL}); PL.foamStep=dev.createComputePipeline({layout:"auto",compute:{module:fm,entryPoint:"foamStep"}}); B.FU=dev.createBuffer({size:64,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}); }
   E.bgl=bgl; resizeTank();
   const rmod=dev.createShaderModule({code:RWGSL});
   const rbgl=dev.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.VERTEX|GPUShaderStage.FRAGMENT,buffer:{type:"uniform"}},{binding:1,visibility:GPUShaderStage.VERTEX,buffer:{type:"read-only-storage"}},{binding:2,visibility:GPUShaderStage.VERTEX,buffer:{type:"read-only-storage"}},{binding:3,visibility:GPUShaderStage.VERTEX,buffer:{type:"read-only-storage"}},{binding:4,visibility:GPUShaderStage.FRAGMENT,buffer:{type:"read-only-storage"}}]});
@@ -1331,7 +1336,7 @@ const foamSurf=()=>S.fstyle===1 && S.scene===0 && S.mat!==1;   /* 표면 무늬�
 function runSteps(n){ if(n<=0) return; const e=dev.createCommandEncoder(); const rd=frameNo%4===0 && sortPass(e), n0=N, FS=foamSurf();
   for(let k=0;k<n;k++){ step(e,k); if(FS && k===n-1){ pF[31]+=10; } }   /* 마지막 박자만 거품 지도에 모은다 */
   if(FS){ const tS=n*DT, tR=tS/(72*Math.max(0.05,S.spd)), keep=Math.exp(-tR/(0.8+7*S.flife));   /* 사라지는 시간은 실제 시간 기준 (빠르기를 낮춰도 그대로) */
-    const u=new ArrayBuffer(48), ui=new Uint32Array(u), uf=new Float32Array(u); ui[0]=FX; ui[1]=FZ; uf[4]=FR; uf[5]=tS; uf[6]=keep; uf[7]=1.6*S.foam; uf[8]=pVol; uf[9]=DS; uf[10]=n; uf[11]=Math.exp(-tR/(0.3+1.5*S.flife));
+    const u=new ArrayBuffer(64), ui=new Uint32Array(u), uf=new Float32Array(u); uf[12]=S.fspr===undefined?0.5:S.fspr; uf[13]=S.fstay===undefined?0.5:S.fstay; ui[0]=FX; ui[1]=FZ; uf[4]=FR; uf[5]=tS; uf[6]=keep; uf[7]=1.6*S.foam; uf[8]=pVol; uf[9]=DS; uf[10]=n; uf[11]=Math.exp(-tR/(0.3+1.5*S.flife));
     dev.queue.writeBuffer(B.FU,0,u); const c=e.beginComputePass(); c.setPipeline(PL.foamStep); c.setBindGroup(0,E.fbg); c.dispatchWorkgroups(Math.ceil(FX*FZ/64)); c.end(); e.copyBufferToBuffer(B.fmB,0,B.fmA,0,FX*FZ*16); }
   dev.queue.writeBuffer(B.U,0,params,0,256*n); dev.queue.submit([e.finish()]); if(rd) readAlive(n0); }
 
@@ -1404,8 +1409,9 @@ function frame(now){
   camData.set([S.conn,DS,0.45,S.spsz],96); camData.set([visF(3),visF(GX-4),zcG(),S.cull>0?1.35-0.4*S.cull:0],100); camData.set([S.brd*spacing(),S.brt*spacing(),S.fcon,0],104);
   EYEG[0]=eye[0]+GX/2; EYEG[1]=eye[1]+GY/2; EYEG[2]=zcG()+(eye[2]+GZ/2-zcG())/Math.max(0.2,visF(EYEG[0])); EYEG[3]=dist*0.45;
   camData.set([FR,FX,FZ,foamSurf()?1:0],108); camData.set([0.62-0.5*S.fsz,0.02+0.16*S.frim,0.8*72*S.spd,S.flace],112); camData.set([S.frc,DS/(0.5+2.5*S.flsz),S.mat!==1?S.wgr:0,S.lcol],116);
+  camData.set([S.fsamt===undefined?0.7:S.fsamt,0,0,0],124);   /* 표면 무늬 양 */
   camData.set([1.5+1.7*S.mball,0.3,S.scene===0?(S.btr||0):0,S.scene===0?(S.bwh===undefined?0.5:S.bwh):0],120);
-  dev.queue.writeBuffer(B.cam,0,camData,0,124); sandMesh(); lines();
+  dev.queue.writeBuffer(B.cam,0,camData,0,128); sandMesh(); lines();
   const SURF=S.rmode===0; if(SURF) surfTargets(w,h);
   const e=dev.createCommandEncoder();
   if(SURF){ const rp=(view,clear,bg,pl,count,inst,depthTex)=>{ const q=e.beginRenderPass({colorAttachments:[{view,clearValue:{r:clear,g:0,b:0,a:0},loadOp:"clear",storeOp:"store"}],...(depthTex?{depthStencilAttachment:{view:depthTex.createView(),depthClearValue:1,depthLoadOp:"clear",depthStoreOp:"store"}}:{})}); q.setPipeline(pl); q.setBindGroup(0,bg); q.draw(count,inst); q.end(); };
