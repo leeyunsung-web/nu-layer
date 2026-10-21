@@ -295,9 +295,10 @@ float bub(vec2 p){ return min(worley(p), worley(p*2.3+5.1)*1.35); }
 /* 거품 양에 방울 구멍을 뚫는다. 무늬는 거품 속도를 따라 두 겹으로 번갈아 흘러가 끊김 없이 움직인다 */
 float foamLace(float f, vec2 q, vec2 v){
   if(f<0.02 || uFoamP.z<0.01) return f;
-  float P=0.8, t=uTime/P, p0=fract(t), p1=fract(t+0.5), sc=uFoamP.w;
-  vec2 vv=clamp(v*P*uFoamQ.y, vec2(-1.0/sc), vec2(1.0/sc));
-  float n0=bub((q-vv*p0)*sc), n1=bub((q-vv*p1)*sc+31.7), w0=1.0-abs(2.0*p0-1.0), n=n0*w0+n1*(1.0-w0);
+  /* 무늬 두 장을 천천히 번갈아 밀어 준다 (주기를 길게, 한 번에 밀리는 거리는 방울 반 개 이하로 → 거품 끝이 떨리지 않게) */
+  float P=2.6, t=uTime/P, p0=fract(t), p1=fract(t+0.5), sc=uFoamP.w;
+  vec2 vv=clamp(v*P*uFoamQ.y, vec2(-0.45/sc), vec2(0.45/sc));
+  float n0=bub((q-vv*p0)*sc), n1=bub((q-vv*p1)*sc+31.7), w0=smoothstep(0.0,1.0,1.0-abs(2.0*p0-1.0)), n=n0*w0+n1*(1.0-w0);
   float hs=mix(0.62,0.2,clamp(f,0.0,1.0))*(0.4+0.6*uFoamP.z);
   float hole=1.0-smoothstep(hs-0.07,hs,n);
   return f-hole*1.2-(0.45-n)*0.15*uFoamP.z;
