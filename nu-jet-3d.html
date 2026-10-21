@@ -118,6 +118,7 @@ const CTL=[
  ["secWave","해변 경사","beach",0,1.6,0.02,0.3,"","오른쪽 바닥을 비탈로 만듭니다. 바꾸면 다시 채웁니다.",1],
  ["secWave","스며들기","soak",0,1,0.02,0.5,"%","백사장 위에 얇게 남은 물이 모래에 스며드는 빠르기. 스며든 만큼 바다 쪽 바닥에서 다시 솟아 물은 줄지 않습니다. 0이면 스며들지 않습니다.",0],
  ["secDrop","떨어지는 간격","dint",0.08,6,0.02,0.7,"초","'계속 떨어뜨리기'일 때 다음 방울까지의 시간.",0],
+ ["secDrop","웅덩이 깊이","dpool",0,0.6,0.01,0.25,"%","바닥에 고인 물의 깊이. 방울이 물 위로 떨어져 튀어 오르는 모습을 볼 수 있습니다. 0이면 웅덩이 없이 바닥에 떨어져 퍼지며 사라집니다. 바꾸면 다시 채웁니다.",2],
  ["secDrop","방울 크기","dsize",0.5,12,0.25,2.5,"칸","떨어지는 물방울의 반지름.",0],
  ["secDrop","떨어지는 높이","dh",0.2,1,0.02,0.85,"%","수조 높이에서 몇 % 높이에서 떨어뜨릴지. 높을수록 세게 부딪혀 튑니다.",0],
  ["secDrop","옆으로 던지기","dthrow",0,2,0.02,0.15,"%","떨어질 때 옆으로 날아가는 세기.",0],
@@ -144,6 +145,7 @@ const CTL=[
  ["secLook","구름 양","cloud",0,1,0.02,0.55,"%","하늘을 덮는 구름의 양. 0이면 맑은 하늘.",0],
  ["secLook","구름 빠르기","cspd",0,2,0.02,0.35,"%","구름이 바람에 흘러가는 빠르기.",0],
  ["secLook","부드러움","smooth",0,1,0.05,0.6,"%","물 표면을 얼마나 매끈하게 녹여 이을지. 낮추면 방울 알갱이가 보입니다.",0],
+ ["secLook","부드러운 이음","mball",0,1,0.05,0,"%","방울과 물이 메타볼처럼 부드럽게 이어집니다. 떨어지는 방울이 수면에 가까워지면 사이가 차오르고, 솟는 물기둥에 가는 목이 생깁니다. 0이면 끄기 (지금 방식). 높일수록 더 멀리서 이어지고 조금 무거워집니다.",0],
  ["secLook","선 색","lcol",0,1,0.05,0,"%","물 테두리 선의 색. 0 = 물 색에 맞춘 진한 선, 1 = 또렷한 파란 선.",0],
  ["secLook","하얘짐","wgr",0,1,0.05,0.7,"%","위로 솟구치는 물기둥·물보라 끝이 물색에서 흰색으로 부드럽게 바뀌는 정도. 떨어지는 방울은 하얘지지 않습니다. 0이면 끄기 (조금 가벼워짐).",0],
  ["secLook","거품 덩어리","fsz",0,1,0.05,0.5,"%","(표면 그림) 거품 덩어리의 굵기. 높이면 거품이 넓고 통통하게 퍼지고, 낮추면 가늘게 갈라진 무늬만 남습니다.",0],
@@ -223,12 +225,12 @@ const cMax=()=>Math.sqrt(S.stiff*0.5*1.728)/DS;
 const stepDT=()=>{ let d=Math.min(0.2,0.72/cMax()); if(S.visc>0.6) d=Math.min(d,0.2*0.6/S.visc); return S.mat===1?Math.min(d,(S.stiff>10?0.11:0.14)*DS):d; };
 const MAXCELLS=16000000;   /* 격자 칸 수 한도 (그래픽카드 한 번에 돌릴 수 있는 양) */
 function tankSize(){ const W0=SMALL?13:S.tzc, W1=W0, wz=W0;   /* 계산은 언제나 '계산 폭'의 반듯한 상자 */
-  if(SMALL){ DS=1; GX=40; GY=24; GZ=20; TOPG=2+S.level*(GY-5); }
+  if(SMALL){ DS=1; GX=40; GY=24; GZ=20; TOPG=2+S.level*(GY-5); POOLG=2+S.dpool*(GY-5); }
   else { /* 계산하는 높이는 물 높이 + '튈 공간'까지만 (그 위 빈 하늘은 계산하지 않아 알갱이를 더 작게 할 수 있다). 칸 수 한도를 넘으면 알갱이를 조금씩 키운다 */
-    let ds=S.dsz; for(let it=0;it<8;it++){ const X=Math.round(S.tx/ds)+7, Hf=Math.round(S.ty/ds)+7, top=2+S.level*(Hf-5), Y=Math.min(Hf,Math.ceil(top+S.head/ds)+7), Z=Math.round(wz/ds)+7, n=X*Y*Z;
-      DS=ds; GX=X; GY=Y; GZ=Z; TOPG=top; if(n<=MAXCELLS) break; ds*=Math.cbrt(n/MAXCELLS)*1.01; } }
+    let ds=S.dsz; for(let it=0;it<8;it++){ const X=Math.round(S.tx/ds)+7, Hf=Math.round(S.ty/ds)+7, lv=S.scene===1?Math.max(S.level,S.dpool):S.level, top=2+lv*(Hf-5), Y=Math.min(Hf,Math.ceil(top+S.head/ds)+7), Z=Math.round(wz/ds)+7, n=X*Y*Z;
+      DS=ds; GX=X; GY=Y; GZ=Z; TOPG=top; POOLG=2+S.dpool*(Hf-5); if(n<=MAXCELLS) break; ds*=Math.cbrt(n/MAXCELLS)*1.01; } }
   HW0=(SMALL?6.5:W0/DS)/2; HW1=(SMALL?6.5:W1/DS)/2; CELLS=GX*GY*GZ; }
-let FR=1, FX=2, FZ=2;   /* 표면 거품 지도 크기 */
+let FR=1, FX=2, FZ=2, POOLG=2;   /* POOLG: 물방울 장면 웅덩이 높이 */   /* 표면 거품 지도 크기 */
 let HW0=20, HW1=20, NBLK=1, TOPG=10;   /* TOPG: 처음 물 높이(격자 칸) */ const EYEG=[0,0,0,1];   /* 카메라 자리 (격자 칸)와 가까움 기준 거리 */
 tankSize();
 const E={ok:false};
@@ -531,7 +533,7 @@ fn updAt(cid: u32) {
 
 /* 그리기: 방울마다 화면을 향한 작은 원판. 둥근 공처럼 빛을 나눠 칠한다(1단계 미리보기) */
 const RWGSL=/* wgsl */`
-struct Cam { vp: mat4x4f, view: mat4x4f, c0: vec4f, c1: vec4f, c2: vec4f, c3: vec4f, prm: vec4f, ext: vec4f, ext2: vec4f, ext3: vec4f, s0: vec4f, s1: vec4f, s2: vec4f, s3: vec4f, sun: vec4f, g0: vec4f, g1: vec4f, sand: vec4f, ex4: vec4f, ex5: vec4f, ex6: vec4f, ex7: vec4f, ex8: vec4f, ex9: vec4f };
+struct Cam { vp: mat4x4f, view: mat4x4f, c0: vec4f, c1: vec4f, c2: vec4f, c3: vec4f, prm: vec4f, ext: vec4f, ext2: vec4f, ext3: vec4f, s0: vec4f, s1: vec4f, s2: vec4f, s3: vec4f, sun: vec4f, g0: vec4f, g1: vec4f, sand: vec4f, ex4: vec4f, ex5: vec4f, ex6: vec4f, ex7: vec4f, ex8: vec4f, ex9: vec4f, ex10: vec4f };
 @group(0) @binding(0) var<uniform> K: Cam;
 @group(0) @binding(1) var<storage, read> pos: array<vec4f>;
 @group(0) @binding(2) var<storage, read> vel: array<vec4f>;
@@ -677,7 +679,7 @@ struct LV { @builtin(position) p: vec4f, @location(0) c: vec3f };
 /* 물 표면: ① 방울을 작은 공으로 그려 화면 깊이만 남기고 ② 깊이를 가로·세로로 두 번씩 녹여 잇고(가장자리는 지킨다)
    ③ 빠른 방울로 거품 자리를 표시한 뒤 ④ 녹인 깊이에서 면의 방향을 구해 셀 채색·외곽선·하이라이트를 칠한다 */
 const SWGSL=/* wgsl */`
-struct Cam { vp: mat4x4f, view: mat4x4f, c0: vec4f, c1: vec4f, c2: vec4f, c3: vec4f, prm: vec4f, ext: vec4f, ext2: vec4f, ext3: vec4f, s0: vec4f, s1: vec4f, s2: vec4f, s3: vec4f, sun: vec4f, g0: vec4f, g1: vec4f, sand: vec4f, ex4: vec4f, ex5: vec4f, ex6: vec4f, ex7: vec4f, ex8: vec4f, ex9: vec4f };
+struct Cam { vp: mat4x4f, view: mat4x4f, c0: vec4f, c1: vec4f, c2: vec4f, c3: vec4f, prm: vec4f, ext: vec4f, ext2: vec4f, ext3: vec4f, s0: vec4f, s1: vec4f, s2: vec4f, s3: vec4f, sun: vec4f, g0: vec4f, g1: vec4f, sand: vec4f, ex4: vec4f, ex5: vec4f, ex6: vec4f, ex7: vec4f, ex8: vec4f, ex9: vec4f, ex10: vec4f };
 @group(0) @binding(0) var<uniform> K: Cam;
 @group(0) @binding(1) var<storage, read> pos: array<vec4f>;
 @group(0) @binding(2) var<storage, read> vel: array<vec4f>;
@@ -835,9 +837,9 @@ fn fblur(p: vec2f, dir: vec2i) -> vec4f {
 @vertex fn vsW(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> SV {
   var o = sprite(vi, ii, K.ex4.x * 1.5);
   let vw = vel[ii];
-  let up = smoothstep(0.25, 1.1, vw.y * K.ex4.y);
+  let up = smoothstep(0.6, 1.8, vw.y * K.ex4.y);   /* 가라앉거나 출렁이는 정도의 느린 움직임은 빼고, 빠르게 솟는 물만 */
   let thin = 1.0 - smoothstep(0.45, 0.95, auxDens(vw.w) / max(K.sun.w, 1e-6));
-  var wt = up * (0.35 + 0.65 * thin);
+  var wt = up * (0.2 + 0.8 * thin);
   if (K.ext3.z > 1.5) { wt = max(wt, auxFoam(vw.w) * 1.4); }
   o.ph = clamp(wt, 0.0, 1.0);
   return o;
@@ -849,6 +851,23 @@ fn fblur(p: vec2f, dir: vec2i) -> vec4f {
   if (-vz > ds + i.r * 1.5) { discard; }   /* 겉에 보이는 방울만 */
   let k = (1.0 - r2) * (1.0 - r2);
   return vec4f(0.0, i.ph * k, k, 0.0);
+}
+/* ── 부드러운 이음 (메타볼): 방울마다 흐린 덩어리 값을 더하고, 일정 진하기 이상만 물로 본다 ──
+   방울이 수면에 가까워지면 사이가 저절로 차오르고, 늘어난 물기둥에는 가는 목이 생긴다 */
+@vertex fn vsM(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> SV { return sprite(vi, ii, K.ex4.x * K.ex10.x); }
+@vertex fn vsMS(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> SV { return sprS(vi, ii, K.ex10.x); }
+@fragment fn fsM(i: SV) -> @location(0) vec4f {
+  let r2 = dot(i.uv, i.uv); if (r2 > 1.0) { discard; }
+  let ds = textureLoad(src, vec2i(i.p.xy), 0).r;
+  if (ds < BIG && -i.c.z > ds + i.r * 0.8) { discard; }   /* 앞에 보이는 물 뒤쪽 방울은 빼고 */
+  let k = (1.0 - r2) * (1.0 - r2) * (1.0 - r2);
+  let dd = -i.c.z - sqrt(max(0.0, 1.0 - r2)) * i.r / K.ex10.x;   /* 방울 겉면 깊이 (작은 공) */
+  return vec4f(k, k * (dd - K.ext2.w), 0.0, 0.0);
+}
+@fragment fn fsMR(i: FV) -> @location(0) f32 {
+  let m = textureLoad(fom, vec2i(i.p.xy), 0);
+  if (m.r < K.ex10.y) { return BIG; }
+  return m.g / m.r + K.ext2.w;
 }
 fn vpos(ip: vec2i, d: f32) -> vec3f {
   let nx = (f32(ip.x) + 0.5) / K.ext.x * 2.0 - 1.0; let ny = 1.0 - (f32(ip.y) + 0.5) / K.ext.y * 2.0;
@@ -1029,6 +1048,9 @@ async function init(){
     PL.sFoamS=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsFS"},fragment:{module:sm,entryPoint:"fsF",targets:[{format:"rgba16float",blend:add}]},primitive:{topology:"triangle-list"}});
     PL.sFBH=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsQ"},fragment:{module:sm,entryPoint:"fsFBH",targets:[{format:"rgba16float"}]}});
     PL.sFBV=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsQ"},fragment:{module:sm,entryPoint:"fsFBV",targets:[{format:"rgba16float"}]}});
+    PL.sMB=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsM"},fragment:{module:sm,entryPoint:"fsM",targets:[{format:"rgba16float",blend:add}]},primitive:{topology:"triangle-list"}});
+    PL.sMBS=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsMS"},fragment:{module:sm,entryPoint:"fsM",targets:[{format:"rgba16float",blend:add}]},primitive:{topology:"triangle-list"}});
+    PL.sMR=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsQ"},fragment:{module:sm,entryPoint:"fsMR",targets:[{format:"r32float"}]}});
     PL.sWhite=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsW"},fragment:{module:sm,entryPoint:"fsW",targets:[{format:"rgba16float",blend:add}]},primitive:{topology:"triangle-list"}});
     PL.sComp=dev.createRenderPipeline({layout:spl,vertex:{module:sm,entryPoint:"vsQ"},fragment:{module:sm,entryPoint:"fsC",targets:[{format:fmtTex}]},depthStencil:ds});
     E.dummy=dev.createTexture({size:[1,1],format:"r16float",usage:GPUTextureUsage.TEXTURE_BINDING}); }
@@ -1067,8 +1089,9 @@ function resizeTank(){ tankSize(); BX0=GX*0.45; const SB=GPUBufferUsage.STORAGE|
   BG0=dev.createBindGroup({layout:E.bgl,entries:[{binding:0,resource:{buffer:B.U,size:128}},{binding:1,resource:{buffer:B.pos}},{binding:2,resource:{buffer:B.vel}},{binding:3,resource:{buffer:B.C}},{binding:4,resource:{buffer:B.gi}},{binding:5,resource:{buffer:B.gv}},{binding:6,resource:{buffer:B.F}},{binding:7,resource:{buffer:B.spr}},{binding:8,resource:{buffer:B.sc}}]}); }
 /* 물 채우기: 물 높이까지 방울을 고르게 (살짝 흔들어) 놓는다. 수조가 커서 방울이 한도를 넘으면 간격을 조금 넓힌다 */
 let SPC=0.5; function spacing(){ return SPC; }
-function fill(){ PEND.length=0; dripT=0; if(B.spr){ const e=dev.createCommandEncoder(); e.clearBuffer(B.spr); if(B.fmA){ e.clearBuffer(B.fmA); e.clearBuffer(B.fmB); e.clearBuffer(B.gv); } dev.queue.submit([e.finish()]); } if(S.scene===1){ SPC=Math.cbrt(1/S.ppc); pVol=SPC**3; N=0; stepNo=0; PADX=2.5; PADV=0; return; }
-  const top=TOPG, vol=(()=>{ let v=0; for(let x=PADX+1.2;x<GX-3.2;x+=0.5){ const zw=zwallsJS(x); v+=0.5*(zw[1]-zw[0]+0.6)*Math.max(0,top-Math.max(3.2,floorAt(x)+1.3)); } return Math.max(1,v); })();   /* 물 부피(칸): 백사장 비탈만큼 빼고 셈 */
+function fill(){ PEND.length=0; dripT=0; if(B.spr){ const e=dev.createCommandEncoder(); e.clearBuffer(B.spr); if(B.fmA){ e.clearBuffer(B.fmA); e.clearBuffer(B.fmB); e.clearBuffer(B.gv); } dev.queue.submit([e.finish()]); } const POOL=S.scene===1 && S.dpool>0;
+  if(S.scene===1 && !POOL){ SPC=Math.cbrt(1/S.ppc); pVol=SPC**3; N=0; stepNo=0; PADX=2.5; PADV=0; return; }
+  const top=POOL?POOLG:TOPG, vol=(()=>{ let v=0; for(let x=PADX+1.2;x<GX-3.2;x+=0.5){ const zw=zwallsJS(x); v+=0.5*(zw[1]-zw[0]+0.6)*Math.max(0,top-Math.max(3.2,floorAt(x)+1.3)); } return Math.max(1,v); })();   /* 물 부피(칸): 백사장 비탈만큼 빼고 셈 */
   /* 알갱이 통은 필요한 만큼만 (한도 안에서): 알갱이 크기를 줄이면 저절로 늘어난다 */
   if(!SMALL){ const need=Math.ceil(vol*S.ppc*1.05)+30000, want=Math.min(S.pcount,need); if(want>MAXP || want<MAXP*0.5) allocParticles(false,want); } SPC=Math.max(Math.cbrt(1/S.ppc),Math.cbrt(vol/Math.min(MAXP*0.97,S.pcount)));   /* 정한 방울 수에 맞춰 간격을 정한다 */ const sp=SPC, P=new Float32Array(MAXP*4); let n=0;
   for(let z=3.2;z<GZ-3.2;z+=sp){ for(let y=3.2;y<top;y+=sp) for(let x=PADX+1.2;x<GX-3.2;x+=sp){ if(y<floorAt(x)+1.3) continue; const zw=zwallsJS(x); if(z<zw[0]+0.2||z>zw[1]+0.8) continue; if(n>=MAXP) break;
@@ -1105,7 +1128,7 @@ function step(e,k){
   pF[4]=DT; pF[5]=-S.grav/DS; pF[6]=E5; pF[7]=1/pVol; pF[8]=S.visc*0.5; pF[9]=PADX; pF[10]=PADV; pF[11]=HW0; pF[12]=DROP?0:S.beach;
   pF[13]=JEL?1.5+3.5*S.jmu:0; pF[14]=JEL?0.003+0.08*S.melt*S.melt:1; pF[15]=JEL?0.02+0.08*S.coh:0.0005+0.006*S.coh;   /* 물: 뭉침은 아주 약하게 (세면 떨어진 물이 공처럼 말린다) */
   /* 물방울 장면: 바닥에 닿은 뒤 (1.2~9초에 걸쳐) 사라지고, 바닥에서 덜 미끄러지고, 공처럼 튀지 않게 */
-  pF[16]=DROP&&S.dfade>0?1/(72*(9-7.8*S.dfade)):0; pF[17]=DROP?0.015+0.1*(1-S.dspread):0; pF[18]=JEL?0.04:DROP?0.25:0.06;   /* 파도 장면은 약하게: 세면 물보라가 덩어리째 눌려 따로 튀어 나가지 못한다 */ pF[19]=HW1;
+  const POOL=DROP&&S.dpool>0; pF[16]=DROP&&!POOL&&S.dfade>0?1/(72*(9-7.8*S.dfade)):0; pF[17]=DROP&&!POOL?0.015+0.1*(1-S.dspread):0;   /* 웅덩이가 있으면 사라지지 않고 바닥에서 끌리지도 않는다 */ pF[18]=JEL?0.04:DROP?0.25:0.06;   /* 파도 장면은 약하게: 세면 물보라가 덩어리째 눌려 따로 튀어 나가지 못한다 */ pF[19]=HW1;
   pF[20]=DS; pF[21]=DROP?0:S.foam*2; pF[22]=!DROP&&S.soak>0?S.soak/(72*0.4):0; pF[23]=S.mat===0?S.spray*0.35:0;
   pF[24]=EYEG[0]; pF[25]=EYEG[1]; pF[26]=EYEG[2]; pF[27]=EYEG[3];
   pF[28]=TOPG; pF[29]=!DROP?S.soak*0.06:0; pF[30]=FR; pF[31]=0;
@@ -1158,12 +1181,12 @@ const m4={ persp(f,a,n,fa){ const t=1/Math.tan(f/2); return [t/a,0,0,0, 0,t,0,0,
 const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]], dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2], crs=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]], nrm=a=>{ const l=Math.hypot(...a)||1; return [a[0]/l,a[1]/l,a[2]/l]; };
 const camData=new Float32Array(128);
 const T={w:0,h:0};   /* 물 표면용 화면 크기 그림판 */
-function surfTargets(w,h){ if(T.w===w && T.h===h) return; for(const k of ["dep","tmp","sm","fo","fo2","hw"]) if(T[k]) T[k].destroy();
+function surfTargets(w,h){ if(T.w===w && T.h===h) return; for(const k of ["dep","tmp","sm","fo","fo2","mb","hw"]) if(T[k]) T[k].destroy();
   const RT=GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING;
-  T.dep=dev.createTexture({size:[w,h],format:"r32float",usage:RT}); T.tmp=dev.createTexture({size:[w,h],format:"r32float",usage:RT}); T.sm=dev.createTexture({size:[w,h],format:"r32float",usage:RT}); T.fo=dev.createTexture({size:[w,h],format:"rgba16float",usage:RT}); T.fo2=dev.createTexture({size:[w,h],format:"rgba16float",usage:RT});
+  T.dep=dev.createTexture({size:[w,h],format:"r32float",usage:RT}); T.tmp=dev.createTexture({size:[w,h],format:"r32float",usage:RT}); T.sm=dev.createTexture({size:[w,h],format:"r32float",usage:RT}); T.fo=dev.createTexture({size:[w,h],format:"rgba16float",usage:RT}); T.fo2=dev.createTexture({size:[w,h],format:"rgba16float",usage:RT}); T.mb=dev.createTexture({size:[w,h],format:"rgba16float",usage:RT});
   T.hw=dev.createTexture({size:[w,h],format:"depth24plus",usage:GPUTextureUsage.RENDER_ATTACHMENT});
   const bg=(a,b)=>dev.createBindGroup({layout:E.sbgl,entries:[{binding:0,resource:{buffer:B.cam}},{binding:1,resource:{buffer:B.pos}},{binding:2,resource:{buffer:B.vel}},{binding:3,resource:a.createView()},{binding:4,resource:b.createView()},{binding:5,resource:{buffer:B.F}},{binding:6,resource:{buffer:B.spr}},{binding:7,resource:{buffer:B.fmA}}]});
-  T.bgDep=bg(T.sm,E.dummy); T.bgH1=bg(T.dep,E.dummy); T.bgV=bg(T.tmp,E.dummy); T.bgH2=bg(T.sm,E.dummy); T.bgFoam=bg(T.sm,E.dummy); T.bgComp=bg(T.sm,T.fo); T.bgFB2=bg(T.sm,T.fo2); T.w=w; T.h=h; }
+  T.bgDep=bg(T.sm,E.dummy); T.bgH1=bg(T.dep,E.dummy); T.bgV=bg(T.tmp,E.dummy); T.bgH2=bg(T.sm,E.dummy); T.bgFoam=bg(T.sm,E.dummy); T.bgComp=bg(T.sm,T.fo); T.bgFB2=bg(T.sm,T.fo2); T.bgMR=bg(T.sm,T.mb); T.w=w; T.h=h; }
 /* 백사장 모양 (바뀔 때만 다시 만든다): 바닥 + 해변 비탈 + 비탈의 앞·뒤·옆 면 */
 function sandMesh(){ const key=[GX,GY,GZ,HW0,HW1,S.beach,S.scene,S.tz,S.tz1,S.tzc].join(","); if(key===sandKey) return; sandKey=key;
   const V=[], X=x=>x-GX/2, Y=y=>y-GY/2, Z=z=>z-GZ/2, fy=2.5, top=GY-4, beach=S.beach>0 && S.scene!==1, bx=beachX(), x0=2, x1=GX-2;
@@ -1213,13 +1236,18 @@ function frame(now){
   camData.set([S.conn,DS,0.45,S.spsz],96); camData.set([visF(3),visF(GX-4),zcG(),0],100); camData.set([S.brd*spacing(),S.brt*spacing(),S.fcon,0],104);
   EYEG[0]=eye[0]+GX/2; EYEG[1]=eye[1]+GY/2; EYEG[2]=zcG()+(eye[2]+GZ/2-zcG())/Math.max(0.2,visF(EYEG[0])); EYEG[3]=dist*0.45;
   camData.set([FR,FX,FZ,foamSurf()?1:0],108); camData.set([0.62-0.5*S.fsz,0.02+0.16*S.frim,0.8*72*S.spd,S.flace],112); camData.set([S.frc,DS/(0.5+2.5*S.flsz),S.mat===0?S.wgr:0,S.lcol],116);
-  dev.queue.writeBuffer(B.cam,0,camData,0,120); sandMesh(); lines();
+  camData.set([1.5+1.7*S.mball,0.3,0,0],120);
+  dev.queue.writeBuffer(B.cam,0,camData,0,124); sandMesh(); lines();
   const SURF=S.rmode===0; if(SURF) surfTargets(w,h);
   const e=dev.createCommandEncoder();
   if(SURF){ const rp=(view,clear,bg,pl,count,inst,depthTex)=>{ const q=e.beginRenderPass({colorAttachments:[{view,clearValue:{r:clear,g:0,b:0,a:0},loadOp:"clear",storeOp:"store"}],...(depthTex?{depthStencilAttachment:{view:depthTex.createView(),depthClearValue:1,depthLoadOp:"clear",depthStoreOp:"store"}}:{})}); q.setPipeline(pl); q.setBindGroup(0,bg); q.draw(count,inst); q.end(); };
     { const q=e.beginRenderPass({colorAttachments:[{view:T.dep.createView(),clearValue:{r:1e6,g:0,b:0,a:0},loadOp:"clear",storeOp:"store"}],depthStencilAttachment:{view:T.hw.createView(),depthClearValue:1,depthLoadOp:"clear",depthStoreOp:"store"}});
       q.setBindGroup(0,T.bgDep); if(N){ q.setPipeline(PL.sDepth); q.draw(6,N); } if(S.mat===0){ q.setPipeline(PL.sDepthS); q.draw(6,262144); } q.end(); }
-    if(S.brd>0){ rp(T.sm.createView(),1e6,T.bgH1,PL.sBrH,3,1); rp(T.dep.createView(),1e6,T.bgH2,PL.sBrV,3,1); }   /* 알갱이 잇기: 깊이 → 가로 잇기 → 세로 잇기 → 다시 깊이 그림 */
+    if(S.mball>0){   /* 부드러운 이음: 앞 깊이를 보며 덩어리 값을 더한 뒤 → 문턱을 넘는 곳만 물 깊이로 */
+      const q=e.beginRenderPass({colorAttachments:[{view:T.mb.createView(),clearValue:{r:0,g:0,b:0,a:0},loadOp:"clear",storeOp:"store"}]}); q.setBindGroup(0,T.bgH1);
+      if(N){ q.setPipeline(PL.sMB); q.draw(6,N); } if(S.mat===0){ q.setPipeline(PL.sMBS); q.draw(6,262144); } q.end();
+      rp(T.dep.createView(),1e6,T.bgMR,PL.sMR,3,1); }
+    else if(S.brd>0){ rp(T.sm.createView(),1e6,T.bgH1,PL.sBrH,3,1); rp(T.dep.createView(),1e6,T.bgH2,PL.sBrV,3,1); }   /* 알갱이 잇기: 깊이 → 가로 잇기 → 세로 잇기 → 다시 깊이 그림 */
     rp(T.tmp.createView(),1e6,T.bgH1,PL.sBH,3,1); rp(T.sm.createView(),1e6,T.bgV,PL.sBV,3,1);
     rp(T.tmp.createView(),1e6,T.bgH2,PL.sBH,3,1); rp(T.sm.createView(),1e6,T.bgV,PL.sBV,3,1);
     { const q=e.beginRenderPass({colorAttachments:[{view:T.fo.createView(),clearValue:{r:0,g:0,b:0,a:0},loadOp:"clear",storeOp:"store"}]}); q.setBindGroup(0,T.bgFoam);
