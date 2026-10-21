@@ -102,7 +102,7 @@ const CTL=[
  ["secTank","빠르기","spd",0.1,2,0.05,1,"배","물이 움직이는 빠르기. 화면이 몇 프레임으로 돌든 같은 빠르기로 흐릅니다. 낮추면 슬로모션.",0],
  ["secTank","가로","tx",32,256,4,96,"칸","수조의 가로(좌우) 길이. 넓을수록 파도가 길게 달려갑니다. 바꾸면 다시 채웁니다.",2],
  ["secTank","깊이","tz",16,160,4,40,"칸","수조의 앞뒤 길이. 바꾸면 다시 채웁니다.",2],
- ["secTank","벌어짐","flare",0,0.8,0.02,0.35,"%","화면 안쪽(뒤)으로 갈수록 좌우 폭이 넓어지는 정도. 높이면 앞쪽이 좁아져 부채꼴이 됩니다. 0이면 반듯한 상자. 바꾸면 다시 채웁니다.",1],
+ ["secTank","벌어짐","flare",0,0.8,0.02,0.35,"%","파도가 시작되는 쪽(파도 판)이 앞뒤로 넓고, 해변 쪽으로 갈수록 좁아지는 정도. 0이면 반듯한 상자. 바꾸면 다시 채웁니다.",1],
  ["secTank","높이","ty",24,96,4,40,"칸","수조의 높이. 높을수록 물보라가 높이 튈 공간이 생깁니다. 바꾸면 다시 채웁니다.",2],
  ["secWave","물 높이","level",0.15,0.6,0.01,0.3,"%","수조에 채울 물의 높이. 바꾸면 다시 채웁니다.",1],
  ["secWave","파도 세기","amp",0,30,0.5,8,"칸","파도 판이 밀고 나가는 거리(격자 칸).",0],
@@ -122,6 +122,7 @@ const CTL=[
  ["secLiq","뭉침","coh",0,1,0.02,0.3,"%","방울끼리 붙는 힘. 높이면 떨어진 물이 동글동글 맺힙니다.",0],
  ["secLiq","녹아 붙기","melt",0,1,0.02,0.3,"%","젤리가 모양을 잊는 빠르기. 높이면 물처럼 흘러 합쳐지고, 낮추면 오래 출렁입니다.",0],
  ["secLiq","방울 수 한도","pcount",40000,500000,10000,300000,"알","물을 이루는 방울 수의 한도. 방울은 촘촘한 간격(한 칸에 8알)으로 채우고, 수조가 커서 한도를 넘을 때만 간격을 넓힙니다. 간격이 넓어지면 물보라가 공처럼 뭉쳐 보이니, 프레임이 떨어지면 한도보다 수조 크기를 줄이세요. 바꾸면 다시 채웁니다.",1],
+ ["secLook","모래 색","sandc",0,1,0.02,0.08,"%","백사장 모래 색. 0이면 하얀 백사장, 높일수록 노란 모래.",0],
  ["secLook","구름 양","cloud",0,1,0.02,0.55,"%","하늘을 덮는 구름의 양. 0이면 맑은 하늘.",0],
  ["secLook","구름 빠르기","cspd",0,1,0.02,0.35,"%","구름이 바람에 흘러가는 빠르기.",0],
  ["secLook","부드러움","smooth",0,1,0.05,0.6,"%","물 표면을 얼마나 매끈하게 녹여 이을지. 낮추면 방울 알갱이가 보입니다.",0],
@@ -191,10 +192,10 @@ tankSize();
 const E={ok:false};
 let N=0, stepNo=0, PADX=2.5, PADV=0, SLAP=0, waveOn=true, paused=false, AMPc=0, WPH=0;
 let BX0=GX*0.45;
-/* 수조 좌우 벽 (z에 따라): 계산 쪽 walls()와 같은 식 */
-const wallsJS=z=>{ const lo=3,hi=GX-4,cx=(lo+hi)/2,hb=(hi-lo)/2,hf=hb*(1-S.flare),zl=3,zh=GZ-4,t=Math.min(1,Math.max(0,(zh-z)/Math.max(zh-zl,1))),hw=hf+(hb-hf)*t; return [cx-hw,cx+hw]; };
-const beachAt=z=>{ const w=wallsJS(z); return w[0]+0.45*(w[1]-w[0]); };
-const floorAt=(x,z)=>{ const bx=beachAt(z); return 2+(S.beach>0 && S.scene!==1 && x>bx? S.beach*(x-bx):0); };
+/* 수조 앞뒤 벽 (x에 따라): 계산 쪽 zwalls()와 같은 식 */
+const zwallsJS=x=>{ const lo=3,hi=GX-4,zl=3,zh=GZ-4,zc=(zl+zh)/2,hw=(zh-zl)/2,hn=hw*(1-S.flare),t=Math.min(1,Math.max(0,(x-lo)/Math.max(hi-lo,1))),hd=hw+(hn-hw)*t; return [zc-hd,zc+hd]; };
+const beachX=()=>3+0.45*(GX-7);
+const floorAt=x=>{ const bx=beachX(); return 2+(S.beach>0 && S.scene!==1 && x>bx? S.beach*(x-bx):0); };
 
 const WGSL=/* wgsl */`
 /* g: 격자 크기·방울 수 / a: 박자, 중력, 단단함(E), 방울 부피 / b: 끈적임, 파도 판 위치·속도, 해변 시작 / c: 해변 경사, 말랑함(μ), 모양 잊기, 뭉침
@@ -213,14 +214,14 @@ fn enc(x: f32) -> i32 { return i32(clamp(x, -20000.0, 20000.0) * FP); }
 fn dec(x: i32) -> f32 { return f32(x) / FP; }
 fn gidx(c: vec3i) -> u32 { return u32(c.x) + U.g.x * (u32(c.y) + U.g.y * u32(c.z)); }
 fn wts(d: vec3f) -> array<vec3f,3> { return array<vec3f,3>(0.5*(0.5-d)*(0.5-d), 0.75-d*d, 0.5*(0.5+d)*(0.5+d)); }
-/* 벌어진 수조: 화면 안쪽(뒤, z가 작은 쪽)으로 갈수록 좌우 폭이 넓어진다. d.w = 앞쪽을 좁히는 정도 */
-fn walls(z: f32) -> vec2f {
-  let lo = 3.0; let hi = f32(U.g.x) - 4.0; let cx = (lo + hi) * 0.5; let hb = (hi - lo) * 0.5; let hf = hb * (1.0 - U.d.w);
-  let zl = 3.0; let zh = f32(U.g.z) - 4.0; let t = clamp((zh - z) / max(zh - zl, 1.0), 0.0, 1.0);
-  let hw = mix(hf, hb, t); return vec2f(cx - hw, cx + hw);
+/* 벌어진 수조: 파도가 시작되는 쪽(파도 판, x가 작은 쪽)이 앞뒤로 가장 넓고, 해변 쪽으로 갈수록 좁아진다. d.w = 해변 쪽을 좁히는 정도 */
+fn zwalls(x: f32) -> vec2f {
+  let lo = 3.0; let hi = f32(U.g.x) - 4.0; let zl = 3.0; let zh = f32(U.g.z) - 4.0;
+  let zc = (zl + zh) * 0.5; let hw = (zh - zl) * 0.5; let hn = hw * (1.0 - U.d.w);
+  let t = clamp((x - lo) / max(hi - lo, 1.0), 0.0, 1.0); let hd = mix(hw, hn, t); return vec2f(zc - hd, zc + hd);
 }
-fn wslope() -> f32 { let hb = (f32(U.g.x) - 7.0) * 0.5; return hb * U.d.w / max(f32(U.g.z) - 7.0, 1.0); }
-fn beachX(wl: vec2f) -> f32 { return wl.x + 0.45 * (wl.y - wl.x); }
+fn zslope() -> f32 { let hw = (f32(U.g.z) - 7.0) * 0.5; return hw * U.d.w / max(f32(U.g.x) - 7.0, 1.0); }
+fn beachX() -> f32 { return 3.0 + 0.45 * (f32(U.g.x) - 7.0); }
 
 @compute @workgroup_size(64) fn clearGrid(@builtin(global_invocation_id) id: vec3u) {
   let n = U.g.x*U.g.y*U.g.z; if (id.x >= n) { return; }
@@ -280,14 +281,13 @@ fn beachX(wl: vec2f) -> f32 { return wl.x + 0.45 * (wl.y - wl.x); }
     if (x < 2u || x > U.g.x-3u) { v.x = 0.0; }
     if (y < 2u || y > U.g.y-3u) { v.y = 0.0; }
     if (z < 2u || z > U.g.z-3u) { v.z = 0.0; }
-    let wl = walls(f32(z)); let sl = wslope();
-    let nL = normalize(vec3f(1.0, 0.0, -sl)); let nR = normalize(vec3f(-1.0, 0.0, -sl));
-    if (fx < wl.x + 0.5) { let vn = dot(v, nL); if (vn < 0.0) { v -= vn * nL; } if (fx < wl.x - 1.5) { v = vec3f(0.0); } }   /* 비스듬한 왼쪽 벽 */
-    if (fx > wl.y - 0.5) { let vn = dot(v, nR); if (vn < 0.0) { v -= vn * nR; } if (fx > wl.y + 1.5) { v = vec3f(0.0); } }   /* 오른쪽 벽 */
-    let pd = wl.x + (U.b.y - 3.0);
-    if (fx < pd + 1.0) { let vn = dot(v, nL); if (vn < U.b.z) { v += (U.b.z - vn) * nL; } }   /* 파도 판 (왼쪽 벽과 나란히) */
+    if (fx < U.b.y + 1.0) { v.x = max(v.x, U.b.z); }   /* 파도 판 */
+    let zw = zwalls(fx); let sl = zslope(); let fz = f32(z);
+    let nB = normalize(vec3f(-sl, 0.0, 1.0)); let nF = normalize(vec3f(-sl, 0.0, -1.0));
+    if (fz < zw.x + 0.5) { let vn = dot(v, nB); if (vn < 0.0) { v -= vn * nB; } if (fz < zw.x - 1.5) { v = vec3f(0.0); } }   /* 비스듬한 뒷벽 */
+    if (fz > zw.y - 0.5) { let vn = dot(v, nF); if (vn < 0.0) { v -= vn * nF; } if (fz > zw.y + 1.5) { v = vec3f(0.0); } }   /* 비스듬한 앞벽 */
     if (y < 4u && U.d.y > 0.0) { v.x *= 1.0 - U.d.y; v.z *= 1.0 - U.d.y; }   /* 바닥에 붙은 물은 덜 미끄러진다 */
-    let bx = beachX(wl);
+    let bx = beachX();
     if (U.c.x > 0.0 && fx > bx) {                      /* 해변 비탈 */
       let fy = 2.0 + U.c.x * (fx - bx);
       if (f32(y) < fy + 0.5) { let nn = normalize(vec3f(-U.c.x, 1.0, 0.0)); let vn = dot(v, nn); if (vn < 0.0) { v -= vn * nn; } }
@@ -325,19 +325,21 @@ fn beachX(wl: vec2f) -> f32 { return wl.x + 0.45 * (wl.y - wl.x); }
   p += v * U.a.x;
   let lo = vec3f(3.0, 3.0, 3.0); let hi = vec3f(f32(U.g.x)-4.0, f32(U.g.y)-4.0, f32(U.g.z)-4.0);
   let xn = p + v * U.a.x * 3.0;
-  let wl = walls(p.z); let sl = wslope();
-  let nL = normalize(vec3f(1.0, 0.0, -sl)); let nR = normalize(vec3f(-1.0, 0.0, -sl));
-  let pd = max(wl.x, wl.x + U.b.y - 3.0);
-  if (xn.x < pd) { v += nL * (pd - xn.x); }
-  if (xn.x > wl.y) { v += nR * (xn.x - wl.y); }
+  if (xn.x < max(lo.x, U.b.y)) { v.x += max(lo.x, U.b.y) - xn.x; }
+  if (xn.x > hi.x) { v.x += hi.x - xn.x; }
+  let zw = zwalls(p.x); let sl = zslope();
+  let nB = normalize(vec3f(-sl, 0.0, 1.0)); let nF = normalize(vec3f(-sl, 0.0, -1.0));
+  if (xn.z < zw.x) { v += nB * (zw.x - xn.z); }
+  if (xn.z > zw.y) { v += nF * (xn.z - zw.y); }
   if (xn.y < lo.y) { v.y += lo.y - xn.y; }
   if (xn.y > hi.y) { v.y += hi.y - xn.y; }
   if (xn.z < lo.z) { v.z += lo.z - xn.z; }
   if (xn.z > hi.z) { v.z += hi.z - xn.z; }
-  let bx = beachX(wl);
+  let bx = beachX();
   if (U.c.x > 0.0 && p.x > bx) { let fy = 2.0 + U.c.x * (p.x - bx) + 1.0; if (p.y < fy) { p.y = fy; let nn = normalize(vec3f(-U.c.x, 1.0, 0.0)); let vn = dot(v, nn); if (vn < 0.0) { v -= vn * nn; } } }
   p = clamp(p, vec3f(2.0, 2.0, 2.0), vec3f(f32(U.g.x)-3.0, f32(U.g.y)-3.0, f32(U.g.z)-3.0));
-  p.x = clamp(p.x, pd - 1.0, wl.y + 1.0);
+  p.x = max(p.x, min(U.b.y, f32(U.g.x)-3.0));
+  p.z = clamp(p.z, zw.x - 1.0, zw.y + 1.0);
   /* 바닥에 한 번 닿은 물은 그때부터 천천히 사라진다. 얇게 퍼진 곳일수록 빨리.
      남은 양(life): 2 이상 = 아직 바닥에 안 닿음(소수 부분은 방울마다 다른 제비), 0~1 = 사라지는 중 */
   if (U.d.x > 0.0) {
@@ -450,10 +452,13 @@ struct SDV { @builtin(position) p: vec4f, @location(0) w: vec3f };
   var n = normalize(cross(dpdx(i.w), dpdy(i.w))); if (n.y < 0.0) { n = -n; }
   let ndl = dot(n, normalize(vec3f(-0.4, 0.85, 0.5)));
   let wet = i.w.y < K.sand.x;
-  var col = select(vec3f(0.97, 0.87, 0.67), vec3f(0.83, 0.69, 0.49), wet);
-  if (ndl < 0.6) { col = select(vec3f(0.88, 0.74, 0.52), vec3f(0.72, 0.57, 0.39), wet); }
+  /* 모래 색: 0 = 흰 백사장, 1 = 노란 모래 */
+  let lit = mix(vec3f(0.99, 0.98, 0.94), vec3f(0.97, 0.87, 0.67), K.sand.y);
+  let shd = mix(vec3f(0.86, 0.86, 0.85), vec3f(0.88, 0.74, 0.52), K.sand.y);
+  var col = lit; if (ndl < 0.6) { col = shd; }
+  if (wet) { col = col * mix(vec3f(0.84, 0.86, 0.88), vec3f(0.86, 0.79, 0.73), K.sand.y); }
   let g = h21(floor(i.w.xz * 2.0) + vec2f(floor(i.w.y * 2.0) * 7.13, 0.0));
-  if (g > 0.86) { col = col * 0.84; } else if (g < 0.05) { col = min(col * 1.08, vec3f(1.0)); }
+  if (g > 0.9) { col = col * mix(0.95, 0.84, K.sand.y); } else if (g < 0.05) { col = min(col * 1.06, vec3f(1.0)); }   /* 모래 알갱이 (흰 모래는 옅게) */
   if (abs(i.w.y - K.sand.x) < 0.35) { col = mix(col, vec3f(1.0), 0.35); }   /* 물이 닿는 선 (거품 자국) */
   let lum = dot(K.s0.rgb, vec3f(0.3, 0.6, 0.1));
   col = col * mix(0.32, 1.0, clamp(lum * 1.25, 0.0, 1.0)) * mix(vec3f(1.0), K.s0.rgb * 1.15, 0.18);
@@ -701,7 +706,7 @@ function resizeTank(){ tankSize(); BX0=GX*0.45; const SB=GPUBufferUsage.STORAGE|
 let SPC=0.5; function spacing(){ return SPC; }
 function fill(){ PEND.length=0; dripT=0; if(S.scene===1){ SPC=0.5; pVol=0.125; N=0; stepNo=0; PADX=2.5; PADV=0; return; }
   const top=2+S.level*(GY-5), vol=Math.max(1,(GX-PADX-4.4)*(1-S.flare*0.5)*(top-3.2)*(GZ-6.4)); SPC=Math.max(0.5,Math.cbrt(vol/Math.min(MAXP*0.97,S.pcount)));   /* 정한 방울 수에 맞춰 간격을 정한다 */ const sp=SPC, P=new Float32Array(MAXP*4); let n=0;
-  for(let z=3.2;z<GZ-3.2;z+=sp){ const wl=wallsJS(z); for(let y=3.2;y<top;y+=sp) for(let x=wl[0]+0.7;x<wl[1]+0.8;x+=sp){ if(y<floorAt(x,z)+1.3) continue; if(n>=MAXP) break;
+  for(let z=3.2;z<GZ-3.2;z+=sp){ for(let y=3.2;y<top;y+=sp) for(let x=PADX+1.2;x<GX-3.2;x+=sp){ if(y<floorAt(x)+1.3) continue; const zw=zwallsJS(x); if(z<zw[0]+0.2||z>zw[1]+0.8) continue; if(n>=MAXP) break;
     P[n*4]=x+(Math.random()-.5)*sp*0.3; P[n*4+1]=y+(Math.random()-.5)*sp*0.3; P[n*4+2]=z+(Math.random()-.5)*sp*0.3; P[n*4+3]=1; n++; } }
   N=n; dev.queue.writeBuffer(B.pos,0,P,0,n*4); { const V0=new Float32Array(n*4), d0=1/(sp*sp*sp); for(let i=0;i<n;i++) V0[i*4+3]=d0; dev.queue.writeBuffer(B.vel,0,V0); } dev.queue.writeBuffer(B.C,0,new Float32Array(n*12)); dev.queue.writeBuffer(B.F,0,ident(n));
   stepNo=0; WPH=0; PADX=2.5; pVol=sp*sp*sp; }
@@ -713,7 +718,7 @@ function dropBlob(){ if(!E.ok) return; const sp=spacing(), R=Math.min(GY,GZ)*0.1
 
 /* 물방울 하나: 공 모양으로 방울을 채워 아래(와 옆)로 던진다. 줄 세우며 사라진 방울을 정리하는 동안에는 잠깐 기다렸다 넣는다 */
 const PEND=[]; let dripT=0, autoDrip=true, compacting=false;
-function spawnDrop(){ if(!E.ok) return; const sp=0.5, R=S.dsize, m=R+4, cz=GZ*0.5+(Math.random()-.5)*Math.max(0,GZ-2*m)*0.5, wl=wallsJS(cz), cx=(wl[0]+wl[1])/2+(Math.random()-.5)*Math.max(0,wl[1]-wl[0]-2*m)*0.5,
+function spawnDrop(){ if(!E.ok) return; const sp=0.5, R=S.dsize, m=R+4, cx=GX*0.5+(Math.random()-.5)*Math.max(0,GX-2*m)*0.5, zw=zwallsJS(cx), cz=(zw[0]+zw[1])/2+(Math.random()-.5)*Math.max(0,zw[1]-zw[0]-2*m)*0.5,
     cy=Math.min(GY-R-4.5, 3+R+S.dh*(GY-8-2*R)), an=Math.random()*Math.PI*2, th=S.dthrow*1.4, vx=Math.cos(an)*th, vz=Math.sin(an)*th, A=[];
   for(let z=-R;z<=R;z+=sp) for(let y=-R;y<=R;y+=sp) for(let x=-R;x<=R;x+=sp){ if(x*x+y*y+z*z>R*R) continue; const j=()=>(Math.random()-.5)*sp*0.25; A.push(cx+x+j(),cy+y+j(),cz+z+j(),2+Math.random()*0.999); }
   PEND.push({A,vx,vz}); flushDrops(); }
@@ -773,22 +778,22 @@ function surfTargets(w,h){ if(T.w===w && T.h===h) return; for(const k of ["dep",
   T.bgDep=bg(T.sm,E.dummy); T.bgH1=bg(T.dep,E.dummy); T.bgV=bg(T.tmp,E.dummy); T.bgH2=bg(T.sm,E.dummy); T.bgFoam=bg(T.sm,E.dummy); T.bgComp=bg(T.sm,T.fo); T.w=w; T.h=h; }
 /* 백사장 모양 (바뀔 때만 다시 만든다): 바닥 + 해변 비탈 + 비탈의 앞·뒤·옆 면 */
 function sandMesh(){ const key=[GX,GY,GZ,S.flare,S.beach,S.scene].join(","); if(key===sandKey) return; sandKey=key;
-  const V=[], X=x=>x-GX/2, Y=y=>y-GY/2, Z=z=>z-GZ/2, fy=2.5, top=GY-4, nz=24, z0=2, z1=GZ-2, beach=S.beach>0 && S.scene!==1;
+  const V=[], X=x=>x-GX/2, Y=y=>y-GY/2, Z=z=>z-GZ/2, fy=2.5, top=GY-4, beach=S.beach>0 && S.scene!==1, bx=beachX(), x0=2, x1=GX-2;
   const tri=(a,b,c)=>V.push(...a,...b,...c), quad=(a,b,c,d)=>{ tri(a,b,c); tri(a,c,d); };
-  const at=z=>{ const w=wallsJS(Math.min(GZ-4,Math.max(3,z))), xl=w[0]-1, xr=w[1]+2, bx=beach?beachAt(Math.min(GZ-4,Math.max(3,z))):xr, yr=beach?Math.min(top,fy+S.beach*(xr-bx)):fy; return {xl,xr,bx,yr}; };
-  for(let k=0;k<nz;k++){ const za=z0+(z1-z0)*k/nz, zc=z0+(z1-z0)*(k+1)/nz, a=at(za), c=at(zc);
-    quad([X(a.xl),Y(fy),Z(za)],[X(a.bx),Y(fy),Z(za)],[X(c.bx),Y(fy),Z(zc)],[X(c.xl),Y(fy),Z(zc)]);
-    if(beach){ quad([X(a.bx),Y(fy),Z(za)],[X(a.xr),Y(a.yr),Z(za)],[X(c.xr),Y(c.yr),Z(zc)],[X(c.bx),Y(fy),Z(zc)]);
-      quad([X(a.xr),Y(fy),Z(za)],[X(a.xr),Y(a.yr),Z(za)],[X(c.xr),Y(c.yr),Z(zc)],[X(c.xr),Y(fy),Z(zc)]); } }
-  if(beach) for(const z of [z0,z1]){ const a=at(z); tri([X(a.bx),Y(fy),Z(z)],[X(a.xr),Y(fy),Z(z)],[X(a.xr),Y(a.yr),Z(z)]); }
+  const hy=x=>beach&&x>bx?Math.min(top,fy+S.beach*(x-bx)):fy, zw=x=>{ const w=zwallsJS(Math.min(GX-4,Math.max(3,x))); return [w[0]-1,w[1]+2]; };
+  const xs=[]; for(let k=0;k<=24;k++) xs.push(x0+(x1-x0)*k/24); if(beach) xs.push(bx); xs.sort((a,b)=>a-b);
+  for(let k=0;k<xs.length-1;k++){ const a=xs[k], c=xs[k+1]; if(c-a<1e-4) continue; const za=zw(a), zc=zw(c), ya=hy(a), yc=hy(c);
+    quad([X(a),Y(ya),Z(za[0])],[X(a),Y(ya),Z(za[1])],[X(c),Y(yc),Z(zc[1])],[X(c),Y(yc),Z(zc[0])]);   /* 윗면 (바닥·비탈) */
+    if(ya>fy+1e-3||yc>fy+1e-3) for(const s of [0,1]) quad([X(a),Y(fy),Z(za[s])],[X(a),Y(ya),Z(za[s])],[X(c),Y(yc),Z(zc[s])],[X(c),Y(fy),Z(zc[s])]); }   /* 비탈 옆면 */
+  if(beach){ const z=zw(x1), y=hy(x1); quad([X(x1),Y(fy),Z(z[0])],[X(x1),Y(y),Z(z[0])],[X(x1),Y(y),Z(z[1])],[X(x1),Y(fy),Z(z[1])]); }
   sandN=V.length/3; dev.queue.writeBuffer(sandBuf,0,new Float32Array(V)); }
-function lines(){ const hy=GY/2-2, L=[], X=x=>x-GX/2, Z=z=>z-GZ/2, zb=2, zf=GZ-2, wb=wallsJS(3), wf=wallsJS(GZ-4);
-  /* 벌어진 수조 테두리: 뒤(화면 안쪽)가 넓고 앞이 좁다. 벽 안쪽 선보다 한 칸 바깥에 그린다 */
-  const xs=(w,s)=>s?X(w[1]+2):X(w[0]-1), P=[[xs(wb,0),-hy,Z(zb)],[xs(wb,1),-hy,Z(zb)],[xs(wb,1),hy,Z(zb)],[xs(wb,0),hy,Z(zb)],[xs(wf,0),-hy,Z(zf)],[xs(wf,1),-hy,Z(zf)],[xs(wf,1),hy,Z(zf)],[xs(wf,0),hy,Z(zf)]],
+function lines(){ const hy=GY/2-2, L=[], X=x=>x-GX/2, Z=z=>z-GZ/2, xa=2, xb=GX-2, za=zwallsJS(3), zb=zwallsJS(GX-4);
+  /* 벌어진 수조 테두리: 파도 판 쪽(왼쪽)이 앞뒤로 넓고 해변 쪽이 좁다. 벽 안쪽 선보다 한 칸 바깥에 그린다 */
+  const zs=(w,s)=>s?Z(w[1]+2):Z(w[0]-1), P=[[X(xa),-hy,zs(za,0)],[X(xb),-hy,zs(zb,0)],[X(xb),hy,zs(zb,0)],[X(xa),hy,zs(za,0)],[X(xa),-hy,zs(za,1)],[X(xb),-hy,zs(zb,1)],[X(xb),hy,zs(zb,1)],[X(xa),hy,zs(za,1)]],
     Eg=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
   const gl=[0.75,0.66,1], ye=[0.98,0.88,0.12];
   for(const [a,b] of Eg) L.push(...P[a],...gl,...P[b],...gl);
-  if(S.scene!==1){ const o=PADX-3, a=[X(wb[0]+o),-hy,Z(zb)], b=[X(wf[0]+o),-hy,Z(zf)], c=[X(wf[0]+o),hy*0.5,Z(zf)], d=[X(wb[0]+o),hy*0.5,Z(zb)];
+  if(S.scene!==1){ const zp=zwallsJS(Math.max(3,PADX)), px=X(PADX), a=[px,-hy,zs(zp,0)], b=[px,-hy,zs(zp,1)], c=[px,hy*0.5,zs(zp,1)], d=[px,hy*0.5,zs(zp,0)];
     for(const [u,v] of [[a,b],[b,c],[c,d],[d,a]]) L.push(...u,...ye,...v,...ye); }
   lineN=L.length/6; dev.queue.writeBuffer(lineBuf,0,new Float32Array(L)); }
 
@@ -813,7 +818,7 @@ function frame(now){
   camData.set(Pm,0); camData.set(V,16); camData.set([...cc(C[0]),1],32); camData.set([...cc(C[1]),1],36); camData.set([...cc(C[2]),1],40); camData.set([...cc(C[3]),1.6],44);
   camData.set([spacing()*0.95*S.psize,GX,GY,GZ],48);
   const tf=1/Math.tan(0.31); camData.set([w,h,tf,w/h],52); camData.set([spacing()*1.05,2.6-1.8*S.foam,0.5,dist*0.9],56); camData.set([S.smooth,1,S.mat===0?2:1,S.scene===0&&S.mat===0?1/pVol:0],60);
-  { const K=SKIES[S.sky]||SKIES.day, f=c=>c.map(v=>v/255); camData.set([...f(K.hz),(now/1000)%3600],64); camData.set([...f(K.zn),S.cloud],68); camData.set([...f(K.cw),S.cspd],72); camData.set([...f(K.cs),K.mode],76); camData.set([...K.sun,1/pVol],80); camData.set([...f(K.g0),1],84); camData.set([...f(K.g1),1],88); camData.set([S.scene===1?-1e6:2+S.level*(GY-5)-GY/2+0.3,0,0,0],92); }
+  { const K=SKIES[S.sky]||SKIES.day, f=c=>c.map(v=>v/255); camData.set([...f(K.hz),(now/1000)%3600],64); camData.set([...f(K.zn),S.cloud],68); camData.set([...f(K.cw),S.cspd],72); camData.set([...f(K.cs),K.mode],76); camData.set([...K.sun,1/pVol],80); camData.set([...f(K.g0),1],84); camData.set([...f(K.g1),1],88); camData.set([S.scene===1?-1e6:2+S.level*(GY-5)-GY/2+0.3,S.sandc,0,0],92); }
   dev.queue.writeBuffer(B.cam,0,camData,0,96); sandMesh(); lines();
   const SURF=S.rmode===0 && N>0; if(SURF) surfTargets(w,h);
   const e=dev.createCommandEncoder();
