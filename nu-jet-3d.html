@@ -200,7 +200,7 @@ const CTL=[
  ["secLook","거품 테두리","frim",0,1,0.05,0.4,"%","(표면 그림) 거품 가장자리 선의 두께. 0이면 선 없이 흰색만.",0],
  ["secLook","거품 지속","flife",0,1,0.05,0.4,"%","(표면 그림) 거품이 물 위에 남아 있는 시간, 그리고 물이 빠진 모래 위에서 스며들어 사라지는 시간.",0],
  ["secLook","거품 무늬","flace",0,1,0.05,0.6,"%","(표면 그림) 거품 속에 뚫린 방울 구멍(레이스 무늬). 무늬는 물을 따라 흘러갑니다. 0이면 매끈한 덩어리.",0],
- ["secLook","무늬 크기","flsz",0,1,0.05,0.4,"%","(표면 그림) 거품 방울 구멍의 크기.",0],
+ ["secLook","무늬 크기","flsz",0,1,0.01,0.4,"%","표면 무늬의 거품 방울(구멍) 크기. 낮출수록 방울이 잘아집니다 (0이면 아주 잘게).",0],
  ["secLook","테두리 색","frc",0,1,0.05,0.6,"%","(표면 그림) 거품 가장자리 선의 색. 0 = 옅은 물빛, 1 = 로코로코처럼 진한 선.",0],
  ["secLook","거품 이어짐","fcon",0,1,0.05,0.6,"%","가까운 거품끼리 엉겨 붙어 한 덩어리로 이어지는 정도. 0이면 거품 알갱이가 하나하나 동그랗게, 높이면 띠·덩어리·실 모양으로 이어집니다.",0],
  ["secLook","거품","foam",0,1,0.05,0.5,"%","거품이 생기는 정도. 부서지는 물결, 물보라, 백사장으로 얇게 밀려 올라가는 물이 하얗게 거품이 됩니다.",0],
@@ -241,7 +241,7 @@ for(const c of CTL){ const w=document.createElement("label"); w.className="ctl";
 /* 탭 나누기: 자주 쓰는 메뉴만 앞 세 탭으로 옮기고, 남은 것은 모두 '세부' 탭에 그대로 둔다 */
 { const TABS={tWave:["#scenes","#views","cfx","spd","amp","per","skew","level","beach","h3[data-sc='1']","#secDrop"],
     tWater:["#mats","stick","coh","visc","dsz","ppc","spray"],
-    tLook:["#colors","#skies","fsamt","fsx0","fsgw","fspr","fstay","btr","bwh","px","mball","cull","smooth","conn","whue","wsat","wbri"]};
+    tLook:["#colors","#skies","fsamt","flsz","fsx0","fsgw","fspr","fstay","btr","bwh","px","mball","cull","smooth","conn","whue","wsat","wbri"]};
   const el=k=>k[0]==="#"||k.includes("[")?document.querySelector(k):(inputs[k]&&inputs[k][0].closest(".ctl"));
   for(const t in TABS) for(const k of TABS[t]){ const e=el(k); if(e) $(t).appendChild(e); }
   const pn=$("panel"), more=$("tMore"), stop=$("bReset").closest(".row");
@@ -1413,7 +1413,7 @@ function frame(now){
   { const K=SKIES[S.sky]||SKIES.day, f=c=>c.map(v=>v/255); camData.set([...f(K.hz),(now/1000)%3600],64); camData.set([...f(K.zn),S.cloud],68); camData.set([...f(K.cw),S.cspd],72); camData.set([...f(K.cs),K.mode],76); camData.set([...K.sun,1/pVol],80); camData.set([...f(K.g0),1],84); camData.set([...f(K.g1),1],88); camData.set([S.scene===1?-1e6:TOPG-GY/2+0.3,S.sandc,S.sky==="off"?1:0,0],92); }
   camData.set([S.conn,DS,0.45,S.spsz],96); camData.set([visF(3),visF(GX-4),zcG(),S.cull>0?1.35-0.4*S.cull:0],100); camData.set([S.brd*spacing(),S.brt*spacing(),S.fcon,0],104);
   EYEG[0]=eye[0]+GX/2; EYEG[1]=eye[1]+GY/2; EYEG[2]=zcG()+(eye[2]+GZ/2-zcG())/Math.max(0.2,visF(EYEG[0])); EYEG[3]=dist*0.45;
-  camData.set([FR,FX,FZ,foamSurf()?1:0],108); camData.set([0.62-0.5*S.fsz,0.02+0.16*S.frim,0.8*72*S.spd,S.flace],112); camData.set([S.frc,DS/(0.5+2.5*S.flsz),S.mat!==1?S.wgr:0,S.lcol],116);
+  camData.set([FR,FX,FZ,foamSurf()?1:0],108); camData.set([0.62-0.5*S.fsz,0.02+0.16*S.frim,0.8*72*S.spd,S.flace],112); camData.set([S.frc,DS/(0.12+3.45*S.flsz),S.mat!==1?S.wgr:0,S.lcol],116);
   camData.set([S.fsamt===undefined?0.7:S.fsamt,S.fsx0===undefined?0.45:S.fsx0,S.fsgw===undefined?0.15:S.fsgw,0],124);   /* 표면 무늬 양 */
   camData.set([1.5+1.7*S.mball,0.3,S.scene===0?(S.btr||0):0,S.scene===0?(S.bwh===undefined?0.5:S.bwh):0],120);
   dev.queue.writeBuffer(B.cam,0,camData,0,128); sandMesh(); lines();
