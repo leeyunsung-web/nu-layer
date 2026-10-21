@@ -168,7 +168,11 @@ function makeWave(P){
       let f=bil(foam,NX,NZ,bx,bz)*0.72+(bil(foam,NX,NZ,bx+1,bz)+bil(foam,NX,NZ,bx-1,bz)+bil(foam,NX,NZ,bx,bz+1)+bil(foam,NX,NZ,bx,bz-1))*0.07;   /* 살짝 번져 낱알 대신 둥근 덩어리로 */
       let ax=bil(fu,NX,NZ,bx,bz), az=bil(fw,NX,NZ,bx,bz);
       if(wetNow){
-        const wx=0.5*(u[k*(NX+1)+i]+u[k*(NX+1)+i+1]), wz=0.5*(w[k*NX+i]+w[(k+1)*NX+i]);
+        let wx=0.5*(u[k*(NX+1)+i]+u[k*(NX+1)+i+1]); const wz=0.5*(w[k*NX+i]+w[(k+1)*NX+i]);
+        /* 파도 앞면에 올라탄 거품은 물이 아니라 파도와 함께 앞으로 달린다 (마루를 넘어 앞으로 흘러내림) */
+        const e0=i>0?eta[j-1]:eta[j], e1=i<NX-1?eta[j+1]:eta[j], sl=(e0-e1)/(2*dx), Hc=eta[j]-D;
+        const ride=Math.min(1,Math.max(0,sl/0.25))*Math.min(1,Math.max(0,(Hc+0.2)/0.6));
+        if(ride>0) wx=Math.max(wx,ride*0.85*Math.sqrt(g*Math.max(h[j],0.05)));
         const back=wx<ax-0.05 && ax>0; const r=back?0.035:0.4; ax+=(wx-ax)*r; az+=(wz-az)*r;
         const thin=1-Math.min(1,Math.max(0,(h[j]-0.08)/0.4)), slow=1-Math.min(1,Math.max(0,(Math.hypot(ax,az)-0.3)/1.2));
         f=f*Math.pow(keep,1+8*thin*slow);
@@ -442,13 +446,22 @@ function build(){
 /* 프레임마다: 말림을 더한 물 표면 꼭짓점 만들기 */
 function meshUpdate(){
   const {NX,NZ,h,b,brk,dx,D,foam,fu,fw,wet,L}=W, Wd=W.W, d=G.data, px=new Float32Array(NX*NZ), py=new Float32Array(NX*NZ), pz=new Float32Array(NX*NZ);
-  const curl=S.curl;
-  for(let k=0;k<NZ;k++) for(let i=0;i<NX;i++){ const j=k*NX+i;
-    const x=i===0?0:i===NX-1?L:(i+0.5)*dx, z=k===0?0:k===NZ-1?Wd:(k+0.5)*dx;
-    let y=h[j]>0.02?h[j]+b[j]:b[j]-0.04;
-    /* 말림: 부서지는 마루일수록, 높이 솟은 곳일수록 앞으로 휘어 넘어가고 끝이 살짝 처진다 */
-    const Hc=Math.max(0,h[j]+b[j]-D), B=brk[j], s=curl*B*(0.8+Hc*2.2);
-    px[j]=x+s; py[j]=y-s*0.35*B; pz[j]=z; }
+  const curl=S.curl, R=Math.max(4,Math.round(5/dx)), Hrow=new Float32Array(NX);
+  for(let k=0;k<NZ;k++){ const r0=k*NX;
+    for(let i=0;i<NX;i++) Hrow[i]=h[r0+i]>0.02?h[r0+i]+b[r0+i]-D:-9;
+    for(let i=0;i<NX;i++){ const j=r0+i;
+      const x=i===0?0:i===NX-1?L:(i+0.5)*dx, z=k===0?0:k===NZ-1?Wd:(k+0.5)*dx;
+      let y=h[j]>0.02?h[j]+b[j]:b[j]-0.04;
+      /* 말림 (그림의 빨간 선): 깊이가 충분한 곳의 마루 윗부분만 앞으로 둥글게 넘어가고, 끝은 아래로 휘어 떨어진다.
+         앞면 아랫부분과 얕은 물은 그대로 (그림의 보라색 고리가 생기지 않게) */
+      let s=0, dy=0;
+      if(curl>0 && h[j]>0.9){
+        let crest=0, Bc=0; for(let q=Math.max(0,i-R);q<=Math.min(NX-1,i+R);q++){ if(Hrow[q]>crest) crest=Hrow[q]; }
+        for(let q=Math.max(0,i-2);q<=Math.min(NX-1,i+R);q++){ if(brk[r0+q]>Bc) Bc=brk[r0+q]; }
+        const Hc=Hrow[i];
+        if(Bc>0.01 && crest>0.3 && Hc>0){ const f=Math.min(1,Hc/crest), top=Math.max(0,(f-0.45)/0.55);
+          s=curl*Bc*crest*1.6*top*top; dy=s*0.55*top*top*top; } }
+      px[j]=x+s; py[j]=y-dy; pz[j]=z; } }
   for(let k=0;k<NZ;k++) for(let i=0;i<NX;i++){ const j=k*NX+i, o=j*10;
     const a=i>0?j-1:j, c=i<NX-1?j+1:j, e=k>0?j-NX:j, f=k<NZ-1?j+NX:j;
     const ax=px[c]-px[a], ay=py[c]-py[a], az=pz[c]-pz[a], bx=px[f]-px[e], by=py[f]-py[e], bz=pz[f]-pz[e];
