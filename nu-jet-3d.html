@@ -1090,7 +1090,8 @@ function slot(k){ pU=new Uint32Array(params,256*k,32); pF=new Float32Array(param
 async function init(){
   const slow=setTimeout(()=>{ if(!E.ok) $("msg").textContent="그래픽카드가 대답하지 않아요. 브라우저(또는 앱)를 완전히 닫았다 다시 열어 주세요. 다른 창에서 이 페이지가 돌고 있다면 먼저 닫아 주세요."; },12000);
   if(!navigator.gpu){ $("msg").textContent="이 브라우저는 WebGPU(그래픽카드 계산)를 지원하지 않아요. 최신 크롬이나 엣지에서 열어 주세요."; return; }
-  const ad=await navigator.gpu.requestAdapter({powerPreference:"high-performance"}); E.adapter=ad;   /* 어댑터를 붙잡아 둔다 (놓치면 일부 브라우저에서 연결이 끊긴다) */ if(!ad){ $("msg").textContent="그래픽카드를 찾지 못했어요."; return; }
+  let ad=await navigator.gpu.requestAdapter({powerPreference:"high-performance"}); if(!ad) ad=await navigator.gpu.requestAdapter();   /* 고성능 카드를 못 받으면 기본 카드라도 */ E.adapter=ad;   /* 어댑터를 붙잡아 둔다 (놓치면 일부 브라우저에서 연결이 끊긴다) */
+  if(!ad){ $("msg").innerHTML="그래픽카드를 찾지 못했어요.<br><small>① 대화 화면 안 미리보기처럼 그래픽카드를 못 쓰는 창이면, 파일을 내려받아 Chrome으로 여세요.<br>② Chrome이면 Chrome을 완전히 닫았다가(작업 표시줄의 Chrome도 종료) 다시 여세요. 무거운 계산으로 그래픽카드가 한 번 멈추면 Chrome이 그 뒤로 그래픽카드를 막아 둡니다.<br>③ 그래도 안 되면 Chrome 주소창에 chrome://gpu 를 열어 WebGPU 줄이 'Hardware accelerated'인지 확인하고, 설정 › 시스템의 '그래픽 가속 사용'을 켜 주세요.</small>"; return; }
   dev=await ad.requestDevice({requiredLimits:{maxStorageBufferBindingSize:Math.min(ad.limits.maxStorageBufferBindingSize,256*1024*1024)}}); dev.addEventListener("uncapturederror",ev=>showErr("GPU: "+ev.error.message));
   dev.lost.then(i=>{ $("msg").hidden=false; $("msg").textContent="그래픽카드 연결이 끊겼어요. 새로고침해 주세요. ("+(i.message||"")+")"; });
   if(OFF) fmtTex="rgba8unorm"; else { ctx=cv.getContext("webgpu"); fmtTex=navigator.gpu.getPreferredCanvasFormat(); ctx.configure({device:dev,format:fmtTex,alphaMode:"opaque"}); }
