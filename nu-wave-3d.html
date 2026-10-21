@@ -80,6 +80,8 @@ h3{margin:4px 0 0;font-size:12px;letter-spacing:.08em;color:var(--soft)}
       <div class="row"><button id="bShapeReset" type="button">모양 처음으로</button></div>
       <h3>거품</h3>
       <div id="secFoam"></div>
+      <h3>그림자 거품 층</h3>
+      <div id="secShadow"></div>
       <h3>거리별 곡선 (파도 판 → 백사장)</h3>
       <div class="row" id="curveSel"></div>
       <canvas class="ed curve" id="curveCv" width="640" height="320" aria-label="거리별 곡선 편집"></canvas>
@@ -266,8 +268,14 @@ const CTL=[
  ["secCurl","부서지는 기울기","cth",0.15,1.2,0.05,0.5,"","파도 앞면이 이만큼 가팔라지면 부서지기(말림·거품) 시작합니다. 낮추면 일찍·자주 부서집니다.",0],
  ["secFoam","거품 양","foam",0,2,0.05,1.1,"","부서지는 마루와 백사장으로 밀려 올라가는 얇은 물에서 생기는 거품의 양.",0],
  ["secFoam","마루에 붙는 힘","fahead",0,1,0.05,0.35,"%","거품이 파도 마루 꼭대기에 모여 붙은 채 파도와 함께 앞으로 가는 힘. 마루가 백사장에서 사라지면 거품이 떨어져 나와 모래 위로 미끄러집니다. 0이면 물 흐름만 따라갑니다.",0],
- ["secFoam","그림자 거품 층","rev",0,1,0.05,0.5,"%","흰 거품 밑에 한 장 더 깔리는 거품 (무늬가 거꾸로 흐르던 예전 모습). 흰 거품보다 넓게 삐져나와 그림자처럼 보입니다. 0이면 끄기.",0],
- ["secFoam","그림자 층 색","revc",0,1,0.05,0.35,"%","0 = 파도 그림자 색, 1 = 물 색. 처음 값은 그림자보다 살짝 밝게.",0],
+ ["secShadow","양","rev",0,1,0.05,0.5,"%","흰 거품 밑에 한 장 더 깔리는 거품 (무늬가 거꾸로 흐르던 예전 모습). 흰 거품보다 얼마나 넓게 삐져나오는지. 0이면 끄기.",0],
+ ["secShadow","기본 색","revc",0,1,0.05,0.35,"%","0 = 파도 그림자 색, 1 = 물 색. 처음 값은 그림자보다 살짝 밝게.",0],
+ ["secShadow","색조","revhue",-180,180,5,0,"°","색을 돌려 다른 색으로 (예: 보랏빛, 초록빛).",0],
+ ["secShadow","채도","revsat",0,2,0.05,1,"배","1보다 크면 진하게, 작으면 흐리게 (0 = 회색).",0],
+ ["secShadow","밝기","revbri",0.4,1.8,0.05,1,"배","1보다 크면 밝게, 작으면 어둡게.",0],
+ ["secShadow","불투명도","revop",0,1,0.05,1,"%","1 = 꽉 찬 색, 낮출수록 점점이 비쳐 아래 물이 보입니다 (도트 느낌).",0],
+ ["secShadow","가장자리 부드러움","revsoft",0,1,0.05,0.3,"%","가장자리로 갈수록 점점 더 비쳐 부드럽게 사라집니다.",0],
+ ["secShadow","무늬 방향","revdir",-1,1,2,-1,"","-1 = 흰 거품과 반대로 흐름 (예전 모습), 1 = 흰 거품과 같은 방향.",0],
  ["secFoam","물 끝 거품","fedge",0,1,0.05,0.6,"%","백사장으로 밀려 올라온 물의 맨 앞 끝을 흰 거품 띠로 칠합니다 (테두리 선 없이, 가장자리는 고르지 않게). 높일수록 띠가 넓어집니다.",0],
  ["secFoam","백사장 퍼지는 거리","bdist",0,1,0.05,0.5,"%","백사장에 올라온 거품이 모래 위로 얼마나 멀리 미끄러져 가는지.",0],
  ["secFoam","백사장 퍼지는 폭","bspread",0,1,0.05,0.4,"%","모래 위 거품이 옆으로 얼마나 넓게 번지는지.",0],
@@ -324,7 +332,7 @@ const VIEWS={ side:{n:"비스듬히",y:-32,p:22,z:1,t:0}, near:{n:"백사장 가
 const SHAPE0={S:[-2.4,-0.3],A:[0,0.32],L:[0.95,0.05],E:[0.72,-0.75],B:[0.1,-1]};   /* 마루 꼭대기 = (0,0), 단위 = 파도 높이 */
 const CURVES=[["fspd","거품 속도"],["foam","거품 양"],["lift","떠 있는 높이"],["curl","거품 말림"],["steep","앞면 세우기"]];
 /* 윤성이 정한 처음 값 (2026-10-21, 설정 복사로 받은 값) */
-const SAVED={"col":"maldives","sky":"day","cyaw":125.15546874999994,"cpit":26.1015625,"czoom":1.107413588177411,"ctx":0,"shape":{"S":[-2.1206135936661297,-0.34271001073537316],"A":[-0.2346266103059582,0.2271873322597961],"L":[0.633009594739667,0.10347893183038112],"E":[1.1346366747181964,-0.28781702898550715],"B":[0,-1]},"curves":{"fspd":[1,1,1,1,1],"foam":[1,1,1,1,1],"lift":[1,1,1,1,1],"curl":[1,1,1,1,1],"steep":[1,1,1,1,1]},"amp":4.5,"per":6,"skew":0.25,"irr":0.35,"spd":1,"fcurl":1,"curl":0.85,"cth":0.5,"foam":1.1,"fsurge":0.55,"fswirl":0.4,"flift":0.9,"flife":0.5,"fsz":0.5,"flace":0,"fwig":0.08,"flsz":0.4,"frim":0.5,"frc":0.25,"tx":180,"tz":70,"level":11,"bstart":0.4,"beach":0.13,"res":1,"grav":1,"fric":0.15,"visc":0.02,"soak":0.65,"bback":0.8,"rev":0.5,"revc":0.35,"lcol":0,"shal":0.6,"cloud":0.6,"cspd":0.35,"sandc":0,"px":2};
+const SAVED={"col":"maldives","sky":"day","cyaw":125.15546874999994,"cpit":26.1015625,"czoom":1.107413588177411,"ctx":0,"shape":{"S":[-2.1206135936661297,-0.34271001073537316],"A":[-0.2346266103059582,0.2271873322597961],"L":[0.633009594739667,0.10347893183038112],"E":[1.1346366747181964,-0.28781702898550715],"B":[0,-1]},"curves":{"fspd":[1,1,1,1,1],"foam":[1,1,1,1,1],"lift":[1,1,1,1,1],"curl":[1,1,1,1,1],"steep":[1,1,1,1,1]},"amp":4.5,"per":6,"skew":0.25,"irr":0.35,"spd":1,"fcurl":1,"curl":0.85,"cth":0.5,"foam":1.1,"fsurge":0.55,"fswirl":0.4,"flift":0.9,"flife":0.5,"fsz":0.5,"flace":0,"fwig":0.08,"flsz":0.4,"frim":0.5,"frc":0.25,"tx":180,"tz":70,"level":11,"bstart":0.4,"beach":0.13,"res":1,"grav":1,"fric":0.15,"visc":0.02,"soak":0.65,"bback":0.8,"rev":0.5,"revc":0.35,"revhue":0,"revsat":1,"revbri":1,"revop":1,"revsoft":0.3,"revdir":-1,"lcol":0,"shal":0.6,"cloud":0.6,"cspd":0.35,"sandc":0,"px":2};
 const DEF=(()=>{ const o={col:"maldives",sky:"day",cyaw:-32,cpit:22,czoom:1,ctx:0,shape:JSON.parse(JSON.stringify(SHAPE0)),curves:{}}; for(const [k] of CURVES) o.curves[k]=[1,1,1,1,1]; for(const c of CTL) o[c[2]]=c[6]; return Object.assign(o,JSON.parse(JSON.stringify(SAVED))); })();
 const clone=o=>JSON.parse(JSON.stringify(o));
 const KEY="nu-wave-3d-v1";
@@ -435,6 +443,8 @@ uniform vec2 uFoamR;   /* 무늬가 바뀌는 주기(초), 움직임 양 */
 uniform vec2 uFoamS;   /* 앞으로 쏟아짐, 소용돌이 */
 uniform float uFoamEdge;   /* 물 끝 거품 */
 uniform vec3 uRev;   /* 그림자 거품 층: 양, -, 색 */
+uniform vec4 uRev2;  /* 색조(도), 채도, 밝기, 불투명도 */
+uniform vec2 uRev3;  /* 가장자리 부드러움, 무늬 방향 */
 uniform vec4 uFoamE;   /* 가장자리 번짐, 가장자리 구멍, 바다 전체 거품, 무늬 흐름 방향(±1) */
 uniform sampler2D uFoam;
 vec2 fhash(vec2 p){ return fract(sin(vec2(dot(p,vec2(127.1,311.7)),dot(p,vec2(269.5,183.3))))*43758.5453); }
@@ -565,10 +575,21 @@ in vec3 vP; in vec3 vN; in vec2 vH; in vec2 vQ;
 layout(location=0) out vec4 oC; layout(location=1) out vec4 oId;
 void main(){
   if(vH.x<0.02 || uRev.x<0.01) discard;
-  vec4 fm0=foamAt(vQ); vec4 fm=foamAt(foamWarp(vQ, fm0.ba, -uFoamE.w));
+  vec4 fm0=foamAt(vQ); vec4 fm=foamAt(foamWarp(vQ, fm0.ba, uRev3.y*uFoamE.w));
   float sf=max(fm.r, vH.y), thr=uFoamP.x-0.2*uRev.x;
   if(sf<=thr) discard;
-  oC=vec4(mix(uC1,uC0,uRev.z),1.0); oId=vec4(0.75,0.0,0.0,1.0);
+  /* 불투명도·가장자리 부드러움: 4×4 점무늬로 점점이 비치게 (섞지 않아서 선이 생기지 않는다) */
+  ivec2 ip=ivec2(gl_FragCoord.xy)&3; int bi=ip.x+ip.y*4;
+  float bay[16]=float[16](0.0,8.0,2.0,10.0,12.0,4.0,14.0,6.0,3.0,11.0,1.0,9.0,15.0,7.0,13.0,5.0);
+  float edge=uRev3.x>0.01?smoothstep(thr, thr+0.05+0.35*uRev3.x, sf):1.0;
+  if((bay[bi]+0.5)/16.0 > uRev2.w*edge) discard;
+  /* 색: 기본 색 → 색조 돌리기 → 채도 → 밝기 */
+  vec3 c=mix(uC1,uC0,uRev.z);
+  float mx=max(c.r,max(c.g,c.b)), mn=min(c.r,min(c.g,c.b)), dl=mx-mn, hh=0.0;
+  if(dl>1e-5){ hh = mx==c.r ? mod((c.g-c.b)/dl,6.0) : (mx==c.g ? (c.b-c.r)/dl+2.0 : (c.r-c.g)/dl+4.0); hh/=6.0; }
+  float sv=mx>0.0?dl/mx:0.0; hh=fract(hh+uRev2.x/360.0); sv=clamp(sv*uRev2.y,0.0,1.0); float vv=clamp(mx*uRev2.z,0.0,1.0);
+  vec3 k=clamp(abs(mod(hh*6.0+vec3(0.0,4.0,2.0),6.0)-3.0)-1.0,0.0,1.0); c=vv*mix(vec3(1.0),k,sv);
+  oC=vec4(c,1.0); oId=vec4(0.75,0.0,0.0,1.0);
 }`;
 const VS_BODY=COMMON+`
 layout(location=0) in vec3 aP; layout(location=1) in float aT;
@@ -866,7 +887,7 @@ function frame(now){
     for(let i=0;i<4;i++) if(u["uC"+i]) gl.uniform3fv(u["uC"+i],rgb(C[i])); if(u.uLine) gl.uniform3fv(u.uLine,lineC);
     if(u.uHz) gl.uniform3fv(u.uHz,rgb(K.hz)); if(u.uZn) gl.uniform3fv(u.uZn,rgb(K.zn)); if(u.uCw) gl.uniform3fv(u.uCw,rgb(K.cw)); if(u.uCs) gl.uniform3fv(u.uCs,rgb(K.cs));
     if(u.uFoamP) gl.uniform4f(u.uFoamP,0.62-0.5*S.fsz,0.02+0.07*S.frim,S.flace,1/(1.5+5*S.flsz));
-    if(u.uFoamQ) gl.uniform4f(u.uFoamQ,S.frc,S.spd,S.shal,S.sandc); if(u.uTank) gl.uniform4f(u.uTank,L,Wd,D,0); if(u.uFoamR) gl.uniform2f(u.uFoamR,7.0-6.2*S.fwig,Math.min(1,S.fwig*3)); if(u.uFoamS) gl.uniform2f(u.uFoamS,S.fsurge,S.fswirl); if(u.uFoamEdge) gl.uniform1f(u.uFoamEdge,S.fedge); if(u.uRev) gl.uniform3f(u.uRev,S.rev,0,S.revc); if(u.uFoamE) gl.uniform4f(u.uFoamE,S.fgrad,S.fhole,S.fsea,S.fdir<0?-1:1);
+    if(u.uFoamQ) gl.uniform4f(u.uFoamQ,S.frc,S.spd,S.shal,S.sandc); if(u.uTank) gl.uniform4f(u.uTank,L,Wd,D,0); if(u.uFoamR) gl.uniform2f(u.uFoamR,7.0-6.2*S.fwig,Math.min(1,S.fwig*3)); if(u.uFoamS) gl.uniform2f(u.uFoamS,S.fsurge,S.fswirl); if(u.uFoamEdge) gl.uniform1f(u.uFoamEdge,S.fedge); if(u.uRev) gl.uniform3f(u.uRev,S.rev,0,S.revc); if(u.uRev2) gl.uniform4f(u.uRev2,S.revhue,S.revsat,S.revbri,S.revop); if(u.uRev3) gl.uniform2f(u.uRev3,S.revsoft,S.revdir<0?-1:1); if(u.uFoamE) gl.uniform4f(u.uFoamE,S.fgrad,S.fhole,S.fsea,S.fdir<0?-1:1);
     if(u.uFoam){ gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,G.ftex); gl.uniform1i(u.uFoam,0); } };
   gl.bindFramebuffer(gl.FRAMEBUFFER,T.fb); gl.viewport(0,0,w,h);
   gl.clearBufferfv(gl.COLOR,0,[1,1,1,1]); gl.clearBufferfv(gl.COLOR,1,[0,0,0,0]); gl.clear(gl.DEPTH_BUFFER_BIT);
