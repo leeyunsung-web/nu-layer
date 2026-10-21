@@ -190,7 +190,8 @@ function makeWave(P,seed){
   }
   /* 거품: 자기 속도를 가진 2D 그림. 물을 따라 흐르다가, 물이 뒤로 빠져도 앞으로 가던 힘으로 모래 위까지 미끄러져 스며들어 사라진다 */
   function foamStep(dtF){
-    const P=S.P, keep=Math.exp(-dtF/(0.8+7*P.flife)), keepS=Math.exp(-dtF/(0.35+1.6*P.flife)), cell=dtF/dx, eps=2e-3;
+    const P=S.P, keep=Math.exp(-dtF/(0.8+7*P.flife)), keepS=Math.exp(-dtF/(0.3+5*(P.bsoak===undefined?0.3:P.bsoak))), cell=dtF/dx, eps=2e-3;
+    const bd=(P.bdist===undefined?0.5:P.bdist), bsp=(P.bspread===undefined?0.4:P.bspread), sandV=Math.exp(-dtF*(0.3+6*(1-bd)));   /* 백사장: 퍼지는 거리·폭·스며드는 시간 */
     for(let k=0;k<NZ;k++) for(let i=0;i<NX;i++){ const j=k*NX+i;
       const wetNow=h[j]>eps; let vx=fu[j], vz=fw[j];
       if(!wetNow && vx*vx+vz*vz<1e-6){ const a=i>0?j-1:j, c=i<NX-1?j+1:j, d=k>0?j-NX:j, e=k<NZ-1?j+NX:j; vx=0.25*(fu[a]+fu[c]+fu[d]+fu[e]); vz=0.25*(fw[a]+fw[c]+fw[d]+fw[e]); }
@@ -211,7 +212,9 @@ function makeWave(P,seed){
         f=f*Math.pow(keep,1+8*thin*slow);
         const sw=(h[j]<0.5 && wx>0.6 && b[j]>D-1.5)?Math.min(1,(wx-0.6)*0.5):0;   /* 백사장으로 밀려 올라가는 얇은 물도 거품을 만든다 */
         f+=P.foam*cvAt(P,"foam",(i+0.5)/NX)*(brk[j]*3.2+sw*1.2)*dtF*3;   /* 부서지는 마루의 거품은 흐르는 거품 그림으로 남아 백사장까지 실려 간다 */
-      } else { ax*=0.965; az*=0.965; f*=keepS; }   /* 마른 모래 위: 앞으로 조금 더 미끄러지다 멈추며 스며든다 */
+      } else { ax*=sandV; az*=sandV;   /* 마른 모래 위: 앞으로 미끄러지다(퍼지는 거리) 멈추며 */
+        if(bsp>0){ const nb=(bil(foam,NX,NZ,i+1,k)+bil(foam,NX,NZ,i-1,k)+bil(foam,NX,NZ,i,k+1)+bil(foam,NX,NZ,i,k-1))*0.25; f=f+(Math.max(f,nb)-f)*bsp*0.35; }   /* 옆으로 번지고(퍼지는 폭) */
+        f*=keepS; }   /* 모래에 스며든다(스며드는 시간) */
       foam2[j]=Math.min(1,f); fu2[j]=ax; fw2[j]=az;
       wet[j]=wetNow?1:wet[j]*Math.exp(-dtF/2.5); }
     foam.set(foam2); fu.set(fu2); fw.set(fw2);
@@ -249,6 +252,12 @@ const CTL=[
  ["secCurl","앞면 세우기","curl",0,1,0.05,0.85,"","부서지는 파도의 앞면을 절벽처럼 세우는 정도 (뒤쪽은 완만하게). 0이면 계산된 모양 그대로.",0],
  ["secCurl","부서지는 기울기","cth",0.15,1.2,0.05,0.5,"","파도 앞면이 이만큼 가팔라지면 부서지기(말림·거품) 시작합니다. 낮추면 일찍·자주 부서집니다.",0],
  ["secFoam","거품 양","foam",0,2,0.05,1.1,"","부서지는 마루와 백사장으로 밀려 올라가는 얇은 물에서 생기는 거품의 양.",0],
+ ["secFoam","백사장 퍼지는 거리","bdist",0,1,0.05,0.5,"%","백사장에 올라온 거품이 모래 위로 얼마나 멀리 미끄러져 가는지.",0],
+ ["secFoam","백사장 퍼지는 폭","bspread",0,1,0.05,0.4,"%","모래 위 거품이 옆으로 얼마나 넓게 번지는지.",0],
+ ["secFoam","스며드는 시간","bsoak",0,1,0.05,0.3,"%","모래 위 거품이 스며들어 사라지기까지의 시간 (0 = 금방, 1 = 5초 넘게).",0],
+ ["secFoam","가장자리 번짐","fgrad",0,1,0.05,0.5,"%","거품 가장자리가 흰색에서 옅은 물빛으로 부드럽게 바뀌는 폭.",0],
+ ["secFoam","가장자리 구멍","fhole",0,1,0.05,0.4,"%","거품 가장자리 쪽에 송송 뚫린 방울 구멍. 구멍 무늬는 거품을 따라 천천히 흘러갑니다.",0],
+ ["secFoam","바다 전체 거품","fsea",0,1,0.05,0.25,"%","물 표면 전체에 물결 따라 흐르는 옅은 거품 줄무늬.",0],
  ["secFoam","거품 조각 수","brate",0,1,0.05,0.6,"%","파도가 부서질 때 말린 끝에서 떨어져 나와 따로 흘러가는 거품 조각의 수. 0이면 떨어져 나가지 않습니다.",0],
  ["secFoam","조각 빠르기","bspd",0.5,2.5,0.05,1.3,"배","떨어져 나간 거품 조각이 파도보다 얼마나 빨리 앞으로 나가는지.",0],
  ["secFoam","조각 크기","bsize",0.3,2.5,0.05,1,"배","거품 조각의 크기.",0],
@@ -405,6 +414,7 @@ uniform vec4 uFoamQ;   /* 테두리 색, 빠르기 배, 얕은 물빛, 모래 �
 uniform vec4 uTank;    /* 길이, 폭, 물 깊이, - */
 uniform vec2 uFoamR;   /* 무늬가 바뀌는 주기(초), 움직임 양 */
 uniform vec2 uFoamS;   /* 앞으로 쏟아짐, 소용돌이 */
+uniform vec4 uFoamE;   /* 가장자리 번짐, 가장자리 구멍, 바다 전체 거품, - */
 uniform sampler2D uFoam;
 vec2 fhash(vec2 p){ return fract(sin(vec2(dot(p,vec2(127.1,311.7)),dot(p,vec2(269.5,183.3))))*43758.5453); }
 float worley(vec2 p){ vec2 i=floor(p), f=p-i; float d=8.0; for(int y=-1;y<=1;y++) for(int x=-1;x<=1;x++){ vec2 g=vec2(float(x),float(y)); vec2 h=fhash(i+g); d=min(d,length(g+h-f)/(0.7+0.6*fract(h.x*7.3))); } return d; }
@@ -451,6 +461,10 @@ void main(){
   vec3 col=uC0; if(ndl<0.25) col=uC1; else if(ndl>0.82) col=mix(uC0,uC2,0.35);
   col=mix(col, mix(uC0,uC2,0.55), uFoamQ.z*smoothstep(3.0,0.2,vH.x)*step(0.25,ndl));   /* 얕을수록 밝은 물빛 */
   if(sp>0.986) col=uC2;
+  /* 바다 전체 거품: 물결 따라 흐르는 옅은 줄무늬 (부드럽게, 위를 향한 면에만) */
+  if(uFoamE.z>0.01){ vec2 q=vQ*vec2(0.09,0.32)+vec2(-uTime*0.12,0.0); float m=vn2(q)*0.6+vn2(q*2.3+vec2(4.1,1.7)-vec2(uTime*0.1,0.0))*0.4;
+    m=smoothstep(0.62-0.25*uFoamE.z, 0.78-0.2*uFoamE.z, m)*smoothstep(0.2,0.6,n.y);
+    col=mix(col, mix(uC2,vec3(1.0),0.5), m*0.55*min(1.0,uFoamE.z*2.0)); }
   /* 거품 (로코로코식 2D 그림): 위를 향한 면에 */
   vec4 fm=foamAt(vQ);
   float face=smoothstep(-0.3,0.35,n.y);
@@ -470,10 +484,19 @@ void main(){
   if(vH.x<0.02) discard;
   vec4 fm0=foamAt(vQ); vec4 fm=foamAt(foamWarp(vQ, fm0.ba));
   float sf=foamLace(max(fm.r, vH.y), vQ, fm.ba), thr=uFoamP.x, band=uFoamP.y;   /* 부서지는 마루는 언제나 하얀 거품 */
+  /* 가장자리 구멍: 가장자리 쪽일수록 송송. 무늬는 거품 속도를 따라 두 겹으로 천천히 흘러 깜빡이지 않는다 */
+  bool hole=false;
+  if(uFoamE.y>0.01 && sf>thr-band){ float P=6.0, t=uTime/P, p0=fract(t), p1=fract(t+0.5), sc=0.55; vec2 vv=clamp(fm.ba*P*uFoamQ.y,vec2(-0.45/sc),vec2(0.45/sc))*0.35;
+    float n=mix(bub((vQ-vv*p1)*sc+31.7), bub((vQ-vv*p0)*sc), smoothstep(0.0,1.0,1.0-abs(2.0*p0-1.0)));
+    float edgeIn=1.0-smoothstep(thr, thr+0.25+0.35*uFoamE.y, sf);
+    hole = n < uFoamE.y*0.55*edgeIn; }
   if(sf<=thr-band) discard;
   vec3 n=normalize(vN); if(!gl_FrontFacing) n=-n;
   float ndl=dot(n,normalize(vec3(-0.4,0.85,0.5)));
   vec3 col=sf<thr?rimCol():(sf<thr+band*1.6?vec3(0.86,0.95,0.98):vec3(1.0));
+  /* 가장자리 번짐: 흰 속에서 가장자리로 갈수록 옅은 물빛 (3단으로 끊어 만화 느낌 유지) */
+  if(sf>=thr && uFoamE.x>0.01){ float gw=0.05+0.45*uFoamE.x, e=clamp((sf-thr)/gw,0.0,1.0); vec3 edgeC=mix(vec3(0.70,0.90,0.95),uC2,0.3); col=e<0.34?edgeC:(e<0.67?mix(edgeC,vec3(1.0),0.55):vec3(1.0)); }
+  if(hole) col=mix(uC0,uC2,0.45);   /* 구멍: 검은 테두리 없이 물빛이 비쳐 보이게 */
   if(sf>=thr && ndl<0.15) col=vec3(0.78,0.89,0.95);   /* 말려 내려온 거품 아랫면은 옅은 하늘빛 그늘 */
   oC=vec4(col,1.0); oId=vec4(0.75,0.0,0.0,1.0);   /* 거품 층 표시: 물과 경계에 따로 선을 그린다 */
 }`;
@@ -637,7 +660,7 @@ function blobsUpdate(dt){
     if(y>tgt+0.02){ vy-=7.0*dt; y+=vy*dt; if(y<tgt){ y=tgt; vy=0; } BL.air[n]=y>tgt+0.05?1:0; }            /* 날아가다 수면에 내려앉고 */
     else { y=tgt; vy=0; BL.air[n]=0; }
     const onSand=!sf.wet || sf.bed>D-0.4;
-    if(onSand){ vx*=Math.exp(-dt*1.6); vx-=g*S.beach*dt*0.25; A[o+5]*=1+dt*0.35; A[o+6]*=1+dt*0.25; A[o+7]+=0; }   /* 모래·얕은 물: 느려지고 퍼지고 */
+    if(onSand){ vx*=Math.exp(-dt*(0.3+4*(1-S.bdist))); vx-=g*S.beach*dt*0.2*(1-S.bdist*0.7); A[o+5]*=1+dt*(0.1+0.6*S.bspread); A[o+6]*=1+dt*(0.05+0.8*S.bspread); }   /* 모래: 퍼지는 거리만큼 미끄러지고, 퍼지는 폭만큼 넓어진다 */
     else { /* 물 위: 그 자리 파도보다 언제나 조금 빨리 → 파도를 앞질러 백사장으로 (얕아질수록 저절로 느려진다) */
       const cw=Math.sqrt(g*Math.max(sf.dep,0.15)); vx=Math.max(vx*Math.exp(-dt*0.12), sf.u*1.05, cw*1.12*S.bspd*cvAt(S,"fspd",x/L)); }
     x+=vx*dt;
@@ -647,8 +670,9 @@ function blobsUpdate(dt){
   }
   /* 남은 양: 모래 위·느려진 조각부터 스르륵 */
   if(!BL.al||BL.al.length!==BL.max) BL.al=new Float32Array(BL.max);
-  for(let n=0;n<BL.n;n++){ const o=n*8, A=BL.a; if(BL.al[n]===0) BL.al[n]=1; const sf=surf(A[o],A[o+2]); const slowSand=(!sf.wet||sf.bed>D-0.4)?1:(A[o+3]<0.5?0.5:0.05);
-    BL.al[n]-=dt*slowSand/(life*(BL.lf?BL.lf[n]:1))*1.6; }
+  for(let n=0;n<BL.n;n++){ const o=n*8, A=BL.a; if(BL.al[n]===0) BL.al[n]=1; const sf=surf(A[o],A[o+2]); const onS=(!sf.wet||sf.bed>D-0.4);
+    const lt=onS?(0.3+5*S.bsoak):life, rate=onS?1:(A[o+3]<0.5?0.5:0.05);   /* 모래 위에서는 스며드는 시간만큼 */
+    BL.al[n]-=dt*rate/(lt*(BL.lf?BL.lf[n]:1))*1.6; }
   let m=0; for(let n=0;n<BL.n;n++){ if(BL.al[n]>0.001 && BL.a[n*8]<L-0.3){ if(m!==n){ BL.a.copyWithin(m*8,n*8,n*8+8); BL.al[m]=BL.al[n]; if(BL.lf) BL.lf[m]=BL.lf[n]; if(BL.air) BL.air[m]=BL.air[n]; } m++; } } for(let n=m;n<BL.n;n++) BL.al[n]=0; BL.n=m;
 }
 /* 내려앉은 조각은 부드러운 덩어리 값으로 거품 그림에 더한다: 가까운 조각끼리는 값이 합쳐져 로코로코처럼 이어지고, 멀리 떨어진 조각은 따로 남는다 */
@@ -789,7 +813,7 @@ function frame(now){
     for(let i=0;i<4;i++) if(u["uC"+i]) gl.uniform3fv(u["uC"+i],rgb(C[i])); if(u.uLine) gl.uniform3fv(u.uLine,lineC);
     if(u.uHz) gl.uniform3fv(u.uHz,rgb(K.hz)); if(u.uZn) gl.uniform3fv(u.uZn,rgb(K.zn)); if(u.uCw) gl.uniform3fv(u.uCw,rgb(K.cw)); if(u.uCs) gl.uniform3fv(u.uCs,rgb(K.cs));
     if(u.uFoamP) gl.uniform4f(u.uFoamP,0.62-0.5*S.fsz,0.02+0.07*S.frim,S.flace,1/(1.5+5*S.flsz));
-    if(u.uFoamQ) gl.uniform4f(u.uFoamQ,S.frc,S.spd,S.shal,S.sandc); if(u.uTank) gl.uniform4f(u.uTank,L,Wd,D,0); if(u.uFoamR) gl.uniform2f(u.uFoamR,7.0-6.2*S.fwig,Math.min(1,S.fwig*3)); if(u.uFoamS) gl.uniform2f(u.uFoamS,S.fsurge,S.fswirl);
+    if(u.uFoamQ) gl.uniform4f(u.uFoamQ,S.frc,S.spd,S.shal,S.sandc); if(u.uTank) gl.uniform4f(u.uTank,L,Wd,D,0); if(u.uFoamR) gl.uniform2f(u.uFoamR,7.0-6.2*S.fwig,Math.min(1,S.fwig*3)); if(u.uFoamS) gl.uniform2f(u.uFoamS,S.fsurge,S.fswirl); if(u.uFoamE) gl.uniform4f(u.uFoamE,S.fgrad,S.fhole,S.fsea,0);
     if(u.uFoam){ gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,G.ftex); gl.uniform1i(u.uFoam,0); } };
   gl.bindFramebuffer(gl.FRAMEBUFFER,T.fb); gl.viewport(0,0,w,h);
   gl.clearBufferfv(gl.COLOR,0,[1,1,1,1]); gl.clearBufferfv(gl.COLOR,1,[0,0,0,0]); gl.clear(gl.DEPTH_BUFFER_BIT);
