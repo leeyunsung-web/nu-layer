@@ -264,6 +264,7 @@ const CTL=[
  ["secCurl","부서지는 기울기","cth",0.15,1.2,0.05,0.5,"","파도 앞면이 이만큼 가팔라지면 부서지기(말림·거품) 시작합니다. 낮추면 일찍·자주 부서집니다.",0],
  ["secFoam","거품 양","foam",0,2,0.05,1.1,"","부서지는 마루와 백사장으로 밀려 올라가는 얇은 물에서 생기는 거품의 양.",0],
  ["secFoam","마루에 붙는 힘","fahead",0,1,0.05,0.35,"%","거품이 파도 마루 꼭대기에 모여 붙은 채 파도와 함께 앞으로 가는 힘. 마루가 백사장에서 사라지면 거품이 떨어져 나와 모래 위로 미끄러집니다. 0이면 물 흐름만 따라갑니다.",0],
+ ["secFoam","물 끝 거품","fedge",0,1,0.05,0.6,"%","백사장으로 밀려 올라온 물의 맨 앞 끝을 흰 거품 띠로 칠합니다 (테두리 선 없이, 가장자리는 고르지 않게). 높일수록 띠가 넓어집니다.",0],
  ["secFoam","백사장 퍼지는 거리","bdist",0,1,0.05,0.5,"%","백사장에 올라온 거품이 모래 위로 얼마나 멀리 미끄러져 가는지.",0],
  ["secFoam","백사장 퍼지는 폭","bspread",0,1,0.05,0.4,"%","모래 위 거품이 옆으로 얼마나 넓게 번지는지.",0],
  ["secFoam","스며드는 시간","bsoak",0,1,0.05,0.3,"%","모래 위 거품이 스며들어 사라지기까지의 시간 (0 = 금방, 1 = 5초 넘게).",0],
@@ -427,6 +428,7 @@ uniform vec4 uFoamQ;   /* 테두리 색, 빠르기 배, 얕은 물빛, 모래 �
 uniform vec4 uTank;    /* 길이, 폭, 물 깊이, - */
 uniform vec2 uFoamR;   /* 무늬가 바뀌는 주기(초), 움직임 양 */
 uniform vec2 uFoamS;   /* 앞으로 쏟아짐, 소용돌이 */
+uniform float uFoamEdge;   /* 물 끝 거품 */
 uniform vec4 uFoamE;   /* 가장자리 번짐, 가장자리 구멍, 바다 전체 거품, 무늬 흐름 방향(±1) */
 uniform sampler2D uFoam;
 vec2 fhash(vec2 p){ return fract(sin(vec2(dot(p,vec2(127.1,311.7)),dot(p,vec2(269.5,183.3))))*43758.5453); }
@@ -492,8 +494,13 @@ void main(){
   if(sf>thr){ col=sf<thr+band*1.6?vec3(0.86,0.95,0.98):vec3(1.0); if(ndl<0.2) col=vec3(0.80,0.90,0.95); }
   else if(sf>thr-band) col=rimCol();
   float dist=length(uEye-(vP-vec3(uTank.x*0.5,0.0,uTank.y*0.5)));
+  /* 물 끝 거품: 백사장으로 밀려 올라온 얇은 물의 맨 앞을 흰 거품 띠로 (가장자리는 물을 따라 일렁이며 고르지 않게) */
+  float idv=1.0;
+  if(uFoamEdge>0.01){ float wdt=0.08+0.7*uFoamEdge, nz=vn2(vec2(vQ.y*0.55, uTime*0.35+vQ.x*0.12))*0.6+vn2(vec2(vQ.y*1.7+3.0, uTime*0.6))*0.4;
+    float fr=1.0-smoothstep(wdt*(0.45+0.9*nz), wdt*(0.75+0.9*nz), vH.x);
+    if(fr>0.5){ col=fr>0.8?vec3(1.0):mix(vec3(0.84,0.95,0.98),vec3(1.0),0.4); idv=0.75; } }   /* 거품 표시라 테두리 선이 그려지지 않는다 */
   col=mix(col,uHz,clamp((dist-uTank.x*1.4)/(uTank.x*3.0),0.0,0.45));
-  oC=vec4(col,1.0); oId=vec4(1.0,0.0,0.0,1.0);
+  oC=vec4(col,1.0); oId=vec4(idv,0.0,0.0,1.0);
 }`;
 /* 거품 층: 물 위에 따로 떠 있는 2D 거품 그림. 부서지는 마루에서는 물보다 앞으로 더 나가 아래로 말려 떨어지며 파도 모양을 만든다 */
 const FS_FOAM=COMMON+`
@@ -838,7 +845,7 @@ function frame(now){
     for(let i=0;i<4;i++) if(u["uC"+i]) gl.uniform3fv(u["uC"+i],rgb(C[i])); if(u.uLine) gl.uniform3fv(u.uLine,lineC);
     if(u.uHz) gl.uniform3fv(u.uHz,rgb(K.hz)); if(u.uZn) gl.uniform3fv(u.uZn,rgb(K.zn)); if(u.uCw) gl.uniform3fv(u.uCw,rgb(K.cw)); if(u.uCs) gl.uniform3fv(u.uCs,rgb(K.cs));
     if(u.uFoamP) gl.uniform4f(u.uFoamP,0.62-0.5*S.fsz,0.02+0.07*S.frim,S.flace,1/(1.5+5*S.flsz));
-    if(u.uFoamQ) gl.uniform4f(u.uFoamQ,S.frc,S.spd,S.shal,S.sandc); if(u.uTank) gl.uniform4f(u.uTank,L,Wd,D,0); if(u.uFoamR) gl.uniform2f(u.uFoamR,7.0-6.2*S.fwig,Math.min(1,S.fwig*3)); if(u.uFoamS) gl.uniform2f(u.uFoamS,S.fsurge,S.fswirl); if(u.uFoamE) gl.uniform4f(u.uFoamE,S.fgrad,S.fhole,S.fsea,S.fdir<0?-1:1);
+    if(u.uFoamQ) gl.uniform4f(u.uFoamQ,S.frc,S.spd,S.shal,S.sandc); if(u.uTank) gl.uniform4f(u.uTank,L,Wd,D,0); if(u.uFoamR) gl.uniform2f(u.uFoamR,7.0-6.2*S.fwig,Math.min(1,S.fwig*3)); if(u.uFoamS) gl.uniform2f(u.uFoamS,S.fsurge,S.fswirl); if(u.uFoamEdge) gl.uniform1f(u.uFoamEdge,S.fedge); if(u.uFoamE) gl.uniform4f(u.uFoamE,S.fgrad,S.fhole,S.fsea,S.fdir<0?-1:1);
     if(u.uFoam){ gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,G.ftex); gl.uniform1i(u.uFoam,0); } };
   gl.bindFramebuffer(gl.FRAMEBUFFER,T.fb); gl.viewport(0,0,w,h);
   gl.clearBufferfv(gl.COLOR,0,[1,1,1,1]); gl.clearBufferfv(gl.COLOR,1,[0,0,0,0]); gl.clear(gl.DEPTH_BUFFER_BIT);
