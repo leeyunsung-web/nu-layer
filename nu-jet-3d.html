@@ -52,7 +52,7 @@ h3{margin:4px 0 0;font-size:12px;letter-spacing:.08em;color:var(--soft)}
 <div class="wrap">
   <header>
     <h1>NU JET 3D</h1>
-    <nav class="tabs" aria-label="수조 고르기"><a href="nu-jet-3d.html" aria-current="page">알갱이 파도</a><a href="nu-sea-3d.html">넓은 바다</a></nav>
+    <nav class="tabs" aria-label="수조 고르기"><a href="https://leeyunsung-web.github.io/nu-layer/nu-jet-3d.html" aria-current="page">알갱이 파도</a><a href="https://leeyunsung-web.github.io/nu-layer/nu-sea-3d.html">넓은 바다</a></nav>
     <p>입체 수조 실험. 방울 수만 개를 그래픽카드로 계산해 파도를 만듭니다. 화면을 끌면 수조가 돌아가고, 휠로 가까이·멀리 봅니다. 두 번 누르면 물 덩어리가 떨어집니다. <a href="nu-jet.html">← NU JET (2D)</a></p>
   </header>
   <div class="main">
@@ -100,6 +100,10 @@ h3{margin:4px 0 0;font-size:12px;letter-spacing:.08em;color:var(--soft)}
 (function(){
 "use strict";
 const $=id=>document.getElementById(id);
+/* 문제가 생기면 화면에 그대로 적어 보여 준다 (무엇이 잘못됐는지 알려 주기 위해) */
+const ERRS=[]; function showErr(t){ t=String(t).slice(0,300); if(ERRS.includes(t)) return; ERRS.push(t); const m=$("msg"); if(!m) return; m.hidden=false; m.style.background="rgba(0,1,42,0.85)"; m.style.alignItems="flex-start"; m.style.overflow="auto"; m.textContent="문제가 생겼어요 (이 글을 복사해 보내 주세요):\n"+ERRS.join("\n"); m.style.whiteSpace="pre-wrap"; }
+window.addEventListener("error",e=>showErr("JS: "+(e.message||e.error)));
+window.addEventListener("unhandledrejection",e=>showErr("JS: "+(e.reason&&e.reason.message||e.reason)));
 
 /* ── 조절값 ── [칸, 이름, 키, 최소, 최대, 간격, 처음 값, 단위, 설명, 다시 채우기] */
 const CTL=[
@@ -813,7 +817,7 @@ async function init(){
   const slow=setTimeout(()=>{ if(!E.ok) $("msg").textContent="그래픽카드가 대답하지 않아요. 브라우저(또는 앱)를 완전히 닫았다 다시 열어 주세요. 다른 창에서 이 페이지가 돌고 있다면 먼저 닫아 주세요."; },12000);
   if(!navigator.gpu){ $("msg").textContent="이 브라우저는 WebGPU(그래픽카드 계산)를 지원하지 않아요. 최신 크롬이나 엣지에서 열어 주세요."; return; }
   const ad=await navigator.gpu.requestAdapter({powerPreference:"high-performance"}); E.adapter=ad;   /* 어댑터를 붙잡아 둔다 (놓치면 일부 브라우저에서 연결이 끊긴다) */ if(!ad){ $("msg").textContent="그래픽카드를 찾지 못했어요."; return; }
-  dev=await ad.requestDevice({requiredLimits:{maxStorageBufferBindingSize:Math.min(ad.limits.maxStorageBufferBindingSize,256*1024*1024)}});
+  dev=await ad.requestDevice({requiredLimits:{maxStorageBufferBindingSize:Math.min(ad.limits.maxStorageBufferBindingSize,256*1024*1024)}}); dev.addEventListener("uncapturederror",ev=>showErr("GPU: "+ev.error.message));
   dev.lost.then(i=>{ $("msg").hidden=false; $("msg").textContent="그래픽카드 연결이 끊겼어요. 새로고침해 주세요. ("+(i.message||"")+")"; });
   if(OFF) fmtTex="rgba8unorm"; else { ctx=cv.getContext("webgpu"); fmtTex=navigator.gpu.getPreferredCanvasFormat(); ctx.configure({device:dev,format:fmtTex,alphaMode:"opaque"}); }
   const SB=GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST|GPUBufferUsage.COPY_SRC;

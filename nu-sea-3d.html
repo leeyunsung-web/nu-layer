@@ -55,7 +55,7 @@ h3{margin:4px 0 0;font-size:12px;letter-spacing:.08em;color:var(--soft)}
 <div class="wrap">
   <header>
     <h1>NU SEA 3D</h1>
-    <nav class="tabs" aria-label="수조 고르기"><a href="nu-jet-3d.html">알갱이 파도</a><a href="nu-sea-3d.html" aria-current="page">넓은 바다</a></nav>
+    <nav class="tabs" aria-label="수조 고르기"><a href="https://leeyunsung-web.github.io/nu-layer/nu-jet-3d.html">알갱이 파도</a><a href="https://leeyunsung-web.github.io/nu-layer/nu-sea-3d.html" aria-current="page">넓은 바다</a></nav>
     <p>넓은 바다 실험. 바다 본체는 '자리마다 물 높이'만 계산해 아주 넓고 고운 바다를 가볍게 만들고, 파도가 부서지는 곳에서만 작은 물보라 알갱이를 흩뿌립니다. 화면을 끌면 돌아가고, 휠로 가까이·멀리 봅니다.</p>
   </header>
   <div class="main">
@@ -93,6 +93,10 @@ h3{margin:4px 0 0;font-size:12px;letter-spacing:.08em;color:var(--soft)}
 (function(){
 "use strict";
 const $=id=>document.getElementById(id);
+/* 문제가 생기면 화면에 그대로 적어 보여 준다 (무엇이 잘못됐는지 알려 주기 위해) */
+const ERRS=[]; function showErr(t){ t=String(t).slice(0,300); if(ERRS.includes(t)) return; ERRS.push(t); const m=$("msg"); if(!m) return; m.hidden=false; m.style.background="rgba(0,1,42,0.85)"; m.style.alignItems="flex-start"; m.style.overflow="auto"; m.textContent="문제가 생겼어요 (이 글을 복사해 보내 주세요):\n"+ERRS.join("\n"); m.style.whiteSpace="pre-wrap"; }
+window.addEventListener("error",e=>showErr("JS: "+(e.message||e.error)));
+window.addEventListener("unhandledrejection",e=>showErr("JS: "+(e.reason&&e.reason.message||e.reason)));
 
 /* ── 조절값 ── [칸, 이름, 키, 최소, 최대, 간격, 처음 값, 단위, 설명, 다시 채우기] */
 const CTL=[
@@ -441,17 +445,18 @@ const camData=new Float32Array(128);
 async function init(){
   if(!navigator.gpu){ $("msg").textContent="이 브라우저는 WebGPU(그래픽카드 계산)를 지원하지 않아요. 최신 크롬이나 엣지에서 열어 주세요."; return; }
   const ad=await navigator.gpu.requestAdapter({powerPreference:"high-performance"}); E.adapter=ad; if(!ad){ $("msg").textContent="그래픽카드를 찾지 못했어요."; return; }
-  dev=await ad.requestDevice(); dev.lost.then(i=>{ $("msg").hidden=false; $("msg").textContent="그래픽카드 연결이 끊겼어요. 새로고침해 주세요. ("+(i.message||"")+")"; });
+  dev=await ad.requestDevice(); dev.addEventListener("uncapturederror",ev=>showErr("GPU: "+ev.error.message)); dev.lost.then(i=>{ $("msg").hidden=false; $("msg").textContent="그래픽카드 연결이 끊겼어요. 새로고침해 주세요. ("+(i.message||"")+")"; });
   if(OFF) fmt2="rgba8unorm"; else { ctx=cv.getContext("webgpu"); fmt2=navigator.gpu.getPreferredCanvasFormat(); ctx.configure({device:dev,format:fmt2,alphaMode:"opaque"}); }
   const SB=GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST|GPUBufferUsage.COPY_SRC;
   B.U=dev.createBuffer({size:256*NSLOT,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
   B.cam=dev.createBuffer({size:512,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
   B.sp=dev.createBuffer({size:SPN*32,usage:SB}); B.sc=dev.createBuffer({size:16,usage:SB});
   const sm=dev.createShaderModule({code:SIMW});
+  const chk=(m,n)=>m.getCompilationInfo().then(ci=>ci.messages.filter(x=>x.type==="error").forEach(x=>showErr(n+" "+x.lineNum+": "+x.message))); chk(sm,"계산");
   E.sbgl=dev.createBindGroupLayout({entries:[0,1,2,3,4,5,6].map(b=>({binding:b,visibility:GPUShaderStage.COMPUTE,buffer:b?{type:"storage"}:{type:"uniform",hasDynamicOffset:true}}))});
   const spl=dev.createPipelineLayout({bindGroupLayouts:[E.sbgl]});
   for(const e of ["flux","height","spray"]) PL[e]=dev.createComputePipeline({layout:spl,compute:{module:sm,entryPoint:e}});
-  const rm=dev.createShaderModule({code:RW});
+  const rm=dev.createShaderModule({code:RW}); chk(rm,"그리기");
   E.rbgl=dev.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.VERTEX|GPUShaderStage.FRAGMENT,buffer:{type:"uniform"}},{binding:1,visibility:GPUShaderStage.VERTEX,buffer:{type:"read-only-storage"}},{binding:2,visibility:GPUShaderStage.VERTEX,buffer:{type:"read-only-storage"}},{binding:3,visibility:GPUShaderStage.VERTEX,buffer:{type:"read-only-storage"}}]});
   const rpl=dev.createPipelineLayout({bindGroupLayouts:[E.rbgl]});
   const ds={format:"depth24plus",depthWriteEnabled:true,depthCompare:"less"}, mk=(vs,fs,extra)=>dev.createRenderPipeline(Object.assign({layout:rpl,vertex:{module:rm,entryPoint:vs},fragment:{module:rm,entryPoint:fs,targets:[{format:fmt2}]},primitive:{topology:"triangle-list"},depthStencil:ds},extra||{}));
