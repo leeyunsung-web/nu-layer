@@ -211,13 +211,14 @@ const CTL=[
  ["secWave","밀어치기","skew",0,1,0.05,0.25,"%","빠르게 밀고 천천히 돌아오는 정도. 높이면 너울 앞이 처음부터 가팔라집니다.",0],
  ["secWave","불규칙","irr",0,1,0.05,0.35,"%","파도마다 세기가 조금씩 다르고, 옆으로도 조금씩 엇갈려 와서 실제 바다처럼 일정하지 않게 됩니다.",0],
  ["secWave","빠르기","spd",0.1,3,0.05,1,"배","시간이 흐르는 빠르기. 낮추면 슬로모션.",0],
- ["secCurl","거품 말림","fcurl",0,2,0.05,1,"","부서지는 마루 위 거품이 앞면 너머로 둥글게 말려 내려가는 크기.",0],
+ ["secCurl","거품 말림","fcurl",0,2.5,0.05,1.4,"","부서지는 마루 위 거품이 앞면 너머로 둥글게 말려 내려가는 크기.",0],
  ["secCurl","앞면 세우기","curl",0,1,0.05,0.85,"","부서지는 파도의 앞면을 절벽처럼 세우는 정도 (뒤쪽은 완만하게). 0이면 계산된 모양 그대로.",0],
  ["secCurl","부서지는 기울기","cth",0.15,1.2,0.05,0.5,"","파도 앞면이 이만큼 가팔라지면 부서지기(말림·거품) 시작합니다. 낮추면 일찍·자주 부서집니다.",0],
  ["secFoam","거품 양","foam",0,2,0.05,1.1,"","부서지는 마루와 백사장으로 밀려 올라가는 얇은 물에서 생기는 거품의 양.",0],
+ ["secFoam","떠 있는 높이","flift",0,3,0.05,0.9,"칸","거품 층이 물 위로 떠 있는 높이. 거품이 진한 곳일수록 더 도톰하게 솟습니다. 0이면 물 표면에 붙어 있습니다.",0],
  ["secFoam","거품 지속","flife",0,1,0.05,0.5,"%","거품이 물 위에 남는 시간. 물이 빠진 모래 위에서는 이보다 빨리 스며듭니다.",0],
  ["secFoam","거품 덩어리","fsz",0,1,0.05,0.5,"%","높이면 거품이 넓고 통통하게, 낮추면 가늘게 갈라진 무늬만.",0],
- ["secFoam","거품 무늬","flace",0,1,0.05,0.25,"%","거품 속 방울 구멍 (레이스 무늬). 무늬는 물을 따라 흘러갑니다.",0],
+ ["secFoam","거품 무늬","flace",0,1,0.05,0,"%","거품 속 방울 구멍 (레이스 무늬). 0이면 구멍 없는 매끈한 덩어리. 올리면 구멍이 생기지만, 거품이 움직일 때 구멍이 열렸다 닫히며 반짝일 수 있습니다.",0],
  ["secFoam","무늬 떨림","fwig",0,1,0.05,0.08,"%","거품 속 방울 무늬가 일렁이는 빠르기. 0이면 무늬가 멈춰 있고, 높일수록 빠르게 파르르 떨립니다.",0],
  ["secFoam","무늬 크기","flsz",0,1,0.05,0.4,"%","거품 방울 구멍의 크기.",0],
  ["secFoam","거품 테두리","frim",0,1,0.05,0.5,"%","거품 가장자리 선의 두께.",0],
@@ -352,7 +353,7 @@ void main(){
   float ndl=dot(n,normalize(vec3(-0.4,0.85,0.5)));
   vec3 col=sf<thr?rimCol():(sf<thr+band*1.6?vec3(0.86,0.95,0.98):vec3(1.0));
   if(sf>=thr && ndl<0.15) col=vec3(0.78,0.89,0.95);   /* 말려 내려온 거품 아랫면은 옅은 하늘빛 그늘 */
-  oC=vec4(col,1.0); oId=vec4(1.0,0.0,0.0,1.0);
+  oC=vec4(col,1.0); oId=vec4(0.75,0.0,0.0,1.0);   /* 거품 층 표시: 물과 경계에 따로 선을 그린다 */
 }`;
 const VS_BODY=COMMON+`
 layout(location=0) in vec3 aP; layout(location=1) in float aT;
@@ -414,8 +415,8 @@ void main(){
   bool edge=false;
   for(int k=0;k<4;k++){ vec2 o=k==0?vec2(uPx.x,0.0):k==1?vec2(-uPx.x,0.0):k==2?vec2(0.0,uPx.y):vec2(0.0,-uPx.y);
     float id2=texture(uId,vU+o).r, d2=lin(texture(uDep,vU+o).r);
-    if((id>0.9 || id2>0.9) && (abs(id-id2)>0.2 || (id>0.9 && d2-d>0.6+d*0.03))) edge=true; }   /* 물의 바깥 선 · 말린 파도 앞 끝 · 물이 겹친 곳 */
-  if(edge && id>0.9) c.rgb=uLine;
+    if((id>0.6 || id2>0.6) && (abs(id-id2)>0.1 || (id>0.6 && d2-d>0.6+d*0.03))) edge=true; }   /* 물·거품의 바깥 선 · 말린 끝 · 겹친 곳 */
+  if(edge && id>0.6 && !(id<0.9 && texture(uId,vU).r<0.9 && false)) c.rgb=uLine;
   oC=vec4(c.rgb,1.0); }`;
 function sh(type,src){ const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s); if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)+"\n"+src.split("\n").slice(0,3).join(" ")); return s; }
 function prog(vs,fs){ const p=gl.createProgram(); gl.attachShader(p,sh(gl.VERTEX_SHADER,vs)); gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs)); gl.linkProgram(p); if(!gl.getProgramParameter(p,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p)); const u={}; const n=gl.getProgramParameter(p,gl.ACTIVE_UNIFORMS); for(let i=0;i<n;i++){ const a=gl.getActiveUniform(p,i); u[a.name]=gl.getUniformLocation(p,a.name); } return {p,u}; }
@@ -470,16 +471,19 @@ function build(){
 function meshUpdate(fdt){
   const {NX,NZ,h,b,brk,dx,D,foam,fu,fw,wet,L}=W, Wd=W.W, d=G.data, px=new Float32Array(NX*NZ), py=new Float32Array(NX*NZ), pz=new Float32Array(NX*NZ);
   const curl=S.curl, fcurl=S.fcurl, R=Math.max(4,Math.round(5/dx)), Hrow=new Float32Array(NX), qx=G.qx&&G.qx.length===NX*NZ?G.qx:(G.qx=new Float32Array(NX*NZ)), qy=G.qy&&G.qy.length===NX*NZ?G.qy:(G.qy=new Float32Array(NX*NZ)), qc=G.qc&&G.qc.length===NX*NZ?G.qc:(G.qc=new Float32Array(NX*NZ));
-  const aC=1-Math.exp(-(fdt||0.016)*5), aF=1-Math.exp(-(fdt||0.016)*7), NN=NX*NZ;
-  if(!G.sm||G.sm.n!==NN) G.sm={n:NN,s:new Float32Array(NN),dy:new Float32Array(NN),sf:new Float32Array(NN),dyf:new Float32Array(NN),cw:new Float32Array(NN),f:new Float32Array(NN),u:new Float32Array(NN),w:new Float32Array(NN)};
+  const gapA=0.25+S.flift*0.7, aY=1-Math.exp(-(fdt||0.016)*14), aC=1-Math.exp(-(fdt||0.016)*5), aF=1-Math.exp(-(fdt||0.016)*7), NN=NX*NZ;
+  if(!G.sm||G.sm.n!==NN) G.sm={n:NN,s:new Float32Array(NN),dy:new Float32Array(NN),sf:new Float32Array(NN),dyf:new Float32Array(NN),cw:new Float32Array(NN),f:new Float32Array(NN),u:new Float32Array(NN),w:new Float32Array(NN),y:null};
   for(let k=0;k<NZ;k++){ const r0=k*NX;
     for(let i=0;i<NX;i++) Hrow[i]=h[r0+i]>0.02?h[r0+i]+b[r0+i]-D:-9;
     for(let i=0;i<NX;i++){ const j=r0+i;
       const x=i===0?0:i===NX-1?L:(i+0.5)*dx, z=k===0?0:k===NZ-1?Wd:(k+0.5)*dx;
       let y=h[j]>0.02?h[j]+b[j]:b[j]-0.04;
+      /* 화면에 그리는 물 높이는 프레임 사이를 부드럽게: 계산이 프레임마다 아주 미세하게 흔들려도 색 경계가 떨리지 않게 */
+      if(!G.sm.y){ G.sm.y=new Float32Array(NN); for(let q=0;q<NN;q++) G.sm.y[q]=h[q]>0.02?h[q]+b[q]:b[q]-0.04; }
+      y=G.sm.y[j]+=(y-G.sm.y[j])*aY;
       /* 부서지는 파도 (윤성 그림): 물은 앞면이 절벽처럼 서고 뒤는 완만하게 (보라색),
          거품은 마루 위를 덮다가 앞면 너머로 둥글게 말려 내려간다 (초록색) */
-      let s=0, dy=0, sf=0, dyf=0, cw=0;
+      let s=0, dy=0, sf=0, dyf=0, cw=0, arc=0;
       if(h[j]>0.9){
         let ic=i, crest=Hrow[i], Bc=0;
         for(let q=Math.max(0,i-R);q<=Math.min(NX-1,i+R);q++){ if(Hrow[q]>crest){ crest=Hrow[q]; ic=q; } }
@@ -491,16 +495,22 @@ function meshUpdate(fdt){
             let ib=ic+1; while(ib<NX-1 && ib<ic+R*2 && Hrow[ib]>0.2*crest) ib++;
             const t=Math.min(1,(i-ic)/Math.max(1,ib-ic));
             const xw=xc+(x-xc)*(1-curl*Bc*0.92); s=xw-x;                     /* 앞면을 마루 쪽으로 모아 세운다 */
-            const r=0.15+fcurl*crest*0.85*Math.min(1,Bc*1.6), th=t*1.95;    /* 거품 입술: 마루에서 앞으로 나가 둥글게 말려 내려간다 */
-            const xf=xc+r*Math.sin(th), yf=ytop+r*(Math.cos(th)-1);
-            sf=xf-x; dyf=y-yf; cw=Math.min(1,Bc*2.2);
-          } else {     /* 마루와 뒤쪽: 거품이 마루 위를 덮는다 */
-            const f=Hc>0?Hc/crest:0, c=Math.min(1,Math.max(0,(f-0.55)/0.4)); cw=Math.min(1,Bc*2.2)*c*c*(3-2*c);
+            /* 거품 호 (그림의 초록 선): 마루 위에 떠서 앞으로 나가 둥글게 말려 내려간다. 물 표면에 붙지 않는다 */
+            const r=0.3+fcurl*crest*1.0*Math.min(1,Bc*1.8), th=t*1.95;
+            const xf=xc+r*Math.sin(th), yf=ytop+gapA+r*(Math.cos(th)-1);
+            sf=xf-x; dyf=y-yf; cw=Math.min(1,Bc*2.2); arc=1;
+          } else {     /* 마루 뒤쪽: 비탈에서 시작해 마루 위로 매끈하게 떠오르는 호 */
+            let ia=ic; while(ia>0 && ia>ic-R*2 && Hrow[ia]>0.45*crest) ia--;
+            if(i>=ia){ const xa=(ia+0.5)*dx, ya=Hrow[ia]+D, tb=Math.min(1,(x-xa)/Math.max(dx,xc-xa));
+              const yArc=ya+0.05+(ytop+gapA-ya-0.05)*Math.sin(tb*1.5708);
+              dyf=y-yArc; cw=Math.min(1,Bc*2.2)*Math.min(1,tb*2.5); arc=1; }
           } } }
       /* 화면에 그리는 말림·흰 마루는 프레임 사이를 부드럽게 이어 준다 (부서짐 판정이 순간순간 바뀌어도 떨리지 않게) */
       /* 생길 때는 빨리, 사라질 때는 천천히: 파도가 낮아지면 말린 거품이 물 위로 스르륵 내려앉아 흐르는 거품으로 이어진다 */
       const sm=G.sm, ac=Math.abs(sf)>Math.abs(sm.sf[j])?aC:aC*0.35; s=sm.s[j]+=(s-sm.s[j])*ac; dy=sm.dy[j]+=(dy-sm.dy[j])*ac; sf=sm.sf[j]+=(sf-sm.sf[j])*ac; dyf=sm.dyf[j]+=(dyf-sm.dyf[j])*ac; cw=sm.cw[j]+=(cw-sm.cw[j])*(cw>sm.cw[j]?aC:aC*0.35);
-      px[j]=x+s; py[j]=y-dy; pz[j]=z; qx[j]=x+sf; qy[j]=y-dyf+0.06; qc[j]=cw; } }
+      /* 거품은 물과 다른 층: 물 위로 떠서, 진한 곳일수록 도톰하게 솟는다 */
+      const fv=Math.max(sm.f[j],cw), lift=S.flift*(0.35+0.65*Math.min(1,fv*1.4))*(1-Math.min(1,cw));   /* 호가 된 곳은 호 높이를 따른다 */
+      px[j]=x+s; py[j]=y-dy; pz[j]=z; qx[j]=x+sf; qy[j]=y-dyf+0.06+lift; qc[j]=cw; } }
   for(let k=0;k<NZ;k++) for(let i=0;i<NX;i++){ const j=k*NX+i, o=j*10;
     const a=i>0?j-1:j, c=i<NX-1?j+1:j, e=k>0?j-NX:j, f=k<NZ-1?j+NX:j;
     const ax=px[c]-px[a], ay=py[c]-py[a], az=pz[c]-pz[a], bx=px[f]-px[e], by=py[f]-py[e], bz=pz[f]-pz[e];
@@ -600,7 +610,7 @@ function frame(now){
 }
 try{ build(); $("msg").hidden=true; requestAnimationFrame(frame); }
 catch(e){ $("msg").textContent="준비 중 문제: "+e.message; console.error(e); }
-window.__nw={ get W(){ return W; }, get S(){ return S; } };
+window.__nw={ get W(){ return W; }, get S(){ return S; }, get G(){ return G; } };
 })();
 </script>
 </body>
