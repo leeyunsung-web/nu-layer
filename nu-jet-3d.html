@@ -95,6 +95,8 @@ h3{margin:4px 0 0;font-size:12px;letter-spacing:.08em;color:var(--soft)}
         <button id="bFill" type="button">다시 채우기</button>
         <button id="bPause" type="button" aria-pressed="false">멈춤</button>
         <button id="bFull" type="button">전체 화면</button>
+        <button id="bMeas" type="button" title="파도의 옆모습(수조 가운데 단면)을 20초 동안 기록합니다. 끝나면 '측정 파일 받기'로 내려받아 Claude에게 보내 주세요. 가벼운 버전을 이 파도에 맞추는 데 씁니다.">파도 측정 20초</button>
+        <button id="bMeasGet" type="button" hidden>측정 파일 받기</button>
         <span id="stat"></span>
       </div>
     </div>
@@ -1209,6 +1211,22 @@ struct CO { @location(0) c: vec4f, @builtin(frag_depth) z: f32 };
 
 /* ── 방울 줄 세우기: 같은 칸에 있는 방울끼리 메모리에 나란히 놓는다 (격자에 더할 때 덜 헤맨다) ── */
 /* 표면 거품 지도: 위에서 내려다본 2D 그림. 물 흐름을 따라 떠밀려 가고, 얕은 곳(백사장)에서는 빨리 스며들어 사라진다 */
+/* 파도 측정: 수조 가운데 앞뒤 얇은 띠 안의 알갱이·물보라를 옆에서 본 칸(cell×cell 격자칸)마다 센다 → 옆모습 단면 그림 */
+const MEASWGSL=`
+struct MU { d: vec4u, f: vec4f };
+@group(0) @binding(0) var<uniform> M: MU;
+@group(0) @binding(1) var<storage, read> pos: array<vec4f>;
+@group(0) @binding(2) var<storage, read> spr: array<vec4f>;
+@group(0) @binding(3) var<storage, read_write> mo: array<atomic<u32>>;
+fn put(q: vec4f, ch: u32) {
+  if (q.w <= 0.0 || abs(q.z - M.f.x) > M.f.y) { return; }
+  let ix = u32(max(q.x / M.f.z, 0.0)); let iy = u32(max(q.y / M.f.z, 0.0));
+  if (ix >= M.d.x || iy >= M.d.y) { return; }
+  atomicAdd(&mo[(iy * M.d.x + ix) * 2u + ch], 1u);
+}
+@compute @workgroup_size(64) fn mBody(@builtin(global_invocation_id) id: vec3u) { if (id.x >= M.d.z) { return; } put(pos[id.x], 0u); }
+@compute @workgroup_size(64) fn mSpr(@builtin(global_invocation_id) id: vec3u) { if (id.x >= M.d.w) { return; } put(spr[id.x * 2u], 1u); }
+`;
 const FOAMWGSL=`
 struct FU { d: vec4u, a: vec4f, b: vec4f, c: vec4f };   /* c: 퍼짐, 백사장에 남는 정도 */   /* d: 가로 칸, 세로 칸 / a: 칸 비율, 이번 프레임 시간, 남는 비율, 새 거품 세기 / b: 알갱이 부피, -, 박자 수, 모래에 스며드는 비율 */
 @group(0) @binding(0) var<uniform> F: FU;
@@ -1464,6 +1482,49 @@ function readAlive(n0){ compacting=true; const sc=S.scene; B.rd.mapAsync(GPUMapM
 /* 한 프레임의 박자들을 한 주문서에 담아 한 번에 보낸다 */
 let frameNo=0;
 const foamSurf=()=>false;   /* 표면 무늬는 뺐다 (2026-10-22) */
+/* ── 파도 측정 ── */
+let SIMSTEP=0, SIMT=0;
+const MEAS={on:false,done:null,frames:[],meta:[],t0:0,last:0,dur:20000,gap:50,pool:[],busy:0};
+function measStart(){
+  if(!E.ok || !N) return;
+  if(!PL.mBody){ const mm=dev.createShaderModule({code:MEASWGSL}), C=GPUShaderStage.COMPUTE;
+    MEAS.bgl=dev.createBindGroupLayout({entries:[{binding:0,visibility:C,buffer:{type:"uniform"}},{binding:1,visibility:C,buffer:{type:"read-only-storage"}},{binding:2,visibility:C,buffer:{type:"read-only-storage"}},{binding:3,visibility:C,buffer:{type:"storage"}}]});
+    const lay=dev.createPipelineLayout({bindGroupLayouts:[MEAS.bgl]});
+    PL.mBody=dev.createComputePipeline({layout:lay,compute:{module:mm,entryPoint:"mBody"}}); PL.mSpr=dev.createComputePipeline({layout:lay,compute:{module:mm,entryPoint:"mSpr"}}); }
+  const cell=3, MW=Math.ceil(GX/cell), MH=Math.ceil(GY/cell), bytes=MW*MH*2*4;
+  if(MEAS.buf) MEAS.buf.destroy(); for(const b of MEAS.pool) b.destroy();
+  MEAS.buf=dev.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC|GPUBufferUsage.COPY_DST});
+  MEAS.pool=[0,1,2].map(()=>dev.createBuffer({size:bytes,usage:GPUBufferUsage.MAP_READ|GPUBufferUsage.COPY_DST})); MEAS.free=[0,1,2];
+  MEAS.U=dev.createBuffer({size:32,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
+  const ent=pl=>dev.createBindGroup({layout:MEAS.bgl,entries:[{binding:0,resource:{buffer:MEAS.U}},{binding:1,resource:{buffer:B.pos}},{binding:2,resource:{buffer:B.spr}},{binding:3,resource:{buffer:MEAS.buf}}]});
+  MEAS.bgB=ent(PL.mBody); MEAS.bgS=ent(PL.mSpr);
+  Object.assign(MEAS,{on:true,done:null,frames:[],meta:[],t0:performance.now(),last:0,cell,MW,MH,bytes,posBuf:B.pos,band:3});
+  MEAS.head={v:1,what:"NU JET 3D 파도 옆모습 단면 (수조 가운데 띠). 칸마다 [알갱이 수, 물보라 수] (0~255)",GX,GY,GZ,DS,TOPG,beachX:beachX(),bedR:bedR(),cell,MW,MH,band:3,zc:zcG(),settings:JSON.parse(JSON.stringify(S))};
+  $("bMeas").textContent="측정 중… 0초"; $("bMeasGet").hidden=true;
+}
+function measTick(){
+  if(!MEAS.on) return; const now=performance.now(), el=now-MEAS.t0;
+  if(B.pos!==MEAS.posBuf){ MEAS.on=false; $("bMeas").textContent="파도 측정 20초"; $("stat").textContent="물을 다시 채워서 측정을 멈췄어요. 다시 눌러 주세요."; return; }
+  if(el>=MEAS.dur){ MEAS.on=false; measFinish(); return; }
+  $("bMeas").textContent="측정 중… "+Math.floor(el/1000)+"초";
+  if(now-MEAS.last<MEAS.gap || !MEAS.free.length) return; MEAS.last=now;
+  const slot=MEAS.free.shift(), rb=MEAS.pool[slot];
+  const u=new ArrayBuffer(32), ui=new Uint32Array(u), uf=new Float32Array(u); ui[0]=MEAS.MW; ui[1]=MEAS.MH; ui[2]=N; ui[3]=SPCAP(); uf[4]=zcG(); uf[5]=MEAS.band; uf[6]=MEAS.cell; dev.queue.writeBuffer(MEAS.U,0,u);
+  const e=dev.createCommandEncoder(); e.clearBuffer(MEAS.buf); const c=e.beginComputePass();
+  c.setPipeline(PL.mBody); c.setBindGroup(0,MEAS.bgB); c.dispatchWorkgroups(Math.ceil(N/64));
+  if(S.mat!==1){ c.setPipeline(PL.mSpr); c.setBindGroup(0,MEAS.bgS); c.dispatchWorkgroups(SPCAP()/64); }
+  c.end(); e.copyBufferToBuffer(MEAS.buf,0,rb,0,MEAS.bytes); dev.queue.submit([e.finish()]);
+  const meta={ms:Math.round(el),step:SIMSTEP,simT:+SIMT.toFixed(3),dt:+DT.toFixed(4),padx:+PADX.toFixed(3),n:N}; MEAS.busy++;
+  rb.mapAsync(GPUMapMode.READ).then(()=>{ const a=new Uint32Array(rb.getMappedRange()), o=new Uint8Array(a.length); for(let i=0;i<a.length;i++) o[i]=a[i]>255?255:a[i]; rb.unmap(); MEAS.frames.push(o); MEAS.meta.push(meta); MEAS.free.push(slot); MEAS.busy--; if(MEAS.done===false) measFinish(); }).catch(()=>{ MEAS.free.push(slot); MEAS.busy--; });
+}
+function measFinish(){
+  if(MEAS.busy>0){ MEAS.done=false; $("bMeas").textContent="측정 마무리 중…"; return; }
+  MEAS.done=true; const head=Object.assign({},MEAS.head,{frames:MEAS.meta}), hb=new TextEncoder().encode(JSON.stringify(head));
+  const out=new Uint8Array(4+hb.length+MEAS.frames.length*MEAS.MW*MEAS.MH*2); new DataView(out.buffer).setUint32(0,hb.length,true); out.set(hb,4);
+  let off=4+hb.length; for(const f of MEAS.frames){ out.set(f,off); off+=f.length; }
+  MEAS.blob=new Blob([out],{type:"application/octet-stream"});
+  $("bMeas").textContent="파도 측정 20초"; $("bMeasGet").hidden=false; $("bMeasGet").textContent="측정 파일 받기 ("+(MEAS.blob.size/1048576).toFixed(1)+"MB, "+MEAS.frames.length+"장)";
+}
 function runSteps(n){ if(n<=0) return; const e=dev.createCommandEncoder(); const rd=frameNo%4===0 && sortPass(e), n0=N, FS=foamSurf();
   for(let k=0;k<n;k++){ step(e,k); if(FS && k===n-1){ pF[31]+=10; } }   /* 마지막 박자만 거품 지도에 모은다 */
   if(FS){ const tS=n*DT, tR=tS/(72*Math.max(0.05,S.spd)), keep=Math.exp(-tR/(0.8+7*S.flife));   /* 사라지는 시간은 실제 시간 기준 (빠르기를 낮춰도 그대로) */
@@ -1524,7 +1585,7 @@ function frame(now){
   const dt=Math.min(0.05,(now-last)/1000); last=now;
   if(!paused){ DT=stepDT(); const r2=0.2/DT; acc+=dt*SPS*r2*S.spd; let k=0; const km=Math.min(NSLOT,Math.round(MAXSTEP*r2)); while(acc>=1 && k<km){ acc-=1; k++; }
     if(S.scene===1 && autoDrip && k){ dripT+=k*DT; if(dripT>=S.dint*72){ dripT=0; spawnDrop(); } }
-    runSteps(k); frameNo++; stepsN+=k; slowF=acc>=1?1:Math.max(0,slowF-dt); if(acc>2*r2) acc=0; }
+    runSteps(k); SIMSTEP+=k; SIMT+=k*DT; measTick(); frameNo++; stepsN+=k; slowF=acc>=1?1:Math.max(0,slowF-dt); if(acc>2*r2) acc=0; }
   /* 화면 크기: 작은 해상도로 그린 뒤 픽셀 그대로 키운다 */
   const r=$("stage").getBoundingClientRect(), w=Math.max(80,Math.round(r.width/S.px)), h=Math.max(50,Math.round(r.height/S.px));
   if(cv.width!==w || cv.height!==h || !depth){ cv.width=w; cv.height=h; if(depth) depth.destroy(); depth=dev.createTexture({size:[w,h],format:"depth24plus",usage:GPUTextureUsage.RENDER_ATTACHMENT}); if(OFF){ if(offTex) offTex.destroy(); offTex=dev.createTexture({size:[w,h],format:fmtTex,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC}); } }
@@ -1583,6 +1644,8 @@ stage.addEventListener("pointerup",up); stage.addEventListener("pointercancel",u
 stage.addEventListener("wheel",e=>{ e.preventDefault(); S.czoom=Math.min(4,Math.max(0.4,S.czoom*Math.exp(-e.deltaY*0.0012))); save(); },{passive:false});
 stage.addEventListener("dblclick",()=>S.scene===1?spawnDrop():dropBlob());
 $("bSlap").addEventListener("click",()=>{ SLAP=1; });
+$("bMeas").addEventListener("click",()=>{ if(MEAS.on){ MEAS.on=false; measFinish(); } else measStart(); });
+$("bMeasGet").addEventListener("click",()=>{ if(!MEAS.blob) return; const a=document.createElement("a"); a.href=URL.createObjectURL(MEAS.blob); a.download="nujet-wave-measure-"+new Date().toISOString().slice(0,16).replace(/[:T]/g,"-")+".bin"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),5000); });
 $("bWave").addEventListener("click",()=>{ waveOn=!waveOn; $("bWave").setAttribute("aria-pressed",waveOn?"true":"false"); });
 $("bDrop").addEventListener("click",()=>S.scene===1?spawnDrop():dropBlob());
 $("bDrip").addEventListener("click",spawnDrop);
@@ -1593,7 +1656,7 @@ $("bFull").addEventListener("click",()=>{ try{ if(document.fullscreenElement) do
 document.addEventListener("keydown",e=>{ if(e.target.tagName==="INPUT") return; if(e.code==="Space"){ e.preventDefault(); if(S.scene===1) spawnDrop(); else SLAP=1; } else if(e.key==="f"||e.key==="F") $("bFull").click(); });
 
 /* 점검용: 방울 위치를 읽어 온다 */
-window.__nj3={ idle(){ return dev.queue.onSubmittedWorkDone(); }, async snap(){ const w=cv.width, h=cv.height, bpr=Math.ceil(w*4/256)*256, rb=dev.createBuffer({size:bpr*h,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}); const e=dev.createCommandEncoder(); e.copyTextureToBuffer({texture:offTex},{buffer:rb,bytesPerRow:bpr},[w,h]); dev.queue.submit([e.finish()]); await rb.mapAsync(GPUMapMode.READ); const a=new Uint8Array(rb.getMappedRange()); let c=document.getElementById("snap"); if(!c){ c=document.createElement("canvas"); c.id="snap"; c.style.cssText="position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated"; $("stage").appendChild(c); } c.width=w; c.height=h; const g=c.getContext("2d"), im=g.createImageData(w,h); for(let y=0;y<h;y++) im.data.set(a.subarray(y*bpr,y*bpr+w*4),y*w*4); g.putImageData(im,0,0); rb.unmap(); rb.destroy(); }, get n(){ return N; }, set sort(v){ sortOn=!!v; }, get S(){ return S; }, slap(){ SLAP=1; }, fill:()=>fill(), async probe(){ const k=Math.min(N,20000), rb=dev.createBuffer({size:k*16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}); const e=dev.createCommandEncoder(); e.copyBufferToBuffer(B.pos,0,rb,0,k*16); dev.queue.submit([e.finish()]); await rb.mapAsync(GPUMapMode.READ); const a=new Float32Array(rb.getMappedRange().slice(0)); rb.unmap(); rb.destroy();
+window.__nj3={ get meas(){ return MEAS; }, idle(){ return dev.queue.onSubmittedWorkDone(); }, async snap(){ const w=cv.width, h=cv.height, bpr=Math.ceil(w*4/256)*256, rb=dev.createBuffer({size:bpr*h,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}); const e=dev.createCommandEncoder(); e.copyTextureToBuffer({texture:offTex},{buffer:rb,bytesPerRow:bpr},[w,h]); dev.queue.submit([e.finish()]); await rb.mapAsync(GPUMapMode.READ); const a=new Uint8Array(rb.getMappedRange()); let c=document.getElementById("snap"); if(!c){ c=document.createElement("canvas"); c.id="snap"; c.style.cssText="position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated"; $("stage").appendChild(c); } c.width=w; c.height=h; const g=c.getContext("2d"), im=g.createImageData(w,h); for(let y=0;y<h;y++) im.data.set(a.subarray(y*bpr,y*bpr+w*4),y*w*4); g.putImageData(im,0,0); rb.unmap(); rb.destroy(); }, get n(){ return N; }, set sort(v){ sortOn=!!v; }, get S(){ return S; }, slap(){ SLAP=1; }, fill:()=>fill(), async probe(){ const k=Math.min(N,20000), rb=dev.createBuffer({size:k*16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}); const e=dev.createCommandEncoder(); e.copyBufferToBuffer(B.pos,0,rb,0,k*16); dev.queue.submit([e.finish()]); await rb.mapAsync(GPUMapMode.READ); const a=new Float32Array(rb.getMappedRange().slice(0)); rb.unmap(); rb.destroy();
   let bad=0, my=0, mxy=-1e9, mx=0; for(let i=0;i<k;i++){ const x=a[i*4], y=a[i*4+1], z=a[i*4+2]; if(!isFinite(x)||!isFinite(y)||!isFinite(z)) bad++; else { my+=y; mx+=x; if(y>mxy) mxy=y; } } return {k,bad,meanY:my/k,maxY:mxy,meanX:mx/k,padX:PADX}; } };
 init().catch(e=>{ $("msg").hidden=false; $("msg").textContent="그래픽카드를 준비하지 못했어요: "+e.message; console.error(e); });
 })();
