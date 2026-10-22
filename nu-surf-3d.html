@@ -1613,7 +1613,7 @@ function frame(now){
   requestAnimationFrame(frame);
   const dt=Math.min(0.05,(now-last)/1000); last=now; frames++; fpsT+=dt; if(fpsT>0.5){ fps=frames/fpsT; frames=0; fpsT=0; if(JF.n>=JF.lim*0.9 && fps<24) JF.lim=Math.max(500,Math.round(JF.lim*0.85)); else if(fps>40) JF.lim=Math.min(JF.max,JF.lim+150); }   /* 느리면 거품 알갱이 수를 스스로 줄인다 */
   if(!W) return;
-  const t0=performance.now(); if(!paused || stepOnce){ const sdt=(stepOnce?1/60:dt)*S.spd*(slow?0.25:1); W.advance(sdt); viewSync(WV,W); if(FX){ blobsUpdate(sdt); blobsField(); } else if(G.cf) G.cf.fill(0); lipUpdate(sdt); if(FX||FXS) sprUpdate(sdt); jfUpdate(sdt); decUpdate(sdt); drpUpdate(sdt); flowUpdate(sdt); stepOnce=false; } simMs=simMs*0.9+(performance.now()-t0)*0.1;
+  const t0=performance.now(); if(!paused || stepOnce){ const sdt=(stepOnce?1/60:dt)*S.spd*(slow?0.25:1)*(window.__dr||1); W.advance(sdt); viewSync(WV,W); if(FX){ blobsUpdate(sdt); blobsField(); } else if(G.cf) G.cf.fill(0); lipUpdate(sdt); if(FX||FXS) sprUpdate(sdt); jfUpdate(sdt); decUpdate(sdt); drpUpdate(sdt); flowUpdate(sdt); stepOnce=false; } simMs=simMs*0.9+(performance.now()-t0)*0.1;
   meshUpdate(dt);
   const popOn=POP.w&&!POP.w.closed, r=popOn?{width:POP.w.innerWidth,height:POP.w.innerHeight}:stage.getBoundingClientRect(), w=Math.max(80,Math.round(r.width/S.px)), h=Math.max(50,Math.round(r.height/S.px));
   if(cv.width!==w||cv.height!==h){ cv.width=w; cv.height=h; } targets(w,h);
@@ -1685,7 +1685,7 @@ function frame(now){
   gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D,T.ff); gl.uniform1i(E.u.uFF,3); gl.uniform4f(E.u.uFC,0.22,1.0,1,0);
   { const so=S.jfShO===undefined?0.8:S.jfShO, sd=S.jfShd===undefined?0.6:S.jfShd, c0=rgb(C[0]), c1=rgb(C[1]); gl.uniform4f(E.u.uSh,sd,so*1.1*(S.jfR||1)*h*1.564,0,1); gl.uniform3fv(E.u.uSC,c1.map((v,i)=>Math.min(1,Math.max(0.35,v/Math.max(0.05,c0[i]))))); } gl.uniform3f(E.u.uFL,0.43,0.75,0.95); gl.uniform3fv(E.u.uFH,rgb(C[0]).map((v,i)=>v*0.7+rgb(C[2])[i]*0.3));
   gl.uniform2f(E.u.uPx,1/w,1/h); gl.uniform3fv(E.u.uLine,lineC); gl.uniform2f(E.u.uNF,near,far); gl.drawArrays(gl.TRIANGLES,0,3); gl.activeTexture(gl.TEXTURE0);
-  popDraw();
+  popDraw(); if(window.__demoHook) window.__demoHook(dt,paused&&!stepOnce);
   $("stat").textContent=`격자 ${W.NX}×${W.NZ}${W.TILE>1?" ×"+W.TILE+" 이어붙임":""} · ${Math.round(fps)}fps · 계산 ${simMs.toFixed(1)}ms`;
 }
 try{ build(); $("msg").hidden=true; requestAnimationFrame(frame); }
