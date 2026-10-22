@@ -402,6 +402,8 @@ const CTL=[
  ["secJF","물결 매끈함","wsmooth",0,5,1,2,"단계","물 표면의 자잘한 잔주름·떨림을 거르는 정도. 높일수록 부드럽고 유연하게 출렁입니다.",0],
  ["secJF","파도 앞면 그늘","faceSh",0,1,0.05,0.8,"","파도가 솟아오르면 백사장 쪽(보는 쪽)을 향한 면이 어두워지는 진하기. 높이 솟을수록 한 단계 더 짙어집니다. 0이면 끔.",0],
  ["secJF","얇은 물 비침","thinG",0,1,0.05,0.8,"","말려 올라간 혀처럼 물이 얇은 곳에 햇빛이 비쳐 밝은 연둣빛으로 빛나는 정도. 0이면 끔.",0],
+ ["secJF","혀 하이라이트","hiL",0,1,0.05,0.8,"","말려 나가는 혀 바깥면 꼭대기 아래로 휘어 흐르는 흰 빛 줄. 0이면 끔.",0],
+ ["secJF","마루 하이라이트","hiC",0,1,0.05,0.6,"","솟아오른 파도 꼭대기 능선을 따라 끊어지며 이어지는 흰 빛 줄. 0이면 끔.",0],
  ["secJF","밝은 물빛 조각","wpat",0,1,0.05,0.6,"%","빛 받는 물 위에 흐르는 밝은 아쿠아 조각의 양 (비탈에서는 비탈 따라 길쭉하게). 0이면 끄기.",0],
  ["secJF","조각 흐름","wpflow",0,3,0.05,1,"배","밝은 조각이 물 흐름에 실려 가는 정도. 0이면 제자리.",0],
  ["secJF","조각 크기","wpsz",0.4,2.5,0.05,1,"배","값이 클수록 잘게.",0],
@@ -495,7 +497,7 @@ const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(_){} }
 const fmt=(c,v)=>{ const d=c[5]<0.1?2:c[5]<1?1:0; return (+v).toFixed(d)+(c[7]?(c[7]==="%"?"":" ")+c[7]:""); };
 const inputs={}; let rebuildT=0;
 /* 간결한 메뉴: 지금 보이는 손잡이 (나머지는 숨긴 칸에서 지금 값 그대로) */
-const SHOW={amp:"nWave",per:"nWave",irr:"nWave",lat:"nWave",spd:"nWave", bar:"nCurl",barAng:"nCurl",barrel:"nCurl",lipLen:"nCurl",lipCurl:"nCurl",lipTh:"nCurl",lipT:"nCurl",lipC:"nCurl",lipMelt:"nCurl",lipDrop:"nCurl",lipLean:"nCurl",lipDip:"nCurl",lipShade:"nCurl",peel:"nCurl", jfN:"nSpr",jfJel:"nSpr",jfWob:"nSpr",jfR:"nSpr",jfVar:"nSpr",jfCover:"nSpr",jfLipF:"nSpr",bore:"nSpr",edgeL:"nSpr",bwStr:"nSpr",sandF:"nSpr",jfMerge:"nSpr",jfShd:"nSpr",jfShO:"nSpr",jfCap:"nSpr",jfUp:"nSpr",jfG:"nSpr",jfSpr:"nSpr",jfSlide:"nSpr",jfLine:"nSpr",jfLife:"nSpr", sea:"nLook",endless:"nLook",wsmooth:"nLook",faceSh:"nLook",thinG:"nLook",tiles:"nLook",wpat:"nLook",wpflow:"nLook",wpsz:"nLook",deco:"nLook", level:"nTank",beach:"nTank",hidez:"nTank",swash:"nTank",bwash:"nTank",btr:"nTank",wetK:"nTank",wdry:"nTank",btd:"nTank"};
+const SHOW={amp:"nWave",per:"nWave",irr:"nWave",lat:"nWave",spd:"nWave", bar:"nCurl",barAng:"nCurl",barrel:"nCurl",lipLen:"nCurl",lipCurl:"nCurl",lipTh:"nCurl",lipT:"nCurl",lipC:"nCurl",lipMelt:"nCurl",lipDrop:"nCurl",lipLean:"nCurl",lipDip:"nCurl",lipShade:"nCurl",peel:"nCurl", jfN:"nSpr",jfJel:"nSpr",jfWob:"nSpr",jfR:"nSpr",jfVar:"nSpr",jfCover:"nSpr",jfLipF:"nSpr",bore:"nSpr",edgeL:"nSpr",bwStr:"nSpr",sandF:"nSpr",jfMerge:"nSpr",jfShd:"nSpr",jfShO:"nSpr",jfCap:"nSpr",jfUp:"nSpr",jfG:"nSpr",jfSpr:"nSpr",jfSlide:"nSpr",jfLine:"nSpr",jfLife:"nSpr", sea:"nLook",endless:"nLook",wsmooth:"nLook",faceSh:"nLook",thinG:"nLook",hiL:"nLook",hiC:"nLook",tiles:"nLook",wpat:"nLook",wpflow:"nLook",wpsz:"nLook",deco:"nLook", level:"nTank",beach:"nTank",hidez:"nTank",swash:"nTank",bwash:"nTank",btr:"nTank",wetK:"nTank",wdry:"nTank",btd:"nTank"};
 const ORDER=Object.keys(SHOW); CTL.sort((a,b)=>(ORDER.indexOf(a[2])+1||999)-(ORDER.indexOf(b[2])+1||999));
 for(const c of CTL){ const box=$(SHOW[c[2]]||c[0]); const d=document.createElement("div"); d.className="ctl";
   d.innerHTML=`<label for="k_${c[2]}">${c[1]}</label><input id="k_${c[2]}" type="range" min="${c[3]}" max="${c[4]}" step="${c[5]}"><output></output>`+(c[8]?`<div class="desc">${c[8]}</div>`:"");
@@ -623,7 +625,7 @@ uniform vec4 uRev2;  /* 색조(도), 채도, 밝기, 불투명도 */
 uniform vec2 uRev3;  /* 가장자리 부드러움, 무늬 방향 */
 uniform vec4 uFoamE;   /* 가장자리 번짐, 가장자리 구멍, 바다 전체 거품, 무늬 흐름 방향(±1) */
 uniform vec4 uSurf;    /* 숨기는 x, 하얘짐 시작 x, 하얘짐 번짐(길이), 하얘짐 세기 */
-uniform vec4 uSurf2; uniform vec4 uFace; uniform vec4 uBore;   /* 투명 세기, 투명 시작 x, 투명 끝 x, - */
+uniform vec4 uSurf2; uniform vec4 uFace; uniform vec4 uBore; uniform vec4 uHi;   /* 투명 세기, 투명 시작 x, 투명 끝 x, - */
 float bay4(vec2 fc){ ivec2 ip=ivec2(fc)&3; int bi=ip.x+ip.y*4; float b[16]=float[16](0.0,8.0,2.0,10.0,12.0,4.0,14.0,6.0,3.0,11.0,1.0,9.0,15.0,7.0,13.0,5.0); return (b[bi]+0.5)/16.0; }
 uniform sampler2D uFoam;
 vec2 fhash(vec2 p){ return fract(sin(vec2(dot(p,vec2(127.1,311.7)),dot(p,vec2(269.5,183.3))))*43758.5453); }
@@ -688,12 +690,17 @@ void main(){
     vec2 fa=fl.xy, fb2=fl.zw; if(uTZ.y>0.5){ fa.y=-fa.y; fb2.y=-fb2.y; }
     float pA=wpat(((wq+fa)*an)*uWP.y), pB=wpat(((wq+fb2)*an)*uWP.y+vec2(17.3,5.1)), pn=mix(pB,pA,uFlowW);
     if(pn>0.74-0.15*uWP.x) col=uC2; }   /* 밝은 조각은 그림처럼 드문드문 */
-  if(sp>0.986 && n.y>0.6) col=uC2;   /* 반짝임은 위를 향한 면에만 (쏟아지는 혀 앞면이 하얗게 번지지 않게) */
+  if(sp>0.986 && n.y>0.6) col=uC2;
+  /* 마루 하이라이트: 솟아오른 파도 꼭대기 능선을 따라 흰 빛 줄 (파도 앞쪽으로 살짝, 끊어지며) */
+  if(uHi.y>0.0){ float rise2=vP.y-uTank.z, br2=vn2(vec2(vQ.y*0.35, vQ.x*0.05+uTime*0.08))*0.7+vn2(vec2(vQ.y*1.3+7.0, uTime*0.2))*0.3;
+    if(rise2>1.1-0.4*uHi.y && n.y>0.955 && n.y<0.995 && n.x>0.02 && br2>0.62-0.25*uHi.y){ col=vec3(1.0); mul=vec3(1.0); } }   /* 반짝임은 위를 향한 면에만 (쏟아지는 혀 앞면이 하얗게 번지지 않게) */
   /* 파도 앞면 그늘 (윤성 그림): 파도가 솟아오르면 백사장 쪽을 향한 면(보는 사람 쪽)이 빛을 등져 어두워진다. 높이 솟을수록 한 단계 더 */
   if(uFace.x>0.0){ float rise=vP.y-uTank.z, fx=n.x+(nz-0.5)*0.25;
     if(fx>0.32-0.12*uFace.x && n.y<0.9 && rise>0.35+(nz-0.5)*0.5){ vec3 fc=(rise>1.8+(nz-0.5)*0.8 && fx>0.5)?mix(uC1,uC3,0.3):uC1; mul=min(mul,min(vec3(1.0),mix(B0,fc,uFace.x)/B0)); } }
   /* 얇은 물 비침: 말려 올라간 혀처럼 물이 얇은 곳은 뒤에서 오는 햇빛이 비쳐 밝은 연둣빛 에메랄드로 (그늘보다 위에 칠한다) */
-  if(vH.y<-1.9){ float tg=-vH.y-2.0; if(tg>0.25){ vec3 gl1=mix(uC0,mix(uC2,vec3(0.78,1.0,0.86),0.35),0.6), gl2=mix(uC2,vec3(0.86,1.0,0.9),0.45); mul=vec3(1.0); col=tg>0.62?gl2:gl1; } }
+  if(vH.y<-3.9){ float br=vn2(vec2(vQ.y*0.55, vQ.x*0.25+uTime*0.15))*0.7+vn2(vec2(vQ.y*1.7+2.0, uTime*0.3))*0.3;   /* 혀 하이라이트: 혀 바깥면 꼭대기 아래로 휘어 흐르는 흰 빛 줄 (군데군데 끊겨 붓질처럼) */
+    mul=vec3(1.0); if(br>0.38) col=br>0.5?vec3(1.0):mix(uC2,vec3(1.0),0.6); }
+  else if(vH.y<-1.9){ float tg=-vH.y-2.0; if(tg>0.25){ vec3 gl1=mix(uC0,mix(uC2,vec3(0.78,1.0,0.86),0.35),0.6), gl2=mix(uC2,vec3(0.86,1.0,0.9),0.45); mul=vec3(1.0); col=tg>0.62?gl2:gl1; } }
   else if(vH.y<-0.12){ float ts=-vH.y; vec3 tc=ts>0.7?mix(uC1,uC3,0.38):ts>0.4?mix(uC1,uC3,0.18):mix(uC1,uC0,0.35); mul=min(mul,min(vec3(1.0),tc/B0)); }
   col*=mul;   /* 그늘 곱하기 */   /* 파도 안쪽(터널) 그늘: 깊을수록 한 단계씩 어둡게 */   /* 말린 혀 아래 터널 안쪽 벽은 그늘 */
   /* 바다 전체 거품: 물결 따라 흐르는 옅은 줄무늬 (부드럽게, 위를 향한 면에만) */
@@ -895,6 +902,7 @@ void main(){
   float sh=ndl+(nn-0.5)*0.3;
   if(n.y<0.4 && vLoc.x>uTank.x-1.5) discard;   /* 수조 끝 모래 벽은 그리지 않는다 (너머의 끝없는 모래가 이어진다) */
   vec3 col=sh>0.62?LIT:(sh>0.42?MID:SHD);
+  if(n.y<0.4) col=SHD;   /* 모래 옆면(수조 단면)은 한 색으로 (점점이 얼룩지지 않게) */
   if(n.y>0.5){ vec4 fm=foamAt(vLoc);
     /* 젖은 모래 자국: 물이 쓸려 내려간 자리에 조금 진한 모래색이 남았다가, 마르면서 바깥부터 세 단계로 옅어진다 */
     /* 모래에 남는 거품: 물이 멈춘 자리에 거품 줄이 잠깐 남았다가 스며든다 (아래쪽은 옅은 물빛 그늘) */
@@ -1302,7 +1310,7 @@ function lipUpdate(dt){
         const y0=ic>0?EV(r0+ic-1):cr, y2=ic<NX-1?EV(r0+ic+1):cr, pk=cr-0.25*(y0-y2)*off;   /* 칸 사이 진짜 마루 높이 (칸 가운데 값만 쓰면 톱니처럼 오르내린다) */
         const ay=Math.min(1,dt*2.5);
         LIP.xc[k]=pred+er*al; LIP.vx[k]+=er*be; LIP.yc[k]+=(pk-LIP.yc[k])*ay;
-        if(ph<0.35 || ph>=1) LIP.hc[k]+=(Math.max(0.2,pk-D)-LIP.hc[k])*ay; }   /* 말리기 시작할 때 높이를 잡아 두고(가장 높을 때), 말리는 동안의 낮아짐은 모양에서 */
+        if(ph<0.35) LIP.hc[k]+=(Math.max(0.2,pk-D)-LIP.hc[k])*ay; else if(ph>=1) LIP.hc[k]+=(Math.max(0.2,pk-D)-LIP.hc[k])*Math.min(1,dt*0.8); }   /* 무너질 때 크기는 천천히 줄어든다 (물이 백사장에서 낮아져도 혀가 확 쪼그라들지 않게) */   /* 말리기 시작할 때 높이를 잡아 두고(가장 높을 때), 말리는 동안의 낮아짐은 모양에서 */
       else { LIP.xc[k]=pred; LIP.vx[k]*=Math.exp(-dt*0.6); if(ph<1 && !(ic>=0 && cr-D>0.2)) LIP.fon[k]=1;
         if(ic>=0){ LIP.yc[k]+=(cr-LIP.yc[k])*Math.min(1,dt*2.5); } }   /* 백사장에서 서두를 때도 높이는 실제 물을 따라 (혼자 높게 남아 들려 보이지 않게) */
       LIP.fast[k]+=((LIP.fon[k]?1:0)-LIP.fast[k])*Math.min(1,dt*3);   /* 서두르기도 서서히 (갑자기 빨라지면 툭 튄다) */   /* 마루가 사라져도 같은 빠르기로 미끄러지며 무너짐으로 */
@@ -1383,7 +1391,7 @@ function surfWarp(){
     /* 지금 물 표면의 실제 마루 (무너짐 끝에 둔덕을 여기로 맞춰, 봉우리가 둘로 갈라지지 않게) */
     { const r0=k*NX, q0=Math.max(0,Math.round((xc-0.5*hc)/dx)), q1=Math.min(NX-1,Math.round((xc+2*hc)/dx)); let bx=xc, by=-1e9; for(let q=q0;q<=q1;q++){ if(sm[r0+q]>by){ by=sm[r0+q]; bx=(q+0.5)*dx; } } A.xh[k]=bx; A.yh[k]=by; }
     A.xa[k]=Math.max(2,xc-1.25*hc); A.xb[k]=Math.min(L-4,xc+Math.max(1.8,0.5*S.lipLen+1.1)*hc);
-    const p=A.ph[k], up=Math.min(1,p/0.25), ds0=Math.min(1.62,1.7-0.5*(S.lipMelt===undefined?0.6:S.lipMelt)), dn=1-Math.min(1,Math.max(0,((on[k]>0?on[k]:0)-ds0)/(1.7-ds0)));   /* 원래 물 표면으로 녹아드는 구간을 길게 */   /* 둔덕이 다 된 뒤에야 원래 물 표면으로 */
+    const p=A.ph[k], up=Math.min(1,p/0.25), ds0=Math.min(1.66,Math.max(1.6,1.7-0.5*(S.lipMelt===undefined?0.6:S.lipMelt))), dn=1-Math.min(1,Math.max(0,((on[k]>0?on[k]:0)-ds0)/(1.7-ds0)));   /* 원래 물 표면으로 녹아드는 구간을 길게 */   /* 둔덕이 다 된 뒤에야 원래 물 표면으로 */
     A.w[k]=(p>0?up*up*(3-2*up)*dn*dn*(3-2*dn):0)*Math.min(1,S.barrel); }
   { const TR=6; for(let k=0;k<NZ;k++){ if(!(on[k]>0)){ A.w[k]=0; continue; } let dd=TR; for(let r=1;r<TR;r++){ if((k-r>=0&&!(on[k-r]>0))||(k+r<NZ&&!(on[k+r]>0))){ dd=r; break; } }
       const t=dd/TR; A.w[k]*=t*t*(3-2*t); } }
@@ -1404,19 +1412,19 @@ function surfWarp(){
     /* ── 설계한 옆모습: 터널 안쪽은 타원 하나 (천장·벽·바닥이 한 곡선으로 매끈하게), 혀 바깥면은 그 타원을 두께만큼 키운 것 ── */
     /* 무너짐 (cl 0→1): ① 앞 40% — 혀 끝이 계속 감겨 내려가 앞 수면을 친다(터널이 닫힘)  ② 뒤 60% — 터널이 오므라들며
        둥근 거품물 둔덕이 되어, 원래 물 표면 모양으로 자연스럽게 녹아든다 (봉우리가 둘로 갈라지지 않게 마루 자리는 그대로) */
-    const gq=Math.min(1,p), gg=gq*gq*(3-2*gq), cl=Math.min(1,Math.max(0,(p-1)/0.6)), c1a=Math.min(1,cl/0.4), c1=c1a*c1a*(3-2*c1a), c2=Math.max(0,(cl-0.4)/0.6), e2=c2*c2*(3-2*c2);
+    const gq=Math.min(1,p), gg=gq*gq*(3-2*gq), cl=Math.min(1,Math.max(0,(p-1)/0.6)), c1a=Math.min(1,cl/0.4), c1=c1a*c1a*(3-2*c1a), c2=Math.min(1,Math.max(0,(p-1.24)/0.44)), e2=Math.min(1,c2*(1.25-0.25*c2));   /* 녹아드는 건 고르게 (가운데서 확 사라지지 않게) */
     const hf=1-(S.lipDrop===undefined?0.25:S.lipDrop)*gg-0.12*c1, lean=hc*(S.lipLean===undefined?0.35:S.lipLean)*gg*(1-e2);   /* 가장 높은 건 말리기 직전 — 말려 쓰러지며 높이가 내려가고, 꼭대기가 앞으로 기운다 */
     const dip=hc*(S.lipDip===undefined?0.15:S.lipDip)*gg*(1-e2), yt=yt0-dip;   /* 말리면 앞쪽 골(바닥)이 더 낮아진다 — 물이 파도 앞면으로 빨려 올라가니까 */
     const xc=xc0+(Math.max(xc0,xh)-xc0)*e2+lean, H0=Math.min(hc*hf+dip, Math.max(0.3*hc, yh-yt+0.05))+(Math.max(0.2,yh-yt0)-hc*hf)*e2,   /* 꼭대기는 실제 물 마루보다 높아지지 않게 (말릴 때 들리지 않게) */ th0=hc*S.lipTh*(0.25+0.75*gg);
-    const ry0=Math.max(0.05,(H0-th0)*0.5), ry=Math.max(0.01,ry0*(1-e2)), th=H0-2*ry;   /* 터널이 오므라드는 만큼 물 두께가 채운다 */
-    const rx=Math.max(0.01,hc*(0.1+0.3*S.lipLen*gg)*(1-e2));   /* 터널이 자라며 앞으로 불룩해지고, 무너질 땐 다시 오므라든다 (뒤 벽은 제자리) */
+    const shr=Math.sqrt(Math.max(0,1-e2)), ry0=Math.max(0.05,(H0-th0)*0.5), ry=Math.max(0.01,ry0*shr), th=H0-2*ry;   /* 터널은 천천히 오므라든다 (처음엔 모양을 오래 지키다 끝에서 닫힘) */   /* 터널이 오므라드는 만큼 물 두께가 채운다 */
+    const rx=Math.max(0.01,hc*(0.1+0.3*S.lipLen*gg)*shr);   /* 터널이 자라며 앞으로 불룩해지고, 무너질 땐 다시 오므라든다 (뒤 벽은 제자리) */
     const ex=xc+rx, ey=yt+ry, Cy=ey+ry+th;
     const fFull=(90-105*S.lipCurl*gg)*D2R, sMin=Math.max(-1,Math.min(1,(-ry-0.04)/(ry+th))), phMin=Math.asin(sMin);   /* 혀 끝은 앞 수면까지만 (물속으로 파고들지 않게) */
     const phT=Math.max(phMin, fFull+(Math.min(fFull,phMin)-fFull)*c1);   /* 혀 끝 각도: 위(90°)에서 앞으로 감겨 내려가 수면에 닿는다 */
     const qa=smp(kf,xa), qb=smp(kf,xb);
     const ein=f=>[ex+rx*Math.cos(f), ey+ry*Math.sin(f)], eout=f=>[ex+(rx+th)*Math.cos(f), ey+(ry+th)*Math.sin(f)], Pc=eout(phT);
     if(r%2===0){ A.pcx[r>>1]=w>0.05?Pc[0]:0; A.pcy[r>>1]=Pc[1]; }
-    const eC=Math.min(1,e2*1.8), toC=Q=>[Q[0]+(Pc[0]-Q[0])*eC, Q[1]+(Pc[1]-Q[1])*eC];   /* 무너질 때 혀 끝·터널 안쪽은 혀가 닿은 자리로 모여 사라진다 (접힌 면 없이 둥근 둔덕) */
+    const eC=e2*e2, toC=Q=>[Q[0]+(Pc[0]-Q[0])*eC, Q[1]+(Pc[1]-Q[1])*eC];   /* 무너질 때 혀 끝·터널 안쪽은 혀가 닿은 자리로 모여 사라진다 (접힌 면 없이 둥근 둔덕) */
     /* 무너짐 끝으로 갈수록 곡선의 칸 나눔도 물 표면과 같은 방식(앞뒤 거리 비례)으로 — 둘을 섞을 때 마루가 꺼지지 않게 */
     const uc=(ex-xa)/(xb-xa), ucP=Math.max(uc+0.01,(Pc[0]-xa)/(xb-xa)), UB=lerp(UB0,uc,e2), UL=lerp(UL0,ucP,e2), UT=lerp(UT0,ucP+0.002,e2), UI=lerp(UI0,ucP+0.004,e2); A.ubr[r]=UB; A.ulr[r]=UL; A.uir[r]=UI;
     const design=u=>{
@@ -1434,7 +1442,7 @@ function surfWarp(){
       let kk=q[2]; if(w>0.05){ let sd=0; if(u>UT && u<UI){ const t2=(u-UT)/(UI-UT); sd=Math.min(1,1.6*Math.sin(Math.PI*Math.min(1,t2*1.15))); }
           else if(u>=UI && u<UI+0.1) sd=0.6*(1-(u-UI)/0.1);
           sd*=w*(1-eC)*Math.min(1,gg*(S.lipShade===undefined?2.5:S.lipShade*4)); if(sd>0.05) kk=-sd;
-          else if(u>UB && u<UT){ const t3=(u-UB)/(UT-UB), sm3=Math.min(1,Math.max(0,(t3-0.3)/0.7)), gl=sm3*sm3*(3-2*sm3)*w*Math.min(1,gg*2)*(1-eC)*(S.thinG===undefined?0.8:S.thinG)*1.25; if(gl>0.1) kk=-2-Math.min(1,gl); } }   /* 혀 바깥면 끝 쪽(얇은 물)은 비침 표시 */   /* 오목해지는 만큼 그늘이 일찍·짙게 */
+          else if(u>UB && u<UT){ const t3=(u-UB)/(UT-UB); const hlA=(t3>0.07&&t3<0.24)?Math.sin(Math.PI*(t3-0.07)/0.17)*w*Math.min(1,gg*2)*(1-eC)*(S.hiL===undefined?0.8:S.hiL):0; if(hlA>0.18){ kk=-4-Math.min(1,hlA); } else { const sm3=Math.min(1,Math.max(0,(t3-0.3)/0.7)), gl=sm3*sm3*(3-2*sm3)*w*Math.min(1,gg*2)*(1-eC)*(S.thinG===undefined?0.8:S.thinG)*1.25; if(gl>0.1) kk=-2-Math.min(1,gl); } } }   /* 혀 바깥면 끝 쪽(얇은 물)은 비침 표시 */   /* 오목해지는 만큼 그늘이 일찍·짙게 */
       put(r,c,x,y,hh,kk,smp(kf,Math.min(Math.max(x,0),L))[3],z); } }
   return A;
 }
@@ -1724,7 +1732,7 @@ function frame(now){
     for(let i=0;i<4;i++) if(u["uC"+i]) gl.uniform3fv(u["uC"+i],rgb(C[i])); if(u.uLine) gl.uniform3fv(u.uLine,lineC);
     if(u.uHz) gl.uniform3fv(u.uHz,rgb(K.hz)); if(u.uZn) gl.uniform3fv(u.uZn,rgb(K.zn)); if(u.uCw) gl.uniform3fv(u.uCw,rgb(K.cw)); if(u.uCs) gl.uniform3fv(u.uCs,rgb(K.cs));
     if(u.uFoamP) gl.uniform4f(u.uFoamP,0.62-0.5*S.fsz,0.02+0.07*S.frim,S.flace,1/(1.5+5*S.flsz));
-    if(u.uWetK) gl.uniform1f(u.uWetK,S.wetK===undefined?0.7:S.wetK); if(u.uBore) gl.uniform4f(u.uBore,S.bore===undefined?1:S.bore,S.edgeL===undefined?1:S.edgeL,S.bwStr===undefined?1:S.bwStr,S.sandF===undefined?1:S.sandF); if(u.uFace) gl.uniform4f(u.uFace,S.faceSh===undefined?0.8:S.faceSh,WV?WV.b[(WV.NZ>>1)*WV.NX+WV.NX-1]+0.01:0,0,0); if(u.uFoamQ) gl.uniform4f(u.uFoamQ,S.frc,S.spd,S.shal,S.sandc); if(u.uTank) gl.uniform4f(u.uTank,L,Wd,D,h/(2*Math.tan(0.31))); if(u.uSurf) gl.uniform4f(u.uSurf,hideX(),L*S.bw0,L*S.bwg,FX?S.bwhite:0); if(u.uSurf2) gl.uniform4f(u.uSurf2,FX?S.btr:0,WV.xb,L,S.btd||1.6); if(u.uFoamR) gl.uniform2f(u.uFoamR,7.0-6.2*S.fwig,Math.min(1,S.fwig*3)); if(u.uFoamS) gl.uniform2f(u.uFoamS,S.fsurge,S.fswirl); if(u.uFoamEdge) gl.uniform1f(u.uFoamEdge,FX?S.fedge:0); if(u.uRev) gl.uniform3f(u.uRev,S.rev,0,S.revc); if(u.uRev2) gl.uniform4f(u.uRev2,S.revhue,S.revsat,S.revbri,S.revop); if(u.uRev3) gl.uniform2f(u.uRev3,S.revsoft,S.revdir<0?-1:1); if(u.uFoamE) gl.uniform4f(u.uFoamE,S.fgrad,S.fhole,FX?S.fsea:0,S.fdir<0?-1:1);
+    if(u.uWetK) gl.uniform1f(u.uWetK,S.wetK===undefined?0.7:S.wetK); if(u.uHi) gl.uniform4f(u.uHi,S.hiL===undefined?0.8:S.hiL,S.hiC===undefined?0.6:S.hiC,0,0); if(u.uBore) gl.uniform4f(u.uBore,S.bore===undefined?1:S.bore,S.edgeL===undefined?1:S.edgeL,S.bwStr===undefined?1:S.bwStr,S.sandF===undefined?1:S.sandF); if(u.uFace) gl.uniform4f(u.uFace,S.faceSh===undefined?0.8:S.faceSh,WV?WV.b[(WV.NZ>>1)*WV.NX+WV.NX-1]+0.01:0,0,0); if(u.uFoamQ) gl.uniform4f(u.uFoamQ,S.frc,S.spd,S.shal,S.sandc); if(u.uTank) gl.uniform4f(u.uTank,L,Wd,D,h/(2*Math.tan(0.31))); if(u.uSurf) gl.uniform4f(u.uSurf,hideX(),L*S.bw0,L*S.bwg,FX?S.bwhite:0); if(u.uSurf2) gl.uniform4f(u.uSurf2,FX?S.btr:0,WV.xb,L,S.btd||1.6); if(u.uFoamR) gl.uniform2f(u.uFoamR,7.0-6.2*S.fwig,Math.min(1,S.fwig*3)); if(u.uFoamS) gl.uniform2f(u.uFoamS,S.fsurge,S.fswirl); if(u.uFoamEdge) gl.uniform1f(u.uFoamEdge,FX?S.fedge:0); if(u.uRev) gl.uniform3f(u.uRev,S.rev,0,S.revc); if(u.uRev2) gl.uniform4f(u.uRev2,S.revhue,S.revsat,S.revbri,S.revop); if(u.uRev3) gl.uniform2f(u.uRev3,S.revsoft,S.revdir<0?-1:1); if(u.uFoamE) gl.uniform4f(u.uFoamE,S.fgrad,S.fhole,FX?S.fsea:0,S.fdir<0?-1:1);
     if(u.uFlow&&FLOW.tex){ gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D,FLOW.tex); gl.uniform1i(u.uFlow,4); gl.activeTexture(gl.TEXTURE0); if(u.uFlowW) gl.uniform1f(u.uFlowW,FLOW.w); }
     if(u.uTZ) gl.uniform2f(u.uTZ,0,0); if(u.uFog) gl.uniform2f(u.uFog,FOG[0],FOG[1]);
     if(u.uWP) gl.uniform2f(u.uWP,S.wpat===undefined?0.6:S.wpat,S.wpsz===undefined?1:S.wpsz);
