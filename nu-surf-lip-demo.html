@@ -420,7 +420,7 @@ const CTL=[
  ["secJF","맨 앞 거품 줄","edgeL",0,2,0.05,1,"배","백사장 위로 퍼지는 얇은 물막의 맨 앞을 따라가는 흰 거품 줄의 굵기.",0],
  ["secJF","빠지는 물 거품 줄","bwStr",0,2,0.05,1,"배","물이 바다 쪽으로 빠질 때 끌려 내려가는 가는 거품 줄무늬.",0],
  ["secJF","모래에 남는 거품","sandF",0,2,0.05,1,"배","물이 멈춘 자리 모래 위에 잠깐 남았다 스며드는 거품.",0],
- ["secJF","백사장에서 거품 합쳐짐","jfMerge",0,2,0.05,1,"배","젤리 거품이 백사장 얇은 물에 닿으면 맨 앞 거품 줄로 녹아들며 사라지는 빠르기.",0],
+ ["secJF","젤리 거품 → 백파로 넘기기","jfMerge",0,2,0.05,1,"배","혀에서 떨어져 물 위로 내려앉은 젤리 거품이 하얀 물 띠(백파)에 자리를 넘기고 사라지는 빠르기. 0이면 둘 다 남아 겹칩니다.",0],
  ["secJF","거품 솟구침","jfUp",0,3,0.05,1,"배","파도가 칠 때 거품이 위로 치솟는 힘과, 달리는 앞머리에서 튀어 오르는 횟수.",0],
  ["secJF","거품 중력","jfG",0.2,3,0.05,1,"배","공중에 뜬 거품·물방울이 떨어지는 빠르기. 낮추면 오래 떠 있다가 천천히 내려앉습니다.",0],
  ["secJF","백사장 미끄러지는 거리","jfSlide",0,1,0.05,0.85,"%","물 끝을 넘어 모래 위로 거품이 미끄러져 나가는 거리. 높일수록 멀리 주욱.",0],
@@ -1598,7 +1598,8 @@ function jfUpdate(dt){
     if(b[j]>D-1.2 && hh>0.03 && lineK>0){ const eg=EG[k0], dE=eg-X[i]; if(dE>0 && dE<1.5+5*lineK) tx+=dE*(1.5+7*lineK); }
     const a=Math.min(1,dt*(hh>0.03?3.5:6)); VX[i]+=(tx*JF.spf[i]-VX[i])*a; VZ[i]+=(tz-VZ[i])*a;   /* 알갱이마다 조금씩 다른 빠르기 → 앞서고 처지며 갈라진다 */
     const up=S.jfUp===undefined?1:S.jfUp; if(front>0.6 && hh>0.4 && up>0 && Math.random()<dt*0.35*S.jfN*up){ ST[i]=1; VY[i]=(1.5+2.5*Math.random())*Math.sqrt(Math.max(0.5,hh))*Math.sqrt(up); VX[i]+=0.8; if(Math.random()<0.4){ const r2=Math.random(); drpAdd(X[i],Y[i]+0.2,Z[i],VX[i]*(0.9+0.3*r2),VY[i]*(1.1+0.4*r2),(Math.random()-0.5)*1.5,(0.14+0.2*Math.random())*S.jfR); } continue; }   /* 달리는 앞머리에서 가끔 튀어 오르는 손가락·물방울 */
-    if(b[j]>D-1.2 && hh>0.03 && hh<0.5){ const mg=S.jfMerge===undefined?1:S.jfMerge; if(mg>0){ LF[i]-=dt*0.45*mg; VY[i]=0; } }   /* 백사장 얇은 물 위: 맨 앞 거품 줄로 녹아들듯 납작해지며 스민다 */
+    { const mg=S.jfMerge===undefined?1:S.jfMerge;   /* 물 위로 내려앉은 젤리 거품은 그려진 백파(하얀 물 띠)에 자리를 넘기고 스르륵 사라진다 — 두 거품이 겹치지 않게 */
+      if(mg>0 && (WV.foam[j]*(S.bore===undefined?1:S.bore)>0.22 || b[j]>D-1.2)) LF[i]-=dt*1.6*mg; }
     const dry=hh<0.03, behind=front<0.12 && hh>0.6 && b[j]<D-0.6;   /* 앞머리에서 떨어져 파도 뒤 깊은 물에 남은 거품 */
     LF[i]-=dt/((dry?(1.2+4.0*S.jfLife):behind?(0.8+2.2*S.jfLife):life)*JF.lff[i]);   /* 마루·앞머리에선 하얗게 오래, 뒤로 처지면 스르륵 옅어지며 사라진다 */
   }
