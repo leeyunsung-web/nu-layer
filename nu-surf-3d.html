@@ -583,7 +583,7 @@ void main(){
   vec3 col=uC0; if(ndl<0.25) col=uC1; else if(ndl>0.82) col=mix(uC0,uC2,0.35);
   col=mix(col, mix(uC0,uC2,0.55), uFoamQ.z*smoothstep(3.0,0.2,vH.x)*step(0.25,ndl));   /* 얕을수록 밝은 물빛 */
   if(sp>0.986 && n.y>0.6) col=uC2;   /* 반짝임은 위를 향한 면에만 (쏟아지는 혀 앞면이 하얗게 번지지 않게) */
-  if(vH.y<-0.3) col=mix(uC1,uC0,0.25);   /* 말린 혀 아래 터널 안쪽 벽은 그늘 */
+  if(vH.y<-0.12){ float ts=-vH.y; col=ts>0.7?mix(uC1,uC3,0.38):ts>0.4?mix(uC1,uC3,0.18):mix(uC1,uC0,0.35); }   /* 파도 안쪽(터널) 그늘: 깊을수록 한 단계씩 어둡게 */   /* 말린 혀 아래 터널 안쪽 벽은 그늘 */
   /* 바다 전체 거품: 물결 따라 흐르는 옅은 줄무늬 (부드럽게, 위를 향한 면에만) */
   if(uFoamE.z>0.01){ vec2 q=vQ*vec2(0.09,0.32)+vec2(-uTime*0.12,0.0); float m=vn2(q)*0.6+vn2(q*2.3+vec2(4.1,1.7)-vec2(uTime*0.1,0.0))*0.4;
     m=smoothstep(0.62-0.25*uFoamE.z, 0.78-0.2*uFoamE.z, m)*smoothstep(0.2,0.6,n.y);
@@ -1178,7 +1178,11 @@ function surfWarp(){
     for(let c=cA+1;c<cB;c++){ const u=(c-cA)/NS, xh=xa+(xb-xa)*u, q=smp(kf,xh);
       let x=xh, y=q[0], hh=q[1];
       if(w>0.001){ const Pq=design(u); x+=(Pq[0]-xh)*w; y+=(Pq[1]-y)*w; hh=Math.max(hh,0.6*w); }
-      put(r,c,x,y,hh,q[2],smp(kf,Math.min(Math.max(x,0),L))[3],z); } }
+      /* 파도 안쪽 그늘: 터널 천장·벽은 깊을수록 어둡게, 혀 아래 앞쪽 수면도 살짝 (음수로 넘겨 물 그림에서 단계별 그늘) */
+      let kk=q[2]; if(w>0.05){ let sd=0; if(u>UT && u<UI){ const t2=(u-UT)/(UI-UT); sd=Math.min(1,1.6*Math.sin(Math.PI*Math.min(1,t2*1.15))); }
+          else if(u>=UI && u<UI+0.06) sd=0.45*(1-(u-UI)/0.06);
+          sd*=w*(1-eC)*Math.min(1,gg*1.5); if(sd>0.05) kk=-sd; }
+      put(r,c,x,y,hh,kk,smp(kf,Math.min(Math.max(x,0),L))[3],z); } }
   return A;
 }
 function lipTip(k){ /* 혀 끝이 수면에 닿은 자리 (옆모습 곡선에서) */ const A=G.wp; if(A&&A.pcx&&A.pcx[k]>0) return [A.pcx[k],A.pcy[k]]; return [LIP.xc[k]+LIP.hc[k]*0.6,LIP.yc[k]-LIP.hc[k]]; }
@@ -1276,7 +1280,7 @@ function jfUpdate(dt){
   if(S.jfN>0){
     const A=G.wp, RZ=G.RZ;
     if(LIP.ph && A && A.NS) for(let k=0;k<NZ;k++){ const ph=LIP.ph[k]; if(!(ph>0.12 && ph<1.2) || !(A.w[k]>0.3)) continue;
-      const rate=10*S.jfN*Math.min(1,ph/0.3); let nn=rate*dt; while(nn>0){ if(Math.random()<nn){ const r=Math.min(RZ-1,Math.max(0,2*k+(Math.random()<0.5?0:(Math.random()<0.5?-1:1))));
+      const rate=7*S.jfN*Math.min(1,ph/0.3); let nn=rate*dt; while(nn>0){ if(Math.random()<nn){ const r=Math.min(RZ-1,Math.max(0,2*k+(Math.random()<0.5?0:(Math.random()<0.5?-1:1))));
         const cu=Math.random()*0.25, P=jfMesh(r,cu); if(P) jfAdd({x:P[0],y:P[1],z:P[2],st:0,rr:r,cu}); } nn-=1; } }
     /* 말림 없이 부서지는 앞머리(모래톱 너머·백사장 앞)에서도 마루 꼭대기에 */
     const step=2; for(let k=0;k<NZ;k+=step){ const r0=k*NX; let bi=-1, bm=0.5; for(let i=Math.floor(NX*0.08);i<NX-2;i++){ const v=brk[r0+i]; if(v>bm && h[r0+i]>0.25){ bm=v; bi=i; } }
@@ -1290,7 +1294,7 @@ function jfUpdate(dt){
   for(let i=0;i<n;i++){
     if(ST[i]===0){ /* 혀에 붙어 쏟아짐 */
       const r=JF.rr[i], k=r>>1, ph=LIP.ph?LIP.ph[Math.min(NZ-1,k)]:0, A=G.wp;
-      JF.cu[i]=Math.min(1,JF.cu[i]+dt*slide*(0.6+0.8*JF.sd[i]));
+      JF.cu[i]=Math.min(0.45,JF.cu[i]+dt*slide*0.5*(0.6+0.8*JF.sd[i]));   /* 마루 꼭대기 언저리에 얇은 흰 띠로 머문다 (터널을 가리지 않게) */
       const P=jfMesh(r,JF.cu[i]);
       if(!P || ph>=1.24 || !(ph>0) || !(A&&A.w[Math.min(NZ-1,k)]>0.15)){ ST[i]=1; const cw=Math.sqrt(g*Math.max(0.3,D*0.6)); VX[i]=cw*(1.0+0.3*JF.sd[i]); VY[i]=0.5+1.5*JF.sd[i]; VZ[i]=(Math.random()-0.5)*0.8; }
       else { VX[i]=(P[0]-X[i])/dt; VY[i]=(P[1]-Y[i])/dt; VZ[i]=0; X[i]=P[0]; Y[i]=P[1]; Z[i]=P[2]; continue; } }
@@ -1302,7 +1306,8 @@ function jfUpdate(dt){
     const cw=Math.sqrt(g*Math.max(0.15,hh)), front=Math.min(1,brk[j]*2.5);
     const tx=hh>0.03?Math.max(uw, front*cw*0.97+(1-front)*uw):VX[i]*0.9, tz=hh>0.03?ww:0;
     const a=Math.min(1,dt*(hh>0.03?3.5:6)); VX[i]+=(tx-VX[i])*a; VZ[i]+=(tz-VZ[i])*a;
-    const dry=hh<0.03; LF[i]-=dt/(dry?(0.6+2.5*S.jfLife):life);
+    const dry=hh<0.03, behind=front<0.12 && hh>0.6 && b[j]<D-0.6;   /* 앞머리에서 떨어져 파도 뒤 깊은 물에 남은 거품 */
+    LF[i]-=dt/(dry?(0.6+2.5*S.jfLife):behind?(0.8+2.2*S.jfLife):life);   /* 마루·앞머리에선 하얗게 오래, 뒤로 처지면 스르륵 옅어지며 사라진다 */
   }
   /* ── 알갱이끼리: 뭉침(당김) · 부피(밀어냄) · 출렁임(속도 맞춤이 약할수록 탱글) ── */
   { const Hn=2.6*R0, cs=Hn, gx=Math.ceil(L/cs)+1, gz=Math.ceil(Wd/cs)+1, head=JF.head&&JF.head.length===gx*gz?JF.head:(JF.head=new Int32Array(gx*gz)), nxt=JF.nxt&&JF.nxt.length===JF.max?JF.nxt:(JF.nxt=new Int32Array(JF.max));
@@ -1325,7 +1330,7 @@ function jfUpdate(dt){
   let m=0; const hx=hideX();
   for(let i=0;i<n;i++){ if(!(LF[i]>0) || X[i]<0 || X[i]>L || (ST[i]===2 && X[i]<hx-2)) continue;
     if(m!==i) for(const k of ["x","y","z","vx","vy","vz","st","lf","rr","cu","rad","sd"]) JF[k][m]=JF[k][i];
-    const o=m*5, lf=JF.lf[m]; JF.g[o]=JF.x[m]; JF.g[o+1]=JF.y[m]; JF.g[o+2]=JF.z[m]; JF.g[o+3]=2.3*R0*JF.rad[m]*(0.55+0.45*Math.min(1,lf*3));   /* 그리는 동그라미는 알갱이 간격보다 크게 → 이웃끼리 녹아 붙는다 */ JF.g[o+4]=Math.min(1,lf*4); m++; }
+    const o=m*5, lf=JF.lf[m]; JF.g[o]=JF.x[m]; JF.g[o+1]=JF.y[m]; JF.g[o+2]=JF.z[m]; JF.g[o+3]=2.3*R0*JF.rad[m]*(0.55+0.45*Math.min(1,lf*3))*(JF.st[m]===0?0.6:1);   /* 그리는 동그라미는 알갱이 간격보다 크게 → 이웃끼리 녹아 붙는다 */ JF.g[o+4]=Math.min(1,lf*1.6); m++; }   /* 남은 양이 줄수록 덩어리가 서서히 오므라든다 */
   JF.n=m;
 }
 function frame(now){
