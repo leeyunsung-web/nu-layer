@@ -296,7 +296,7 @@ function makeWave(P,seed){
         if(bsp>0){ const nb=(bil(foam,NX,NZ,i+1,k)+bil(foam,NX,NZ,i-1,k)+bil(foam,NX,NZ,i,k+1)+bil(foam,NX,NZ,i,k-1))*0.25; f=f+(Math.max(f,nb)-f)*bsp*0.35; }   /* 옆으로 번지고(퍼지는 폭) */
         f*=keepS; }   /* 모래에 스며든다(스며드는 시간) */
       foam2[j]=Math.min(1,f); fu2[j]=ax; fw2[j]=az;
-      wet[j]=wetNow?1:wet[j]*Math.exp(-dtF/2.5); }
+      wet[j]=wetNow?1:wet[j]*Math.exp(-dtF/Math.max(0.3,P.wdry===undefined?3:P.wdry)); }   /* 젖은 모래 자국이 마르는 시간 */
     foam.set(foam2); fu.set(fu2); fw.set(fw2);
   }
   S.advance=function(simT){
@@ -414,6 +414,8 @@ const CTL=[
  ["secTank","백사장 경사","beach",0.04,0.4,0.01,0.13,"","비탈의 가파름. 완만하면 길게 밀려 올라가고, 가파르면 짧고 세게 부서집니다. 바꾸면 다시 만듭니다.",2],
  ["secTank","밀려 올라오는 정도","swash",0,2,0.05,1.2,"배","파도가 부서진 뒤 물이 백사장 위로 촥 밀려 올라오는 거리. 클수록 멀리 올라옵니다.",0],
  ["secTank","쓸려 내려가는 정도","bwash",0,1,0.05,0.7,"","올라온 물이 다시 바다 쪽으로 쓸려 내려가는 세기. 0이면 그 자리에서 스며들고, 1이면 시원하게 빨려 내려갑니다.",0],
+ ["secTank","젖은 모래 자국","wetK",0,1,0.05,0.7,"","물이 빠진 자리에 남는 젖은(조금 진한) 모래 자국의 진하기. 0이면 끔.",0],
+ ["secTank","모래 마르는 시간","wdry",0.5,10,0.1,3,"초","젖은 모래 자국이 말라서 사라지는 데 걸리는 시간.",0],
  ["secTank","백사장 물 투명","btr",0,1,0.05,0.75,"","얕은 물일수록 투명해져 아래 모래가 비칩니다. 0이면 끄기.",0],
  ["secTank","투명해지는 깊이","btd",0.3,4,0.1,1.6,"","이 깊이보다 얕아질수록 점점 투명해집니다. 클수록 더 깊은 곳부터 비칩니다.",0],
  ["secTank","마른 백사장 높이","berm",0,1.5,0.05,0.5,"배","물 높이보다 이만큼(물 깊이 대비) 올라가면 모래가 평평해집니다. 낮을수록 넓은 마른 모래밭. 바꾸면 다시 만듭니다.",2],
@@ -463,7 +465,7 @@ const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(_){} }
 const fmt=(c,v)=>{ const d=c[5]<0.1?2:c[5]<1?1:0; return (+v).toFixed(d)+(c[7]?(c[7]==="%"?"":" ")+c[7]:""); };
 const inputs={}; let rebuildT=0;
 /* 간결한 메뉴: 지금 보이는 손잡이 (나머지는 숨긴 칸에서 지금 값 그대로) */
-const SHOW={amp:"nWave",per:"nWave",irr:"nWave",lat:"nWave",spd:"nWave", bar:"nCurl",barAng:"nCurl",barrel:"nCurl",lipLen:"nCurl",lipCurl:"nCurl",lipTh:"nCurl",lipT:"nCurl",lipC:"nCurl",lipMelt:"nCurl",peel:"nCurl", jfN:"nSpr",jfJel:"nSpr",jfWob:"nSpr",jfR:"nSpr",jfVar:"nSpr",jfCover:"nSpr",jfShd:"nSpr",jfShO:"nSpr",jfCap:"nSpr",jfUp:"nSpr",jfG:"nSpr",jfSpr:"nSpr",jfSlide:"nSpr",jfLine:"nSpr",jfLife:"nSpr", sea:"nLook",endless:"nLook",wsmooth:"nLook",tiles:"nLook",wpat:"nLook",wpflow:"nLook",wpsz:"nLook",deco:"nLook", level:"nTank",beach:"nTank",hidez:"nTank",swash:"nTank",bwash:"nTank",btr:"nTank",btd:"nTank"};
+const SHOW={amp:"nWave",per:"nWave",irr:"nWave",lat:"nWave",spd:"nWave", bar:"nCurl",barAng:"nCurl",barrel:"nCurl",lipLen:"nCurl",lipCurl:"nCurl",lipTh:"nCurl",lipT:"nCurl",lipC:"nCurl",lipMelt:"nCurl",peel:"nCurl", jfN:"nSpr",jfJel:"nSpr",jfWob:"nSpr",jfR:"nSpr",jfVar:"nSpr",jfCover:"nSpr",jfShd:"nSpr",jfShO:"nSpr",jfCap:"nSpr",jfUp:"nSpr",jfG:"nSpr",jfSpr:"nSpr",jfSlide:"nSpr",jfLine:"nSpr",jfLife:"nSpr", sea:"nLook",endless:"nLook",wsmooth:"nLook",tiles:"nLook",wpat:"nLook",wpflow:"nLook",wpsz:"nLook",deco:"nLook", level:"nTank",beach:"nTank",hidez:"nTank",swash:"nTank",bwash:"nTank",btr:"nTank",wetK:"nTank",wdry:"nTank",btd:"nTank"};
 const ORDER=Object.keys(SHOW); CTL.sort((a,b)=>(ORDER.indexOf(a[2])+1||999)-(ORDER.indexOf(b[2])+1||999));
 for(const c of CTL){ const box=$(SHOW[c[2]]||c[0]); const d=document.createElement("div"); d.className="ctl";
   d.innerHTML=`<label for="k_${c[2]}">${c[1]}</label><input id="k_${c[2]}" type="range" min="${c[3]}" max="${c[4]}" step="${c[5]}"><output></output>`+(c[8]?`<div class="desc">${c[8]}</div>`:"");
@@ -832,7 +834,7 @@ layout(location=0) in vec3 aP; out vec3 vP;
 out vec2 vLoc;
 void main(){ vP=tzp(aP); vLoc=aP.xz; gl_Position=uVP*vec4(vP-vec3(uTank.x*0.5,0.0,uTank.y*0.5),1.0); }`;
 const FS_SAND=COMMON+`
-in vec3 vP; in vec2 vLoc; layout(location=0) out vec4 oC; layout(location=1) out vec4 oId;
+in vec3 vP; in vec2 vLoc; layout(location=0) out vec4 oC; layout(location=1) out vec4 oId; uniform float uWetK;
 void main(){
   if(vP.x<uSurf.x-0.01 || vLoc.x<uSurf2.y-3.0) discard;   /* 바다 밑바닥(모래톱 굴곡)은 그리지 않는다: 깊은 물처럼 */
   vec3 n=normalize(cross(dFdx(vP),dFdy(vP))); if(n.y<0.0) n=-n;
@@ -843,7 +845,9 @@ void main(){
   float sh=ndl+(nn-0.5)*0.3;
   vec3 col=sh>0.8?LIT:(sh>0.6?MID:SHD);
   if(n.y>0.5){ vec4 fm=foamAt(vLoc);
-    float wt=fm.g; if(wt>0.55) col=mix(col,vec3(0.86,0.905,0.925),0.75); else if(wt>0.2) col=mix(col,vec3(0.90,0.925,0.935),0.6); }   /* 젖은 모래: 두 단계 (물이 막 빠진 곳이 더 진하게) */
+    /* 젖은 모래 자국: 물이 쓸려 내려간 자리에 조금 진한 모래색이 남았다가, 마르면서 바깥부터 세 단계로 옅어진다 */
+    float wt=fm.g+(nn-0.5)*0.12; vec3 WET=vec3(0.86,0.83,0.76);
+    if(wt>0.62) col=mix(col,WET*vec3(0.95,0.96,0.98),uWetK); else if(wt>0.35) col=mix(col,WET,uWetK*0.7); else if(wt>0.14) col=mix(col,WET,uWetK*0.38); }
   oC=vec4(col,1.0); oId=vec4(0.5,0.0,0.0,1.0);
 }`;
 const VS_LINE=COMMON+`
@@ -1637,7 +1641,7 @@ function frame(now){
     for(let i=0;i<4;i++) if(u["uC"+i]) gl.uniform3fv(u["uC"+i],rgb(C[i])); if(u.uLine) gl.uniform3fv(u.uLine,lineC);
     if(u.uHz) gl.uniform3fv(u.uHz,rgb(K.hz)); if(u.uZn) gl.uniform3fv(u.uZn,rgb(K.zn)); if(u.uCw) gl.uniform3fv(u.uCw,rgb(K.cw)); if(u.uCs) gl.uniform3fv(u.uCs,rgb(K.cs));
     if(u.uFoamP) gl.uniform4f(u.uFoamP,0.62-0.5*S.fsz,0.02+0.07*S.frim,S.flace,1/(1.5+5*S.flsz));
-    if(u.uFoamQ) gl.uniform4f(u.uFoamQ,S.frc,S.spd,S.shal,S.sandc); if(u.uTank) gl.uniform4f(u.uTank,L,Wd,D,h/(2*Math.tan(0.31))); if(u.uSurf) gl.uniform4f(u.uSurf,hideX(),L*S.bw0,L*S.bwg,FX?S.bwhite:0); if(u.uSurf2) gl.uniform4f(u.uSurf2,FX?S.btr:0,WV.xb,L,S.btd||1.6); if(u.uFoamR) gl.uniform2f(u.uFoamR,7.0-6.2*S.fwig,Math.min(1,S.fwig*3)); if(u.uFoamS) gl.uniform2f(u.uFoamS,S.fsurge,S.fswirl); if(u.uFoamEdge) gl.uniform1f(u.uFoamEdge,FX?S.fedge:0); if(u.uRev) gl.uniform3f(u.uRev,S.rev,0,S.revc); if(u.uRev2) gl.uniform4f(u.uRev2,S.revhue,S.revsat,S.revbri,S.revop); if(u.uRev3) gl.uniform2f(u.uRev3,S.revsoft,S.revdir<0?-1:1); if(u.uFoamE) gl.uniform4f(u.uFoamE,S.fgrad,S.fhole,FX?S.fsea:0,S.fdir<0?-1:1);
+    if(u.uWetK) gl.uniform1f(u.uWetK,S.wetK===undefined?0.7:S.wetK); if(u.uFoamQ) gl.uniform4f(u.uFoamQ,S.frc,S.spd,S.shal,S.sandc); if(u.uTank) gl.uniform4f(u.uTank,L,Wd,D,h/(2*Math.tan(0.31))); if(u.uSurf) gl.uniform4f(u.uSurf,hideX(),L*S.bw0,L*S.bwg,FX?S.bwhite:0); if(u.uSurf2) gl.uniform4f(u.uSurf2,FX?S.btr:0,WV.xb,L,S.btd||1.6); if(u.uFoamR) gl.uniform2f(u.uFoamR,7.0-6.2*S.fwig,Math.min(1,S.fwig*3)); if(u.uFoamS) gl.uniform2f(u.uFoamS,S.fsurge,S.fswirl); if(u.uFoamEdge) gl.uniform1f(u.uFoamEdge,FX?S.fedge:0); if(u.uRev) gl.uniform3f(u.uRev,S.rev,0,S.revc); if(u.uRev2) gl.uniform4f(u.uRev2,S.revhue,S.revsat,S.revbri,S.revop); if(u.uRev3) gl.uniform2f(u.uRev3,S.revsoft,S.revdir<0?-1:1); if(u.uFoamE) gl.uniform4f(u.uFoamE,S.fgrad,S.fhole,FX?S.fsea:0,S.fdir<0?-1:1);
     if(u.uFlow&&FLOW.tex){ gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D,FLOW.tex); gl.uniform1i(u.uFlow,4); gl.activeTexture(gl.TEXTURE0); if(u.uFlowW) gl.uniform1f(u.uFlowW,FLOW.w); }
     if(u.uTZ) gl.uniform2f(u.uTZ,0,0); if(u.uFog) gl.uniform2f(u.uFog,FOG[0],FOG[1]);
     if(u.uWP) gl.uniform2f(u.uWP,S.wpat===undefined?0.6:S.wpat,S.wpsz===undefined?1:S.wpsz);
