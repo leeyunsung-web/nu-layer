@@ -186,13 +186,13 @@ function makeWave(P,seed){
       x+=c.a*Math.sin(om*t-kz*z+c.ph); }
     return x; }
   /* 처음부터 바다에 너울이 가득: 파도 판이 지금까지 계속 밀어 왔던 것처럼 깊은 바다에 너울을 미리 채워 둔다 (먼 바다에서 첫 파도를 오래 기다리지 않게) */
-  { const irr=P.irr===undefined?1:P.irr, mix=Math.min(1,irr*0.8), As=P.amp*1.9*mix, c0=Math.sqrt(g*D);
+  { const irr=P.irr===undefined?1:P.irr, mix=Math.min(1,irr*0.8), As=P.amp*1.05*mix, c0=Math.sqrt(g*D);
     if(As>0) for(let k=0;k<NZ;k++){ const z=(k+0.5)*dx; for(let i=0;i<NX;i++){ const j=k*NX+i; if(b[j]>0.25*D) continue; const x=(i+0.5)*dx, t=-x/c0;
       const xd=As*(specX(t+1e-3,z)-specX(t-1e-3,z))/2e-3, eta=(D/c0)*xd*Math.min(1,x/(4*dx)); h[j]=Math.max(0.05,h[j]+eta); u[k*(NX+1)+i+1]=c0*eta/D; } } }
   function padVel(k,dt){ const P=S.P, on=S.waveOn?1:0, z=(k+0.5)*dx, irr=P.irr===undefined?1:P.irr, mix=Math.min(1,irr*0.8);
     const A=(P.amp*S.cycAmp*on+P.amp*1.3*S.slap)*zam[k], t=S.t+zph[k], v0=(padX(t+dt,P,A)-padX(t,P,A))/dt;
     if(mix<=0) return v0;
-    const As=P.amp*1.9*on, vs=As*(specX(S.t+dt,z)-specX(S.t,z))/dt;   /* 겹친 너울 (세트·간격·마루 길이가 저절로 달라진다) */
+    const As=P.amp*1.05*on, vs=As*(specX(S.t+dt,z)-specX(S.t,z))/dt;   /* 겹친 너울 (세트·간격·마루 길이가 저절로 달라진다) */
     return v0*(1-mix)+vs*mix+P.amp*1.3*S.slap*0; }
   const bil=(F,nx,ny,x,y)=>{ x=Math.min(Math.max(x,0),nx-1.001);
     if(PER){ while(y<0) y+=NZ; while(y>=NZ) y-=NZ; const j=y|0, j1=j+1<NZ?j+1:0, i=x|0, a=x-i, c=y-j, o=j*nx+i, o1=j1*nx+i; return (F[o]*(1-a)+F[o+1]*a)*(1-c)+(F[o1]*(1-a)+F[o1+1]*a)*c; }
@@ -1267,7 +1267,7 @@ function surfWarp(){
   const smp=(kf,x)=>{ const f=Math.min(NX-1.0001,Math.max(0,x/dx-0.5)), i=f|0, t=f-i, k0=Math.min(NZ-2,Math.max(0,Math.floor(kf))), s2=Math.min(1,Math.max(0,kf-k0));
     const g=(F,k)=>{ const j=k*NX+i; return F[j]+(F[j+1]-F[j])*t; }, m=F=>g(F,k0)*(1-s2)+g(F,k0+1)*s2; return [m(sm),m(h),m(brk),m(b)]; };
   const put=(r,c,x,y,hh,kk,bd,z)=>{ const j=r*RX+c;
-    if(bd<D-0.4){ const mn=bd+Math.max(0.3,(D-bd)*0.4); if(y<mn) y=mn; if(hh<0.3) hh=0.3; }   /* 물이 빠져도 바닥이 드러날 만큼은 내려가지 않게 (원래 물에 잠긴 곳) */ A.X[j]=x; A.Y[j]=y; A.Z[j]=z; A.H[j]=hh; A.K[j]=kk; A.Q[j]=x; A.Bd[j]=bd; };
+    if(bd<D-2.5){ const mn=bd+(D-bd)*0.3; if(y<mn){ y=mn; } if(hh<0.3) hh=0.3; }   /* 물이 빠져도 바닥이 드러날 만큼은 내려가지 않게 (원래 물에 잠긴 곳) */ A.X[j]=x; A.Y[j]=y; A.Z[j]=z; A.H[j]=hh; A.K[j]=kk; A.Q[j]=x; A.Bd[j]=bd; };
   const on=LIP.ph; let any=false; if(on) for(let k=0;k<NZ;k++) if(on[k]>0){ any=true; break; }
   A.cA=0; A.NS=0;
   if(!any || !(S.barrel>0)){ for(let r=0;r<RZ;r++){ const kf=r*(NZ-1)/(RZ-1), k0=Math.min(NZ-2,Math.floor(kf)), z=zOf(k0)+(zOf(k0+1)-zOf(k0))*(kf-k0);
