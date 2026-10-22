@@ -51,7 +51,7 @@ h3{margin:4px 0 0;font-size:12px;letter-spacing:.08em;color:var(--soft)}
 <div class="wrap">
   <header>
     <h1>NU SURF 3D <small style="font-size:.55em;opacity:.7">버전 3 · 가벼운 서핑 파도</small></h1>
-    <p>구슬 파도(버전 1)를 측정한 움직임에 맞춘 가벼운 물 표면 파도. 비스듬한 모래톱에서 앞이 말려 터널을 만들며 한쪽 끝부터 옆으로 까지듯 부서지고, 물보라를 흩뿌린 뒤 거품물로 백사장을 타고 올라가 하얘지며 스며듭니다. 화면을 끌면 돌아가고, 휠로 가까이·멀리 봅니다. <a href="nu-jet-3d.html">← 버전 1 (구슬)</a> · <a href="nu-wave-3d.html">버전 2 (물 표면)</a></p>
+    <p>파도 모양만 보는 단계입니다. 거품·물보라 같은 다른 요소는 꺼 두었고, 꼭 필요한 손잡이만 남겼습니다. 여기서부터 하나씩 다시 쌓아 갑니다.</p>
   </header>
   <div class="main">
     <div class="stagebox">
@@ -60,17 +60,29 @@ h3{margin:4px 0 0;font-size:12px;letter-spacing:.08em;color:var(--soft)}
         <button id="bSlap" class="hot" type="button" title="파도 판을 한 번 세게 밉니다 (스페이스 키)">철썩!</button>
         <button id="bWave" type="button" aria-pressed="true">파도 판 움직이기</button>
         <button id="bFill" type="button">다시 채우기</button>
-        <button id="bReplay" type="button" title="지금 설정으로 같은 파도를 처음부터 똑같이 다시 봅니다">같은 파도 다시</button>
+        <button id="bReplay" hidden type="button" title="지금 설정으로 같은 파도를 처음부터 똑같이 다시 봅니다">같은 파도 다시</button>
         <button id="bPause" type="button" aria-pressed="false">멈춤</button>
-        <button id="bStep" type="button" title="멈춘 상태에서 한 프레임씩 넘깁니다">한 프레임 ▶</button>
+        <button id="bStep" hidden type="button" title="멈춘 상태에서 한 프레임씩 넘깁니다">한 프레임 ▶</button>
         <button id="bSlow" type="button" aria-pressed="false" title="4배 느리게">느리게</button>
         <button id="bFull" type="button">전체 화면</button>
-        <button id="bPop" type="button" aria-pressed="false" title="파도 화면을 따로 떼어낸 창에 띄웁니다. 다른 모니터로 옮기거나 크게 키우고, 이 창에서는 설정을 만지면 됩니다. 떼어낸 창에서도 끌기·휠로 시점을 바꿀 수 있습니다.">미리보기 창 띄우기</button>
+        <button id="bPop" hidden type="button" aria-pressed="false" title="파도 화면을 따로 떼어낸 창에 띄웁니다. 다른 모니터로 옮기거나 크게 키우고, 이 창에서는 설정을 만지면 됩니다. 떼어낸 창에서도 끌기·휠로 시점을 바꿀 수 있습니다.">미리보기 창 띄우기</button>
         <span id="stat"></span>
       </div>
     </div>
     <aside class="panel" id="panel">
       <div class="row" id="views"><span class="lab">시점</span></div>
+      <h3>파도</h3>
+      <div id="nWave"></div>
+      <h3>말림</h3>
+      <div id="nCurl"></div>
+      <h3>수조</h3>
+      <div id="nTank"></div>
+      <div class="row"><button id="bReset" type="button">처음 값으로</button><button id="bCopy" type="button">설정 복사</button><button id="bPasteOpen" type="button">설정 붙여넣기</button></div>
+      <div id="cfgBox" hidden>
+        <textarea id="cfgTxt" rows="5" spellcheck="false" aria-label="설정 글"></textarea>
+        <div class="row"><button id="bApply" type="button">이 설정 적용</button><span class="note" id="cfgMsg"></span></div>
+      </div>
+      <div id="oldPanel" hidden>   <!-- 예전 손잡이들: 하나씩 다시 꺼내 쓰기 위해 숨겨 둠 -->
       <h3>파도</h3>
       <div id="secWave"></div>
       <h3>말림</h3>
@@ -101,12 +113,8 @@ h3{margin:4px 0 0;font-size:12px;letter-spacing:.08em;color:var(--soft)}
       <div class="row" id="skies"><span class="lab">하늘</span></div>
       <div id="secLook"></div>
       <div class="row" id="slots"><span class="lab">저장 칸</span></div>
-      <div class="row"><button id="bReset" type="button">처음 값으로</button><button id="bCopy" type="button">설정 복사</button><button id="bPasteOpen" type="button">설정 붙여넣기</button></div>
-      <div id="cfgBox" hidden>
-        <textarea id="cfgTxt" rows="5" spellcheck="false" aria-label="설정 글"></textarea>
-        <div class="row"><button id="bApply" type="button">이 설정 적용</button><span class="note" id="cfgMsg"></span></div>
-      </div>
       <p class="note">파도: 물 표면을 격자 한 장으로 계산합니다 (얕은 물 방정식). 깊은 바다에서는 너울이 모양을 지키며 달리고, 얕아지는 곳에서 가팔라집니다. 말림: 가팔라진 마루를 앞으로 휘어 넘겨 그립니다. 거품: 물 위에 떠서 자기 속도로 움직이는 2D 그림입니다.</p>
+      </div>
     </aside>
   </div>
 </div>
@@ -328,7 +336,7 @@ const CTL=[
  ["secFoam","무늬 크기","flsz",0,1,0.05,0.4,"%","거품 방울 구멍의 크기.",0],
  ["secFoam","거품 테두리","frim",0,1,0.05,0.5,"%","거품 가장자리 선의 두께.",0],
  ["secFoam","테두리 색","frc",0,1,0.05,0.25,"%","0 = 옅은 물빛, 1 = 로코로코처럼 진한 선.",0],
- ["secSurf","모래톱 높이","bar",0,0.9,0.05,0.6,"%","바다 쪽 비스듬한 모래톱의 높이(물 깊이 대비). 높을수록 파도가 갑자기 얕아져 앞이 세게 서고 크게 말립니다. 0이면 모래톱 없음. 바꾸면 다시 만듭니다.",2],
+ ["secSurf","모래톱 높이","bar",0,0.9,0.05,0.6,"배","바다 쪽 비스듬한 모래톱의 높이(물 깊이 대비). 높을수록 파도가 갑자기 얕아져 앞이 세게 서고 크게 말립니다. 0이면 모래톱 없음. 바꾸면 다시 만듭니다.",2],
  ["secSurf","모래톱 위치","barX",0.1,0.6,0.01,0.3,"","파도가 말리는 곳 (수조 길이 비율).",2],
  ["secSurf","모래톱 기울기","barAng",-40,40,1,20,"°","모래톱이 비스듬할수록 파도가 한쪽 끝부터 옆으로 까지듯 차례로 말립니다. 0이면 한꺼번에, 부호를 바꾸면 반대쪽부터.",2],
  ["secSurf","모래톱 폭","barW",3,20,0.5,8,"칸","모래톱 둔덕의 폭. 좁으면 갑자기 서서 세게 말리고, 넓으면 부드럽게.",2],
@@ -396,7 +404,10 @@ if(!S.shape||!S.shape.A) S.shape=clone(SHAPE0); if(!S.curves) S.curves={}; for(c
 const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(_){} };
 const fmt=(c,v)=>{ const d=c[5]<0.1?2:c[5]<1?1:0; return (+v).toFixed(d)+(c[7]?(c[7]==="%"?"":" ")+c[7]:""); };
 const inputs={}; let rebuildT=0;
-for(const c of CTL){ const box=$(c[0]); const d=document.createElement("div"); d.className="ctl";
+/* 간결한 메뉴: 지금 보이는 손잡이 (나머지는 숨긴 칸에서 지금 값 그대로) */
+const SHOW={amp:"nWave",per:"nWave",spd:"nWave", bar:"nCurl",barAng:"nCurl",barrel:"nCurl",lipLen:"nCurl",lipCurl:"nCurl",lipTh:"nCurl",lipT:"nCurl", level:"nTank",beach:"nTank",hidez:"nTank"};
+const ORDER=Object.keys(SHOW); CTL.sort((a,b)=>(ORDER.indexOf(a[2])+1||999)-(ORDER.indexOf(b[2])+1||999));
+for(const c of CTL){ const box=$(SHOW[c[2]]||c[0]); const d=document.createElement("div"); d.className="ctl";
   d.innerHTML=`<label for="k_${c[2]}">${c[1]}</label><input id="k_${c[2]}" type="range" min="${c[3]}" max="${c[4]}" step="${c[5]}"><output></output>`+(c[8]?`<div class="desc">${c[8]}</div>`:"");
   box.appendChild(d); const r=d.querySelector("input"), o=d.querySelector("output"); r.value=S[c[2]]; o.textContent=fmt(c,S[c[2]]); inputs[c[2]]=[r,o];
   r.addEventListener("input",()=>{ S[c[2]]=+r.value; o.textContent=fmt(c,S[c[2]]); save(); if(c[9]===2){ clearTimeout(rebuildT); rebuildT=setTimeout(build,350); } }); }
@@ -998,6 +1009,8 @@ function popDraw(){ if(!POP.w) return; if(POP.w.closed){ POP.w=null; popSet(fals
   POP.ctx.drawImage(cv,0,0); }
 
 const rgb=c=>[c[0]/255,c[1]/255,c[2]/255];
+/* 다른 요소(거품·물보라·거품 조각·백사장 하얘짐·혀 끝 흰색): 지금은 꺼 둠 — 파도 모양만 */
+const FX=false;
 let last=performance.now(), fps=0, fpsT=0, frames=0, simMs=0;
 /* ── 숨기는 구간 ── */
 const hideX=()=>(S.hidez||0)*(WV?WV.L:0);
@@ -1075,7 +1088,7 @@ function lipUpload(){
       const tx=P[jn]-P[jp], ty=P[jn+1]-P[jp+1], zx=P[ka]-P[kb], zy=P[ka+1]-P[kb+1], zz=(k<NZ-1?dx:0)+(k>0?dx:0);
       let nx=-(ty*zz), ny=tx*zz, nz=-(tx*zy-ty*zx); const l=Math.hypot(nx,ny,nz)||1;   /* 바깥(위·앞)을 향하게: 바깥은 밝고, 터널 안쪽은 그늘 */
       d[o]=P[j]; d[o+1]=P[j+1]; d[o+2]=z; d[o+3]=nx/l; d[o+4]=ny/l; d[o+5]=nz/l;
-      d[o+6]=on; d[o+7]=Math.min(1,Math.max(0,(u-0.55)*2.4*gq)+cl*0.6*u); d[o+8]=P[j]; d[o+9]=z;
+      d[o+6]=on; d[o+7]=FX?Math.min(1,Math.max(0,(u-0.55)*2.4*gq)+cl*0.6*u):0; d[o+8]=P[j]; d[o+9]=z;
       /* 안쪽 면: 바깥에서 두께만큼 안으로 (끝으로 갈수록 얇게), 끝에서 바깥면과 만나 닫힌다 */
       const oi=(k*M2+(M2-1-m))*10, t=th*(1-0.85*u);
       d[oi]=P[j]-nx/l*t; d[oi+1]=P[j+1]-ny/l*t; d[oi+2]=z; d[oi+3]=-nx/l; d[oi+4]=-ny/l; d[oi+5]=-nz/l;
@@ -1113,7 +1126,7 @@ function frame(now){
   requestAnimationFrame(frame);
   const dt=Math.min(0.05,(now-last)/1000); last=now; frames++; fpsT+=dt; if(fpsT>0.5){ fps=frames/fpsT; frames=0; fpsT=0; }
   if(!W) return;
-  const t0=performance.now(); if(!paused || stepOnce){ const sdt=(stepOnce?1/60:dt)*S.spd*(slow?0.25:1); W.advance(sdt); viewSync(WV,W); blobsUpdate(sdt); blobsField(); lipUpdate(sdt); sprUpdate(sdt); stepOnce=false; } simMs=simMs*0.9+(performance.now()-t0)*0.1;
+  const t0=performance.now(); if(!paused || stepOnce){ const sdt=(stepOnce?1/60:dt)*S.spd*(slow?0.25:1); W.advance(sdt); viewSync(WV,W); if(FX){ blobsUpdate(sdt); blobsField(); } else if(G.cf) G.cf.fill(0); lipUpdate(sdt); if(FX) sprUpdate(sdt); stepOnce=false; } simMs=simMs*0.9+(performance.now()-t0)*0.1;
   meshUpdate(dt);
   const popOn=POP.w&&!POP.w.closed, r=popOn?{width:POP.w.innerWidth,height:POP.w.innerHeight}:stage.getBoundingClientRect(), w=Math.max(80,Math.round(r.width/S.px)), h=Math.max(50,Math.round(r.height/S.px));
   if(cv.width!==w||cv.height!==h){ cv.width=w; cv.height=h; } targets(w,h);
@@ -1126,7 +1139,7 @@ function frame(now){
     for(let i=0;i<4;i++) if(u["uC"+i]) gl.uniform3fv(u["uC"+i],rgb(C[i])); if(u.uLine) gl.uniform3fv(u.uLine,lineC);
     if(u.uHz) gl.uniform3fv(u.uHz,rgb(K.hz)); if(u.uZn) gl.uniform3fv(u.uZn,rgb(K.zn)); if(u.uCw) gl.uniform3fv(u.uCw,rgb(K.cw)); if(u.uCs) gl.uniform3fv(u.uCs,rgb(K.cs));
     if(u.uFoamP) gl.uniform4f(u.uFoamP,0.62-0.5*S.fsz,0.02+0.07*S.frim,S.flace,1/(1.5+5*S.flsz));
-    if(u.uFoamQ) gl.uniform4f(u.uFoamQ,S.frc,S.spd,S.shal,S.sandc); if(u.uTank) gl.uniform4f(u.uTank,L,Wd,D,h/(2*Math.tan(0.31))); if(u.uSurf) gl.uniform4f(u.uSurf,hideX(),L*S.bw0,L*S.bwg,S.bwhite); if(u.uSurf2) gl.uniform4f(u.uSurf2,S.btr,WV.xb,L,0); if(u.uFoamR) gl.uniform2f(u.uFoamR,7.0-6.2*S.fwig,Math.min(1,S.fwig*3)); if(u.uFoamS) gl.uniform2f(u.uFoamS,S.fsurge,S.fswirl); if(u.uFoamEdge) gl.uniform1f(u.uFoamEdge,S.fedge); if(u.uRev) gl.uniform3f(u.uRev,S.rev,0,S.revc); if(u.uRev2) gl.uniform4f(u.uRev2,S.revhue,S.revsat,S.revbri,S.revop); if(u.uRev3) gl.uniform2f(u.uRev3,S.revsoft,S.revdir<0?-1:1); if(u.uFoamE) gl.uniform4f(u.uFoamE,S.fgrad,S.fhole,S.fsea,S.fdir<0?-1:1);
+    if(u.uFoamQ) gl.uniform4f(u.uFoamQ,S.frc,S.spd,S.shal,S.sandc); if(u.uTank) gl.uniform4f(u.uTank,L,Wd,D,h/(2*Math.tan(0.31))); if(u.uSurf) gl.uniform4f(u.uSurf,hideX(),L*S.bw0,L*S.bwg,FX?S.bwhite:0); if(u.uSurf2) gl.uniform4f(u.uSurf2,FX?S.btr:0,WV.xb,L,0); if(u.uFoamR) gl.uniform2f(u.uFoamR,7.0-6.2*S.fwig,Math.min(1,S.fwig*3)); if(u.uFoamS) gl.uniform2f(u.uFoamS,S.fsurge,S.fswirl); if(u.uFoamEdge) gl.uniform1f(u.uFoamEdge,FX?S.fedge:0); if(u.uRev) gl.uniform3f(u.uRev,S.rev,0,S.revc); if(u.uRev2) gl.uniform4f(u.uRev2,S.revhue,S.revsat,S.revbri,S.revop); if(u.uRev3) gl.uniform2f(u.uRev3,S.revsoft,S.revdir<0?-1:1); if(u.uFoamE) gl.uniform4f(u.uFoamE,S.fgrad,S.fhole,FX?S.fsea:0,S.fdir<0?-1:1);
     if(u.uFoam){ gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,G.ftex); gl.uniform1i(u.uFoam,0); } };
   gl.bindFramebuffer(gl.FRAMEBUFFER,T.fb); gl.viewport(0,0,w,h);
   gl.clearBufferfv(gl.COLOR,0,[1,1,1,1]); gl.clearBufferfv(gl.COLOR,1,[0,0,0,0]); gl.clear(gl.DEPTH_BUFFER_BIT);
@@ -1136,10 +1149,10 @@ function frame(now){
   setU(PR.body); gl.bindVertexArray(G.bvao); gl.drawArrays(gl.TRIANGLE_STRIP,0,G.NX*2); gl.drawArrays(gl.TRIANGLE_STRIP,G.NX*2,G.NX*2); gl.drawArrays(gl.TRIANGLE_STRIP,G.NX*4,G.NZ*2);
   setU(PR.water); gl.bindVertexArray(G.vao); gl.drawElements(gl.TRIANGLES,G.nIdx,gl.UNSIGNED_INT,0);
   if(G.lipVao){ lipUpload(); setU(PR.lip); gl.bindVertexArray(G.lipVao); gl.drawElements(gl.TRIANGLES,G.lipN,gl.UNSIGNED_INT,0); }   /* 말리는 혀 */
-  if(S.rev>0){ setU(PR.foam2); gl.bindVertexArray(G.fvao); gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(2,2); gl.drawElements(gl.TRIANGLES,G.nIdx,gl.UNSIGNED_INT,0); gl.disable(gl.POLYGON_OFFSET_FILL); }   /* 그림자 거품 층을 먼저, 조금 뒤로 */
-  setU(PR.foam); gl.bindVertexArray(G.fvao); gl.drawElements(gl.TRIANGLES,G.nIdx,gl.UNSIGNED_INT,0);
-  setU(PR.blob); blobsDraw();
-  if(SPR.n>0){ setU(PR.spr); gl.bindVertexArray(G.sprVao); gl.bindBuffer(gl.ARRAY_BUFFER,G.sprVb); gl.bufferSubData(gl.ARRAY_BUFFER,0,SPR.g,0,SPR.n*5); gl.drawArrays(gl.POINTS,0,SPR.n); }   /* 물보라 */
+  if(FX && S.rev>0){ setU(PR.foam2); gl.bindVertexArray(G.fvao); gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(2,2); gl.drawElements(gl.TRIANGLES,G.nIdx,gl.UNSIGNED_INT,0); gl.disable(gl.POLYGON_OFFSET_FILL); }   /* 그림자 거품 층을 먼저, 조금 뒤로 */
+  if(FX){ setU(PR.foam); gl.bindVertexArray(G.fvao); gl.drawElements(gl.TRIANGLES,G.nIdx,gl.UNSIGNED_INT,0);
+  setU(PR.blob); blobsDraw(); }
+  if(FX && SPR.n>0){ setU(PR.spr); gl.bindVertexArray(G.sprVao); gl.bindBuffer(gl.ARRAY_BUFFER,G.sprVb); gl.bufferSubData(gl.ARRAY_BUFFER,0,SPR.g,0,SPR.n*5); gl.drawArrays(gl.POINTS,0,SPR.n); }   /* 물보라 */
   setU(PR.line); gl.bindVertexArray(G.lvao); gl.drawArrays(gl.LINES,0,G.ln);
   gl.bindVertexArray(null); gl.bindFramebuffer(gl.FRAMEBUFFER,null); gl.viewport(0,0,w,h); gl.disable(gl.DEPTH_TEST);
   const E=PR.edge; gl.useProgram(E.p);
