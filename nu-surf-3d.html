@@ -353,12 +353,15 @@ const CTL=[
  ["secSurf","말려 나가는 속도","peel",2,30,0.5,10,"칸/초","말림이 옆으로 번져 가는 빠르기. 느리면 긴 터널이 천천히 까지고, 빠르면 한꺼번에 무너집니다.",0],
  ["secSurf","말림 시작 기준","lipThr",0.1,0.9,0.05,0.35,"","파도가 얼마나 부서지기 시작해야 혀가 생기는지. 낮추면 더 일찍·자주 말립니다.",0],
  ["secJF","밝은 물빛 조각","wpat",0,1,0.05,0.6,"%","빛 받는 물 위에 흐르는 밝은 아쿠아 조각의 양 (비탈에서는 비탈 따라 길쭉하게). 0이면 끄기.",0],
+ ["secJF","조각 흐름","wpflow",0,3,0.05,1,"배","밝은 조각이 물 흐름에 실려 가는 정도. 0이면 제자리.",0],
  ["secJF","조각 크기","wpsz",0.4,2.5,0.05,1,"배","값이 클수록 잘게.",0],
  ["secJF","방울·반짝이","deco",0,2,0.05,1,"배","거품에서 떠오르는 비눗방울과 반짝이 별의 양. 0이면 끄기.",0],
  ["secJF","거품 양","jfN",0,3,0.05,1,"배","말리는 마루 꼭대기와 부서지는 앞머리에서 생기는 흰 거품의 양.",0],
  ["secJF","젤리 정도","jfJel",0,2,0.05,1,"배","거품 알갱이끼리 당기는 힘. 높일수록 한 덩어리로 뭉쳐 말랑하게 움직이고, 낮추면 잘게 흩어집니다.",0],
  ["secJF","출렁임","jfWob",0,1,0.05,0.6,"%","덩어리가 탱글탱글 출렁이는 정도. 낮추면 끈적하게 천천히 움직입니다.",0],
- ["secJF","거품 크기","jfR",0.4,2.5,0.05,1,"배","",0],
+ ["secJF","거품 알갱이 크기","jfR",0.5,1.5,0.05,1,"배","거품을 이루는 알갱이 하나의 크기. 0.5면 지금의 절반 — 더 잘고 섬세한 거품.",0],
+ ["secJF","거품 솟구침","jfUp",0,3,0.05,1,"배","파도가 칠 때 거품이 위로 치솟는 힘과, 달리는 앞머리에서 튀어 오르는 횟수.",0],
+ ["secJF","거품 중력","jfG",0.2,3,0.05,1,"배","공중에 뜬 거품·물방울이 떨어지는 빠르기. 낮추면 오래 떠 있다가 천천히 내려앉습니다.",0],
  ["secJF","해변에서 퍼짐","jfSpr",0,1,0.05,0.7,"%","얕은 물·백사장에 올라가면 덩어리가 풀려 넓게 퍼지는 정도.",0],
  ["secJF","사라지는 시간","jfLife",0,1,0.05,0.5,"%","물 위에 남아 있는 시간. 물이 빠진 모래 위에서는 이보다 빨리 스며듭니다.",0],
  ["secSpr","물보라 양","sprN",0,4,0.05,1,"배","혀가 수면을 칠 때와 무너지며 밀려가는 앞머리에서 튀는 물보라의 양.",0],
@@ -422,7 +425,7 @@ const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(_){} }
 const fmt=(c,v)=>{ const d=c[5]<0.1?2:c[5]<1?1:0; return (+v).toFixed(d)+(c[7]?(c[7]==="%"?"":" ")+c[7]:""); };
 const inputs={}; let rebuildT=0;
 /* 간결한 메뉴: 지금 보이는 손잡이 (나머지는 숨긴 칸에서 지금 값 그대로) */
-const SHOW={amp:"nWave",per:"nWave",spd:"nWave", bar:"nCurl",barAng:"nCurl",barrel:"nCurl",lipLen:"nCurl",lipCurl:"nCurl",lipTh:"nCurl",lipT:"nCurl",peel:"nCurl", jfN:"nSpr",jfJel:"nSpr",jfWob:"nSpr",jfR:"nSpr",jfSpr:"nSpr",jfLife:"nSpr", wpat:"nLook",wpsz:"nLook",deco:"nLook", level:"nTank",beach:"nTank",hidez:"nTank"};
+const SHOW={amp:"nWave",per:"nWave",spd:"nWave", bar:"nCurl",barAng:"nCurl",barrel:"nCurl",lipLen:"nCurl",lipCurl:"nCurl",lipTh:"nCurl",lipT:"nCurl",peel:"nCurl", jfN:"nSpr",jfJel:"nSpr",jfWob:"nSpr",jfR:"nSpr",jfUp:"nSpr",jfG:"nSpr",jfSpr:"nSpr",jfLife:"nSpr", wpat:"nLook",wpflow:"nLook",wpsz:"nLook",deco:"nLook", level:"nTank",beach:"nTank",hidez:"nTank"};
 const ORDER=Object.keys(SHOW); CTL.sort((a,b)=>(ORDER.indexOf(a[2])+1||999)-(ORDER.indexOf(b[2])+1||999));
 for(const c of CTL){ const box=$(SHOW[c[2]]||c[0]); const d=document.createElement("div"); d.className="ctl";
   d.innerHTML=`<label for="k_${c[2]}">${c[1]}</label><input id="k_${c[2]}" type="range" min="${c[3]}" max="${c[4]}" step="${c[5]}"><output></output>`+(c[8]?`<div class="desc">${c[8]}</div>`:"");
@@ -530,7 +533,7 @@ if(!gl){ $("msg").textContent="이 브라우저는 WebGL2를 지원하지 않아
 const COMMON=`#version 300 es
 precision highp float;
 uniform mat4 uVP; uniform vec3 uEye; uniform float uTime;
-uniform vec3 uC0,uC1,uC2,uC3,uLine,uHz,uZn,uCw,uCs; uniform vec2 uWP;
+uniform vec3 uC0,uC1,uC2,uC3,uLine,uHz,uZn,uCw,uCs; uniform vec2 uWP; uniform sampler2D uFlow; uniform float uFlowW;
 uniform vec4 uFoamP;   /* 덩어리 문턱, 테두리 두께, 무늬 양, 무늬 크기(방울 수/칸) */
 uniform vec4 uFoamQ;   /* 테두리 색, 빠르기 배, 얕은 물빛, 모래 색 */
 uniform vec4 uTank;    /* 길이, 폭, 물 깊이, - */
@@ -579,6 +582,7 @@ vec2 foamWarp(vec2 q, vec2 v, float sg){
   float tongue=uFoamS.x*6.0*(0.15+1.4*W.x*W.x);
   return q-dir*tongue+W.yz*uFoamS.y*9.0*sg;
 }
+float wpat(vec2 q){ q=mat2(0.87,0.5,-0.5,0.87)*q; return vn2(q)*0.55+vn2(mat2(0.6,-0.8,0.8,0.6)*q*1.9+vec2(3.1,7.7))*0.3+vn2(q*4.1+1.7)*0.15; }
 vec4 foamAt(vec2 xz){ vec4 t=texture(uFoam, xz/uTank.xy); return vec4(t.r, t.g, (t.b-0.5)*12.5, (t.a-0.5)*12.5); }
 `;
 const VS_WATER=COMMON+`
@@ -598,8 +602,10 @@ void main(){
   float shd=ndl+(nz-0.5)*0.42, low=uTank.z-vP.y;
   bool dark=shd<0.32 || (low>0.45+(nz-0.5)*0.9 && n.y>0.25);
   vec3 col=uC0; if(dark) col=uC1; if(shd<0.02) col=mix(uC1,uC3,0.35);
-  if(!dark && uWP.x>0.0){ float slope=1.0-n.y; vec2 q=(slope>0.12?vQ*vec2(0.08,0.55):vQ*vec2(0.13,0.2))*uWP.y+vec2(-uTime*0.18,uTime*0.03);   /* 비탈에서는 비탈 따라 길쭉하게 */
-    q=mat2(0.87,0.5,-0.5,0.87)*q; float pn=vn2(q)*0.55+vn2(mat2(0.6,-0.8,0.8,0.6)*q*1.9+vec2(3.1,7.7))*0.3+vn2(q*4.1+1.7)*0.15; if(pn>0.70-0.15*uWP.x) col=uC2; }
+  if(!dark && uWP.x>0.0){ /* 밝은 조각은 물의 실제 흐름에 실려 간다 (두 겹을 번갈아 섞어 늘어짐 없이) */
+    vec4 fl=texture(uFlow, vQ/uTank.xy); float slope=1.0-n.y; vec2 an=slope>0.12?vec2(0.08,0.55):vec2(0.13,0.2);   /* 비탈에서는 비탈 따라 길쭉하게 */
+    float pA=wpat(((vQ+fl.xy)*an)*uWP.y), pB=wpat(((vQ+fl.zw)*an)*uWP.y+vec2(17.3,5.1)), pn=mix(pB,pA,uFlowW);
+    if(pn>0.70-0.15*uWP.x) col=uC2; }
   if(sp>0.986 && n.y>0.6) col=uC2;   /* 반짝임은 위를 향한 면에만 (쏟아지는 혀 앞면이 하얗게 번지지 않게) */
   if(vH.y<-0.12){ float ts=-vH.y; col=ts>0.7?mix(uC1,uC3,0.38):ts>0.4?mix(uC1,uC3,0.18):mix(uC1,uC0,0.35); }   /* 파도 안쪽(터널) 그늘: 깊을수록 한 단계씩 어둡게 */   /* 말린 혀 아래 터널 안쪽 벽은 그늘 */
   /* 바다 전체 거품: 물결 따라 흐르는 옅은 줄무늬 (부드럽게, 위를 향한 면에만) */
@@ -732,14 +738,28 @@ const FS_JF=`#version 300 es
 precision highp float; in float vL; out vec4 oC;
 void main(){ vec2 d=gl_PointCoord*2.0-1.0; float r=dot(d,d); float a=abs(vL); if(r>1.0||a<=0.0) discard; float f=(1.0-r);
   float g=vL<0.0?max(0.0,1.0-sqrt(r)/0.42):0.0;   /* 구멍 알갱이: 가운데 작은 동그라미만 '구멍 밭'에 */
-  oC=vec4(f*f*0.8*a, g*g*1.6*a, 0.0, 1.0); }`;
+  oC=vec4(f*f*0.35*a, 0.0, 0.0, 1.0); }`;
+/* 탱글한 물방울 (핏방울에서 정한 대로): 늘 내 쪽을 향한 2D 모양. 날아가는 방향으로 늘어나고, 떨어지면 납작해졌다 출렁이며 돌아온다.
+   알갱이마다 '방울 밭'(B 채널)에 값을 더해 가까운 방울끼리 붙었다 떨어진다 */
+const VS_DRP=COMMON+`
+layout(location=0) in vec4 aF; layout(location=1) in float aL; layout(location=2) in vec3 aV; layout(location=3) in vec2 aJ;
+out float vL; out vec2 vDir; out vec2 vJ; out float vM;
+void main(){ vec3 p=aF.xyz-vec3(uTank.x*0.5,0.0,uTank.y*0.5); vec3 te=normalize(uEye-p); p+=te*0.3*aF.w;
+  vec4 c0=uVP*vec4(p,1.0), c1=uVP*vec4(p+aV*0.05,1.0); vec2 sd=c1.xy/c1.w-c0.xy/c0.w; float l=length(sd); vDir=l>1e-5?sd/l:vec2(0.0,1.0);
+  float st=aJ.x, sx=1.0+max(st,-0.6), sy=1.0/(1.0+0.6*st); vM=max(sx,sy); vJ=vec2(sx,sy)/vM;
+  vL=aF.x<uSurf.x?0.0:aL; gl_Position=c0; gl_PointSize=max(2.0, aF.w*2.2*vM*uTank.w/max(c0.w,0.1)); vM=aJ.y; }`;
+const FS_DRP=`#version 300 es
+precision highp float; in float vL; in vec2 vDir; in vec2 vJ; in float vM; out vec4 oC;
+void main(){ vec2 d=gl_PointCoord*2.0-1.0; d.y=-d.y; float al=dot(d,vDir), pe=dot(d,vec2(-vDir.y,vDir.x));
+  float th=atan(pe,al), e=(al*al)/(vJ.x*vJ.x)+(pe*pe)/(vJ.y*vJ.y); e*=1.0+0.07*sin(3.0*th+vM)+0.04*sin(2.0*th-vM*1.3);   /* 탱글한 출렁임 */
+  if(e>1.0||vL<=0.0) discard; float f=1.0-e; oC=vec4(0.0,0.0,f*f*0.38*vL,1.0); }`;
 /* 장식: 비눗방울 고리 · 네 갈래 반짝이 (윤성 그림) */
 const VS_DEC=COMMON+`
-layout(location=0) in vec4 aF; layout(location=1) in float aL; out float vL;
-void main(){ vec3 p=aF.xyz-vec3(uTank.x*0.5,0.0,uTank.y*0.5); vL=aF.x<uSurf.x?0.0:aL; gl_Position=uVP*vec4(p,1.0); gl_PointSize=max(3.0, aF.w*2.0*uTank.w/max(gl_Position.w,0.1)); }`;
+layout(location=0) in vec4 aF; layout(location=1) in float aL; out float vL; out float vPh;
+void main(){ vec3 p=aF.xyz-vec3(uTank.x*0.5,0.0,uTank.y*0.5); vL=aF.x<uSurf.x?0.0:aL; vPh=fract(sin(dot(aF.xz,vec2(12.9898,78.233)))*43758.5)*6.28; gl_Position=uVP*vec4(p,1.0); gl_PointSize=max(3.0, aF.w*2.3*uTank.w/max(gl_Position.w,0.1)); }`;
 const FS_DEC=COMMON+`
-in float vL; layout(location=0) out vec4 oC; layout(location=1) out vec4 oId;
-void main(){ vec2 d=gl_PointCoord*2.0-1.0; d.y=-d.y; float r=length(d); if(r>1.0||vL==0.0) discard; vec3 col;
+in float vL; in float vPh; layout(location=0) out vec4 oC; layout(location=1) out vec4 oId;
+void main(){ vec2 d=gl_PointCoord*2.0-1.0; d.y=-d.y; float a0=atan(d.y,d.x); float r=length(d)*1.12*(1.0+(vL>0.0?0.06*sin(2.0*a0+uTime*5.0+vPh)+0.03*sin(3.0*a0-uTime*4.0+vPh):0.0)); if(r>1.0||vL==0.0) discard; vec3 col;   /* 비눗방울도 말랑하게 출렁인다 */
   if(vL>0.0){ vec2 hp=d-vec2(-0.38,0.38);
     if(r>0.84) col=vec3(0.43,0.75,0.95); else if(r>0.70) col=vec3(0.93,0.97,1.0); else if(length(hp)<0.2) col=vec3(1.0); else discard; }   /* 비눗방울: 고리 + 하이라이트 */
   else { vec2 a=abs(d); float w=0.16*(1.0-max(a.x,a.y)); if(!(a.x<w || a.y<w) || r>0.95) discard; col=vec3(1.0); }   /* 네 갈래 반짝이 */
@@ -840,21 +860,32 @@ void main(){
   /* 젤리 거품 덩어리: 흰 몸통 · 아래쪽 옅은 물빛 그늘 · 가장자리 옅은 띠 · 바깥 선 */
   if(uFC.z>0.5){ float f=texture(uFF,vU).r, th=uFC.x;
     if(f>=th){ vec4 F=texture(uFF,vU); float fu=texture(uFF,vU+vec2(0.0,uPx.y*4.0)).r, fd=texture(uFF,vU-vec2(0.0,uPx.y*4.0)).r;
-      vec3 fc=vec3(0.99); if(f<th+0.06) fc=vec3(0.894,0.94,0.988); else if(fu-fd>0.05) fc=vec3(0.80,0.894,0.988);   /* 윤성 그림: 흰 몸통 · 아래쪽 옅은 하늘빛 그늘 */
-      bool ol=false, hole=F.g>0.5 && f>th+0.3, hol=false; float w=uFC.y;
-      for(int k=0;k<8;k++){ float a=float(k)*0.785398; vec2 o=vec2(cos(a),sin(a))*uPx*w; vec4 Q=texture(uFF,vU+o); if(Q.r<th) ol=true; if(hole && !(Q.g>0.5 && Q.r>th+0.3)) hol=true; }
-      c.rgb=ol?uFL:fc; if(hole) c.rgb=hol?uFL:uFH; } }   /* 덩어리 속 물빛 구멍 (레이스) */
+      vec3 fc=vec3(0.99); if(f<th+0.025) fc=vec3(0.894,0.94,0.988); else if(fu-fd>0.025) fc=vec3(0.80,0.894,0.988);   /* 윤성 그림: 흰 몸통 · 아래쪽 옅은 하늘빛 그늘 */
+      /* 덩어리 속 구멍: 둘레는 거품이 빽빽한데 이 자리만 알갱이가 성긴 곳 → 거품과 함께 흐르며 모양이 제각각 */
+      float avg=0.0; for(int k=0;k<8;k++){ float a=float(k)*0.785398+0.39; avg+=texture(uFF,vU+vec2(cos(a),sin(a))*uPx*9.0).r; } avg/=8.0;
+      float hth=th+0.06+0.25*(avg-th-0.2); bool hole=avg>th+0.2 && f<hth, ol=false, hol=false; float w=uFC.y;
+      for(int k=0;k<8;k++){ float a=float(k)*0.785398; vec2 o=vec2(cos(a),sin(a))*uPx*w; float q=texture(uFF,vU+o).r; if(q<th) ol=true; if(hole && q>=hth) hol=true; }
+      c.rgb=ol?uFL:fc; if(hole) c.rgb=hol?uFL:uFH; }
+    /* 탱글한 물방울: 몸통 · 형태 따라 생기는 그늘(테두리까지 채우지 않음 = 반사광) · 형태 따라 생기는 하이라이트 · 하늘색 선 */
+    float bd=texture(uFF,vU).b;
+    if(bd>=th){ vec2 o2=uPx*2.5; float gx=texture(uFF,vU+vec2(o2.x,0.0)).b-texture(uFF,vU-vec2(o2.x,0.0)).b, gy=texture(uFF,vU+vec2(0.0,o2.y)).b-texture(uFF,vU-vec2(0.0,o2.y)).b;
+      vec2 nn=-vec2(gx,gy); float gl=length(nn); nn=gl>1e-4?nn/gl:vec2(0.0); float lt=dot(nn,normalize(vec2(-0.6,0.8)));
+      vec3 dc=vec3(0.90,0.96,1.0);
+      if(lt<-0.2 && bd>th+0.03 && bd<th+0.2) dc=vec3(0.76,0.88,0.98);   /* 아래쪽 그늘: 가장자리에서 한 줄 떨어져 */
+      if(lt>0.45 && bd>th+0.015 && bd<th+0.08) dc=vec3(1.0);   /* 위쪽 하이라이트: 형태를 따라 휜 초승달 */
+      bool ol2=false; for(int k=0;k<8;k++){ float a=float(k)*0.785398; if(texture(uFF,vU+vec2(cos(a),sin(a))*uPx*uFC.y).b<th) ol2=true; }
+      c.rgb=ol2?uFL:dc; } }
   oC=vec4(c.rgb,1.0); }`;
 function sh(type,src){ const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s); if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)+"\n"+src.split("\n").slice(0,3).join(" ")); return s; }
 function prog(vs,fs){ const p=gl.createProgram(); gl.attachShader(p,sh(gl.VERTEX_SHADER,vs)); gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs)); gl.linkProgram(p); if(!gl.getProgramParameter(p,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p)); const u={}; const n=gl.getProgramParameter(p,gl.ACTIVE_UNIFORMS); for(let i=0;i<n;i++){ const a=gl.getActiveUniform(p,i); u[a.name]=gl.getUniformLocation(p,a.name); } return {p,u}; }
 let PR={};
-try{ PR.water=prog(VS_WATER,FS_WATER); PR.lip=prog(VS_WATER,FS_LIP); PR.spr=prog(VS_SPR,FS_SPR); PR.foam=prog(VS_WATER,FS_FOAM); PR.foam2=prog(VS_WATER,FS_FOAM2); PR.blob=prog(VS_BLOB,FS_BLOB); PR.body=prog(VS_BODY,FS_BODY); PR.sand=prog(VS_SAND,FS_SAND); PR.line=prog(VS_LINE,FS_LINE); PR.sky=prog(VS_Q,FS_SKY); PR.jf=prog(VS_JF,FS_JF); PR.dec=prog(VS_DEC,FS_DEC); PR.edge=prog(VS_Q,FS_EDGE); }
+try{ PR.water=prog(VS_WATER,FS_WATER); PR.lip=prog(VS_WATER,FS_LIP); PR.spr=prog(VS_SPR,FS_SPR); PR.foam=prog(VS_WATER,FS_FOAM); PR.foam2=prog(VS_WATER,FS_FOAM2); PR.blob=prog(VS_BLOB,FS_BLOB); PR.body=prog(VS_BODY,FS_BODY); PR.sand=prog(VS_SAND,FS_SAND); PR.line=prog(VS_LINE,FS_LINE); PR.sky=prog(VS_Q,FS_SKY); PR.jf=prog(VS_JF,FS_JF); PR.dec=prog(VS_DEC,FS_DEC); PR.drp=prog(VS_DRP,FS_DRP); PR.edge=prog(VS_Q,FS_EDGE); }
 catch(e){ $("msg").textContent="그리기 준비 중 문제: "+e.message.slice(0,300); console.error(e); return; }
 
 /* 물 표면 그물: 칸 가운데마다 꼭짓점 하나. 위치·방향·깊이·부서짐을 프레임마다 새로 올린다 */
 let G={};
 function build(seed){
-  const P=S; W=makeWave(Object.assign({},P),seed); W.P=S; WV=makeView(W); G.sm=null; BL.n=0; JF.n=0; DEC.n=0; BL.cool=null; if(BL.al) BL.al.fill(0); $("bWave").setAttribute("aria-pressed","true");
+  const P=S; W=makeWave(Object.assign({},P),seed); W.P=S; WV=makeView(W); G.sm=null; BL.n=0; JF.n=0; DEC.n=0; DRP.n=0; BL.cool=null; if(BL.al) BL.al.fill(0); $("bWave").setAttribute("aria-pressed","true");
   const {NX,NZ}=WV; G.NX=NX; G.NZ=NZ;
   for(const k of ["vao","vb","ib","fvao","fvb","bvao","bvb","svao","svb","lvao","lvb"]) if(G[k]){ if(k.endsWith("vao")) gl.deleteVertexArray(G[k]); else gl.deleteBuffer(G[k]); }
   /* 화면용 그물은 계산 격자보다 촘촘하게: 앞뒤 칸 +RXE, 옆 줄 2배 (쏟아지는 곡선을 정교하게) */
@@ -1362,38 +1393,43 @@ function jfUpdate(dt){
       const r=JF.rr[i], k=r>>1, ph=LIP.ph?LIP.ph[Math.min(NZ-1,k)]:0, A=G.wp;
       JF.cu[i]=Math.min(0.45,JF.cu[i]+dt*slide*0.5*(0.6+0.8*JF.sd[i]));   /* 마루 꼭대기 언저리에 얇은 흰 띠로 머문다 (터널을 가리지 않게) */
       const P=jfMesh(r,JF.cu[i]);
-      if(!P || ph>=1.24 || !(ph>0) || !(A&&A.w[Math.min(NZ-1,k)]>0.15)){ ST[i]=1; const cw=Math.sqrt(g*Math.max(0.3,D*0.6)), hc=Math.max(0.5,LIP.hc[Math.min(NZ-1,k)]); VX[i]=cw*(0.8+0.5*JF.sd[i]); VY[i]=(1.2+3.2*Math.random())*Math.sqrt(hc); VZ[i]=(Math.random()-0.5)*1.2;   /* 혀가 칠 때 위·앞으로 튀어 오르는 손가락 */
-        if(Math.random()<0.3) JF.rad[i]=0.28+0.15*Math.random(); }   /* 일부는 작은 물방울 */
+      if(!P || ph>=1.24 || !(ph>0) || !(A&&A.w[Math.min(NZ-1,k)]>0.15)){ ST[i]=1; const cw=Math.sqrt(g*Math.max(0.3,D*0.6)), hc=Math.max(0.5,LIP.hc[Math.min(NZ-1,k)]); VX[i]=cw*(0.8+0.5*JF.sd[i]); VY[i]=(1.2+3.2*Math.random())*Math.sqrt(hc)*(S.jfUp===undefined?1:S.jfUp); VZ[i]=(Math.random()-0.5)*1.2;   /* 혀가 칠 때 위·앞으로 튀어 오르는 손가락 */
+        if(Math.random()<0.35){ const r2=Math.random(); drpAdd(X[i],Y[i],Z[i],VX[i]*(0.9+0.4*r2),VY[i]*(1.05+0.35*r2),VZ[i]+(Math.random()-0.5)*1.5,(0.16+0.22*Math.random())*S.jfR); } }   /* 일부는 탱글한 물방울로 튀어 나간다 */
       else { VX[i]=(P[0]-X[i])/dt; VY[i]=(P[1]-Y[i])/dt; VZ[i]=0; X[i]=P[0]; Y[i]=P[1]; Z[i]=P[2]; continue; } }
     if(ST[i]===1){ /* 떨어져 날아감 */
-      VY[i]-=g*dt; X[i]+=VX[i]*dt; Y[i]+=VY[i]*dt; Z[i]+=VZ[i]*dt; const sy=hs(X[i],Z[i])+0.1; if(Y[i]<=sy && VY[i]<0){ Y[i]=sy; VY[i]=0; ST[i]=2; if(JF.rad[i]<0.5) LF[i]=0; } continue; }   /* 물방울은 떨어지면 물에 섞인다 */
+      VY[i]-=g*(S.jfG===undefined?1:S.jfG)*dt; X[i]+=VX[i]*dt; Y[i]+=VY[i]*dt; Z[i]+=VZ[i]*dt; const sy=hs(X[i],Z[i])+0.1; if(Y[i]<=sy && VY[i]<0){ Y[i]=sy; VY[i]=0; ST[i]=2; if(JF.rad[i]<0.5) LF[i]=0; } continue; }   /* 물방울은 떨어지면 물에 섞인다 */
     /* 물 위: 물 흐름을 따르되, 부서지는 앞머리에서는 앞머리 빠르기로 같이 달린다 */
     const j=cell(X[i],Z[i]), i0=j%NX, k0=(j/NX)|0, hh=h[j];
     const uw=0.5*(U[k0*(NX+1)+i0]+U[k0*(NX+1)+i0+1]), ww=0.5*(Wv[k0*NX+i0]+Wv[Math.min(NZ,k0+1)*NX+i0]);
     const cw=Math.sqrt(g*Math.max(0.15,hh)), front=Math.min(1,brk[j]*2.5);
-    const tx=hh>0.03?Math.max(uw, front*cw*0.97+(1-front)*uw):VX[i]*0.9, tz=hh>0.03?ww:0;
+    const tx=hh>0.03?Math.max(uw, front*cw*0.97+(1-front)*uw):VX[i]*Math.exp(-dt*3), tz=hh>0.03?ww:VZ[i]*Math.exp(-dt*3);
     const a=Math.min(1,dt*(hh>0.03?3.5:6)); VX[i]+=(tx-VX[i])*a; VZ[i]+=(tz-VZ[i])*a;
-    if(front>0.6 && hh>0.4 && Math.random()<dt*0.35*S.jfN){ ST[i]=1; VY[i]=(1.5+2.5*Math.random())*Math.sqrt(Math.max(0.5,hh)); VX[i]+=0.8; if(Math.random()<0.35) JF.rad[i]=0.3+0.12*Math.random(); continue; }   /* 달리는 앞머리에서 가끔 튀어 오르는 손가락·물방울 */
+    const up=S.jfUp===undefined?1:S.jfUp; if(front>0.6 && hh>0.4 && up>0 && Math.random()<dt*0.35*S.jfN*up){ ST[i]=1; VY[i]=(1.5+2.5*Math.random())*Math.sqrt(Math.max(0.5,hh))*Math.sqrt(up); VX[i]+=0.8; if(Math.random()<0.4){ const r2=Math.random(); drpAdd(X[i],Y[i]+0.2,Z[i],VX[i]*(0.9+0.3*r2),VY[i]*(1.1+0.4*r2),(Math.random()-0.5)*1.5,(0.14+0.2*Math.random())*S.jfR); } continue; }   /* 달리는 앞머리에서 가끔 튀어 오르는 손가락·물방울 */
     const dry=hh<0.03, behind=front<0.12 && hh>0.6 && b[j]<D-0.6;   /* 앞머리에서 떨어져 파도 뒤 깊은 물에 남은 거품 */
     LF[i]-=dt/(dry?(0.6+2.5*S.jfLife):behind?(0.8+2.2*S.jfLife):life);   /* 마루·앞머리에선 하얗게 오래, 뒤로 처지면 스르륵 옅어지며 사라진다 */
   }
   /* ── 알갱이끼리: 뭉침(당김) · 부피(밀어냄) · 출렁임(속도 맞춤이 약할수록 탱글) ── */
   { const Hn=2.6*R0, cs=Hn, gx=Math.ceil(L/cs)+1, gz=Math.ceil(Wd/cs)+1, head=JF.head&&JF.head.length===gx*gz?JF.head:(JF.head=new Int32Array(gx*gz)), nxt=JF.nxt&&JF.nxt.length===JF.max?JF.nxt:(JF.nxt=new Int32Array(JF.max));
     head.fill(-1); for(let i=0;i<n;i++){ if(ST[i]!==2) continue; const ci=Math.min(gx-1,Math.max(0,(X[i]/cs)|0)), ck=Math.min(gz-1,Math.max(0,(Z[i]/cs)|0)), c=ck*gx+ci; nxt[i]=head[c]; head[c]=i; }
-    const visc=0.25+2.5*(1-S.jfWob);
+    /* 안정한 방식: 밀어냄은 자리를 직접 조금씩 떼어 놓고(튀지 않음), 당김은 약한 힘, 출렁임은 이웃 속도 평균 쪽으로 (이웃이 많아도 넘치지 않게) */
+    const visc=0.15+0.85*(1-S.jfWob), CX=JF.cx&&JF.cx.length===JF.max?JF.cx:(JF.cx=new Float32Array(JF.max)), CZ=JF.cz&&JF.cz.length===JF.max?JF.cz:(JF.cz=new Float32Array(JF.max));
     for(let i=0;i<n;i++){ if(ST[i]!==2) continue; const ci=Math.min(gx-1,Math.max(0,(X[i]/cs)|0)), ck=Math.min(gz-1,Math.max(0,(Z[i]/cs)|0));
       const jj=cell(X[i],Z[i]), hh=h[jj], beach=Math.max(0,Math.min(1,(b[jj]-(D-1.2))/1.2)), shallow=Math.max(beach, Math.max(0,Math.min(1,(0.8-hh)/0.8)));
-      const spread=S.jfSpr*shallow, r0=1.55*R0*(1+1.6*spread), coh=4.5*S.jfJel*(1-0.85*spread), rep=14;
-      let ax=0, az=0;
+      const spread=S.jfSpr*shallow, r0=1.55*R0*(1+0.9*spread), coh=4.5*S.jfJel*(1-0.85*spread), hr=Math.max(Hn,r0*1.4);
+      let ax=0, az=0, cx=0, cz=0, vs=0, vz2=0, ws=0;
       for(let dk=-1;dk<=1;dk++){ const kk=ck+dk; if(kk<0||kk>=gz) continue; for(let di=-1;di<=1;di++){ const ii=ci+di; if(ii<0||ii>=gx) continue;
-        for(let q=head[kk*gx+ii];q>=0;q=nxt[q]){ if(q===i) continue; const ex=X[q]-X[i], ez=Z[q]-Z[i], d2=ex*ex+ez*ez; const hr=Math.max(Hn,r0*1.4); if(d2>hr*hr||d2<1e-8) continue;
+        for(let q=head[kk*gx+ii];q>=0;q=nxt[q]){ if(q===i) continue; const ex=X[q]-X[i], ez=Z[q]-Z[i], d2=ex*ex+ez*ez; if(d2>hr*hr||d2<1e-8) continue;
           const d=Math.sqrt(d2), nx=ex/d, nz=ez/d;
-          if(d<r0){ const f=rep*(r0-d)/r0; ax-=nx*f; az-=nz*f; }
+          if(d<r0){ const c=(r0-d)*0.22; cx-=nx*c; cz-=nz*c; }
           else { const t=(d-r0)/(hr-r0), f=coh*t*(1-t)*4; ax+=nx*f; az+=nz*f; }
-          const wv=visc*(1-d/hr); ax+=(VX[q]-VX[i])*wv; az+=(VZ[q]-VZ[i])*wv; } } }
-      VX[i]+=ax*dt; VZ[i]+=az*dt; }
-    for(let i=0;i<n;i++){ if(ST[i]!==2) continue; X[i]+=VX[i]*dt; Z[i]+=VZ[i]*dt; if(Z[i]<0.05){ Z[i]=0.05; VZ[i]=Math.abs(VZ[i])*0.3; } if(Z[i]>Wd-0.05){ Z[i]=Wd-0.05; VZ[i]=-Math.abs(VZ[i])*0.3; }
-      Y[i]=hs(X[i],Z[i])+0.1; } }
+          const w=1-d/hr; vs+=(VX[q]-VX[i])*w; vz2+=(VZ[q]-VZ[i])*w; ws+=w; } } }
+      const am=Math.hypot(ax,az), cap=25; if(am>cap){ ax*=cap/am; az*=cap/am; }
+      const cm=Math.hypot(cx,cz), ccap=0.35*R0; if(cm>ccap){ cx*=ccap/cm; cz*=ccap/cm; }
+      VX[i]+=ax*dt; VZ[i]+=az*dt; if(ws>0){ const k=Math.min(1,visc*dt*8); VX[i]+=vs/ws*k; VZ[i]+=vz2/ws*k; }
+      const damp=Math.exp(-dt*2.5*shallow); VX[i]*=damp; VZ[i]*=damp;   /* 얕은 곳에서는 차분하게 */
+      CX[i]=cx; CZ[i]=cz; }
+    for(let i=0;i<n;i++){ if(ST[i]!==2) continue; X[i]+=VX[i]*dt+CX[i]; Z[i]+=VZ[i]*dt+CZ[i]; if(Z[i]<0.05){ Z[i]=0.05; VZ[i]=Math.abs(VZ[i])*0.3; } if(Z[i]>Wd-0.05){ Z[i]=Wd-0.05; VZ[i]=-Math.abs(VZ[i])*0.3; }
+      const ty=hs(X[i],Z[i])+0.1; Y[i]+=(ty-Y[i])*Math.min(1,dt*10); } }   /* 높이도 부드럽게 따라가 (얕은 물이 출렁여도 덜덜 떨지 않게) */
   /* ── 정리 · 그릴 값 ── */
   let m=0; const hx=hideX();
   for(let i=0;i<n;i++){ if(!(LF[i]>0) || X[i]<0 || X[i]>L || (ST[i]===2 && X[i]<hx-2)) continue;
@@ -1404,10 +1440,45 @@ function jfUpdate(dt){
      그리는 동그라미는 알갱이 간격보다 크게 → 이웃끼리 녹아 붙고, 남은 양이 줄수록 서서히 오므라든다 */
   let gq=0; const G5=JF.g;
   for(let i=0;i<m;i++){ const lf=JF.lf[i], st=JF.st[i], sz=2.3*R0*JF.rad[i]*(0.55+0.45*Math.min(1,lf*3))*(st===0?0.6:1), al=Math.min(1,lf*1.6), hole=st===2 && JF.sd[i]<0.16 && JF.rad[i]>0.6;
-    G5[gq*5]=JF.x[i]; G5[gq*5+1]=JF.y[i]; G5[gq*5+2]=JF.z[i]; G5[gq*5+3]=sz; G5[gq*5+4]=hole?-al:al; gq++;
+    G5[gq*5]=JF.x[i]; G5[gq*5+1]=JF.y[i]; G5[gq*5+2]=JF.z[i]; G5[gq*5+3]=sz; G5[gq*5+4]=al; gq++;
     if(st===1 && JF.rad[i]>0.6){ const sp=Math.hypot(JF.vx[i],JF.vy[i],JF.vz[i]); if(sp>1.5) for(let t=1;t<=3;t++){ const k2=0.045*t;
         G5[gq*5]=JF.x[i]-JF.vx[i]*k2; G5[gq*5+1]=JF.y[i]-JF.vy[i]*k2; G5[gq*5+2]=JF.z[i]-JF.vz[i]*k2; G5[gq*5+3]=sz*(1-0.17*t); G5[gq*5+4]=al; gq++; } } }
   JF.gn=gq;
+}
+/* 물 흐름에 실려 가는 무늬 자리 (흐름 지도): 두 겹을 번갈아 처음 자리로 되돌리며 섞는다 */
+const FLOW={t:0,w:1,tex:null,n:0};
+function flowUpdate(dt){
+  if(!WV) return; const {NX,NZ,dx,u:U,w:Wv}=WV, N=NX*NZ;
+  if(FLOW.n!==N){ FLOW.n=N; FLOW.a=new Float32Array(N*2); FLOW.b=new Float32Array(N*2); FLOW.ta=new Float32Array(N*2); FLOW.buf=new Float32Array(N*4);
+    if(FLOW.tex) gl.deleteTexture(FLOW.tex); FLOW.tex=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,FLOW.tex); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA16F,NX,NZ,0,gl.RGBA,gl.FLOAT,null);
+    for(const k of [gl.TEXTURE_MIN_FILTER,gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D,k,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE); }
+  const P=3.2, t0=FLOW.t; FLOW.t+=dt; const fa0=(t0/P)%1, fa=(FLOW.t/P)%1, fb0=(t0/P+0.5)%1, fb=(FLOW.t/P+0.5)%1;
+  if(fa<fa0) FLOW.a.fill(0); if(fb<fb0) FLOW.b.fill(0); FLOW.w=1-Math.abs(2*fa-1);
+  const sc=S.wpflow===undefined?1:S.wpflow;
+  for(const F of [FLOW.a,FLOW.b]){ const T=FLOW.ta;
+    for(let k=0;k<NZ;k++) for(let i=0;i<NX;i++){ const j=k*NX+i;
+      const vx=0.5*(U[k*(NX+1)+i]+U[k*(NX+1)+i+1])*sc, vz=0.5*(Wv[k*NX+i]+Wv[Math.min(NZ,k+1)*NX+i])*sc;
+      const fx=Math.min(NX-1.001,Math.max(0,i-vx*dt/dx)), fz=Math.min(NZ-1.001,Math.max(0,k-vz*dt/dx)), ii=fx|0, kk=fz|0, tx=fx-ii, tz=fz-kk, o=(kk*NX+ii)*2, o1=o+NX*2;
+      for(let c=0;c<2;c++) T[j*2+c]=(F[o+c]*(1-tx)+F[o+2+c]*tx)*(1-tz)+(F[o1+c]*(1-tx)+F[o1+2+c]*tx)*tz-(c===0?vx:vz)*dt; }
+    F.set(T); }
+  const B=FLOW.buf, A1=FLOW.a, B1=FLOW.b; for(let j=0;j<N;j++){ B[j*4]=A1[j*2]; B[j*4+1]=A1[j*2+1]; B[j*4+2]=B1[j*2]; B[j*4+3]=B1[j*2+1]; }
+  gl.bindTexture(gl.TEXTURE_2D,FLOW.tex); gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,NX,NZ,gl.RGBA,gl.FLOAT,B);
+}
+const DRP={max:1500,n:0,a:new Float32Array(1500*12),g:new Float32Array(1500*10)};
+function drpAdd(x,y,z,vx,vy,vz,sz){ if(DRP.n>=DRP.max) return; const o=DRP.n*12, A=DRP.a; A[o]=x; A[o+1]=y; A[o+2]=z; A[o+3]=vx; A[o+4]=vy; A[o+5]=vz; A[o+6]=0; A[o+7]=0; A[o+8]=Math.random()*6.28; A[o+9]=1; A[o+10]=sz; A[o+11]=0; DRP.n++; }
+function drpUpdate(dt){
+  if(!WV||!G.sm||!G.sm.y) return; const {NX,NZ,dx,L}=WV, g=(WV.g||9.8), sm=G.sm.y, A=DRP.a;
+  const hs=(x,z)=>{ const f=Math.min(NX-1.001,Math.max(0,x/dx-0.5)), i=f|0, t=f-i, fk=Math.min(NZ-1.001,Math.max(0,z/dx-0.5)), k=fk|0, s2=fk-k, j=k*NX+i; return (sm[j]*(1-t)+sm[j+1]*t)*(1-s2)+(sm[j+NX]*(1-t)+sm[j+NX+1]*t)*s2; };
+  let m=0;
+  for(let n=0;n<DRP.n;n++){ const o=n*12; let x=A[o],y=A[o+1],z=A[o+2],vx=A[o+3],vy=A[o+4],vz=A[o+5],s=A[o+6],sv=A[o+7],ph=A[o+8],lf=A[o+9],sz=A[o+10],st=A[o+11];
+    if(st===0){ vy-=g*1.2*(S.jfG===undefined?1:S.jfG)*dt; x+=vx*dt; y+=vy*dt; z+=vz*dt; const sy=hs(x,z)+0.06; if(y<=sy && vy<0){ y=sy; st=1; sv-=5+Math.min(8,-vy*0.8); vx*=0.4; vz*=0.4; vy=0; } }   /* 떨어지면 납작 */
+    else { x+=vx*dt; z+=vz*dt; y=hs(x,z)+0.06; lf-=dt/0.45; }   /* 물에 내려앉아 출렁이다 스며든다 */
+    const sp=Math.hypot(vx,vy,vz), tgt=st===0?Math.min(0.9,sp*0.07):0;   /* 빠를수록 길쭉 */
+    sv+=(150*(tgt-s)-6*sv)*dt; s+=sv*dt; s=Math.max(-0.6,Math.min(1.2,s)); ph+=dt*(10+Math.abs(sv)*2);
+    if(lf<=0||x<0||x>L) continue;
+    const q=m*12; A[q]=x;A[q+1]=y;A[q+2]=z;A[q+3]=vx;A[q+4]=vy;A[q+5]=vz;A[q+6]=s;A[q+7]=sv;A[q+8]=ph;A[q+9]=lf;A[q+10]=sz;A[q+11]=st;
+    const G2=DRP.g, r=m*10; G2[r]=x;G2[r+1]=y;G2[r+2]=z;G2[r+3]=sz*(st===1?Math.max(0.2,lf):1);G2[r+4]=Math.min(1,lf*2);G2[r+5]=vx;G2[r+6]=vy;G2[r+7]=vz;G2[r+8]=s;G2[r+9]=ph; m++; }
+  DRP.n=m;
 }
 const DEC={max:400,n:0,a:new Float32Array(400*9),g:new Float32Array(400*5)};
 function decUpdate(dt){
@@ -1428,7 +1499,7 @@ function frame(now){
   requestAnimationFrame(frame);
   const dt=Math.min(0.05,(now-last)/1000); last=now; frames++; fpsT+=dt; if(fpsT>0.5){ fps=frames/fpsT; frames=0; fpsT=0; if(JF.n>=JF.lim*0.9 && fps<24) JF.lim=Math.max(500,Math.round(JF.lim*0.85)); else if(fps>40) JF.lim=Math.min(JF.max,JF.lim+150); }   /* 느리면 거품 알갱이 수를 스스로 줄인다 */
   if(!W) return;
-  const t0=performance.now(); if(!paused || stepOnce){ const sdt=(stepOnce?1/60:dt)*S.spd*(slow?0.25:1); W.advance(sdt); viewSync(WV,W); if(FX){ blobsUpdate(sdt); blobsField(); } else if(G.cf) G.cf.fill(0); lipUpdate(sdt); if(FX||FXS) sprUpdate(sdt); jfUpdate(sdt); decUpdate(sdt); stepOnce=false; } simMs=simMs*0.9+(performance.now()-t0)*0.1;
+  const t0=performance.now(); if(!paused || stepOnce){ const sdt=(stepOnce?1/60:dt)*S.spd*(slow?0.25:1); W.advance(sdt); viewSync(WV,W); if(FX){ blobsUpdate(sdt); blobsField(); } else if(G.cf) G.cf.fill(0); lipUpdate(sdt); if(FX||FXS) sprUpdate(sdt); jfUpdate(sdt); decUpdate(sdt); drpUpdate(sdt); flowUpdate(sdt); stepOnce=false; } simMs=simMs*0.9+(performance.now()-t0)*0.1;
   meshUpdate(dt);
   const popOn=POP.w&&!POP.w.closed, r=popOn?{width:POP.w.innerWidth,height:POP.w.innerHeight}:stage.getBoundingClientRect(), w=Math.max(80,Math.round(r.width/S.px)), h=Math.max(50,Math.round(r.height/S.px));
   if(cv.width!==w||cv.height!==h){ cv.width=w; cv.height=h; } targets(w,h);
@@ -1447,6 +1518,7 @@ function frame(now){
     if(u.uHz) gl.uniform3fv(u.uHz,rgb(K.hz)); if(u.uZn) gl.uniform3fv(u.uZn,rgb(K.zn)); if(u.uCw) gl.uniform3fv(u.uCw,rgb(K.cw)); if(u.uCs) gl.uniform3fv(u.uCs,rgb(K.cs));
     if(u.uFoamP) gl.uniform4f(u.uFoamP,0.62-0.5*S.fsz,0.02+0.07*S.frim,S.flace,1/(1.5+5*S.flsz));
     if(u.uFoamQ) gl.uniform4f(u.uFoamQ,S.frc,S.spd,S.shal,S.sandc); if(u.uTank) gl.uniform4f(u.uTank,L,Wd,D,h/(2*Math.tan(0.31))); if(u.uSurf) gl.uniform4f(u.uSurf,hideX(),L*S.bw0,L*S.bwg,FX?S.bwhite:0); if(u.uSurf2) gl.uniform4f(u.uSurf2,FX?S.btr:0,WV.xb,L,0); if(u.uFoamR) gl.uniform2f(u.uFoamR,7.0-6.2*S.fwig,Math.min(1,S.fwig*3)); if(u.uFoamS) gl.uniform2f(u.uFoamS,S.fsurge,S.fswirl); if(u.uFoamEdge) gl.uniform1f(u.uFoamEdge,FX?S.fedge:0); if(u.uRev) gl.uniform3f(u.uRev,S.rev,0,S.revc); if(u.uRev2) gl.uniform4f(u.uRev2,S.revhue,S.revsat,S.revbri,S.revop); if(u.uRev3) gl.uniform2f(u.uRev3,S.revsoft,S.revdir<0?-1:1); if(u.uFoamE) gl.uniform4f(u.uFoamE,S.fgrad,S.fhole,FX?S.fsea:0,S.fdir<0?-1:1);
+    if(u.uFlow&&FLOW.tex){ gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D,FLOW.tex); gl.uniform1i(u.uFlow,4); gl.activeTexture(gl.TEXTURE0); if(u.uFlowW) gl.uniform1f(u.uFlowW,FLOW.w); }
     if(u.uWP) gl.uniform2f(u.uWP,S.wpat===undefined?0.6:S.wpat,S.wpsz===undefined?1:S.wpsz);
     if(u.uFoam){ gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,G.ftex); gl.uniform1i(u.uFoam,0); } };
   gl.bindFramebuffer(gl.FRAMEBUFFER,T.fb); gl.viewport(0,0,w,h);
@@ -1471,19 +1543,24 @@ function frame(now){
       gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,4,gl.FLOAT,false,20,0); gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1,1,gl.FLOAT,false,20,16); }
     setU(PR.jf); gl.bindVertexArray(G.jfVao); gl.bindBuffer(gl.ARRAY_BUFFER,G.jfVb); gl.bufferSubData(gl.ARRAY_BUFFER,0,JF.g,0,JF.gn*5);
     gl.enable(gl.DEPTH_TEST); gl.depthMask(false); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE,gl.ONE); gl.drawArrays(gl.POINTS,0,JF.gn); gl.disable(gl.BLEND); gl.depthMask(true); }
+  if(DRP.n>0){ if(!G.drpVao){ G.drpVao=gl.createVertexArray(); gl.bindVertexArray(G.drpVao); G.drpVb=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,G.drpVb); gl.bufferData(gl.ARRAY_BUFFER,DRP.max*40,gl.DYNAMIC_DRAW);
+      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,4,gl.FLOAT,false,40,0); gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1,1,gl.FLOAT,false,40,16);
+      gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2,3,gl.FLOAT,false,40,20); gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3,2,gl.FLOAT,false,40,32); }
+    setU(PR.drp); gl.bindVertexArray(G.drpVao); gl.bindBuffer(gl.ARRAY_BUFFER,G.drpVb); gl.bufferSubData(gl.ARRAY_BUFFER,0,DRP.g,0,DRP.n*10);
+    gl.enable(gl.DEPTH_TEST); gl.depthMask(false); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE,gl.ONE); gl.drawArrays(gl.POINTS,0,DRP.n); gl.disable(gl.BLEND); gl.depthMask(true); }   /* 탱글한 물방울 */
   gl.bindVertexArray(null); gl.bindFramebuffer(gl.FRAMEBUFFER,null); gl.viewport(0,0,w,h); gl.disable(gl.DEPTH_TEST);
   const E=PR.edge; gl.useProgram(E.p);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,T.c); gl.uniform1i(E.u.uCol,0);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,T.i); gl.uniform1i(E.u.uId,1);
   gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D,T.d); gl.uniform1i(E.u.uDep,2);
-  gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D,T.ff); gl.uniform1i(E.u.uFF,3); gl.uniform4f(E.u.uFC,0.5,1.0,1,0); gl.uniform3f(E.u.uFL,0.43,0.75,0.95); gl.uniform3fv(E.u.uFH,rgb(C[0]).map((v,i)=>v*0.7+rgb(C[2])[i]*0.3));
+  gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D,T.ff); gl.uniform1i(E.u.uFF,3); gl.uniform4f(E.u.uFC,0.22,1.0,1,0); gl.uniform3f(E.u.uFL,0.43,0.75,0.95); gl.uniform3fv(E.u.uFH,rgb(C[0]).map((v,i)=>v*0.7+rgb(C[2])[i]*0.3));
   gl.uniform2f(E.u.uPx,1/w,1/h); gl.uniform3fv(E.u.uLine,lineC); gl.uniform2f(E.u.uNF,near,far); gl.drawArrays(gl.TRIANGLES,0,3); gl.activeTexture(gl.TEXTURE0);
   popDraw();
   $("stat").textContent=`격자 ${W.NX}×${W.NZ}${W.TILE>1?" ×"+W.TILE+" 이어붙임":""} · ${Math.round(fps)}fps · 계산 ${simMs.toFixed(1)}ms`;
 }
 try{ build(); $("msg").hidden=true; requestAnimationFrame(frame); }
 catch(e){ $("msg").textContent="준비 중 문제: "+e.message; console.error(e); }
-window.__nw={ get LIP(){ return LIP; }, get SPR(){ return SPR; }, get W(){ return W; }, get V(){ return WV; }, get S(){ return S; }, get G(){ return G; } };
+window.__jf=JF; window.__nw={ get LIP(){ return LIP; }, get SPR(){ return SPR; }, get W(){ return W; }, get V(){ return WV; }, get S(){ return S; }, get G(){ return G; } };
 })();
 </script>
 </body>
