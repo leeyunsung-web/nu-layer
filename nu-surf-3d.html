@@ -624,7 +624,7 @@ const FS_WATER=COMMON+`
 in vec3 vP; in vec3 vN; in vec2 vH; in vec2 vQ;
 layout(location=0) out vec4 oC; layout(location=1) out vec4 oId;
 void main(){
-  if(vH.x<0.02 || vP.x<uSurf.x) discard;                  /* 마른 자리 · 숨기는 구간 */
+  if((vH.x<0.02 && vP.x>uSurf2.y-2.0) || vP.x<uSurf.x) discard;   /* 마른 자리는 백사장에서만 — 바다 쪽은 얕아져도 늘 물로 덮어 바닥이 안 보이게 */
   vec3 n=normalize(vN); if(!gl_FrontFacing) n=-n;
   vec3 L=normalize(vec3(0.45,0.8,0.4)), V=normalize(uEye-(vP-vec3(uTank.x*0.5,0.0,uTank.y*0.5)));
   float ndl=dot(n,L), sp=dot(n,normalize(L+V));
@@ -633,14 +633,17 @@ void main(){
   float nz=vn2(wq*vec2(0.11,0.32)+vec2(-uTime*0.12,uTime*0.02))*0.7+vn2(wq*vec2(0.3,0.6)+vec2(4.0,uTime*0.05))*0.3;
   float shd=ndl+(nz-0.5)*0.42, low=uTank.z-vP.y;
   bool dark=shd<0.32 || (low>0.45+(nz-0.5)*0.9 && n.y>0.25);
-  vec3 col=uC0; if(dark) col=uC1; if(shd<0.02) col=mix(uC1,uC3,0.35);
-  if(!dark && uWP.x>0.0){ /* 밝은 조각은 물의 실제 흐름에 실려 간다 (두 겹을 번갈아 섞어 늘어짐 없이) */
+  /* 포토샵 '곱하기' 레이어처럼: 바탕 위에 밝은 조각을 먼저 칠하고, 그늘은 그 위에 곱해서 얹는다 → 그늘 속에서도 밝은 조각이 한 톤 어둡게 비친다 */
+  vec3 col=uC0, B0=max(uC0,vec3(0.05)), mul=vec3(1.0);
+  if(dark) mul=min(vec3(1.0),uC1/B0); if(shd<0.02) mul=min(vec3(1.0),mix(uC1,uC3,0.35)/B0);
+  if(uWP.x>0.0){ /* 밝은 조각은 물의 실제 흐름에 실려 간다 (두 겹을 번갈아 섞어 늘어짐 없이) */
     vec4 fl=texture(uFlow, vQ/uTank.xy); float slope=1.0-n.y; vec2 an=slope>0.12?vec2(0.08,0.55):vec2(0.13,0.2);   /* 비탈에서는 비탈 따라 길쭉하게 */
     vec2 fa=fl.xy, fb2=fl.zw; if(uTZ.y>0.5){ fa.y=-fa.y; fb2.y=-fb2.y; }
     float pA=wpat(((wq+fa)*an)*uWP.y), pB=wpat(((wq+fb2)*an)*uWP.y+vec2(17.3,5.1)), pn=mix(pB,pA,uFlowW);
     if(pn>0.70-0.15*uWP.x) col=uC2; }
   if(sp>0.986 && n.y>0.6) col=uC2;   /* 반짝임은 위를 향한 면에만 (쏟아지는 혀 앞면이 하얗게 번지지 않게) */
-  if(vH.y<-0.12){ float ts=-vH.y; col=ts>0.7?mix(uC1,uC3,0.38):ts>0.4?mix(uC1,uC3,0.18):mix(uC1,uC0,0.35); }   /* 파도 안쪽(터널) 그늘: 깊을수록 한 단계씩 어둡게 */   /* 말린 혀 아래 터널 안쪽 벽은 그늘 */
+  if(vH.y<-0.12){ float ts=-vH.y; vec3 tc=ts>0.7?mix(uC1,uC3,0.38):ts>0.4?mix(uC1,uC3,0.18):mix(uC1,uC0,0.35); mul=min(mul,min(vec3(1.0),tc/B0)); }
+  col*=mul;   /* 그늘 곱하기 */   /* 파도 안쪽(터널) 그늘: 깊을수록 한 단계씩 어둡게 */   /* 말린 혀 아래 터널 안쪽 벽은 그늘 */
   /* 바다 전체 거품: 물결 따라 흐르는 옅은 줄무늬 (부드럽게, 위를 향한 면에만) */
   if(uFoamE.z>0.01){ vec2 q=vQ*vec2(0.09,0.32)+vec2(-uTime*0.12,0.0); float m=vn2(q)*0.6+vn2(q*2.3+vec2(4.1,1.7)-vec2(uTime*0.1,0.0))*0.4;
     m=smoothstep(0.62-0.25*uFoamE.z, 0.78-0.2*uFoamE.z, m)*smoothstep(0.2,0.6,n.y);
@@ -814,7 +817,7 @@ void main(){ vP=tzp(aP); vLoc=aP.xz; gl_Position=uVP*vec4(vP-vec3(uTank.x*0.5,0.
 const FS_SAND=COMMON+`
 in vec3 vP; in vec2 vLoc; layout(location=0) out vec4 oC; layout(location=1) out vec4 oId;
 void main(){
-  if(vP.x<uSurf.x-0.01) discard;
+  if(vP.x<uSurf.x-0.01 || vLoc.x<uSurf2.y-3.0) discard;   /* 바다 밑바닥(모래톱 굴곡)은 그리지 않는다: 깊은 물처럼 */
   vec3 n=normalize(cross(dFdx(vP),dFdy(vP))); if(n.y<0.0) n=-n;
   float ndl=dot(n,normalize(vec3(-0.4,0.85,0.5)));
   /* 몰디브 흰 모래: 알갱이 점 없이, 큰 모래 물결의 부드러운 음영만 2~3단계로 (따뜻한 흰빛 · 옅은 미색 · 시원한 그늘) */
