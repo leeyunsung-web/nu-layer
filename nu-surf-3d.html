@@ -1090,7 +1090,7 @@ function barrelShape(px,py,qx){
 function surfWarp(){
   const {NX,NZ,h,b,brk,dx,L}=WV, Wd=WV.W, RX=G.RX, RZ=G.RZ, N=RX*RZ, sm=G.sm.y;
   const A=G.wp&&G.wp.X.length===N?G.wp:(G.wp={X:new Float32Array(N),Y:new Float32Array(N),Z:new Float32Array(N),H:new Float32Array(N),K:new Float32Array(N),Q:new Float32Array(N),Bd:new Float32Array(N),
-    xa:new Float32Array(NZ),xb:new Float32Array(NZ),xc:new Float32Array(NZ),yt:new Float32Array(NZ),hc:new Float32Array(NZ),ph:new Float32Array(NZ),w:new Float32Array(NZ)});
+    xa:new Float32Array(NZ),xb:new Float32Array(NZ),xc:new Float32Array(NZ),xh:new Float32Array(NZ),yh:new Float32Array(NZ),yt:new Float32Array(NZ),hc:new Float32Array(NZ),ph:new Float32Array(NZ),w:new Float32Array(NZ)});
   const zOf=k=>k<=0?0:k>=NZ-1?Wd:(k+0.5)*dx;
   /* 계산 격자에서 (줄 위치 kf, x) 의 높이·깊이·부서짐·바닥 — 옆 줄 사이도 부드럽게 */
   const smp=(kf,x)=>{ const f=Math.min(NX-1.0001,Math.max(0,x/dx-0.5)), i=f|0, t=f-i, k0=Math.min(NZ-2,Math.max(0,Math.floor(kf))), s2=Math.min(1,Math.max(0,kf-k0));
@@ -1104,8 +1104,10 @@ function surfWarp(){
     A.ph[k]=on[k]>0?Math.min(on[k],sv/sw*1.3):0; }
   for(let k=0;k<NZ;k++){ let kk=-1; for(let r=0;r<NZ && kk<0;r++){ if(k-r>=0&&on[k-r]>0) kk=k-r; else if(k+r<NZ&&on[k+r]>0) kk=k+r; }
     const hc=Math.max(0.4,LIP.hc[kk]), xc=LIP.xc[kk]; A.xc[k]=xc; A.hc[k]=hc; A.yt[k]=LIP.yc[kk]-hc;
+    /* 지금 물 표면의 실제 마루 (무너짐 끝에 둔덕을 여기로 맞춰, 봉우리가 둘로 갈라지지 않게) */
+    { const r0=k*NX, q0=Math.max(0,Math.round((xc-0.5*hc)/dx)), q1=Math.min(NX-1,Math.round((xc+2*hc)/dx)); let bx=xc, by=-1e9; for(let q=q0;q<=q1;q++){ if(sm[r0+q]>by){ by=sm[r0+q]; bx=(q+0.5)*dx; } } A.xh[k]=bx; A.yh[k]=by; }
     A.xa[k]=Math.max(2,xc-1.25*hc); A.xb[k]=Math.min(L-4,xc+Math.max(1.8,0.5*S.lipLen+1.1)*hc);
-    const p=A.ph[k], up=Math.min(1,p/0.25), dn=1-Math.min(1,Math.max(0,((on[k]>0?on[k]:0)-1.2)/0.45));
+    const p=A.ph[k], up=Math.min(1,p/0.25), dn=1-Math.min(1,Math.max(0,((on[k]>0?on[k]:0)-1.5)/0.2));   /* 둔덕이 다 된 뒤에야 원래 물 표면으로 */
     A.w[k]=(p>0?up*up*(3-2*up)*dn*dn*(3-2*dn):0)*Math.min(1,S.barrel); }
   { const TR=6; for(let k=0;k<NZ;k++){ if(!(on[k]>0)){ A.w[k]=0; continue; } let dd=TR; for(let r=1;r<TR;r++){ if((k-r>=0&&!(on[k-r]>0))||(k+r<NZ&&!(on[k+r]>0))){ dd=r; break; } }
       const t=dd/TR; A.w[k]*=t*t*(3-2*t); } }
@@ -1113,29 +1115,36 @@ function surfWarp(){
   const ds=L/(RX-1); let sa=0, ss=0, n=0; for(let k=0;k<NZ;k++) if(on[k]>0){ sa+=A.xa[k]; ss+=A.xb[k]-A.xa[k]; n++; }
   const cA=Math.max(6,Math.min(RX-120,Math.round(sa/n/ds))), cB=Math.min(RX-16,cA+Math.max(60,Math.min(Math.round(RX*0.45),Math.round(ss/n/ds*3)))), NS=cB-cA;
   /* 곡선 구간 (u): 뒷비탈 | 혀 바깥면 | 둥근 혀 끝 | 터널 안쪽 한 바퀴(천장→벽→바닥) | 앞쪽 골 */
-  const UB=0.22, UL=0.40, UT=0.44, UI=0.86, D2R=Math.PI/180;
+  const UB0=0.22, UL0=0.40, UT0=0.44, UI0=0.86, D2R=Math.PI/180;
   const lerp=(a,b2,t)=>a+(b2-a)*t;
   for(let r=0;r<RZ;r++){
     const kf=r*(NZ-1)/(RZ-1), k0=Math.min(NZ-2,Math.floor(kf)), s2=kf-k0, P=F=>lerp(F[k0],F[k0+1],s2), z=lerp(zOf(k0),zOf(k0+1),s2);
-    const xa=P(A.xa), xb=P(A.xb), w=P(A.w), p=P(A.ph), hc=P(A.hc), yt=P(A.yt), xc=P(A.xc);
+    const xa=P(A.xa), xb=P(A.xb), w=P(A.w), p=P(A.ph), hc=P(A.hc), yt=P(A.yt), xc0=P(A.xc), xh=P(A.xh), yh=P(A.yh);
     for(let c=0;c<=cA;c++){ const x=xa*c/cA, q=smp(kf,x); put(r,c,x,q[0],q[1],q[2],q[3],z); }
     for(let c=cB;c<RX;c++){ const x=xb+(L-xb)*(c-cB)/(RX-1-cB), q=smp(kf,x); put(r,c,x,q[0],q[1],q[2],q[3],z); }
     /* ── 설계한 옆모습: 터널 안쪽은 타원 하나 (천장·벽·바닥이 한 곡선으로 매끈하게), 혀 바깥면은 그 타원을 두께만큼 키운 것 ── */
-    const gq=Math.min(1,p), gg=gq*gq*(3-2*gq), cl=Math.min(1,Math.max(0,(p-1)/0.6));
-    const th=hc*S.lipTh*(0.25+0.75*gg)*(1-0.4*cl);
-    const ry=Math.max(0.05,(hc*(1-0.45*cl)-th)*0.5), rx=Math.max(0.02,hc*(0.1+0.3*S.lipLen*gg)*(1-0.6*cl));   /* 터널이 자라며 앞으로 불룩해진다 (뒤 벽은 제자리) */
-    const ex=xc+rx+cl*0.25*hc, ey=yt+ry, Cy=ey+ry+th;
-    const ft=(90-(105*S.lipCurl*gg+70*cl))*D2R, phT=Math.max(-90*D2R,ft);   /* 혀 끝 각도: 위(90°)에서 앞으로 감겨 내려간다 */
+    /* 무너짐 (cl 0→1): ① 앞 40% — 혀 끝이 계속 감겨 내려가 앞 수면을 친다(터널이 닫힘)  ② 뒤 60% — 터널이 오므라들며
+       둥근 거품물 둔덕이 되어, 원래 물 표면 모양으로 자연스럽게 녹아든다 (봉우리가 둘로 갈라지지 않게 마루 자리는 그대로) */
+    const gq=Math.min(1,p), gg=gq*gq*(3-2*gq), cl=Math.min(1,Math.max(0,(p-1)/0.6)), c1=Math.min(1,cl/0.4), c2=Math.max(0,(cl-0.4)/0.6), e2=c2*c2*(3-2*c2);
+    const xc=xc0+(Math.max(xc0,xh)-xc0)*e2, H0=hc*(1-0.15*c1)+(Math.max(0.2,yh-yt)-hc*(1-0.15*c1))*e2, th0=hc*S.lipTh*(0.25+0.75*gg);
+    const ry0=Math.max(0.05,(H0-th0)*0.5), ry=Math.max(0.01,ry0*(1-e2)), th=H0-2*ry;   /* 터널이 오므라드는 만큼 물 두께가 채운다 */
+    const rx=Math.max(0.01,hc*(0.1+0.3*S.lipLen*gg)*(1-e2));   /* 터널이 자라며 앞으로 불룩해지고, 무너질 땐 다시 오므라든다 (뒤 벽은 제자리) */
+    const ex=xc+rx, ey=yt+ry, Cy=ey+ry+th;
+    const fFull=(90-105*S.lipCurl*gg)*D2R, sMin=Math.max(-1,Math.min(1,(-ry-0.04)/(ry+th))), phMin=Math.asin(sMin);   /* 혀 끝은 앞 수면까지만 (물속으로 파고들지 않게) */
+    const phT=Math.max(phMin, fFull+(Math.min(fFull,phMin)-fFull)*c1);   /* 혀 끝 각도: 위(90°)에서 앞으로 감겨 내려가 수면에 닿는다 */
     const qa=smp(kf,xa), qb=smp(kf,xb);
-    const ein=f=>[ex+rx*Math.cos(f), ey+ry*Math.sin(f)], eout=f=>[ex+(rx+th)*Math.cos(f), ey+(ry+th)*Math.sin(f)];
+    const ein=f=>[ex+rx*Math.cos(f), ey+ry*Math.sin(f)], eout=f=>[ex+(rx+th)*Math.cos(f), ey+(ry+th)*Math.sin(f)], Pc=eout(phT);
+    const eC=Math.min(1,e2*1.8), toC=Q=>[Q[0]+(Pc[0]-Q[0])*eC, Q[1]+(Pc[1]-Q[1])*eC];   /* 무너질 때 혀 끝·터널 안쪽은 혀가 닿은 자리로 모여 사라진다 (접힌 면 없이 둥근 둔덕) */
+    /* 무너짐 끝으로 갈수록 곡선의 칸 나눔도 물 표면과 같은 방식(앞뒤 거리 비례)으로 — 둘을 섞을 때 마루가 꺼지지 않게 */
+    const uc=(ex-xa)/(xb-xa), ucP=Math.max(uc+0.01,(Pc[0]-xa)/(xb-xa)), UB=lerp(UB0,uc,e2), UL=lerp(UL0,ucP,e2), UT=lerp(UT0,ucP+0.002,e2), UI=lerp(UI0,ucP+0.004,e2);
     const design=u=>{
       if(u<UB){ const t=u/UB, e=Math.sin(t*Math.PI/2); return [lerp(xa,ex,t), lerp(qa[0],Cy,e)]; }
       if(u<UL){ const t=(u-UB)/(UL-UB); return eout(lerp(90*D2R,phT,t)); }
       if(u<UT){ const t=(u-UL)/(UL===UT?1:UT-UL), Po=eout(phT), Pi=ein(phT), mx=(Po[0]+Pi[0])/2, my=(Po[1]+Pi[1])/2;
         let tx=(rx+th*0.5)*Math.sin(phT), ty=-(ry+th*0.5)*Math.cos(phT); const tl=Math.hypot(tx,ty)||1; tx/=tl; ty/=tl;   /* 둥근 혀 끝 */
-        const a=Math.PI*t; return [mx+(Po[0]-mx)*Math.cos(a)+tx*th*0.5*Math.sin(a), my+(Po[1]-my)*Math.cos(a)+ty*th*0.5*Math.sin(a)]; }
-      if(u<UI){ const t=(u-UT)/(UI-UT); return ein(lerp(phT,270*D2R,t)); }
-      const t=(u-UI)/(1-UI), e=t*t*(3-2*t); return [lerp(ex,xb,t), lerp(yt,qb[0],e)]; };
+        const a=Math.PI*t; return toC([mx+(Po[0]-mx)*Math.cos(a)+tx*th*0.5*Math.sin(a), my+(Po[1]-my)*Math.cos(a)+ty*th*0.5*Math.sin(a)]); }
+      if(u<UI){ const t=(u-UT)/(UI-UT); return toC(ein(lerp(phT,270*D2R,t))); }
+      const t=(u-UI)/(1-UI), e=t*t*(3-2*t), S0=toC([ex,yt]); return [lerp(S0[0],xb,t), lerp(S0[1],qb[0],e)]; };
     for(let c=cA+1;c<cB;c++){ const u=(c-cA)/NS, xh=xa+(xb-xa)*u, q=smp(kf,xh);
       let x=xh, y=q[0], hh=q[1];
       if(w>0.001){ const Pq=design(u); x+=(Pq[0]-xh)*w; y+=(Pq[1]-y)*w; hh=Math.max(hh,0.6*w); }
