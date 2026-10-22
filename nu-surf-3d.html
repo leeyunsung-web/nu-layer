@@ -143,7 +143,7 @@ function makeWave(P,seed){
     const wB=Math.min(1,Math.max(0,(x-xb)/Math.max(1,0.35*(L-xb)))), bump=cusp*0.9*wB*(0.7*Math.sin(z/cl1*6.283+cp1)+0.3*Math.sin(z/cl2*6.283+cp2));
     b[j]=x>xb?Math.max(0,(x-xb)*P.beach+bump):0;
     /* 마른 백사장: 물 높이를 조금 넘으면 거의 평평하게 (모래가 수조 위로 솟지 않고 넓은 여유 공간이 된다) */
-    { const top=D*(1+(P.berm===undefined?0.25:P.berm)); if(b[j]>top) b[j]=top+(b[j]-top)*0.06; }
+    { const top=D*(1+(P.berm===undefined?0.25:P.berm)); if(b[j]>top) b[j]=top+(b[j]-top)*0.3; }   /* 위로 갈수록 완만하게 오르기만: 물이 끝까지 흘러가지 않고 멈춘다 */
     /* 모래톱(서핑 파도): 바다 쪽에 비스듬히 놓인 얕은 둔덕. 파도가 여기서 갑자기 얕아져 앞이 서고 말려 부서진다.
        비스듬하니 한쪽 끝부터 차례로 부서져 옆으로 까지듯 말려 들어간다 */
     if(P.bar>0){ const xbar=L*P.barX+Math.tan((P.barAng||0)*Math.PI/180)*(z-W/2), wb=Math.max(1,P.barW||8), e=(x-xbar)/wb;
@@ -360,7 +360,7 @@ const CTL=[
  ["secTank","물 깊이","level",3,24,0.5,11,"칸","깊은 바다 쪽 물 깊이. 깊을수록 너울이 멀리까지 둥글게 달려옵니다. 바꾸면 다시 만듭니다.",2],
  ["secTank","백사장 시작","bstart",0.15,0.8,0.01,0.4,"%","수조 길이 중 어디서부터 비탈이 시작되는지. 바꾸면 다시 만듭니다.",2],
  ["secTank","백사장 경사","beach",0.04,0.4,0.01,0.13,"","비탈의 가파름. 완만하면 길게 밀려 올라가고, 가파르면 짧고 세게 부서집니다. 바꾸면 다시 만듭니다.",2],
- ["secTank","마른 백사장 높이","berm",0,1,0.05,0.25,"배","물 높이보다 이만큼(물 깊이 대비) 올라가면 모래가 평평해집니다. 낮을수록 넓은 마른 모래밭. 바꾸면 다시 만듭니다.",2],
+ ["secTank","마른 백사장 높이","berm",0,1.5,0.05,0.5,"배","물 높이보다 이만큼(물 깊이 대비) 올라가면 모래가 평평해집니다. 낮을수록 넓은 마른 모래밭. 바꾸면 다시 만듭니다.",2],
  ["secTank","반복 이어붙이기","tile",1,2,1,2,"조각","1 = 수조 전체를 계산 (원래대로). 2 = 좌우 폭의 절반만 계산하고, 양 끝이 서로 이어지게 해서 옆으로 한 번 더 붙여 보여 줍니다. 계산이 거의 절반으로 줄고, 거품 무늬·거품 덩어리는 조각마다 다르게 나옵니다. 바꾸면 다시 만듭니다.",2],
  ["secTank","백사장 굴곡","cusp",0,1,0.05,0.5,"%","모래 바닥이 좌우로 완만하게 오르내려, 밀려 올라온 물 끝이 혀처럼 넘실댑니다. 바꾸면 다시 만듭니다.",2],
  ["secTank","물결 촘촘함","res",0.4,2,0.05,1,"배","계산 격자의 촘촘함. 높이면 물결이 섬세해지지만 무거워집니다. 바꾸면 다시 만듭니다.",2],
@@ -395,11 +395,11 @@ const VIEWS={ side:{n:"비스듬히",y:-32,p:22,z:1,t:0}, near:{n:"백사장 가
 const SHAPE0={S:[-2.4,-0.3],A:[0,0.32],L:[0.95,0.05],E:[0.72,-0.75],B:[0.1,-1]};   /* 마루 꼭대기 = (0,0), 단위 = 파도 높이 */
 const CURVES=[["fspd","거품 속도"],["foam","거품 양"],["lift","떠 있는 높이"],["curl","거품 말림"],["steep","앞면 세우기"]];
 /* 윤성이 정한 처음 값 (2026-10-21, 설정 복사로 받은 값) */
-const SAVED={"col":"maldives","sky":"day","cyaw":32,"cpit":15,"czoom":2.2,"ctx":-0.1,"shape":{"S":[-2.1206135936661297,-0.34271001073537316],"A":[-0.2346266103059582,0.2271873322597961],"L":[0.633009594739667,0.10347893183038112],"E":[1.1346366747181964,-0.28781702898550715],"B":[0,-1]},"curves":{"fspd":[1,1,1,1,1],"foam":[1,1,1,1,1],"lift":[1,1,1,1,1],"curl":[1,1,1,1,1],"steep":[1,1,1,1,1]},"amp":5,"per":4.5,"skew":0.4,"irr":0.35,"spd":1,"fcurl":0,"curl":0.85,"cth":0.5,"foam":1.1,"fsurge":0.55,"fswirl":0.4,"flift":0.9,"flife":0.5,"fsz":0.5,"flace":0,"fwig":0.08,"flsz":0.4,"frim":0.5,"frc":0.25,"tx":140,"tz":50,"level":8,"bstart":0.35,"beach":0.2,"res":1,"grav":1,"fric":0.15,"visc":0.02,"soak":0.65,"bback":0.8,"tile":1,"swob":0.5,"swsz":0.5,"swsp":0.5,"rev":0,"revc":0.35,"revhue":0,"revsat":1,"revbri":1,"revop":1,"revsoft":0.3,"revdir":-1,"lcol":0,"shal":0.6,"cloud":0.6,"cspd":0.35,"sandc":0,"px":2,"lat":0.2,"cusp":0.2,"bar":0.6,"barX":0.32,"barW":6,"barAng":25,"lipLen":1.7,"lipCurl":1.1,"hidez":0.15,"brate":0.3};
+const SAVED={"col":"maldives","sky":"day","cyaw":32,"cpit":15,"czoom":2.2,"ctx":-0.1,"shape":{"S":[-2.1206135936661297,-0.34271001073537316],"A":[-0.2346266103059582,0.2271873322597961],"L":[0.633009594739667,0.10347893183038112],"E":[1.1346366747181964,-0.28781702898550715],"B":[0,-1]},"curves":{"fspd":[1,1,1,1,1],"foam":[1,1,1,1,1],"lift":[1,1,1,1,1],"curl":[1,1,1,1,1],"steep":[1,1,1,1,1]},"amp":5,"per":4.5,"skew":0.4,"irr":0.35,"spd":1,"fcurl":0,"curl":0.85,"cth":0.5,"foam":1.1,"fsurge":0.55,"fswirl":0.4,"flift":0.9,"flife":0.5,"fsz":0.5,"flace":0,"fwig":0.08,"flsz":0.4,"frim":0.5,"frc":0.25,"tx":140,"tz":50,"level":8,"bstart":0.35,"beach":0.2,"res":1,"grav":1,"fric":0.15,"visc":0.02,"soak":0.65,"bback":0.8,"tile":1,"swob":0.5,"swsz":0.5,"swsp":0.5,"rev":0,"revc":0.35,"revhue":0,"revsat":1,"revbri":1,"revop":1,"revsoft":0.3,"revdir":-1,"lcol":0,"shal":0.6,"cloud":0.6,"cspd":0.35,"sandc":0,"px":2,"lat":0.2,"cusp":0.2,"bar":0.6,"barX":0.32,"barW":6,"barAng":25,"lipLen":1.7,"lipCurl":1.1,"hidez":0.15,"brate":0.3,"mig1":1};
 const DEF=(()=>{ const o={col:"maldives",sky:"day",cyaw:-32,cpit:22,czoom:1,ctx:0,shape:JSON.parse(JSON.stringify(SHAPE0)),curves:{}}; for(const [k] of CURVES) o.curves[k]=[1,1,1,1,1]; for(const c of CTL) o[c[2]]=c[6]; return Object.assign(o,JSON.parse(JSON.stringify(SAVED))); })();
 const clone=o=>JSON.parse(JSON.stringify(o));
 const KEY="nu-surf-3d-v2";   /* 기본값이 바뀌어 새 이름으로 (예전 저장값은 그대로 남아 있음) */
-let S=clone(DEF); try{ const v=JSON.parse(localStorage.getItem(KEY)||"null"); if(v) for(const k in DEF) if(k in v) S[k]=v[k]; }catch(_){}
+let S=clone(DEF); try{ const v=JSON.parse(localStorage.getItem(KEY)||"null"); if(v){ for(const k in DEF) if(k in v) S[k]=v[k]; if(!v.mig1){ S.berm=DEF.berm; S.mig1=1; } } }catch(_){}   /* 마른 백사장 높이 새 기본값으로 한 번 */
 if(!S.shape||!S.shape.A) S.shape=clone(SHAPE0); if(!S.curves) S.curves={}; for(const [k] of CURVES) if(!Array.isArray(S.curves[k])||S.curves[k].length!==5) S.curves[k]=[1,1,1,1,1];
 const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(_){} };
 const fmt=(c,v)=>{ const d=c[5]<0.1?2:c[5]<1?1:0; return (+v).toFixed(d)+(c[7]?(c[7]==="%"?"":" ")+c[7]:""); };
@@ -900,7 +900,7 @@ function meshUpdate(fdt){
       /* 부서지는 파도 (윤성 그림): 물은 앞면이 절벽처럼 서고 뒤는 완만하게 (보라색),
          거품은 마루 위를 덮다가 앞면 너머로 둥글게 말려 내려간다 (초록색) */
       let s=0, dy=0, sf=0, dyf=0, cw=0, arc=0;
-      if(h[j]>0.9){
+      if(h[j]>0.9 && b[j]<D*0.7){   /* 앞면 세우기는 바다 쪽에서만: 백사장 위 얇은 물은 비탈 그대로 (상자처럼 서지 않게) */
         let ic=i, crest=Hrow[i], Bc=0;
         for(let q=Math.max(0,i-R);q<=Math.min(NX-1,i+R);q++){ if(Hrow[q]>crest){ crest=Hrow[q]; ic=q; } }
         for(let q=Math.max(0,i-2);q<=Math.min(NX-1,i+R);q++){ if(brk[r0+q]>Bc) Bc=brk[r0+q]; }
@@ -929,6 +929,13 @@ function meshUpdate(fdt){
       const fv=Math.max(sm.f[j]+(G.cf&&G.cf.length===NN?G.cf[j]:0),cw), lift=S.flift*cvAt(S,"lift",x/L)*(0.35+0.65*Math.min(1,fv*1.4))*(1-Math.min(1,cw));   /* 호가 된 곳은 호 높이를 따른다 */
       px[j]=x+s; py[j]=y-dy; pz[j]=z; qx[j]=x+sf; qy[j]=y-dyf+0.06+lift; qc[j]=cw; } }
   barrelShape(px,py,qx);
+  /* 접힘 막기: 옆 줄과 밀린 정도를 고르게 섞고(비틀린 면 없이), 줄마다 앞으로만 이어지게 한다
+     (앞면은 곧게 설 수는 있어도 뒤로 접히지 않는다 — 넘어가는 부분은 혀가 맡는다) */
+  { const OF=G.of&&G.of.length===NX*NZ?G.of:(G.of=new Float32Array(NX*NZ)), O2=G.of2&&G.of2.length===NX*NZ?G.of2:(G.of2=new Float32Array(NX*NZ));
+    for(let k=0;k<NZ;k++) for(let i=0;i<NX;i++){ const j=k*NX+i; OF[j]=px[j]-(i===0?0:i===NX-1?L:(i+0.5)*dx); }
+    for(let pass=0;pass<2;pass++){ for(let k=0;k<NZ;k++){ const ka=k>0?k-1:k, kb=k<NZ-1?k+1:k; for(let i=0;i<NX;i++) O2[k*NX+i]=0.25*OF[ka*NX+i]+0.5*OF[k*NX+i]+0.25*OF[kb*NX+i]; } OF.set(O2); }
+    for(let k=0;k<NZ;k++){ const r0=k*NX; let mx=-1e9;
+      for(let i=0;i<NX;i++){ const j=r0+i, x0=i===0?0:i===NX-1?L:(i+0.5)*dx; let x=x0+OF[j]; if(x<mx+0.02) x=mx+0.02; px[j]=x; mx=x; } } }
   for(let k=0;k<NZ;k++) for(let i=0;i<NX;i++){ const j=k*NX+i, o=j*10;
     const a=i>0?j-1:j, c=i<NX-1?j+1:j, e=k>0?j-NX:j, f=k<NZ-1?j+NX:j;
     const ax=px[c]-px[a], ay=py[c]-py[a], az=pz[c]-pz[a], bx=px[f]-px[e], by=py[f]-py[e], bz=pz[f]-pz[e];
@@ -1022,13 +1029,17 @@ function lipUpdate(dt){
   if(!LIP.ph || !WV) return; const {NX,NZ,h,b,brk,dx,D,L}=WV, g=WV.g||9.8, R=Math.max(3,Math.round(4/dx));
   const i0=Math.floor(NX*0.06), i1=Math.floor(NX*0.85), thr=S.lipThr, rate=1/Math.max(0.2,S.lipT);
   for(let k=0;k<NZ;k++){ const r0=k*NX; LIP.cd[k]=Math.max(0,LIP.cd[k]-dt);
-    let bi=-1, bm=thr; for(let i=i0;i<i1;i++){ const v=brk[r0+i]; if(v>bm && h[r0+i]>0.3){ bm=v; bi=i; } }
+    let bi=-1, bm=thr; for(let i=i0;i<i1;i++){ if(b[r0+i]>D*0.7) break; const v=brk[r0+i]; if(v>bm && h[r0+i]>0.3){ bm=v; bi=i; } }   /* 말리는 건 바다 쪽(모래톱 둘레)에서만 — 백사장 위 얇은 물은 말리지 않는다 */
     let ph=LIP.ph[k];
     if(bi>=0){ let ic=bi, cr=-9; for(let q=Math.max(0,bi-R);q<=Math.min(NX-1,bi+2);q++){ const e=h[r0+q]+b[r0+q]; if(e>cr){ cr=e; ic=q; } }
       const xc=(ic+0.5)*dx, hc=cr-D;
       if(ph<=0 && LIP.cd[k]<=0 && hc>0.3){ ph=0.001; LIP.xc[k]=xc; LIP.yc[k]=cr; LIP.hc[k]=hc; }
       else if(ph>0 && ph<1.05 && Math.abs(xc-LIP.xc[k])<R*dx*3){ const a=Math.min(1,dt*6); LIP.xc[k]+=(xc-LIP.xc[k])*a; LIP.yc[k]+=(cr-LIP.yc[k])*a; LIP.hc[k]=Math.max(LIP.hc[k]*0.98,hc); } }
-    if(ph>0){ const c=Math.sqrt(g*Math.max(0.3,D*0.5)); if(ph>=1.05 || bi<0) LIP.xc[k]+=c*dt*0.8;
+    if(ph>0){   /* 언제나 지금 물 마루에 붙어서 따라간다 (앞으로만) — 혀가 물과 따로 놀지 않게 */
+      const q0=Math.max(0,Math.round(LIP.xc[k]/dx)-2), q1=Math.min(NX-1,q0+R+2);   /* 가까운 마루만 (앞서 간 다른 파도로 건너뛰지 않게) */ let ic=-1, cr=-9; for(let q=q0;q<=q1;q++){ if(h[r0+q]<0.2) continue; const e=h[r0+q]+b[r0+q]; if(e>cr){ cr=e; ic=q; } }
+      if(ic>=0 && b[r0+ic]>D*0.7){ ph=Math.max(ph,1); }   /* 백사장에 닿으면 무너짐으로 */
+      else if(ic>=0 && cr-D>0.2){ const a=Math.min(1,dt*8), nx=(ic+0.5)*dx; if(nx>LIP.xc[k]) LIP.xc[k]+=(nx-LIP.xc[k])*a; LIP.yc[k]+=(cr-LIP.yc[k])*a; if(ph>=1) LIP.hc[k]+=(Math.max(0.2,cr-D)-LIP.hc[k])*a; }
+      else if(ph<1) ph=Math.max(ph,1);   /* 마루가 사라지면 바로 무너짐으로 */
       const was=ph; ph+=dt*rate*(ph<1?1:1.6);
       if(was<1 && ph>=1) LIP.hit=(LIP.hit||[]).concat([k]);   /* 혀가 수면을 치는 순간 */
       if(ph>1.7){ ph=0; LIP.cd[k]=Math.max(1,(S.per||4)*0.6); } }
@@ -1037,10 +1048,10 @@ function lipUpdate(dt){
   { const nxt=LIP.ph.slice(); for(let k=0;k<NZ;k++){ if(LIP.ph[k]>0 || LIP.cd[k]>0) continue;
       for(const kk of [k-1,k+1]){ if(kk<0||kk>=NZ) continue; const pn=LIP.ph[kk]; if(!(pn>0.12 && pn<0.95)) continue;
         const r0=k*NX, ic0=Math.round(LIP.xc[kk]/dx-0.5); let ic=ic0, cr=-9; for(let q=Math.max(0,ic0-R);q<=Math.min(NX-1,ic0+R);q++){ if(h[r0+q]<0.2) continue; const e=h[r0+q]+b[r0+q]; if(e>cr){ cr=e; ic=q; } }
-        const hc=cr-D; if(hc>Math.max(0.3,0.45*LIP.hc[kk])){ nxt[k]=0.001; LIP.xc[k]=(ic+0.5)*dx; LIP.yc[k]=cr; LIP.hc[k]=hc; break; } } }
+        const hc=cr-D; if(b[r0+ic]<D*0.7 && hc>Math.max(0.3,0.45*LIP.hc[kk])){ nxt[k]=0.001; LIP.xc[k]=(ic+0.5)*dx; LIP.yc[k]=cr; LIP.hc[k]=hc; break; } } }
     LIP.ph.set(nxt); }
   /* 옆 줄과 부드럽게 (말린 혀가 줄마다 들쭉날쭉하지 않게) */
-  for(let pass=0;pass<4;pass++) for(let k=1;k<NZ-1;k++){ if(LIP.ph[k]>0 && LIP.ph[k-1]>0 && LIP.ph[k+1]>0){ LIP.xc[k]=(LIP.xc[k-1]+2*LIP.xc[k]+LIP.xc[k+1])/4; LIP.hc[k]=(LIP.hc[k-1]+2*LIP.hc[k]+LIP.hc[k+1])/4; LIP.yc[k]=(LIP.yc[k-1]+2*LIP.yc[k]+LIP.yc[k+1])/4; } }
+  for(let pass=0;pass<8;pass++) for(let k=1;k<NZ-1;k++){ if(LIP.ph[k]>0 && LIP.ph[k-1]>0 && LIP.ph[k+1]>0){ LIP.xc[k]=(LIP.xc[k-1]+2*LIP.xc[k]+LIP.xc[k+1])/4; LIP.hc[k]=(LIP.hc[k-1]+2*LIP.hc[k]+LIP.hc[k+1])/4; LIP.yc[k]=(LIP.yc[k-1]+2*LIP.yc[k]+LIP.yc[k+1])/4; } }
   if(LIP.hit){ for(const k of LIP.hit) sprBurst(k); LIP.hit=null; }
   LIP.dirty=true;
 }
@@ -1056,7 +1067,7 @@ function barrelShape(px,py,qx){
     for(;i<=iE;i++){ const j=r0+i, y=py[j]; if(px[j]<xc-0.2*hc) continue; if(y<ytr+0.04*hc) break;
       let xw; if(y>=ytr+Rf) xw=xc-over*0.35*Rf*Math.min(1,(y-ytr-Rf)/Math.max(0.1,hc-Rf)); else { const e=ytr+Rf-y; xw=xc+Rf-Math.sqrt(Math.max(0,Rf*Rf-e*e)); }
       if(xw<px[j]){ const nx=px[j]+(xw-px[j])*gb; qx[j]+=nx-px[j]; px[j]=nx; }
-      if(y<LIP.yc[k]-0.12*hc) TS[j]=gb; } }   /* 터널 안쪽 벽: 혀 그늘 */
+      const pz=LIP.ps?LIP.ps[k]:ph; if(y<LIP.yc[k]-0.12*hc && pz>0.5 && pz<1.05) TS[j]=gb*Math.min(1,(pz-0.5)/0.25); } }   /* 혀가 충분히 덮었을 때만 그늘 */   /* 터널 안쪽 벽: 혀 그늘 */
 }
 function lipTip(k){ /* 혀 끝 자리 */ return LIP.tip?[LIP.tip[k*2],LIP.tip[k*2+1]]:[LIP.xc[k],LIP.yc[k]]; }
 function lipUpload(){
@@ -1082,7 +1093,7 @@ function lipUpload(){
       P[(k*M+m)*2]=x; P[(k*M+m)*2+1]=y; }
     LIP.tip[k*2]=P[(k*M+M-1)*2]; LIP.tip[k*2+1]=P[(k*M+M-1)*2+1]; }
   const M2=M*2;
-  for(let k=0;k<NZ;k++){ const on=LIP.ph[k]>0?3:0, z=(k+0.5)*dx, gq=Math.min(1,LIP.ph[k]), cl=Math.min(1,Math.max(0,(LIP.ph[k]-1)/0.6)), th=Math.max(0.2,HC[k])*(S.lipTh||0.16)*(1-0.5*cl);
+  for(let k=0;k<NZ;k++){ const on=LIP.ph[k]>0?3:0, z=(k+0.5)*dx, gq=Math.min(1,LIP.ph[k]), cl=Math.min(1,Math.max(0,(LIP.ph[k]-1)/0.6)), th=Math.max(0.2,HC[k])*(S.lipTh||0.16)*(1-0.5*cl)*(0.15+0.85*Math.min(1,(LIP.ps?LIP.ps[k]:gq)/0.6));   /* 막 생길 때는 얇게 (지느러미처럼 보이지 않게) */
     for(let m=0;m<M;m++){ const o=(k*M2+m)*10, j=(k*M+m)*2, u=m/(M-1);
       const jn=m<M-1?j+2:j, jp=m>0?j-2:j, ka=k<NZ-1?((k+1)*M+m)*2:j, kb=k>0?((k-1)*M+m)*2:j;
       const tx=P[jn]-P[jp], ty=P[jn+1]-P[jp+1], zx=P[ka]-P[kb], zy=P[ka+1]-P[kb+1], zz=(k<NZ-1?dx:0)+(k>0?dx:0);
