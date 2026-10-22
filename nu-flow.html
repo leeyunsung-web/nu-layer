@@ -430,7 +430,7 @@ canvas.hold{cursor:grabbing}
 </div>
 <div class="fbar" id="fbar"><button id="fbPanel" type="button" title="조절 창을 따로 엽니다">⚙ 조절 창</button><button id="fbFull" type="button" title="전체 화면 (F 키)">⛶ 전체 화면</button><button id="fbSave" type="button" title="지금 화면을 PNG로 저장">⤓ 이미지 저장</button></div>
 <script>
-window.NF_VIEW=(new URLSearchParams(location.search).get('view')||'both'); window.NF_SOLO=new URLSearchParams(location.search).get('solo')||'';
+window.NF_VIEW=(new URLSearchParams(location.search).get('view')||'both'); window.NF_SOLO=new URLSearchParams(location.search).get('solo')||''; window.NF_FIX=!!(window.NF_SOLO && new URLSearchParams(location.search).get('img')==='1'); window.NF_MENU=!!(window.NF_SOLO && new URLSearchParams(location.search).get('menu')==='1'); if(window.NF_MENU) document.documentElement.classList.add('nfmenu'); if(window.NF_FIX) document.documentElement.classList.add('nfimg');
 document.documentElement.classList.add('v-'+window.NF_VIEW);
 if(window.NF_VIEW==='stage') document.title+=' · 화면'; else if(window.NF_VIEW==='panel') document.title+=' · 조절';
 </script>
@@ -1665,13 +1665,14 @@ const soloIs=l=>{ if(!LCNT[l]) return true; const k=SOLO; if(k.startsWith("cust"
   if(k==="heart") return LHRT[l]===1; if(k==="star") return LHRT[l]===2; if(k==="drop") return !LHRT[l] && (LCOL[l]===0||LCOL[l]===5) && LGRP[l]<0; if(k==="blue") return !LHRT[l] && LCOL[l]===2 && LGRP[l]<0; if(k==="cloud") return LGRP[l]>=0; return false; };
 const SOLOW={drop:5,heart:3,star:3,blue:5,cloud:2}, SOLOTR={drop:[3,4,5,6,2],heart:[4,3,5,6,2],star:[6,5],blue:[3,4,5,2],cloud:[0]}; let SOLON=0;
 function soloSpawn(){ const k=SOLO; SOLOB=1; try{ if(k==="cloud"){ const p=placeNear(CXs+(Math.random()-.5)*260,CYs+(Math.random()-.5)*160,90*G.cloudS); addCloud(p[0],p[1]); return; } if(k.startsWith("cust")){ custSpawn(+k.slice(4),true); return; }
-    const T=SOLOTR[k]; if(!T) return; TFORCE=T[SOLON++%T.length]; const R=Math.max(10,k==="star"?tierRS(5,6):k==="blue"?tierRS(2,5):tierRS(2,6)), p=placeNear(CXs+(Math.random()-.5)*300,CYs+(Math.random()-.5)*200,R*1.25);
+    const T=SOLOTR[k]; if(!T) return; TFORCE=T[SOLON++%T.length]; const R=Math.max(10,k==="star"?tierRS(5,6):k==="blue"?tierRS(2,5):tierRS(2,6)), p=window.NF_FIX?[CXs,CYs]:placeNear(CXs+(Math.random()-.5)*300,CYs+(Math.random()-.5)*200,R*1.25);
     addDrop(p[0],p[1],R,(Math.random()-.5)*20,(Math.random()-.5)*20); const l=nLobe-1; LKEEP[l]=1; LHA[l]=(Math.random()-.5)*.6;
     if(k==="heart") heartStyle(l); else if(k==="star"){ LHRT[l]=2; LCOL[l]=1; } else if(k==="blue") LCOL[l]=2; } finally{ SOLOB=0; TFORCE=0; } }
 function soloTick(dt){ if(!SOLO) return; const jelly=JELLY.includes(SOLO)||SOLO.startsWith("cust");
   for(let l=0;l<nLobe;l++) if(LCNT[l] && (!jelly || !soloIs(l))){ removeLobe(l); LCNT[l]=0; }
+  if(window.NF_FIX && jelly){ let best=-1, bc=0; for(let l=0;l<nLobe;l++) if(LCNT[l] && !LSOK[l] && LCNT[l]>bc){ bc=LCNT[l]; best=l; } const kg=(SOLO==="cloud" && best>=0)?LGRP[best]:-9; for(let l=0;l<nLobe;l++) if(LCNT[l] && !LSOK[l] && l!==best && !(kg>=0 && LGRP[l]===kg)){ removeLobe(l); LCNT[l]=0; } }   /* 고정 보기: 가장 큰 하나만 (터진 잔해는 그대로) */
   if(!jelly) return; let have=0; for(let l=0;l<nLobe;l++) if(LCNT[l]>=6) have++; if(SOLO==="cloud"){ const gs=new Set(); for(let l=0;l<nLobe;l++) if(LCNT[l] && LGRP[l]>=0) gs.add(LGRP[l]); have=gs.size; }
-  const want=SOLO.startsWith("cust")?1:SOLOW[SOLO]||3; SOLOT+=dt; if(have<want && SOLOT>.5){ SOLOT=0; soloSpawn(); } }   /* 모자라면 단계를 바꿔 가며 하나씩 놓는다 (큰 것부터 작은 것까지 섞여 보이게) */
+  const want=(window.NF_FIX||SOLO.startsWith("cust"))?1:SOLOW[SOLO]||3; SOLOT+=dt; if(have<want && SOLOT>.5){ SOLOT=0; soloSpawn(); } }   /* 모자라면 단계를 바꿔 가며 하나씩 놓는다 (큰 것부터 작은 것까지 섞여 보이게) */
 /* 천사와 주고받기: 방울 목록(세계 좌표)과, 천사 자리에 들어온 알갱이를 밀어내 방울이 천사 모양대로 눌리게 */
 function lobesW(){ const o=[]; for(let l=0;l<nLobe;l++){ const c=LCNT[l]; if(c<3) continue; o.push(LCX[l], LCY[l], Math.sqrt(c*SP0*SP0*.866/Math.PI)+RK*.5, LDZ[l], LNF[l]>simT?1:0); } return o; }   // x, y, 반지름, 층, 막 터진 조각
 function repel(x,y,r,vx,vy,z){ const r2=r*r; let hit=0; for(let i=0;i<N;i++){ if(z!=null && LDZ[LBL[i]]!==z) continue; const dx=X[i]-x, dy=Y[i]-y, d2=dx*dx+dy*dy; if(d2>=r2) continue; const d=Math.sqrt(d2)||1e-3, nx=dx/d, ny=dy/d, push=r-d; X[i]+=nx*push*.6; Y[i]+=ny*push*.6; VX[i]+=nx*push*6+vx*.4; VY[i]+=ny*push*6+vy*.4; LEV[LBL[i]]+=push*.02; hit++; } return hit; }
@@ -1763,15 +1764,17 @@ const SPK=[], SKC={f:"#FFE11C",l:"#F2941A",h:"#FFF6AE"}; let skAcc=0, skSeed=0, 
 /* 스파크 자리: 보이는 화면 전체(가장자리 포함)에서 무작위로 뽑되, 후보 몇 개 중 최근에 터진 곳들과 가장 먼 자리를 고른다 (한곳에 몰리지 않게) */
 const SKR=[]; function skPlace(){ let best=null, bd=-1; for(let c=0;c<6;c++){ const u=.02+.96*Math.random(), v=.02+.96*Math.random(), x=lerpV(0,u), y=lerpV(1,v), e=Math.max(Math.abs(u-.5),Math.abs(v-.5))*2; let m=1e18; for(const q of SKR){ const d=(q[0]-x)**2+(q[1]-y)**2; if(d<m) m=d; } const ed=G.skEdge==null?.6:G.skEdge, sc=Math.min(m,1e12)*((1-.7*ed)+e*e*e*ed*3); if(sc>bd){ bd=sc; best=[x,y]; } } SKR.push(best); if(SKR.length>8) SKR.shift(); return best; }   /* 가장자리 쪽에 더 자주 */
 function skSpawn(type,x,y,size,dir){ skSeed++; { const a=Math.min(G.skMin,G.skMax), b=Math.max(G.skMin,G.skMax); const rb=Math.min(.95,Math.max(.05,G.skBig==null?.5:G.skBig)), pw=Math.pow((1-rb)/rb,1.4); size*=a*Math.pow(b/a,Math.pow(Math.random(),pw)); }   /* 큰 스파크 비율: 50%면 고르게, 낮으면 대부분 작고 가끔 큼 */   // 크기 범위: 가장 작은 ~ 가장 큰 사이에서 무작위
-  SPK.push({cf:G.skMix?MIXS[Math.floor(Math.random()*MIXS.length)]:undefined,type,x,y,size,dir:dir??hh(skSeed,1)*TAU,rot:(hh(skSeed,2)-.5)*.8,t:0,life:G.skLife*(.7+.6*hh(skSeed,3))*(type===2?.75:1),sd:skSeed*7919+Math.floor(Math.random()*99991)}); if(SPK.length>150) SPK.shift(); }   // 모양 씨앗은 매번 무작위 (열 때마다·터질 때마다 다른 모양)
-function skTick(dt){ if(!G.skOn){ SPK.length=0; return; } const fl=G.skFloat && G.skT3, ts=[0,1,2,3,4].filter(i=>G["skT"+i] && !(fl && i===3));
+  let __sd=skSeed*7919+Math.floor(Math.random()*99991); if(window.NF_SKH){ const r=NF_SKH.pick(type,size,__sd); if(r){ __sd=r.sd; size=r.size; } }
+  SPK.push({cf:G.skMix?MIXS[Math.floor(Math.random()*MIXS.length)]:undefined,type,x,y,size,dir:dir??hh(skSeed,1)*TAU,rot:(hh(skSeed,2)-.5)*.8,t:0,life:G.skLife*(.7+.6*hh(skSeed,3))*(type===2?.75:1),sd:__sd}); if(SPK.length>150) SPK.shift(); }
+window.NF_SK={spawn:skSpawn,get L(){ return SPK; },get WW(){ return WW; },get WH(){ return WH; }};   // 모양 씨앗은 매번 무작위 (열 때마다·터질 때마다 다른 모양)
+function skTick(dt){ if(!G.skOn){ SPK.length=0; return; } if(window.NF_SKFIX) window.NF_SKFIX(dt); const fl=G.skFloat && G.skT3 && !window.NF_FIX, ts=[0,1,2,3,4].filter(i=>G["skT"+i] && !(fl && i===3));
   if(fl){ let nf=0; for(const s of SPK) if(s.fl) nf++; if(nf<Math.round(G.skStarN) && Math.random()<dt*1.5){ skSpawn(3,lerpV(0,.08+.84*Math.random()),lerpV(1,.08+.84*Math.random()),.6+.8*Math.random()); const s=SPK[SPK.length-1]; s.fl=1; s.life=G.skStarLife*(.7+.6*Math.random()); s.vx=0; s.vy=0; } }   // 떠다니는 별: 정한 개수만큼 늘 떠 있다
   for(const s of SPK){ if(!s.fl && !s.fl2 && !G.skFloat) continue; if(s.vx===undefined){ s.vx=0; s.vy=0; } const w=waterAt(s.x,s.y), k=Math.min(1,dt*2.2), ph=s.sd*1.7;   // 물 흐름을 따라 천천히, 제자리에서 둥실둥실
     s.vx+=(w[0]*.9*G.skFlow+Math.sin(s.t*.5+ph)*6-s.vx)*k; s.vy+=(w[1]*.9*G.skFlow+Math.cos(s.t*.43+ph)*6-s.vy)*k; s.x+=s.vx*dt; s.y+=s.vy*dt; s.rot+=Math.sin(s.t*.6+ph)*.25*dt;
     if(s.x<-80 || s.x>WW+80 || s.y<-80 || s.y>WH+80) s.t=s.life; }
   popT-=dt; if(POPQ.length && popT<=0){ const q=POPQ.shift(); if(Math.random()<(G.skPopP==null?.55:G.skPopP) || q[2]==="bolt"){ const sp=(G.skSpread||0), a=Math.random()*TAU, d=sp*(q[3]*1.2+Math.min(WW,WH)*.22)*Math.sqrt(Math.random()); popNow(q[0]+Math.cos(a)*d,q[1]+Math.sin(a)*d,q[2],q[3]); }   /* 터진 자리 둘레로 흩어져 */   /* 터질 때마다 다 나오지 않게 */ popT=.07+.05*Math.random(); }
   /* 리듬: 한 번에 하나씩, 박자 무늬(길게·짧게·짧게·길게·쉼…)를 따라 나온다. 늦어진 프레임에 몰아서 터뜨리지 않는다 */
-  skAcc-=dt; if(skAcc<=0 && ts.length && G.skRate>0 && skLive()<(G.skCap||10)){ skSeed++; const ty=ts[Math.floor(hh(skSeed,9)*ts.length)]; const pp=skPlace(); skSpawn(ty,pp[0],pp[1],(ty===4?.45:1)*(.55+.9*Math.random()));
+  skAcc-=dt; if(skAcc<=0 && ts.length && G.skRate>0 && skLive()<(G.skCap||10) && !window.NF_FIX){ skSeed++; const ty=window.NF_SKH?NF_SKH.type(ts,hh(skSeed,9)):ts[Math.floor(hh(skSeed,9)*ts.length)]; const pp=skPlace(); skSpawn(ty,pp[0],pp[1],(ty===4?.45:1)*(.55+.9*Math.random()));
     const beat=1/G.skRate, pat=SKPAT[skBeat++%SKPAT.length]; skAcc=Math.max(.22,beat*pat*(.9+.2*Math.random())); }   /* 빈도: 예전보다 덜 자주 */
   if(G.skLink) for(const P of POURS){ if(P.skd || P.delay>0 || P.s<=0) continue; P.skd=1; if(P.c===1 && hh(P.key,77)<.6) continue; const d=Math.atan2(P.dy||0,P.dx||1);   // 분홍 줄기가 새로 터져 나올 때 같은 방향으로 같이 터진다
     if(G.skT0) skSpawn(0,P.x,P.y,1+.3*hh(P.key,78),d); if(G.skT2) skSpawn(2,P.x,P.y,1,d); if(G.skT1) skSpawn(1,P.x+Math.cos(d)*30,P.y+Math.sin(d)*30,.8,d+(hh(P.key,79)-.5)); }
@@ -2097,7 +2100,7 @@ if(window.NF_SOLO){ const K=window.NF_SOLO, NAMES={drop:"핏방울",heart:"하�
   const FX={bub:"fxBubOn",dot:"fxDotOn",wave:"fxWaveOn",ray:"fxRayOn",paint:"fxPaintOn",zeb:"fxZebOn"}, JEL=["drop","heart","star","blue","cloud"].includes(K)||K.startsWith("cust");
   /* 이 창은 보여 주기용으로 다른 것을 끄므로 그대로 저장하지 않는다. 손잡이로 바꾼 값만 골라 저장하고, 열려 있는 메인 창에도 같은 손짓을 보낸다 */
   saveG=()=>{}; BD.noSave(); BD.setSolo(K);
-  const apply=()=>{ if(K!=="liquid") for(let c=0;c<4;c++) if(G.vis[c]) setVis(c,false); for(const k in G) if(/^fx[A-Z][a-z]*On$/.test(k)) G[k]=0; if(FX[K]) G[FX[K]]=1; G.stOn=K==="cross"?1:0; G.skOn=K==="spark"?1:0; G.clOn=K==="cloudbg"?1:0; const b=BD.G; b.leave=0; b.outP=0; b.refill=0; b.heart=0; b.star=0; b.blue=0; b.cloud=0; };
+  const apply=()=>{ if(K!=="liquid") for(let c=0;c<4;c++) if(G.vis[c]) setVis(c,false); for(const k in G) if(/^fx[A-Z][a-z]*On$/.test(k)) G[k]=0; if(FX[K]) G[FX[K]]=1; G.stOn=K==="cross"?1:0; G.skOn=K==="spark"?1:0; G.clOn=K==="cloudbg"?1:0; const b=BD.G; b.leave=0; b.outP=0; b.refill=0; b.heart=0; b.star=0; b.blue=0; b.cloud=0; if(window.NF_FIX){ b.flowInf=0; b.outP=0; } };
   const rd=k=>{ try{ return JSON.parse(localStorage.getItem(k)||"{}")||{}; }catch(_){ return {}; } };
   let RG=rd(KEY), RB=rd("swirl-flow-bd"), SG="", SB="";
   const snapAll=()=>{ SG=JSON.stringify(G); SB=JSON.stringify(BD.G); };
@@ -2457,7 +2460,8 @@ if(window.NF_VIEW==="panel")(function(){
     ["일렁이는 구름","배경",[["나오기","clOn"],["구름 양","clAmt"],["일렁임","clWarp"],["빠르기","clSpd"]],null],
     ["줄기 스플래시","이펙트",[["나오기","xsOnB"],["빈도","xsRate"],["크기","xsSize"]],null]];
   const syncs=[]; const SOLOK={"핏방울":"drop","하트":"heart","별":"star","물방울":"blue","구름":"cloud","십자별":"cross","노란 스파크":"spark","액체 줄기":"liquid","비눗방울":"bub","색 점":"dot","물결 띠":"wave","방사 집중선":"ray","페인트 튀김 줄":"paint","얼룩말 줄무늬":"zeb","줄기 스플래시":"splash","일렁이는 구름":"cloudbg"};
-  const openSolo=(k,ed)=>{ const w=window.open(location.pathname+"?view=stage&solo="+encodeURIComponent(k)+(ed?"&edit=1":""),"nuflow-solo","popup,width=1280,height=820"); if(w) w.focus(); };   // 따로 보기 창 (한 창을 다시 쓴다)
+  const openSolo=(k,ed)=>{ const q=location.pathname+"?view=stage&solo="+encodeURIComponent(k)+(ed?"&edit=1":""), SW=screen.availWidth||1600, SH=screen.availHeight||900, mw=Math.min(460,Math.round(SW*.3));   /* 따로 보기: 이미지 창과 메뉴 창 두 개 (두 번째 창이 막히면 이미지 창의 '⚙ 메뉴 창' 단추로 연다) */
+    const w=window.open(q+"&img=1","nuflow-solo","popup,left=0,top=0,width="+(SW-mw-12)+",height="+SH); const m=window.open(q+"&menu=1","nuflow-solo-menu","popup,left="+(SW-mw)+",top=0,width="+mw+",height="+SH); if(m) m.focus(); else if(w) w.focus(); };   // 따로 보기 창 (한 창을 다시 쓴다)
   function proxy(label,id){ const o=$(id); if(!o) return null; const w=mk("label","pxy"); w.appendChild(mk("span","",label));
     if(o.tagName==="BUTTON"){ const b=mk("button","",""); b.type="button"; b.addEventListener("click",()=>{ o.click(); setTimeout(sy,30); }); const sy=()=>{ b.setAttribute("aria-pressed",o.getAttribute("aria-pressed")||"false"); b.textContent=o.getAttribute("aria-pressed")==="true"?"켜짐":"꺼짐"; }; syncs.push(sy); sy(); w.appendChild(b); return w; }
     const r=mk("input"); r.type="range"; r.min=o.min||0; r.max=o.max||100; r.step=o.step||"any"; r.value=o.value; const out=mk("output","",""); const ov=$(id+"V");
@@ -2588,6 +2592,29 @@ html body #soloP.nfi .it button{min-height:28px;padding:3px 10px;font-size:12px}
 html body #soloP.nfi .it .sw{grid-column:1/-1}
 html body #soloP.nfi .hd b{font-size:13px}
 .v-stage .fbar{z-index:9!important}
+/* 따로 보기 두 창 */
+html.nfimg body #soloP{display:none!important}
+html.nfimg canvas.edcv{right:0;width:100vw}
+html.nfmenu body{overflow:hidden}
+html.nfmenu .stage{display:none!important}
+html.nfmenu body #soloP.nfi{position:fixed!important;inset:0!important;width:100vw!important;max-width:none!important;border:0!important;border-radius:0!important;box-shadow:none!important}
+html.nfmenu .fbar{display:none!important}
+#soloP .twinst{margin:8px 12px 0;font-size:12px;color:#9C2F86;font-weight:700}
+#soloP .twinopen{margin:6px 12px;align-self:flex-start;font:inherit;font-size:12px;font-weight:800;border:1.5px solid #9C2F86;border-radius:999px;background:#FDF11E;color:#33123A;padding:5px 12px;cursor:pointer}
+#soloP .twinopen[hidden],#soloP .twinst[hidden]{display:none}
+.nfrate{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:9;display:flex;gap:10px;align-items:center;background:rgba(255,255,255,.92);border:2px solid #9C2F86;border-radius:999px;padding:8px 12px;box-shadow:0 6px 22px rgba(51,18,58,.25);font:700 14px/1.2 "Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif}
+.nfrate[hidden],.nfinfo[hidden]{display:none}
+.nfrate button{font:inherit;border:2px solid #9C2F86;border-radius:999px;background:#fff;color:#33123A;min-height:42px;padding:6px 18px;cursor:pointer}
+.nfrate button.up{background:#F9618D}.nfrate button.dn{background:#EDE6EE}.nfrate button.nx{background:#FDF11E}
+.nfrate button:focus-visible{outline:3px solid #FDF11E;outline-offset:2px}
+.nfrate .an{display:flex;align-items:center;gap:6px;font-size:12px;color:#7B5876;padding-left:4px}
+.nfinfo{position:fixed;left:50%;bottom:86px;transform:translateX(-50%);z-index:9;font:700 12.5px/1.3 "Pretendard","Malgun Gothic",system-ui,sans-serif;color:#33123A;background:rgba(255,255,255,.85);border-radius:999px;padding:4px 12px}
+.nfflash{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%) scale(.9);z-index:10;font:900 22px/1 "Pretendard","Malgun Gothic",system-ui,sans-serif;color:#33123A;background:#fff;border:3px solid #9C2F86;border-radius:16px;padding:14px 22px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s}
+.nfflash.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.nfmenub{position:fixed;right:12px;top:12px;z-index:9;font:800 12.5px/1 "Pretendard","Malgun Gothic",system-ui,sans-serif;border:2px solid #9C2F86;border-radius:999px;background:rgba(255,255,255,.9);color:#33123A;padding:8px 12px;cursor:pointer}
+html.nfmenu .nfmenub{display:none}
+.ctl button.cnt{opacity:1!important;cursor:default;border-style:dashed}
+html.nfmenu #soloMin{display:none!important}
 
 </style>
 <script>
@@ -2662,7 +2689,7 @@ window.NFUI=(function(){ const $=id=>document.getElementById(id);
    NU FLOW의 오브젝트로 들여온다. 무대 위 따로 된 투명 판에 그리고, 종류마다 켜고 끄며 빈도·크기·색·테두리를 조절한다.
    모양을 만드는 계산은 원래 데모의 코드를 그대로 옮겼다 (아래 '원본' 부분) */
 (function(){ const VIEW=window.NF_VIEW||"both", SOLO=window.NF_SOLO||"", U=window.NFUI, $$=id=>document.getElementById(id);
-  const RUN=VIEW!=="panel" && (!SOLO || SOLO==="splash");
+  const RUN=VIEW!=="panel" && !window.NF_MENU && (!SOLO || SOLO==="splash");
   const SK="nu-flow-splash";
   const PAL=[["#FAD805","#C79A00"],["#EDA40E","#A8650A"],["#E94D78","#B1224F"],["#E72B57","#A50F33"],["#E87799","#B8466A"],["#F2ABCD","#C7709A"],["#A7449D","#6E1E66"],["#593997","#331A63"],["#159FDD","#0B6A99"],["#70CCE8","#2E95B8"],["#49D762","#1E8A3A"],["#FFFFFF","#9AA0AA"]];
   const KINDS=[["impact","충돌 팡"],["radial","방사 폭발"],["shot","날아오는 줄기"],["fork","갈퀴 줄기"],["arc","가시 호"],["fushuk","푸슉"]];
@@ -2981,8 +3008,33 @@ function tplFrame(e,dt){ e.t+=dt; const t=e.t, pk=t<.1?.85+.3*t/.1:t<.22?1.15-(t
   const pickCol=()=>{ if(C.cmode==="pal"){ const p=PAL[Math.floor(Math.random()*PAL.length)]; return p; } const t=darker(C.col); return [C.col,t]; };
   function darker(h){ const n=parseInt(h.slice(1),16), f=v=>Math.round(v*.62).toString(16).padStart(2,"0"); return "#"+f(n>>16)+f(n>>8&255)+f(n&255); }
   function place(){ const m=C.place; if(m==="edge"){ const s=Math.floor(Math.random()*4), u=R(.05,.95); return s===0?[R(.04,.16)*W,u*H]:s===1?[R(.84,.96)*W,u*H]:s===2?[u*W,R(.05,.18)*H]:[u*W,R(.82,.95)*H]; } if(m==="all") return [R(.06,.94)*W,R(.08,.92)*H]; return [R(.22,.78)*W,R(.22,.78)*H]; }
-  function spawnOne(x,y,kind){ const on=KINDS.map(k=>k[0]).filter(k=>C.kinds[k]); if(!on.length) return; const k=kind||on[Math.floor(Math.random()*on.length)]; if(x==null){ [x,y]=place(); } const [c,t]=pickCol(); S.col=c; S.tone=t; S.mode=k; spawn(x,y,k); }
-  window.NF_SPLASH={ now:(k)=>spawnOne(null,null,k), clear:()=>{ FX.length=0; }, get C(){ return C; } };
+  /* ── 취향 배우기: 추천·싫어요를 모아 두고, 새 스플래시를 고를 때 그쪽으로 기울인다 ──
+     변주 하나 = 종류 + 씨앗(같은 씨앗이면 같은 모양) + 색. 모양의 특징은 만들어진 값(줄기 수·길이·굵기·가시…)에서 숫자를 모아 잰다 */
+  const TASTEK="nu-flow-taste", seeded=(sd,f)=>{ const mr=Math.random; Math.random=mul(sd); try{ return f(); } finally{ Math.random=mr; } };
+  const taste=()=>{ const o=U.LS.get(TASTEK,{}); return Array.isArray(o.splash)?o.splash:[]; };
+  const SKIP=new Set(["x","y","t","ox","oy","x0","y0","seed","ph","ph2","sd","col","tone","acx","acy","dead","x1","y1"]);
+  function feat(e,out,pre,d){ out=out||{}; pre=pre||""; d=d||0; if(!e || d>2) return out; for(const k in e){ if(SKIP.has(k)) continue; const v=e[k]; if(typeof v==="number" && isFinite(v)) out[pre+k]=v; else if(typeof v==="boolean") out[pre+k]=v?1:0; else if(Array.isArray(v) && v.length && typeof v[0]==="object" && !Array.isArray(v[0])){ out[pre+k+"#"]=v.length; const acc={}; for(const it of v) feat(it,acc,"",d+1); for(const q in acc) out[pre+k+"."+q]=acc[q]/v.length; } else if(v && typeof v==="object" && !Array.isArray(v)) feat(v,out,pre+k+".",d+1); } return out; }
+  function hueF(h){ const n=parseInt(h.slice(1),16), r=(n>>16)/255, g2=(n>>8&255)/255, b=(n&255)/255, mx=Math.max(r,g2,b), mn=Math.min(r,g2,b); let H=0; if(mx>mn){ const d=mx-mn; H=mx===r?(g2-b)/d:mx===g2?(b-r)/d+2:(r-g2)/d+4; } H*=Math.PI/3; const s=mx?(mx-mn)/mx:0; return [Math.cos(H)*s,Math.sin(H)*s,mx]; }
+  function make(k,sd,x,y,keep){ return seeded(sd,()=>{ const [c,t]=pickCol(); S.col=c; S.tone=t; S.mode=k; const n=FX.length; spawn(x,y,k); const add=FX.slice(n); if(!keep) FX.length=n; const f=feat(add[0]||{}); const hu=hueF(c); f["~h1"]=hu[0]*3; f["~h2"]=hu[1]*3; f["~v"]=hu[2]; return {k,sd,col:c,tone:t,f,add}; }); }
+  function replay(v,x,y){ seeded(v.sd,()=>{ pickCol(); S.col=v.col; S.tone=v.tone; S.mode=v.k; spawn(x,y,v.k); }); }
+  const SC={}; function scale(k){ if(SC[k]) return SC[k]; const m={}, q={}; let n=0; for(let i=0;i<24;i++){ const f=make(k,(Math.random()*2**31)|0,W/2,H/2,false).f; n++; for(const a in f){ m[a]=(m[a]||0)+f[a]; q[a]=(q[a]||0)+f[a]*f[a]; } } const sd={}; for(const a in m){ const mu=m[a]/n; sd[a]=Math.sqrt(Math.max(1e-9,q[a]/n-mu*mu))||1; } return (SC[k]=sd); }
+  function dist(k,a,b){ const sd=scale(k); let s=0, c=0; for(const q in a){ if(!(q in b)) continue; const z=(a[q]-b[q])/(sd[q]>1e-6?sd[q]:1); s+=Math.min(9,z*z); c++; } return c?Math.sqrt(s/c):3; }
+  function score(v,T){ let s=0; for(const r of T){ if(r.k!==v.k) continue; const w=Math.exp(-Math.pow(dist(v.k,v.f,r.f),2)/(2*.55*.55)); s+=r.v>0?w:-1.2*w; } return s; }
+  function kindW(k,T){ let s=0; for(const r of T) if(r.k===k) s+=r.v>0?1:-.8; return Math.exp(Math.max(-1.6,Math.min(1.5,s*.12))); }
+  /* 다음 변주 고르기: 추천한 것 그대로 다시(가끔) · 후보 여럿 중 취향 점수가 높은 쪽을 더 자주 */
+  function choose(kind,exact,plain){ const on=kind?[kind]:KINDS.map(k=>k[0]).filter(k=>C.kinds[k]); if(!on.length) return null; const T=plain?[]:taste();
+    if(exact && T.length){ const L=T.filter(r=>r.v>0 && on.includes(r.k)); if(L.length && Math.random()<.2) return L[Math.floor(Math.random()*L.length)]; }
+    const pk=()=>{ if(on.length===1) return on[0]; const ws=on.map(k=>kindW(k,T)), tot=ws.reduce((a,b)=>a+b,0); let r=Math.random()*tot; for(let i=0;i<on.length;i++){ r-=ws[i]; if(r<=0) return on[i]; } return on[0]; };
+    if(!T.length){ const k=pk(); return make(k,(Math.random()*2**31)|0,W/2,H/2,false); }
+    const M=[]; for(let i=0;i<8;i++){ const k=pk(), v=make(k,(Math.random()*2**31)|0,W/2,H/2,false); v.s=score(v,T); M.push(v); }
+    const ws=M.map(v=>Math.exp(Math.max(-2.5,Math.min(1.6,v.s)))),   /* 한쪽으로 쏠리지 않게: 좋아한 쪽은 최대 다섯 배, 싫어한 쪽은 열두 분의 일까지 */ tot=ws.reduce((a,b)=>a+b,0); let r=Math.random()*tot; for(let i=0;i<M.length;i++){ r-=ws[i]; if(r<=0) return M[i]; } return M[0]; }
+  function spawnOne(x,y,kind){ if(x==null){ [x,y]=place(); } const v=choose(kind,true); if(v) replay(v,x,y); }
+  /* 고정 보기 (따로 보기 이미지 창): 가운데에 한 변주만, 터지고 사라지면 같은 모양으로 다시 */
+  const FIXV=!!(window.NF_FIX && SOLO==="splash"); let CUR=null, gap=0;
+  function next(){ CUR=Math.random()<.6?choose(null,false,true):choose(null,false);   /* 평가하는 창에서는 고루 보여 주어야 하니 열에 여섯은 취향과 상관없이 */ FX.length=0; gap=0; if(window.NF_RATEUI) NF_RATEUI(); }
+  function rate(v){ if(!CUR) return; const o=U.LS.get(TASTEK,{}); const L=Array.isArray(o.splash)?o.splash:[]; L.push({k:CUR.k,sd:CUR.sd,col:CUR.col,tone:CUR.tone,f:CUR.f,v,t:Date.now()}); o.splash=L.slice(-400); U.LS.set(TASTEK,o); }
+  function stats(){ const T=taste(); let up=0, dn=0; for(const r of T) r.v>0?up++:dn++; return {up,dn,cur:CUR?KINDS.find(k=>k[0]===CUR.k)[1]:""}; }
+  window.NF_SPLASH={ pick:()=>{ const v=choose(null,true); return v&&v.k; }, now:(k)=>spawnOne(null,null,k), clear:()=>{ FX.length=0; }, get C(){ return C; }, next, rate, stats, get fixed(){ return FIXV; }, resetTaste:()=>{ const o=U.LS.get(TASTEK,{}); o.splash=[]; U.LS.set(TASTEK,o); } };
   let last=performance.now(), auto=1;
   function frame(now){ requestAnimationFrame(frame); const raw=Math.min(.05,(now-last)/1000); last=now; if(document.hidden) return;
     const live=(C.on || SOLO==="splash"); if(!live && !FX.length){ if(cv._dirty){ g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,cv.width,cv.height); cv._dirty=0; } return; }
@@ -2992,7 +3044,8 @@ function tplFrame(e,dt){ e.t+=dt; const t=e.t, pk=t<.1?.85+.3*t/.1:t<.22?1.15-(t
     const TP=[], FSq=[], groups=new Map(); for(let i=FX.length-1;i>=0;i--){ const e=FX[i]; if(e.k==="tpl"){ TP.push(i); continue; } if(e.k==="fushuk"){ e.t+=dt; const O=[], Cc=[]; if(!fsShapes(e,O,Cc)) FX.splice(i,1); else FSq.push([O,Cc,e.col]); continue; } e.t+=dt; const key=e.col+"|"+e.tone, P=groups.get(key)||[]; const alive=shapes(e,P); groups.set(key,P); if(!alive) FX.splice(i,1); }
     g.save(); g.globalAlpha=C.alpha; for(const [key,P] of groups){ const [c,tn]=key.split("|"); paint(P,c,tn); } for(const [O,Cc,c] of FSq) fsPaint(O,Cc,c); g.restore();
     for(const i of TP){ if(!tplFrame(FX[i],dt)) FX[i].dead=1; } for(let i=FX.length-1;i>=0;i--) if(FX[i].dead) FX.splice(i,1);
-    if(live){ auto-=raw; if(auto<=0){ auto=60/Math.max(.5,C.rate)*R(.6,1.4); if(FX.length<C.max) spawnOne(); } } }
+    if(FIXV){ if(!CUR) next(); if(!FX.length){ gap+=raw; if(gap>.5){ gap=0; replay(CUR,W/2,H/2); } } }
+    else if(live){ auto-=raw; if(auto<=0){ auto=60/Math.max(.5,C.rate)*R(.6,1.4); if(FX.length<C.max) spawnOne(); } } }
   let bt=0;
   if(RUN){ const st=document.querySelector(".stage"); if(st){ st.appendChild(cv); requestAnimationFrame(frame); } }
   /* 설정 칸 */
@@ -3027,10 +3080,13 @@ function tplFrame(e,dt){ e.t+=dt; const t=e.t, pk=t<.1?.85+.3*t/.1:t<.22?1.15-(t
 })();
 /* 따로 보기 창: 이 칸들은 따로 보기 판이 만들어진 뒤에 생기므로, 판에 늦게 채워 넣는다 */
 (function(){ const K=window.NF_SOLO; if(K!=="splash") return; const go=()=>{ const P=document.getElementById("soloP"); if(!P){ setTimeout(go,100); return; } const SB=P.querySelector(".sb");
-  const SETS=[["나오기",["xsOn","xsKinds","xsRate","xsMax","xsPlace"]],["크기·빠르기",["xsSize","xsSpeed","xsAlpha"]],["색·테두리",["xsCM","xsCol","xsLine","xsBoil"]],["가시",["xsJets","xsShort","xsLong","xsNLong","xsSpk","xsShardV","xsShardN","xsTurn","xsShrink","xsBI"]],["푸슉",["xsFsN","xsFsSize","xsFsTail","xsFsIn"]]];
+  const SETS=[["나오기",["xsOn","xsTaste","xsKinds","xsRate","xsMax","xsPlace"]],["크기·빠르기",["xsSize","xsSpeed","xsAlpha"]],["색·테두리",["xsCM","xsCol","xsLine","xsBoil"]],["가시",["xsJets","xsShort","xsLong","xsNLong","xsSpk","xsShardV","xsShardN","xsTurn","xsShrink","xsBI"]],["푸슉",["xsFsN","xsFsSize","xsFsTail","xsFsIn"]]];
   SB.querySelectorAll(".nt").forEach(e=>{ if(/따로 바꿀 값이 없어요/.test(e.textContent)) e.remove(); }); const tail=SB.lastElementChild;
   for(const [h,ids] of SETS){ const h4=document.createElement("h4"); h4.textContent=h; const box=document.createElement("div"); for(const id of ids){ const el=document.querySelector('.it[data-k="'+id+'"]'); if(el) box.appendChild(el); } if(box.children.length) SB.insertBefore(h4,tail), SB.insertBefore(box,tail); } };
   if(document.readyState==="loading") addEventListener("DOMContentLoaded",go); else setTimeout(go,0); })();
+/* 취향 칸 (메뉴): 지금까지 배운 것과 지우기 */
+(function(){ const U=window.NFUI; const w=U.btns("xsTaste","배운 취향",[["xsTasteN","",null,()=>{}],["xsTasteR","지우기",null,b=>{ if(b.dataset.ok!=="1"){ b.dataset.ok="1"; b.textContent="한 번 더 누르면 지움"; setTimeout(()=>{ b.dataset.ok=""; b.textContent="지우기"; },2500); return; } NF_SPLASH.resetTaste(); up(); }]],"따로 보기 이미지 창에서 누른 추천·싫어요. 추천한 모양은 가끔 그대로 다시 나오고, 비슷한 모양이 더 자주 나옵니다. 싫어요를 받은 모양과 비슷한 것은 덜 나옵니다.");
+  const n=document.getElementById("xsTasteN"); n.disabled=true; n.classList.add("cnt"); function up(){ const s=NF_SPLASH.stats(); n.textContent="추천 "+s.up+" · 싫어요 "+s.dn; } up(); addEventListener("storage",e=>{ if(e.key==="nu-flow-taste") up(); }); setInterval(up,3000); })();
 
 </script>
 <script>
@@ -3062,7 +3118,7 @@ function tplFrame(e,dt){ e.t+=dt; const t=e.t, pk=t<.1?.85+.3*t/.1:t<.22?1.15-(t
     tabs.forEach(([n],i)=>{ const b=mk("button","",n); b.type="button"; b.setAttribute("role","tab"); b.addEventListener("click",()=>show(i)); tb.appendChild(b); });
     buildEditor(sb2); show(0);
     window.NF_EDIT_OPEN=()=>{ show(2); };
-    if(new URLSearchParams(location.search).get("edit")==="1") setTimeout(()=>{ show(2); edStart(); },600);
+    if(new URLSearchParams(location.search).get("edit")==="1") setTimeout(()=>{ show(2); edStart(); },window.NF_FIX?900:600);
   }
   if(document.readyState==="loading") addEventListener("DOMContentLoaded",()=>setTimeout(go,50)); else setTimeout(go,50);
 
@@ -3082,7 +3138,7 @@ function tplFrame(e,dt){ e.t+=dt; const t=e.t, pk=t<.1?.85+.3*t/.1:t<.22?1.15-(t
     ui.k=rng(s1,"색 수",2,14,1,6,()=>{},v=>v+"가지"); ui.min=rng(s1,"작은 조각 무시",0,400,5,40,()=>{},v=>v+"px²"); ui.smooth=rng(s1,"매끈함",.4,4,.1,1.4,()=>{},v=>v.toFixed(1));
     const r1b=row(s1); btn(r1b,"영역 고르기",()=>setTool("crop")); btn(r1b,"모양 따기",()=>trace()); btn(r1b,"빈 판",()=>{ snap(); ED.doc.layers=[]; ED.sel=-1; draw(); msg("빈 판이에요 — 펜이나 붓으로 그리세요"); });
     ui.ghost=rng(s1,"원본 비치기",0,1,.05,0,v=>{ ED.ghost=v; draw(); },v=>Math.round(v*100)+"%");
-    const saved=mk("div","esaved"); s1.appendChild(saved); ui.saved=saved;
+    const saved=mk("div","esaved"); saved.id="exSaved"; saved.dataset.sync="html"; s1.appendChild(saved); ui.saved=saved;
     /* 2. 도구 */
     const s2=sec("2 · 도구"); const r2=row(s2); ui.tools={};
     for(const [t,n,k] of [["select","고르기·옮기기","V"],["node","점 고치기","A"],["pen","펜","P"],["brush","붓","B"],["push","밀어서 고치기","M"],["pick","스포이드","I"]]){ ui.tools[t]=btn(r2,n,()=>setTool(t),"tool"); ui.tools[t].title=n+" ("+k+")"; }
@@ -3090,7 +3146,7 @@ function tplFrame(e,dt){ e.t+=dt; const t=e.t, pk=t<.1?.85+.3*t/.1:t<.22?1.15-(t
     const r2b=row(s2); ui.clipB=btn(r2b,"고른 조각 안에만 칠하기",()=>{ ED.clipNew=!ED.clipNew; ui.clipB.setAttribute("aria-pressed",ED.clipNew?"true":"false"); },"tog"); ui.clipB.setAttribute("aria-pressed","false");
     s2.appendChild(mk("p","nt","점 고치기: 점·손잡이를 끌기 · 선 위 두 번 눌러 점 더하기 · 점 두 번 눌러 지우기 · Alt+누르기로 뾰족↔둥글. 펜: 누르면 뾰족점, 끌면 곡선점, 첫 점을 누르면 닫힘. 화면 이동: 스페이스+끌기, 확대: 휠"));
     /* 3. 고른 조각 */
-    const s3=sec("3 · 고른 조각"); ui.selInfo=mk("p","nt","조각을 눌러 고르세요."); s3.appendChild(ui.selInfo);
+    const s3=sec("3 · 고른 조각"); ui.selInfo=mk("p","nt","조각을 눌러 고르세요."); ui.selInfo.id="exSel"; s3.appendChild(ui.selInfo);
     ui.fill=col(s3,"채우기",ED.fill,v=>{ ED.fill=v; setSel(L=>{ if(ui.same.getAttribute("aria-pressed")==="true"){ const old=L.fill; for(const M of ED.doc.layers) if(M.fill===old && M!==L) M.fill=v; } L.fill=v; },true); });
     const sw=mk("div","epal"); for(const c of PAL){ const b=mk("button","sw"); b.type="button"; b.style.background=c; b.title=c; b.addEventListener("click",()=>{ ui.fill._c.value=c; ui.fill._c.dispatchEvent(new Event("input")); }); sw.appendChild(b); } s3.appendChild(sw);
     const r3=row(s3); ui.same=btn(r3,"같은 색 모두 바꾸기",()=>{ const v=ui.same.getAttribute("aria-pressed")!=="true"; ui.same.setAttribute("aria-pressed",v?"true":"false"); },"tog"); ui.same.setAttribute("aria-pressed","false");
@@ -3109,7 +3165,7 @@ function tplFrame(e,dt){ e.t+=dt; const t=e.t, pk=t<.1?.85+.3*t/.1:t<.22?1.15-(t
     /* 5. 저장 */
     const s5=sec("5 · 저장"); const nm=mk("input","ename"); nm.type="text"; nm.placeholder="새 오브젝트 이름"; nm.value=(NAMES[K]||"내 오브젝트")+" 변주"; s5.appendChild(nm); ui.name=nm;
     const r5=row(s5); btn(r5,"새 오브젝트로 등록",()=>register(),"hot"); btn(r5,"PNG",()=>download("png")); btn(r5,"SVG",()=>download("svg"));
-    ui.msg=mk("p","emsg"); ui.msg.setAttribute("aria-live","polite"); s5.appendChild(ui.msg);
+    ui.msg=mk("p","emsg"); ui.msg.id="exMsg"; ui.msg.setAttribute("aria-live","polite"); s5.appendChild(ui.msg);
     syncUI(); listSaved();
   }
   const msg=t=>{ if(ui.msg) ui.msg.textContent=t; const m=ui.msg; if(m){ clearTimeout(m._t); m._t=setTimeout(()=>{ m.textContent=""; },6000); } };
@@ -3128,7 +3184,7 @@ function tplFrame(e,dt){ e.t+=dt; const t=e.t, pk=t<.1?.85+.3*t/.1:t<.22?1.15-(t
   function capture(){ const st=document.querySelector(".stage"); const r=st.getBoundingClientRect(); const k=Math.min(1,1000/Math.max(r.width,r.height)), w=Math.max(8,Math.round(r.width*k)), h=Math.max(8,Math.round(r.height*k)); const c=document.createElement("canvas"); c.width=w; c.height=h; const x=c.getContext("2d");
     st.querySelectorAll("canvas").forEach(cc=>{ if(cc===cv || cc.offsetParent===null && getComputedStyle(cc).display==="none") return; const q=cc.getBoundingClientRect(); if(!q.width) return; try{ x.drawImage(cc,(q.left-r.left)*k,(q.top-r.top)*k,q.width*k,q.height*k); }catch(_){} }); return c; }
   function custImg(){ const m=/^cust(\d+)$/.exec(K); if(!m) return null; let L=[]; try{ L=JSON.parse(localStorage.getItem(CK)||"[]"); }catch(_){} return L[+m[1]]||null; }
-  function edStart(){ if(ED.on) return; const late=K==="splash" && window.NF_SPLASH; if(late) NF_SPLASH.now(); ED.on=true; mkCanvas(); const c=custImg(); if(!late) window.NF_PAUSE=1;
+  function edStart(){ if(ED.on || window.NF_MENU) return; const late=K==="splash" && window.NF_SPLASH; if(late) NF_SPLASH.now(); ED.on=true; mkCanvas(); const c=custImg(); if(!late) window.NF_PAUSE=1;
     const fin=img=>{ ED.img=img; ED.doc={w:img.width,h:img.height,layers:[]}; ED.undo=[]; ED.redo=[]; ED.sel=-1; ED.crop=null; fitView(); const v=c&&(c.vec||(c.vid&&(()=>{ try{ const e=JSON.parse(localStorage.getItem(EK)||"[]").find(x=>x.vid===c.vid); return e&&e.vec; }catch(_){ return null; } })())); if(v){ ED.doc=JSON.parse(JSON.stringify(v)); msg("저장해 둔 벡터를 열었어요"); } else trace(); setTool("select"); syncUI(); draw(); };
     if(c && c.src){ const im=new Image(); im.crossOrigin="anonymous"; im.onload=()=>{ const k=Math.min(1,900/Math.max(im.naturalWidth,im.naturalHeight)), w=Math.round(im.naturalWidth*k), h=Math.round(im.naturalHeight*k); const cc=document.createElement("canvas"); cc.width=w+80; cc.height=h+80; cc.getContext("2d").drawImage(im,40,40,w,h); fin(cc); }; im.onerror=()=>fin(capture()); im.src=c.src; }
     else setTimeout(()=>{ window.NF_PAUSE=1; fin(capture()); },late?420:60); }   // 줄기 스플래시는 하나 터뜨려 한창일 때 찍는다
@@ -3283,7 +3339,7 @@ function tplFrame(e,dt){ e.t+=dt; const t=e.t, pk=t<.1?.85+.3*t/.1:t<.22?1.15-(t
     const E=(()=>{ try{ return JSON.parse(localStorage.getItem(EK)||"[]"); }catch(_){ return []; } })(); E.unshift({name:o.name,t:Date.now(),from:K,vid:o.vid,vec}); try{ localStorage.setItem(EK,JSON.stringify(E.slice(0,12))); }catch(_){}
     if(window.__nfCust) window.__nfCust(); listSaved();
     msg("'"+o.name+"'을(를) 내 오브젝트로 등록했어요 — 메인 화면에 곧 나와요 (오브젝트 → 목록에서 조절)"); }
-  function listSaved(){ if(!ui.saved) return; let E=[]; try{ E=JSON.parse(localStorage.getItem(EK)||"[]"); }catch(_){} ui.saved.replaceChildren(); if(!E.length) return; ui.saved.appendChild(mk("small","","저장한 편집 다시 열기")); const r=mk("div","erow"); E.forEach((e,i)=>{ const b=mk("button","",e.name); b.type="button"; b.title=new Date(e.t).toLocaleString(); b.addEventListener("click",()=>{ if(!ED.on){ window.NF_PAUSE=1; ED.on=true; mkCanvas(); } snap(); ED.doc=JSON.parse(JSON.stringify(e.vec)); ED.img=null; ED.sel=-1; fitView(); syncUI(); draw(); msg("'"+e.name+"'을(를) 열었어요"); }); r.appendChild(b); }); ui.saved.appendChild(r); }
+  function listSaved(){ if(!ui.saved) return; let E=[]; try{ E=JSON.parse(localStorage.getItem(EK)||"[]"); }catch(_){} ui.saved.replaceChildren(); if(!E.length) return; ui.saved.appendChild(mk("small","","저장한 편집 다시 열기")); const r=mk("div","erow"); E.forEach((e,i)=>{ const b=mk("button","",e.name); b.type="button"; b.id="exs"+i; b.title=new Date(e.t).toLocaleString(); b.addEventListener("click",()=>{ if(!ED.on){ window.NF_PAUSE=1; ED.on=true; mkCanvas(); } snap(); ED.doc=JSON.parse(JSON.stringify(e.vec)); ED.img=null; ED.sel=-1; fitView(); syncUI(); draw(); msg("'"+e.name+"'을(를) 열었어요"); }); r.appendChild(b); }); ui.saved.appendChild(r); }
   function download(kind){ if(!ED.doc || !ED.doc.layers.length){ msg("내보낼 그림이 없어요"); return; } const nm=(ui.name.value||"nu-flow-object").replace(/[\\/:*?"<>|]+/g,"_"); let url, fn;
     if(kind==="png"){ const c=render(2048); url=c.toDataURL("image/png"); fn=nm+".png"; }
     else { const b=docBox(), f=v=>+v.toFixed(2); const byId=new Map(ED.doc.layers.map(L=>[L.id,L])); const dOf=L=>L.subs.map(N=>"M"+f(N[0].x)+" "+f(N[0].y)+N.map((a,i)=>{ const q=N[(i+1)%N.length], h1=a.ho||a, h2=q.hi||q; return "C"+f(h1.x)+" "+f(h1.y)+" "+f(h2.x)+" "+f(h2.y)+" "+f(q.x)+" "+f(q.y); }).join("")+"Z").join("");
@@ -3292,6 +3348,74 @@ function tplFrame(e,dt){ e.t+=dt; const t=e.t, pk=t<.1?.85+.3*t/.1:t<.22?1.15-(t
         body+='<path d="'+dOf(L)+'" fill="'+fill+'" fill-rule="evenodd"'+(L.op!=null&&L.op<1?' opacity="'+L.op+'"':'')+(L.sw>0&&L.stroke?' stroke="'+adjC(L.stroke)+'" stroke-width="'+L.sw+'" stroke-linejoin="round"':'')+cp+'/>'; });
       const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+[b[0],b[1],b[2]-b[0],b[3]-b[1]].map(f).join(" ")+'" width="'+f(b[2]-b[0])+'" height="'+f(b[3]-b[1])+'"><defs>'+defs+'</defs>'+body+'</svg>'; url=URL.createObjectURL(new Blob([svg],{type:"image/svg+xml"})); fn=nm+".svg"; }
     const a=mk("a"); a.href=url; a.download=fn; document.body.appendChild(a); a.click(); a.remove(); msg(fn+" 을(를) 내려받았어요"); }
+})();
+
+</script>
+<script>
+/* 따로 보기 두 창 + 고정 보기 + 추천·싫어요
+   - 이미지 창(img=1): 오브젝트 하나를 가운데 고정해 움직임만 되풀이한다. 아래 단추: 👎 싫어요 · ↻ 다음 · 👍 추천
+   - 메뉴 창(menu=1): 오른쪽 판(조절·색·편집)만 창을 꽉 채운다. 누른 것은 이미지 창으로 보내 거기서 실행하고, 이미지 창이 돌려준 상태를 보여 준다
+   - 노란 스파크도 추천·싫어요로 배운다: 추천한 모양(씨앗·크기)은 가끔 그대로 다시, 싫어요가 많은 종류는 덜 나온다 */
+(function(){ const $=id=>document.getElementById(id), K=window.NF_SOLO||"", U=window.NFUI, TK="nu-flow-taste";
+  const LSG=()=>U.LS.get(TK,{}), skT=()=>{ const o=LSG(); return Array.isArray(o.spark)?o.spark:[]; };
+  /* ── 노란 스파크 취향 ── */
+  const SKN=["터지는 별","번개 갈래","뻗는 광선","오각별","작은 반짝이"];
+  window.NF_SKH={ force:null,
+    pick(type,size,sd){ const F=this.force; if(F){ if(F.size==null) F.size=size; return {sd:F.sd,size:F.size}; } const T=skT().filter(r=>r.type===type); if(!T.length) return null;
+      const L=T.filter(r=>r.v>0); if(L.length && Math.random()<.3){ const r=L[Math.floor(Math.random()*L.length)]; return {sd:r.sd,size:r.size}; }
+      let s=0; for(const r of T) s+=(r.v>0?1:-1.2)*Math.exp(-Math.pow((size-r.size)/(.3*Math.max(.3,r.size)),2)); if(s<0 && Math.random()<1-Math.exp(1.2*s)){ if(L.length){ const r=L[Math.floor(Math.random()*L.length)]; return {sd,size:r.size*(.85+.3*Math.random())}; } return {sd,size:size*(Math.random()<.5?.7:1.35)}; } return null; },
+    type(ts,u){ const T=skT(); if(!T.length) return ts[Math.floor(u*ts.length)]; const w=ts.map(t=>{ let s=0; for(const r of T) if(r.type===t) s+=r.v>0?1:-.8; return Math.exp(Math.max(-2.5,Math.min(2.5,s*.2))); }), tot=w.reduce((a,b)=>a+b,0); let r=u*tot; for(let i=0;i<ts.length;i++){ r-=w[i]; if(r<=0) return ts[i]; } return ts[0]; } };
+  let SKC=null, skGap=0;
+  function skNext(){ const on=[0,1,2,3,4].filter(i=>{ try{ return G["skT"+i]; }catch(_){ return i===0; } }); const ts=on.length?on:[0]; let sz=1.4; try{ const lo=Math.min(G.skMin,G.skMax), hi=Math.max(G.skMin,G.skMax); sz=1.4*lo*Math.pow(hi/lo,.35+.65*Math.random()); }catch(_){} SKC={type:NF_SKH.type(ts,Math.random()),sd:(Math.random()*2**31)|0,size:sz}; try{ for(const s of NF_SK.L) s.t=s.life+1; }catch(_){} skGap=.3; ui(); }
+  if(window.NF_FIX && K==="spark") window.NF_SKFIX=dt=>{ if(!window.NF_SK) return; if(!SKC) skNext(); const alive=NF_SK.L.some(s=>s.fix && s.t<s.life); if(alive) return; skGap-=dt; if(skGap>0) return; skGap=.45;
+    NF_SKH.force=SKC; try{ const cx=typeof lerpV==="function"?lerpV(0,.5):NF_SK.WW*.5, cy=typeof lerpV==="function"?lerpV(1,.47):NF_SK.WH*.5; NF_SK.spawn(SKC.type,cx,cy,1.5,-Math.PI/4); }finally{ NF_SKH.force=null; } const s=NF_SK.L[NF_SK.L.length-1]; if(s){ s.fix=1; s.life=Math.max(s.life,2.2); } };
+  const skRate=v=>{ if(!SKC || SKC.size==null) return; const o=LSG(); const L=Array.isArray(o.spark)?o.spark:[]; L.push({type:SKC.type,sd:SKC.sd,size:SKC.size,v,t:Date.now()}); o.spark=L.slice(-400); U.LS.set(TK,o); };
+  { const w=U.btns("skTaste","배운 취향",[["skTasteN","",null,()=>{}],["skTasteR","지우기",null,b=>{ if(b.dataset.ok!=="1"){ b.dataset.ok="1"; b.textContent="한 번 더 누르면 지움"; setTimeout(()=>{ b.dataset.ok=""; b.textContent="지우기"; },2500); return; } const o=LSG(); o.spark=[]; U.LS.set(TK,o); up(); }]],"따로 보기 이미지 창에서 누른 추천·싫어요. 추천한 모양은 가끔 그대로 다시 나오고, 싫어요가 많은 종류·크기는 덜 나옵니다.");
+    const n=$("skTasteN"); n.disabled=true; n.classList.add("cnt"); function up(){ let a=0,b=0; for(const r of skT()) r.v>0?a++:b++; n.textContent="추천 "+a+" · 싫어요 "+b; } up(); addEventListener("storage",e=>{ if(e.key===TK) up(); }); setInterval(up,3000); }
+
+  /* ── 이미지 창: 아래 단추 줄 ── */
+  const RATE=K==="splash"||K==="spark", JEL=["drop","heart","star","blue","cloud"].includes(K)||K.startsWith("cust");
+  let bar=null, info=null, autoNext=true;
+  function ui(){ if(!info) return; let a=0,b=0, cur="";
+    if(K==="splash" && window.NF_SPLASH){ const s=NF_SPLASH.stats(); a=s.up; b=s.dn; cur=s.cur; } else if(K==="spark"){ for(const r of skT()) r.v>0?a++:b++; cur=SKC?SKN[SKC.type]:""; }
+    info.textContent=RATE?(cur?cur+" · ":"")+"추천 "+a+" · 싫어요 "+b:"↻ 다음으로 새로 놓기 · 더블클릭으로 터뜨리기"; }
+  function vote(v){ if(K==="splash" && window.NF_SPLASH) NF_SPLASH.rate(v); else if(K==="spark") skRate(v); flash(v>0?"👍 추천했어요":"👎 덜 나오게 할게요"); ui(); if(autoNext) setTimeout(nextImg,380); }
+  function nextImg(){ if(K==="splash" && window.NF_SPLASH) NF_SPLASH.next(); else if(K==="spark") skNext(); else if(JEL){ const b=$("soloNew"); if(b) b.click(); } ui(); }
+  let ft=0; function flash(t){ const f=$("nfFlash"); if(!f) return; f.textContent=t; f.classList.add("on"); clearTimeout(ft); ft=setTimeout(()=>f.classList.remove("on"),900); }
+  function buildBar(){ bar=document.createElement("div"); bar.className="nfrate"; bar.setAttribute("role","toolbar"); bar.setAttribute("aria-label","이 모양 평가");
+    const mkb=(t,cls,f,title)=>{ const b=document.createElement("button"); b.type="button"; b.className=cls; b.textContent=t; b.title=title||""; b.addEventListener("click",f); bar.appendChild(b); return b; };
+    if(RATE) mkb("👎 싫어요","dn",()=>vote(-1),"이런 모양은 덜 나오게 (↓)");
+    mkb("↻ 다음","nx",()=>nextImg(),"다음 모양 불러오기 (스페이스)");
+    if(RATE) mkb("👍 추천","up",()=>vote(1),"이런 모양이 더 자주 나오게 (↑)");
+    if(RATE){ const t=document.createElement("label"); t.className="an"; t.innerHTML='<input type="checkbox" checked> 누르면 바로 다음'; t.firstChild.addEventListener("change",e=>{ autoNext=e.target.checked; }); bar.appendChild(t); }
+    info=document.createElement("div"); info.className="nfinfo"; const fl=document.createElement("div"); fl.id="nfFlash"; fl.className="nfflash";
+    const mb=document.createElement("button"); mb.type="button"; mb.className="nfmenub"; mb.textContent="⚙ 메뉴 창"; mb.title="조절·색·편집 메뉴를 따로 엽니다"; mb.addEventListener("click",()=>{ const SW=screen.availWidth||1600, SH=screen.availHeight||900, mw=Math.min(460,Math.round(SW*.3)); const w=window.open(location.pathname+"?view=stage&solo="+encodeURIComponent(K)+"&menu=1","nuflow-solo-menu","popup,left="+(SW-mw)+",top=0,width="+mw+",height="+SH); if(w) w.focus(); });
+    document.body.append(bar,info,fl,mb); ui(); setInterval(()=>{ const ed=document.querySelector("canvas.edcv:not([hidden])"); bar.hidden=!!ed; info.hidden=!!ed; },300); setInterval(ui,1500);
+    addEventListener("keydown",e=>{ if(document.querySelector("canvas.edcv:not([hidden])")) return; if(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return; if(e.code==="Space"||e.key==="ArrowRight"){ e.preventDefault(); nextImg(); } else if(RATE && e.key==="ArrowUp"){ e.preventDefault(); vote(1); } else if(RATE && e.key==="ArrowDown"){ e.preventDefault(); vote(-1); } }); }
+
+  /* ── 두 창 잇기 ── */
+  const CH="nu-flow-twin-"+K; let bc=null; try{ bc=new BroadcastChannel(CH); }catch(_){}
+  const ready=f=>{ const P=$("soloP"); if(P && P.dataset.nfi){ f(P); return; } setTimeout(()=>ready(f),80); };
+  function ids(P){ let i=0; P.querySelectorAll("button,input,select,output,p.nt,p.emsg,.sb").forEach(e=>{ if(!e.id) e.id="nfx"+(i++); }); }
+  if(window.NF_FIX && K) addEventListener("DOMContentLoaded",()=>setTimeout(()=>{ buildBar();
+    ready(P=>{ ids(P); if(!bc) return; let t=0; const snap=()=>{ const o={}; P.querySelectorAll("[id]").forEach(el=>{ const r={}, tg=el.tagName; if(tg==="INPUT"){ r.v=el.type==="checkbox"?(el.checked?1:0):el.value; } else if(tg==="BUTTON"){ r.p=el.getAttribute("aria-pressed"); r.s=el.getAttribute("aria-selected"); r.x=el.textContent; r.h=el.hidden?1:0; r.d=el.disabled?1:0; } else if(tg==="OUTPUT"||tg==="P"||tg==="SMALL"||tg==="SPAN") r.x=el.textContent; else { r.h=el.hidden?1:0; if(el.dataset.sync==="html") r.html=el.innerHTML; } o[el.id]=r; }); bc.postMessage({t:"snap",s:o}); };
+      bc.onmessage=e=>{ const m=e.data||{}; if(m.t==="ev"){ const el=$(m.id); if(el){ if(m.k==="click") el.click(); else { if(el.type==="checkbox") el.checked=!!m.v; else el.value=m.v; el.dispatchEvent(new Event("input",{bubbles:true})); el.dispatchEvent(new Event("change",{bubbles:true})); } } clearTimeout(t); t=setTimeout(snap,40); } else if(m.t==="hello") snap(); };
+      setInterval(snap,450); snap(); }); },120));
+  if(window.NF_MENU && K){ window.NF_PAUSE=1; document.title="메뉴 · "+document.title.replace(/^따로 보기 · /,"");
+    addEventListener("DOMContentLoaded",()=>setTimeout(()=>ready(P=>{ ids(P); document.querySelectorAll("body>div").forEach(d=>{ if(/^따로 보기 ·/.test(d.textContent||"") && d.style.position==="fixed") d.remove(); }); const mn=$("soloMin"); if(mn) mn.hidden=true;
+      const st=document.createElement("p"); st.className="twinst"; P.querySelector(".hd").after(st); let last=0;
+      const status=()=>{ const on=Date.now()-last<1600; st.textContent=on?"":"이미지 창이 없어요 — 메인 창 목록에서 '따로 보기'를 다시 누르거나 아래 단추로 여세요."; st.hidden=on; ob.hidden=on; };
+      const ob=document.createElement("button"); ob.type="button"; ob.className="twinopen"; ob.textContent="이미지 창 열기"; ob.addEventListener("click",()=>{ const SW=screen.availWidth||1600, SH=screen.availHeight||900, mw=Math.min(460,Math.round(SW*.3)); const w=window.open(location.pathname+"?view=stage&solo="+encodeURIComponent(K)+"&img=1","nuflow-solo","popup,left=0,top=0,width="+(SW-mw-12)+",height="+SH); if(w) w.focus(); }); st.after(ob);
+      if(!bc){ st.textContent="이 브라우저는 두 창 잇기를 지원하지 않아요."; return; }
+      const fwd=(e,k)=>{ const el=e.target.closest("button[id],input[id],select[id]"); if(!el || !P.contains(el) || el===ob) return; if(k==="click" && el.tagName!=="BUTTON") return; if(k!=="click" && el.tagName==="BUTTON") return; e.stopPropagation(); bc.postMessage({t:"ev",id:el.id,k,v:el.type==="checkbox"?(el.checked?1:0):el.value}); };
+      addEventListener("click",e=>fwd(e,"click"),true); addEventListener("input",e=>fwd(e,"input"),true); addEventListener("change",e=>fwd(e,"input"),true);
+      addEventListener("keydown",e=>{ if(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return; if(["ArrowUp","ArrowDown","ArrowRight"," "].includes(e.key)) e.preventDefault(); },true);
+      bc.onmessage=e=>{ const m=e.data||{}; if(m.t!=="snap") return; last=Date.now(); for(const id in m.s){ const el=$(id); if(!el) continue; const r=m.s[id];
+          if("v" in r && document.activeElement!==el){ if(el.type==="checkbox") el.checked=!!r.v; else if(el.value!==String(r.v)) el.value=r.v; }
+          if("x" in r && el.textContent!==r.x && !(el.tagName==="BUTTON" && el.children.length)) el.textContent=r.x;
+          if("p" in r){ if(r.p===null) el.removeAttribute("aria-pressed"); else el.setAttribute("aria-pressed",r.p); } if("s" in r){ if(r.s===null) el.removeAttribute("aria-selected"); else el.setAttribute("aria-selected",r.s); }
+          if("h" in r) el.hidden=!!r.h; if("d" in r) el.disabled=!!r.d; if("html" in r && el.innerHTML!==r.html) el.innerHTML=r.html; } status(); };
+      setInterval(status,800); status(); bc.postMessage({t:"hello"}); }),150)); }
 })();
 
 </script>
@@ -3318,8 +3442,8 @@ function tplFrame(e,dt){ e.t+=dt; const t=e.t, pk=t<.1?.85+.3*t/.1:t<.22?1.15-(t
       ["별 모양",["@pvS","msP","msN","msRi","msInf","msTip","msIn","msW","msTilt","msSave","kEdgeS"]],
       ["천사",[H("등장"),"anAdd","anAuto","anWaveN","anWaveT","anLife",H("모습"),"anStyle","anSize","anSoft",H("움직임"),"anFlow","anSpeed",H("코드"),"anCode"]]]],
     ["이펙트",[
-      ["줄기 스플래시",[H("나오기"),"xsOn","xsKinds","xsRate","xsMax","xsPlace",H("크기·빠르기"),"xsSize","xsSpeed","xsAlpha",H("색·테두리"),"xsCM","xsCol","xsLine","xsBoil",H("가시"),"xsJets","xsShort","xsLong","xsNLong","xsSpk","xsShardV","xsShardN","xsTurn","xsShrink","xsBI",H("푸슉"),"xsFsN","xsFsSize","xsFsTail","xsFsIn"]],
-      ["노란 스파크",[H("나오기"),"skOn","skCap","skRate","skEdge","skPopP","skSpread","skLife","skPop",H("모양"),"skT0","skSize","skMin","skMax","skBig","skSpikes","skJag","skVar","skLine","skSpin",H("색"),"skCF","skCL","skCH"]],
+      ["줄기 스플래시",[H("나오기"),"xsOn","xsTaste","xsKinds","xsRate","xsMax","xsPlace",H("크기·빠르기"),"xsSize","xsSpeed","xsAlpha",H("색·테두리"),"xsCM","xsCol","xsLine","xsBoil",H("가시"),"xsJets","xsShort","xsLong","xsNLong","xsSpk","xsShardV","xsShardN","xsTurn","xsShrink","xsBI",H("푸슉"),"xsFsN","xsFsSize","xsFsTail","xsFsIn"]],
+      ["노란 스파크",[H("나오기"),"skOn","skTaste","skCap","skRate","skEdge","skPopP","skSpread","skLife","skPop",H("모양"),"skT0","skSize","skMin","skMax","skBig","skSpikes","skJag","skVar","skLine","skSpin",H("색"),"skCF","skCL","skCH"]],
       ["번개",["skBI0","skBO0","skBoltN","skBoltLag","skBoil"]],
       ["떠다니는 별",["skFloat","skStarN","skStarLife","skFlow"]],
       ["입체 스파크",["sk3On","sk3N","sk3Spin","sk3Tilt","sk3Wob","sk3Shade","sk3Persp","sk3Rand"]],
@@ -3457,7 +3581,7 @@ function tplFrame(e,dt){ e.t+=dt; const t=e.t, pk=t<.1?.85+.3*t/.1:t<.22?1.15-(t
    - 바꿀 때: 잠깐 쉬었다가 서버에 올린다 (내 오브젝트 그림은 그림 보관함에 따로 올리고 주소만 적어 둔다)
    - 다른 기기에서 바뀌면: 이 창이 안 보일 때는 조용히 새로 고침, 보고 있을 때는 알림 */
 (function(){ const SOLO=!!window.NF_SOLO; if(!window.claude || !window.claude.use) return;
-  const KEYS=["swirl-flow-g","swirl-flow-bd","nu-flow-q","nu-flow-hidden","nu-flow-fps","nu-flow-aq","nu-flow-scene","nu-flow-layout3","nu-flow-cust","nu-flow-angel","nu-flow-angel-base","nu-flow-splash","nu-flow-jcol"], TK="nu-flow-sync-t";
+  const KEYS=["swirl-flow-g","swirl-flow-bd","nu-flow-q","nu-flow-hidden","nu-flow-fps","nu-flow-aq","nu-flow-scene","nu-flow-layout3","nu-flow-cust","nu-flow-angel","nu-flow-angel-base","nu-flow-splash","nu-flow-jcol","nu-flow-taste"], TK="nu-flow-sync-t";
   const ls={ get:k=>{ try{ return localStorage.getItem(k); }catch(_){ return null; } }, set:(k,v)=>{ try{ if(v==null) localStorage.removeItem(k); else localStorage.setItem(k,v); }catch(_){} } };
   let DEV=ls.get("nu-flow-dev"); if(!DEV){ DEV=Math.random().toString(36).slice(2); ls.set("nu-flow-dev",DEV); }   // 이 기기 이름 (같은 기기의 다른 창끼리는 브라우저 저장소로 이미 맞춰진다)
   let ref=null, assets=null, quiet=false, timer=0, busy=false, again=false, lastT=+(ls.get(TK)||0);
