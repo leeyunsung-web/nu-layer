@@ -345,6 +345,7 @@ const CTL=[
  ["secSurf","말리는 시간","lipT",0.3,4,0.05,1.3,"초","혀가 뻗어 나가 수면을 칠 때까지 걸리는 시간.",0],
  ["secSurf","배럴 (오목한 앞면)","barrel",0,1.5,0.05,1,"배","말릴 때 파도 앞면이 오목하게 서서 혀와 함께 원통(배럴)을 만듭니다. 0이면 끄기, 1을 넘으면 앞면이 살짝 안으로 파고듭니다.",0],
  ["secSurf","혀 두께","lipTh",0.05,0.6,0.01,0.28,"배","말려 나가는 혀의 두께 (파도 높이 대비).",0],
+ ["secSurf","말려 나가는 속도","peel",2,30,0.5,10,"칸/초","말림이 옆으로 번져 가는 빠르기. 느리면 긴 터널이 천천히 까지고, 빠르면 한꺼번에 무너집니다.",0],
  ["secSurf","말림 시작 기준","lipThr",0.1,0.9,0.05,0.35,"","파도가 얼마나 부서지기 시작해야 혀가 생기는지. 낮추면 더 일찍·자주 말립니다.",0],
  ["secSpr","물보라 양","sprN",0,4,0.05,1,"배","혀가 수면을 칠 때와 무너지며 밀려가는 앞머리에서 튀는 물보라의 양.",0],
  ["secSpr","튀는 힘","sprUp",0,3,0.05,1,"배","물보라가 위로 튀어 오르는 힘.",0],
@@ -405,7 +406,7 @@ const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(_){} }
 const fmt=(c,v)=>{ const d=c[5]<0.1?2:c[5]<1?1:0; return (+v).toFixed(d)+(c[7]?(c[7]==="%"?"":" ")+c[7]:""); };
 const inputs={}; let rebuildT=0;
 /* 간결한 메뉴: 지금 보이는 손잡이 (나머지는 숨긴 칸에서 지금 값 그대로) */
-const SHOW={amp:"nWave",per:"nWave",spd:"nWave", bar:"nCurl",barAng:"nCurl",barrel:"nCurl",lipLen:"nCurl",lipCurl:"nCurl",lipTh:"nCurl",lipT:"nCurl", level:"nTank",beach:"nTank",hidez:"nTank"};
+const SHOW={amp:"nWave",per:"nWave",spd:"nWave", bar:"nCurl",barAng:"nCurl",barrel:"nCurl",lipLen:"nCurl",lipCurl:"nCurl",lipTh:"nCurl",lipT:"nCurl",peel:"nCurl", level:"nTank",beach:"nTank",hidez:"nTank"};
 const ORDER=Object.keys(SHOW); CTL.sort((a,b)=>(ORDER.indexOf(a[2])+1||999)-(ORDER.indexOf(b[2])+1||999));
 for(const c of CTL){ const box=$(SHOW[c[2]]||c[0]); const d=document.createElement("div"); d.className="ctl";
   d.innerHTML=`<label for="k_${c[2]}">${c[1]}</label><input id="k_${c[2]}" type="range" min="${c[3]}" max="${c[4]}" step="${c[5]}"><output></output>`+(c[8]?`<div class="desc">${c[8]}</div>`:"");
@@ -683,7 +684,7 @@ void main(){
   float ndl=dot(n,L), sp=dot(n,normalize(L+V));
   vec3 col=uC0; if(ndl<0.25) col=uC1; else if(ndl>0.82) col=mix(uC0,uC2,0.35);
   if(sp>0.986) col=uC2;
-  if(inner) col=ndl<0.1?mix(uC1,uC3,0.25):uC1;   /* 터널 안쪽은 한 단계 어둡게 */
+  if(inner) col=mix(uC1,uC0,0.3);   /* 터널 안쪽은 한 단계 어둡게 */
   float wt=vH.y; if(wt>0.55) col=ndl<0.25?vec3(0.84,0.93,0.97):vec3(1.0); else if(wt>0.35) col=mix(col,vec3(0.86,0.95,0.98),0.7);
   oC=vec4(col,1.0); oId=vec4(1.0,0.0,0.0,1.0);
 }`;
@@ -1033,7 +1034,8 @@ function lipUpdate(dt){
     let ph=LIP.ph[k];
     if(bi>=0){ let ic=bi, cr=-9; for(let q=Math.max(0,bi-R);q<=Math.min(NX-1,bi+2);q++){ const e=h[r0+q]+b[r0+q]; if(e>cr){ cr=e; ic=q; } }
       const xc=(ic+0.5)*dx, hc=cr-D;
-      if(ph<=0 && LIP.cd[k]<=0 && hc>0.3){ ph=0.001; LIP.xc[k]=xc; LIP.yc[k]=cr; LIP.hc[k]=hc; }
+      let busy=false; for(let r=-10;r<=10 && !busy;r++){ const kk=k+r; if(kk>=0&&kk<NZ&&(LIP.ph[kk]>0||LIP.cd[kk]>0)) busy=true; }   /* 이미 말리는 줄 둘레는 옆으로 번져서만 (따로 생기지 않게 — 한 덩어리로) */
+      if(ph<=0 && !busy && hc>0.3){ ph=0.001; LIP.xc[k]=xc; LIP.yc[k]=cr; LIP.hc[k]=hc; }
       else if(ph>0 && ph<1.05 && Math.abs(xc-LIP.xc[k])<R*dx*3){ const a=Math.min(1,dt*6); LIP.xc[k]+=(xc-LIP.xc[k])*a; LIP.yc[k]+=(cr-LIP.yc[k])*a; LIP.hc[k]=Math.max(LIP.hc[k]*0.98,hc); } }
     if(ph>0){   /* 언제나 지금 물 마루에 붙어서 따라간다 (앞으로만) — 혀가 물과 따로 놀지 않게 */
       const q0=Math.max(0,Math.round(LIP.xc[k]/dx)-2), q1=Math.min(NX-1,q0+R+2);   /* 가까운 마루만 (앞서 간 다른 파도로 건너뛰지 않게) */ let ic=-1, cr=-9; for(let q=q0;q<=q1;q++){ if(h[r0+q]<0.2) continue; const e=h[r0+q]+b[r0+q]; if(e>cr){ cr=e; ic=q; } }
@@ -1046,10 +1048,14 @@ function lipUpdate(dt){
     LIP.ph[k]=ph; }
   /* 옆으로 번지기: 옆 줄이 말리기 시작했고 이 줄에도 마루가 서 있으면 뒤따라 말린다 → 한 줄기로 이어져 옆으로 까지듯 말려 나간다 */
   { const nxt=LIP.ph.slice(); for(let k=0;k<NZ;k++){ if(LIP.ph[k]>0 || LIP.cd[k]>0) continue;
-      for(const kk of [k-1,k+1]){ if(kk<0||kk>=NZ) continue; const pn=LIP.ph[kk]; if(!(pn>0.12 && pn<0.95)) continue;
+      const pth=Math.min(0.9,Math.max(0.02,dx/Math.max(0.5,(S.peel||10)*S.lipT)));   /* 말려 나가는 속도: 옆 줄이 이만큼 진행하면 다음 줄 시작 */
+      for(const kk of [k-1,k+1]){ if(kk<0||kk>=NZ) continue; const pn=LIP.ph[kk]; if(!(pn>=pth && pn<0.95)) continue;
         const r0=k*NX, ic0=Math.round(LIP.xc[kk]/dx-0.5); let ic=ic0, cr=-9; for(let q=Math.max(0,ic0-R);q<=Math.min(NX-1,ic0+R);q++){ if(h[r0+q]<0.2) continue; const e=h[r0+q]+b[r0+q]; if(e>cr){ cr=e; ic=q; } }
-        const hc=cr-D; if(b[r0+ic]<D*0.7 && hc>Math.max(0.3,0.45*LIP.hc[kk])){ nxt[k]=0.001; LIP.xc[k]=(ic+0.5)*dx; LIP.yc[k]=cr; LIP.hc[k]=hc; break; } } }
+        const hc=cr-D; if(b[r0+ic]<D*0.7 && hc>Math.max(0.3,0.35*LIP.hc[kk])){ nxt[k]=0.001; LIP.xc[k]=0.5*((ic+0.5)*dx+LIP.xc[kk]); LIP.yc[k]=0.5*(cr+LIP.yc[kk]); LIP.hc[k]=0.5*(hc+LIP.hc[kk]); break; } } }
     LIP.ph.set(nxt); }
+  /* 옆 줄과 단계가 크게 벌어지지 않게: 말린 모양이 계단처럼 끊기지 않고 나선처럼 이어진다 */
+  { const pth=Math.min(0.9,Math.max(0.02,dx/Math.max(0.5,(S.peel||10)*S.lipT)));
+    for(let pass=0;pass<2;pass++) for(let k=0;k<NZ;k++){ if(!(LIP.ph[k]>0)) continue; for(const kk of [k-1,k+1]){ if(kk<0||kk>=NZ||!(LIP.ph[kk]>0)) continue; const lo=LIP.ph[kk]-2*pth, hi=LIP.ph[kk]+2*pth; if(LIP.ph[k]<lo) LIP.ph[k]=lo; if(LIP.ph[k]>hi) LIP.ph[k]=Math.max(0.001,hi); } } }
   /* 옆 줄과 부드럽게 (말린 혀가 줄마다 들쭉날쭉하지 않게) */
   for(let pass=0;pass<8;pass++) for(let k=1;k<NZ-1;k++){ if(LIP.ph[k]>0 && LIP.ph[k-1]>0 && LIP.ph[k+1]>0){ LIP.xc[k]=(LIP.xc[k-1]+2*LIP.xc[k]+LIP.xc[k+1])/4; LIP.hc[k]=(LIP.hc[k-1]+2*LIP.hc[k]+LIP.hc[k+1])/4; LIP.yc[k]=(LIP.yc[k-1]+2*LIP.yc[k]+LIP.yc[k+1])/4; } }
   if(LIP.hit){ for(const k of LIP.hit) sprBurst(k); LIP.hit=null; }
@@ -1067,6 +1073,7 @@ function barrelShape(px,py,qx){
     for(;i<=iE;i++){ const j=r0+i, y=py[j]; if(px[j]<xc-0.2*hc) continue; if(y<ytr+0.04*hc) break;
       let xw; if(y>=ytr+Rf) xw=xc-over*0.35*Rf*Math.min(1,(y-ytr-Rf)/Math.max(0.1,hc-Rf)); else { const e=ytr+Rf-y; xw=xc+Rf-Math.sqrt(Math.max(0,Rf*Rf-e*e)); }
       if(xw<px[j]){ const nx=px[j]+(xw-px[j])*gb; qx[j]+=nx-px[j]; px[j]=nx; }
+      else if(px[j]>xc+0.2*hc && px[j]<xc+0.5*S.lipLen*hc){ const cap=ytr+0.12*hc; if(py[j]>cap) py[j]+= (cap-py[j])*gb; }   /* 터널 속(혀 아래 앞쪽) 물은 낮게: 혀를 뚫고 나오지 않게 */
       const pz=LIP.ps?LIP.ps[k]:ph; if(y<LIP.yc[k]-0.12*hc && pz>0.5 && pz<1.05) TS[j]=gb*Math.min(1,(pz-0.5)/0.25); } }   /* 혀가 충분히 덮었을 때만 그늘 */   /* 터널 안쪽 벽: 혀 그늘 */
 }
 function lipTip(k){ /* 혀 끝 자리 */ return LIP.tip?[LIP.tip[k*2],LIP.tip[k*2+1]]:[LIP.xc[k],LIP.yc[k]]; }
