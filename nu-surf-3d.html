@@ -573,7 +573,7 @@ void main(){
   float ndl=dot(n,L), sp=dot(n,normalize(L+V));
   vec3 col=uC0; if(ndl<0.25) col=uC1; else if(ndl>0.82) col=mix(uC0,uC2,0.35);
   col=mix(col, mix(uC0,uC2,0.55), uFoamQ.z*smoothstep(3.0,0.2,vH.x)*step(0.25,ndl));   /* 얕을수록 밝은 물빛 */
-  if(sp>0.986) col=uC2;
+  if(sp>0.986 && n.y>0.6) col=uC2;   /* 반짝임은 위를 향한 면에만 (쏟아지는 혀 앞면이 하얗게 번지지 않게) */
   if(vH.y<-0.3) col=mix(uC1,uC0,0.25);   /* 말린 혀 아래 터널 안쪽 벽은 그늘 */
   /* 바다 전체 거품: 물결 따라 흐르는 옅은 줄무늬 (부드럽게, 위를 향한 면에만) */
   if(uFoamE.z>0.01){ vec2 q=vQ*vec2(0.09,0.32)+vec2(-uTime*0.12,0.0); float m=vn2(q)*0.6+vn2(q*2.3+vec2(4.1,1.7)-vec2(uTime*0.1,0.0))*0.4;
@@ -787,7 +787,7 @@ function build(seed){
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,3,gl.FLOAT,false,40,0); gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1,3,gl.FLOAT,false,40,12);
     gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2,2,gl.FLOAT,false,40,24); gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3,2,gl.FLOAT,false,40,32);
     const li=new Uint32Array((NZ-1)*(M2-1)*6); let q=0; for(let k=0;k<NZ-1;k++) for(let m=0;m<M2-1;m++){ const a=k*M2+m; li[q++]=a; li[q++]=a+M2; li[q++]=a+1; li[q++]=a+1; li[q++]=a+M2; li[q++]=a+M2+1; }
-    G.lipIb=gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,G.lipIb); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,li,gl.STATIC_DRAW); G.lipN=q;
+    G.lipIb=gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,G.lipIb); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,li,gl.STATIC_DRAW); G.lipN=q; G.lipIdx=li;
     LIP.ph=new Float32Array(NZ); LIP.xc=new Float32Array(NZ); LIP.yc=new Float32Array(NZ); LIP.hc=new Float32Array(NZ); LIP.cd=new Float32Array(NZ); LIP.dirty=true; }
   { if(!G.sprVao){ G.sprVao=gl.createVertexArray(); gl.bindVertexArray(G.sprVao); G.sprVb=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,G.sprVb); gl.bufferData(gl.ARRAY_BUFFER,SPR.max*20,gl.DYNAMIC_DRAW);
       gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,4,gl.FLOAT,false,20,0); gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1,1,gl.FLOAT,false,20,16); }
@@ -929,20 +929,14 @@ function meshUpdate(fdt){
       /* 거품은 물과 다른 층: 물 위로 떠서, 진한 곳일수록 도톰하게 솟는다 */
       const fv=Math.max(sm.f[j]+(G.cf&&G.cf.length===NN?G.cf[j]:0),cw), lift=S.flift*cvAt(S,"lift",x/L)*(0.35+0.65*Math.min(1,fv*1.4))*(1-Math.min(1,cw));   /* 호가 된 곳은 호 높이를 따른다 */
       px[j]=x+s; py[j]=y-dy; pz[j]=z; qx[j]=x+sf; qy[j]=y-dyf+0.06+lift; qc[j]=cw; } }
-  barrelShape(px,py,qx);
-  /* 접힘 막기: 옆 줄과 밀린 정도를 고르게 섞고(비틀린 면 없이), 줄마다 앞으로만 이어지게 한다
-     (앞면은 곧게 설 수는 있어도 뒤로 접히지 않는다 — 넘어가는 부분은 혀가 맡는다) */
-  { const OF=G.of&&G.of.length===NX*NZ?G.of:(G.of=new Float32Array(NX*NZ)), O2=G.of2&&G.of2.length===NX*NZ?G.of2:(G.of2=new Float32Array(NX*NZ));
-    for(let k=0;k<NZ;k++) for(let i=0;i<NX;i++){ const j=k*NX+i; OF[j]=px[j]-(i===0?0:i===NX-1?L:(i+0.5)*dx); }
-    for(let pass=0;pass<2;pass++){ for(let k=0;k<NZ;k++){ const ka=k>0?k-1:k, kb=k<NZ-1?k+1:k; for(let i=0;i<NX;i++) O2[k*NX+i]=0.25*OF[ka*NX+i]+0.5*OF[k*NX+i]+0.25*OF[kb*NX+i]; } OF.set(O2); }
-    for(let k=0;k<NZ;k++){ const r0=k*NX; let mx=-1e9;
-      for(let i=0;i<NX;i++){ const j=r0+i, x0=i===0?0:i===NX-1?L:(i+0.5)*dx; let x=x0+OF[j]; if(x<mx+0.02) x=mx+0.02; px[j]=x; mx=x; } } }
+  /* 물 표면 = 한 장. 부서지는 구간은 '옆모습 곡선'을 따라 그린다 (아래 surfWarp) — 혀를 따로 붙이지 않아 이음매가 없다 */
+  const WP=surfWarp();
   for(let k=0;k<NZ;k++) for(let i=0;i<NX;i++){ const j=k*NX+i, o=j*10;
     const a=i>0?j-1:j, c=i<NX-1?j+1:j, e=k>0?j-NX:j, f=k<NZ-1?j+NX:j;
-    const ax=px[c]-px[a], ay=py[c]-py[a], az=pz[c]-pz[a], bx=px[f]-px[e], by=py[f]-py[e], bz=pz[f]-pz[e];
-    let nx=ay*bz-az*by, ny=az*bx-ax*bz, nz=ax*by-ay*bx; if(ny<0&&false){ nx=-nx; ny=-ny; nz=-nz; } const l=Math.hypot(nx,ny,nz)||1;
-    d[o]=px[j]; d[o+1]=py[j]; d[o+2]=pz[j]; d[o+3]=-nx/l; d[o+4]=-ny/l; d[o+5]=-nz/l; d[o+6]=h[j]; d[o+7]=G.tsh&&G.tsh[j]>0.05?-G.tsh[j]:brk[j];   /* 음수 = 터널 그늘 */
-    d[o+8]=(i+0.5)*dx; d[o+9]=(k+0.5)*dx; }
+    const ax=WP.X[c]-WP.X[a], ay=WP.Y[c]-WP.Y[a], az=WP.Z[c]-WP.Z[a], bx=WP.X[f]-WP.X[e], by=WP.Y[f]-WP.Y[e], bz=WP.Z[f]-WP.Z[e];
+    const nx=ay*bz-az*by, ny=az*bx-ax*bz, nz=ax*by-ay*bx, l=Math.hypot(nx,ny,nz)||1;
+    d[o]=WP.X[j]; d[o+1]=WP.Y[j]; d[o+2]=WP.Z[j]; d[o+3]=-nx/l; d[o+4]=-ny/l; d[o+5]=-nz/l; d[o+6]=WP.H[j]; d[o+7]=WP.K[j];
+    d[o+8]=WP.Q[j]; d[o+9]=WP.Z[j]; px[j]=WP.X[j]; py[j]=WP.Y[j]; }
   gl.bindBuffer(gl.ARRAY_BUFFER,G.vb); gl.bufferSubData(gl.ARRAY_BUFFER,0,d);
   /* 거품 층: 방향은 거품 층 자리로 다시 구한다 */
   { const fd=G.fdata; fd.set(d);
@@ -954,7 +948,7 @@ function meshUpdate(fdt){
     gl.bindBuffer(gl.ARRAY_BUFFER,G.fvb); gl.bufferSubData(gl.ARRAY_BUFFER,0,fd); }
   /* 옆면 */
   const bd=G.bdata; let n=0; const put=(x,y,z,t)=>{ bd[n++]=x; bd[n++]=y; bd[n++]=z; bd[n++]=t; };
-  for(const k of [0,NZ-1]) for(let i=0;i<NX;i++){ const j=k*NX+i, top=h[j]>0.02?py[j]:b[j], zz=k===0?0:Wd; put(px[j],top,zz,1); put(px[j],Math.min(top,b[j]+0.02),zz,0); }
+  for(const k of [0,NZ-1]) for(let i=0;i<NX;i++){ const j=k*NX+i, bb=WP.Bd[j], top=WP.H[j]>0.02?py[j]:bb, zz=k===0?0:Wd; put(px[j],top,zz,1); put(px[j],Math.min(top,bb+0.02),zz,0); }
   for(let k=0;k<NZ;k++){ const j=k*NX; put(0,h[j]>0.02?py[j]:b[j],pz[j],1); put(0,b[j],pz[j],0); }
   gl.bindBuffer(gl.ARRAY_BUFFER,G.bvb); gl.bufferSubData(gl.ARRAY_BUFFER,0,bd);
   /* 거품 그림 */
@@ -1029,13 +1023,15 @@ const LIP={};
 function lipUpdate(dt){
   if(!LIP.ph || !WV) return; const {NX,NZ,h,b,brk,dx,D,L}=WV, g=WV.g||9.8, R=Math.max(3,Math.round(4/dx));
   const i0=Math.floor(NX*0.06), i1=Math.floor(NX*0.85), thr=S.lipThr, rate=1/Math.max(0.2,S.lipT);
+  /* 말림은 한 번에 한 덩어리만: 지금 말리는 덩어리가 끝나야 새로 시작 (서로 다른 파도의 말림이 섞여 이어지지 않게) */
+  LIP.any=false; for(let k=0;k<NZ;k++) if(LIP.ph[k]>0){ LIP.any=true; break; }
   for(let k=0;k<NZ;k++){ const r0=k*NX; LIP.cd[k]=Math.max(0,LIP.cd[k]-dt);
     let bi=-1, bm=thr; for(let i=i0;i<i1;i++){ if(b[r0+i]>D*0.7) break; const v=brk[r0+i]; if(v>bm && h[r0+i]>0.3){ bm=v; bi=i; } }   /* 말리는 건 바다 쪽(모래톱 둘레)에서만 — 백사장 위 얇은 물은 말리지 않는다 */
     let ph=LIP.ph[k];
     if(bi>=0){ let ic=bi, cr=-9; for(let q=Math.max(0,bi-R);q<=Math.min(NX-1,bi+2);q++){ const e=h[r0+q]+b[r0+q]; if(e>cr){ cr=e; ic=q; } }
       const xc=(ic+0.5)*dx, hc=cr-D;
-      let busy=false; for(let r=-10;r<=10 && !busy;r++){ const kk=k+r; if(kk>=0&&kk<NZ&&(LIP.ph[kk]>0||LIP.cd[kk]>0)) busy=true; }   /* 이미 말리는 줄 둘레는 옆으로 번져서만 (따로 생기지 않게 — 한 덩어리로) */
-      if(ph<=0 && !busy && hc>0.3){ ph=0.001; LIP.xc[k]=xc; LIP.yc[k]=cr; LIP.hc[k]=hc; }
+      const busy=LIP.any||LIP.cd[k]>0;   /* 이미 말리는 줄 둘레는 옆으로 번져서만 (따로 생기지 않게 — 한 덩어리로) */
+      if(ph<=0 && !busy && hc>0.3){ ph=0.001; LIP.any=true; LIP.xc[k]=xc; LIP.yc[k]=cr; LIP.hc[k]=hc; }
       else if(ph>0 && ph<1.05 && Math.abs(xc-LIP.xc[k])<R*dx*3){ const a=Math.min(1,dt*6); LIP.xc[k]+=(xc-LIP.xc[k])*a; LIP.yc[k]+=(cr-LIP.yc[k])*a; LIP.hc[k]=Math.max(LIP.hc[k]*0.98,hc); } }
     if(ph>0){   /* 언제나 지금 물 마루에 붙어서 따라간다 (앞으로만) — 혀가 물과 따로 놀지 않게 */
       const q0=Math.max(0,Math.round(LIP.xc[k]/dx)-2), q1=Math.min(NX-1,q0+R+2);   /* 가까운 마루만 (앞서 간 다른 파도로 건너뛰지 않게) */ let ic=-1, cr=-9; for(let q=q0;q<=q1;q++){ if(h[r0+q]<0.2) continue; const e=h[r0+q]+b[r0+q]; if(e>cr){ cr=e; ic=q; } }
@@ -1051,13 +1047,19 @@ function lipUpdate(dt){
       const pth=Math.min(0.9,Math.max(0.02,dx/Math.max(0.5,(S.peel||10)*S.lipT)));   /* 말려 나가는 속도: 옆 줄이 이만큼 진행하면 다음 줄 시작 */
       for(const kk of [k-1,k+1]){ if(kk<0||kk>=NZ) continue; const pn=LIP.ph[kk]; if(!(pn>=pth && pn<0.95)) continue;
         const r0=k*NX, ic0=Math.round(LIP.xc[kk]/dx-0.5); let ic=ic0, cr=-9; for(let q=Math.max(0,ic0-R);q<=Math.min(NX-1,ic0+R);q++){ if(h[r0+q]<0.2) continue; const e=h[r0+q]+b[r0+q]; if(e>cr){ cr=e; ic=q; } }
-        const hc=cr-D; if(b[r0+ic]<D*0.7 && hc>Math.max(0.3,0.35*LIP.hc[kk])){ nxt[k]=0.001; LIP.xc[k]=0.5*((ic+0.5)*dx+LIP.xc[kk]); LIP.yc[k]=0.5*(cr+LIP.yc[kk]); LIP.hc[k]=0.5*(hc+LIP.hc[kk]); break; } } }
+        const hc=cr-D; if(b[r0+ic]<D*0.7 && hc>Math.max(0.3,0.35*LIP.hc[kk])){ nxt[k]=Math.max(0.001,pn-pth); LIP.xc[k]=0.5*((ic+0.5)*dx+LIP.xc[kk]); LIP.yc[k]=0.5*(cr+LIP.yc[kk]); LIP.hc[k]=0.5*(hc+LIP.hc[kk]); break; } } }
     LIP.ph.set(nxt); }
   /* 옆 줄과 단계가 크게 벌어지지 않게: 말린 모양이 계단처럼 끊기지 않고 나선처럼 이어진다 */
   { const pth=Math.min(0.9,Math.max(0.02,dx/Math.max(0.5,(S.peel||10)*S.lipT)));
-    for(let pass=0;pass<2;pass++) for(let k=0;k<NZ;k++){ if(!(LIP.ph[k]>0)) continue; for(const kk of [k-1,k+1]){ if(kk<0||kk>=NZ||!(LIP.ph[kk]>0)) continue; const lo=LIP.ph[kk]-2*pth, hi=LIP.ph[kk]+2*pth; if(LIP.ph[k]<lo) LIP.ph[k]=lo; if(LIP.ph[k]>hi) LIP.ph[k]=Math.max(0.001,hi); } } }
+    for(let pass=0;pass<2;pass++) for(let k=0;k<NZ;k++){ if(!(LIP.ph[k]>0)) continue; for(const kk of [k-1,k+1]){ if(kk<0||kk>=NZ||!(LIP.ph[kk]>0)) continue; const lo=LIP.ph[kk]-2*pth, hi=LIP.ph[kk]+2*pth; if(LIP.ph[k]<lo) LIP.ph[k]=lo; } } }
   /* 옆 줄과 부드럽게 (말린 혀가 줄마다 들쭉날쭉하지 않게) */
   for(let pass=0;pass<8;pass++) for(let k=1;k<NZ-1;k++){ if(LIP.ph[k]>0 && LIP.ph[k-1]>0 && LIP.ph[k+1]>0){ LIP.xc[k]=(LIP.xc[k-1]+2*LIP.xc[k]+LIP.xc[k+1])/4; LIP.hc[k]=(LIP.hc[k-1]+2*LIP.hc[k]+LIP.hc[k+1])/4; LIP.yc[k]=(LIP.yc[k-1]+2*LIP.yc[k]+LIP.yc[k+1])/4; } }
+  /* 한 덩어리 혀: 옆 줄끼리 마루 자리·높이가 갑자기 벌어지지 않게 묶는다 (벌어지면 사이 면이 길게 늘어나 파도와 파도 사이가 이어져 보인다) */
+  for(let pass=0;pass<6;pass++) for(let k=0;k<NZ;k++){ if(!(LIP.ph[k]>0)) continue; for(const kk of [k-1,k+1]){ if(kk<0||kk>=NZ||!(LIP.ph[kk]>0)) continue;
+      const lim=Math.max(0.5,dx*0.9);
+      if(LIP.xc[k]>LIP.xc[kk]+lim) LIP.xc[k]=LIP.xc[kk]+lim; else if(LIP.xc[k]<LIP.xc[kk]-lim) LIP.xc[k]=LIP.xc[kk]-lim;
+      const lh=0.35*dx/0.6; if(LIP.hc[k]>LIP.hc[kk]+lh) LIP.hc[k]=LIP.hc[kk]+lh; else if(LIP.hc[k]<LIP.hc[kk]-lh) LIP.hc[k]=LIP.hc[kk]-lh;
+      if(LIP.yc[k]>LIP.yc[kk]+lh) LIP.yc[k]=LIP.yc[kk]+lh; else if(LIP.yc[k]<LIP.yc[kk]-lh) LIP.yc[k]=LIP.yc[kk]-lh; } }
   if(LIP.hit){ for(const k of LIP.hit) sprBurst(k); LIP.hit=null; }
   LIP.dirty=true;
 }
@@ -1069,12 +1071,69 @@ function barrelShape(px,py,qx){
   for(let k=0;k<NZ;k++){ const ph=LIP.ph[k]; if(!(ph>0)) continue;
     const gq=Math.min(1,ph/0.45), cl=Math.min(1,Math.max(0,(ph-1)/0.6)), gb=gq*gq*(3-2*gq)*(1-cl)*amt; if(gb<0.01) continue;
     const xc=LIP.xc[k], hc=Math.max(0.3,LIP.hc[k]), ytr=LIP.yc[k]-hc, Rf=hc*0.55, r0=k*NX;
-    let i=Math.max(0,Math.floor(xc/dx-1)); const iE=Math.min(NX-1,i+Math.round(hc*4/dx)+4);
-    for(;i<=iE;i++){ const j=r0+i, y=py[j]; if(px[j]<xc-0.2*hc) continue; if(y<ytr+0.04*hc) break;
+    /* 이 줄의 앞면만: 마루에서 출발해 물이 내려가는 동안만 (골을 지나 다음 파도로 넘어가지 않게), 길이도 파도 높이의 1.6배까지 */
+    const ib=Math.round(xc/dx-0.5); let ic=ib, ym=-1e9; for(let q=Math.max(0,ib-3);q<=Math.min(NX-1,ib+3);q++){ if(py[r0+q]>ym){ ym=py[r0+q]; ic=q; } }
+    let prevY=ym; const xLim=xc+1.6*hc;
+    for(let i=ic;i<NX;i++){ const j=r0+i, y=py[j], xb0=(i+0.5)*dx; if(xb0>xLim || y>prevY+0.02 || y<ytr+0.04*hc) break; prevY=y;
       let xw; if(y>=ytr+Rf) xw=xc-over*0.35*Rf*Math.min(1,(y-ytr-Rf)/Math.max(0.1,hc-Rf)); else { const e=ytr+Rf-y; xw=xc+Rf-Math.sqrt(Math.max(0,Rf*Rf-e*e)); }
       if(xw<px[j]){ const nx=px[j]+(xw-px[j])*gb; qx[j]+=nx-px[j]; px[j]=nx; }
       else if(px[j]>xc+0.2*hc && px[j]<xc+0.5*S.lipLen*hc){ const cap=ytr+0.12*hc; if(py[j]>cap) py[j]+= (cap-py[j])*gb; }   /* 터널 속(혀 아래 앞쪽) 물은 낮게: 혀를 뚫고 나오지 않게 */
       const pz=LIP.ps?LIP.ps[k]:ph; if(y<LIP.yc[k]-0.12*hc && pz>0.5 && pz<1.05) TS[j]=gb*Math.min(1,(pz-0.5)/0.25); } }   /* 혀가 충분히 덮었을 때만 그늘 */   /* 터널 안쪽 벽: 혀 그늘 */
+}
+/* ── 부서지는 파도의 옆모습 ──
+   줄(z)마다 [마루 뒤 ~ 마루 앞 골] 구간을 한 줄의 곡선으로 그린다:
+   뒷비탈 → 마루 → 혀 바깥면(앞으로 휘어 쏟아짐) → 혀 끝 → 혀 안쪽면(터널 천장) → 곧게 선 앞면(터널 벽) → 골 → 앞쪽 물.
+   격자의 칸 번호가 모든 줄에서 같은 자리(마루·혀 끝·골)를 가리키도록 칸을 나눠 쓰므로, 옆 줄과 이어지는 면이 꼬이거나 늘어나지 않는다.
+   부서지지 않는 줄·때는 같은 칸에 물 높이를 그대로 담는다(모양 차이 없음). */
+function surfWarp(){
+  const {NX,NZ,h,b,brk,dx,L,D}=WV, N=NX*NZ, sm=G.sm.y;
+  const A=G.wp&&G.wp.X.length===N?G.wp:(G.wp={X:new Float32Array(N),Y:new Float32Array(N),Z:new Float32Array(N),H:new Float32Array(N),K:new Float32Array(N),Q:new Float32Array(N),Bd:new Float32Array(N),
+    xa:new Float32Array(NZ),xb:new Float32Array(NZ),xc:new Float32Array(NZ),yt:new Float32Array(NZ),hc:new Float32Array(NZ),ph:new Float32Array(NZ),w:new Float32Array(NZ)});
+  const nat=i=>i===0?0:i===NX-1?L:(i+0.5)*dx;
+  const smp=(k,x)=>{ const f=Math.min(NX-1.0001,Math.max(0,x/dx-0.5)), i=f|0, t=f-i, j=k*NX+i; return [sm[j]+(sm[j+1]-sm[j])*t, h[j]+(h[j+1]-h[j])*t, brk[j]+(brk[j+1]-brk[j])*t, b[j]+(b[j+1]-b[j])*t]; };
+  const put=(k,c,x,y,hh,kk,bd)=>{ const j=k*NX+c; A.X[j]=x; A.Y[j]=y; A.Z[j]=k===0?0:k===NZ-1?WV.W:(k+0.5)*dx; A.H[j]=hh; A.K[j]=kk; A.Q[j]=x; A.Bd[j]=bd; };
+  /* 줄마다 말림 값 (말리지 않는 줄은 가장 가까운 말리는 줄 값을 빌려 칸 나눔만 맞춘다) */
+  const on=LIP.ph?LIP.ph:null; let any=false, near=-1;
+  if(on) for(let k=0;k<NZ;k++) if(on[k]>0){ any=true; break; }
+  if(!any || !(S.barrel>0)){ for(let k=0;k<NZ;k++) for(let i=0;i<NX;i++){ const j=k*NX+i; put(k,i,nat(i),sm[j],h[j],brk[j],b[j]); } return A; }
+  /* 옆 줄과 섞은 단계: 말리는 덩어리의 양 끝은 서서히 */
+  for(let k=0;k<NZ;k++){ let sw=0, sv=0; for(let r=-4;r<=4;r++){ const kk=k+r; if(kk<0||kk>=NZ) continue; const wg=1-Math.abs(r)/5; sw+=wg; sv+=wg*(on[kk]>0?Math.min(1.7,on[kk]):0); }
+    A.ph[k]=on[k]>0?Math.min(on[k],sv/sw*1.3):0; }
+  for(let k=0;k<NZ;k++){ let kk=-1; for(let r=0;r<NZ && kk<0;r++){ if(k-r>=0&&on[k-r]>0) kk=k-r; else if(k+r<NZ&&on[k+r]>0) kk=k+r; }
+    const hc=Math.max(0.4,LIP.hc[kk]), xc=LIP.xc[kk]; A.xc[k]=xc; A.hc[k]=hc; A.yt[k]=LIP.yc[kk]-hc;
+    A.xa[k]=Math.max(2,xc-1.25*hc); A.xb[k]=Math.min(L-4,xc+Math.max(1.7,0.5*S.lipLen+1.0)*hc);
+    const p=A.ph[k], up=Math.min(1,p/0.25), dn=1-Math.min(1,Math.max(0,((on[k]>0?on[k]:0)-1.25)/0.45));   /* 사라질 때는 줄마다 제 단계로 (끝난 옆 줄 때문에 갑자기 끊기지 않게) */ A.w[k]=(p>0?up*up*(3-2*up)*dn*dn*(3-2*dn):0)*Math.min(1,S.barrel); }
+  /* 덩어리 양 끝: 말리지 않는 줄까지의 거리만큼 서서히 (수조 벽 쪽 끝은 그대로) */
+  { const TR=6; for(let k=0;k<NZ;k++){ if(!(on[k]>0)){ A.w[k]=0; continue; } let dd=TR; for(let r=1;r<TR;r++){ if((k-r>=0&&!(on[k-r]>0))||(k+r<NZ&&!(on[k+r]>0))){ dd=r; break; } }
+      const t=dd/TR; A.w[k]*=t*t*(3-2*t); } }
+  /* 모든 줄이 같이 쓰는 칸 나눔 */
+  let sa=0, ss=0, n=0; for(let k=0;k<NZ;k++) if(on[k]>0){ sa+=A.xa[k]; ss+=A.xb[k]-A.xa[k]; n++; }
+  const cA=Math.max(4,Math.min(NX-70,Math.round(sa/n/dx))), Ns=Math.max(30,Math.min(110,Math.round(ss/n/dx*2))), cB=Math.min(NX-12,cA+Ns), NS=cB-cA;
+  const UB=0.26, UL=0.48, UT=0.53, UI=0.68, UW=0.88;   /* 곡선 구간: 뒷비탈 | 혀 바깥 | 혀 끝 | 혀 안쪽 | 벽 | 골 */
+  for(let k=0;k<NZ;k++){
+    const xa=A.xa[k], xb=A.xb[k], w=A.w[k], p=A.ph[k];
+    for(let c=0;c<=cA;c++){ const x=xa*c/cA, q=smp(k,x); put(k,c,x,q[0],q[1],q[2],q[3]); }
+    for(let c=cB;c<NX;c++){ const x=xb+(L-xb)*(c-cB)/(NX-1-cB), q=smp(k,x); put(k,c,x,q[0],q[1],q[2],q[3]); }
+    /* 설계한 옆모습 */
+    const hc=A.hc[k], yt=A.yt[k], xc=A.xc[k], gq=Math.min(1,p), gg=gq*gq*(3-2*gq), cl=Math.min(1,Math.max(0,(p-1)/0.6));
+    const qa=smp(k,xa), qb=smp(k,xb), Cy=yt+hc*(1-0.5*cl), Hy=Cy-yt;
+    const Lx=hc*0.5*S.lipLen*(0.35+0.65*gg), span=(108*S.lipCurl*gg+40*cl)*Math.PI/180, t0=Math.PI/2, tt=t0-span, lx0=xc+cl*0.45*hc;
+    const th=Math.min(Hy*0.45,hc*S.lipTh*(0.15+0.85*gg)), Rf=Math.min(Hy*0.8,hc*0.45);
+    const ell=(t,ax,ay)=>[lx0+ax*Math.cos(t), yt+ay*Math.sin(t)];
+    const design=u=>{
+      if(u<UB){ const t=u/UB, e=Math.sin(t*Math.PI/2); return [xa+(xc-xa)*t, qa[0]+(Cy-qa[0])*e]; }
+      if(u<UL){ const t=(u-UB)/(UL-UB), P=ell(t0-span*t,Lx,Hy); return [P[0]+(xc-lx0)*(1-t), P[1]]; }
+      if(u<UT){ const t=(u-UL)/(UT-UL), P=ell(tt,Lx,Hy), Q=ell(tt,Math.max(0,Lx-th),Math.max(0,Hy-th)); return [P[0]+(Q[0]-P[0])*t, P[1]+(Q[1]-P[1])*t]; }
+      if(u<UI){ const t=(u-UT)/(UI-UT), P=ell(tt+span*t,Math.max(0,Lx-th),Math.max(0,Hy-th)); return [P[0]+(xc-lx0)*t, P[1]]; }
+      if(u<UW){ const t=(u-UI)/(UW-UI), top=Cy-th, mid=yt+Rf;
+        if(t<0.5){ const s2=t/0.5; return [xc, top+(Math.min(top,mid)-top)*s2]; }
+        const f=(t-0.5)/0.5*Math.PI/2; return [xc+Rf-Rf*Math.cos(f), Math.min(top,mid)+(yt-Math.min(top,mid))*Math.sin(f)]; }
+      const t=(u-UW)/(1-UW); return [xc+Rf+(xb-xc-Rf)*t, yt+(qb[0]-yt)*t]; };
+    for(let c=cA+1;c<cB;c++){ const u=(c-cA)/NS, xh=xa+(xb-xa)*u, q=smp(k,xh);
+      let x=xh, y=q[0], hh=q[1];
+      if(w>0.001){ const P=design(u); x+= (P[0]-xh)*w; y+=(P[1]-y)*w; hh=Math.max(hh,0.6*w); }
+      put(k,c,x,y,hh,q[2],smp(k,Math.min(x,xb))[3]); } }
+  return A;
 }
 function lipTip(k){ /* 혀 끝 자리 */ return LIP.tip?[LIP.tip[k*2],LIP.tip[k*2+1]]:[LIP.xc[k],LIP.yc[k]]; }
 function lipUpload(){
@@ -1112,6 +1171,13 @@ function lipUpload(){
       d[oi]=P[j]-nx/l*t; d[oi+1]=P[j+1]-ny/l*t; d[oi+2]=z; d[oi+3]=-nx/l; d[oi+4]=-ny/l; d[oi+5]=-nz/l;
       d[oi+6]=on; d[oi+7]=d[o+7]; d[oi+8]=d[oi]; d[oi+9]=z; } }
   gl.bindBuffer(gl.ARRAY_BUFFER,G.lipVb); gl.bufferSubData(gl.ARRAY_BUFFER,0,d);
+  /* 면은 '둘 다 말리는 중이고 서로 가까운' 옆 줄끼리만 잇는다 — 떨어진 줄을 억지로 이어 늘어난 면이 생기지 않게 */
+  { const I=G.lipIdx; let q=0; const far=Math.max(1.2,dx*2.5);
+    for(let k=0;k<NZ-1;k++){ if(!(LIP.ph[k]>0 && LIP.ph[k+1]>0)) continue; let ok=true;
+      for(let m=0;m<M2 && ok;m+=3){ const a=(k*M2+m)*10, b2=((k+1)*M2+m)*10; if(Math.hypot(d[a]-d[b2],d[a+1]-d[b2+1])>far) ok=false; }
+      if(!ok) continue;
+      for(let m=0;m<M2-1;m++){ const a=k*M2+m; I[q++]=a; I[q++]=a+M2; I[q++]=a+1; I[q++]=a+1; I[q++]=a+M2; I[q++]=a+M2+1; } }
+    G.lipN=q; gl.bindVertexArray(G.lipVao); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,G.lipIb); gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER,0,I.subarray(0,q)); }
 }
 /* ── 물보라 (가벼운 점) ── */
 const SPR={max:12000,n:0,a:new Float32Array(12000*8),g:new Float32Array(12000*5)};
@@ -1166,7 +1232,7 @@ function frame(now){
   setU(PR.sand); gl.bindVertexArray(G.svao); gl.drawArrays(gl.TRIANGLES,0,G.sn);
   setU(PR.body); gl.bindVertexArray(G.bvao); gl.drawArrays(gl.TRIANGLE_STRIP,0,G.NX*2); gl.drawArrays(gl.TRIANGLE_STRIP,G.NX*2,G.NX*2); gl.drawArrays(gl.TRIANGLE_STRIP,G.NX*4,G.NZ*2);
   setU(PR.water); gl.bindVertexArray(G.vao); gl.drawElements(gl.TRIANGLES,G.nIdx,gl.UNSIGNED_INT,0);
-  if(G.lipVao){ lipUpload(); setU(PR.lip); gl.bindVertexArray(G.lipVao); gl.drawElements(gl.TRIANGLES,G.lipN,gl.UNSIGNED_INT,0); }   /* 말리는 혀 */
+  if(false && G.lipVao){ lipUpload(); setU(PR.lip); gl.bindVertexArray(G.lipVao); gl.drawElements(gl.TRIANGLES,G.lipN,gl.UNSIGNED_INT,0); }   /* 말리는 혀 */
   if(FX && S.rev>0){ setU(PR.foam2); gl.bindVertexArray(G.fvao); gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(2,2); gl.drawElements(gl.TRIANGLES,G.nIdx,gl.UNSIGNED_INT,0); gl.disable(gl.POLYGON_OFFSET_FILL); }   /* 그림자 거품 층을 먼저, 조금 뒤로 */
   if(FX){ setU(PR.foam); gl.bindVertexArray(G.fvao); gl.drawElements(gl.TRIANGLES,G.nIdx,gl.UNSIGNED_INT,0);
   setU(PR.blob); blobsDraw(); }
