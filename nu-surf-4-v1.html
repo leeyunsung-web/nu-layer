@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NU SURF 3D 버전 4</title>
+<style>
+:root{ --bg:#FBF8F7; --ink:#33123A; --soft:#7A5C80; --line:#9C2F86; --pink:#F9618D; --panel:#fff }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#1C0E22; --ink:#FBEAF1; --soft:#C39FC6; --line:#E06BC6; --panel:#28152F } }
+:root[data-theme="dark"]{ --bg:#1C0E22; --ink:#FBEAF1; --soft:#C39FC6; --line:#E06BC6; --panel:#28152F }
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif}
+.wrap{max-width:1300px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:10px}
+h1{margin:0;font-size:20px;letter-spacing:.1em} h1 small{font-size:12px;letter-spacing:.2em;color:var(--soft);margin-left:8px}
+p{margin:0;color:var(--soft);font-size:13px;line-height:1.55}
+#stage{position:relative;border:3px solid var(--line);border-radius:12px;overflow:hidden;background:#0d2fb5;aspect-ratio:16/9;touch-action:none}
+#gl{width:100%;height:100%;display:block;cursor:grab}
+#load{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:15px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.lab{font-size:12px;font-weight:800;color:var(--soft);margin-right:2px}
+button{font:inherit;font-size:13px;font-weight:800;color:var(--ink);background:var(--panel);border:2px solid var(--line);border-radius:999px;min-height:38px;padding:6px 14px;cursor:pointer}
+button[aria-pressed="true"]{background:var(--pink);color:#33123A}
+.set{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px 18px;background:var(--panel);border:2px solid var(--line);border-radius:12px;padding:12px}
+.set label{display:flex;flex-direction:column;gap:3px;font-size:13px;font-weight:800}
+.set label span{font-weight:500;font-size:12px;color:var(--soft)}
+.set input{accent-color:var(--line);width:100%}
+#stat{margin-left:auto;font-size:12px;color:var(--soft);font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>NU SURF 3D <small>버전 4 · v1</small></h1>
+  <p>여러 방향에서 오는 너울이 겹친 바다에, 큰 파도가 불규칙한 간격으로 밀려옵니다. 파도는 얕아질수록 느려지고 높아지다가 깊이의 0.78배를 넘으면 부서집니다. 마루에서 앞으로 던져진 물이 포물선을 그리며 떨어져 혀가 크게 말리고, 암초가 얕은 봉우리에서 먼저 말리기 시작해 양옆으로 차례차례 까져 나갑니다. 수면을 친 뒤에는 흰 물이 백사장으로 쳐 올라갔다 빠집니다.</p>
+  <div id="stage"><canvas id="gl" aria-label="파도 3D 화면"></canvas><div id="load">바다를 채우는 중…</div></div>
+  <div class="bar">
+    <span class="lab">시점</span><span id="views"></span>
+    <span class="lab" style="margin-left:10px">빠르기</span>
+    <button type="button" data-sp="0.25">¼배</button><button type="button" data-sp="0.5">½배</button><button type="button" data-sp="1" aria-pressed="true">1배</button>
+    <button type="button" id="bPause" aria-pressed="false">멈춤</button>
+    <span id="stat"></span>
+  </div>
+  <div class="set" id="set"></div>
+</div>
+<script>
+(()=>{
+const $=id=>document.getElementById(id);
+window.addEventListener("error",e=>{ const l=document.getElementById("load"); if(l) l.textContent="오류: "+e.message; });
+/* ── NU SURF 버전 4 파도 엔진 ──
+   바다: 여러 방향 너울을 겹친 물결(마루 뾰족, 골 넓게)
+   부서지는 파도: 파도마다 해변 쪽으로 달려오다(얕아지면 느려지고 높아짐) 깊이의 0.78배를 넘으면 부서진다.
+   부서지는 동안의 옆모습 = 포물선 물줄기 혀(마루에서 앞으로 던져진 물이 중력으로 떨어지는 길) → 수면을 침 → 흰 물(보어) → 백사장 쳐 올라감 → 빠짐.
+   암초가 얕은 봉우리에서 먼저 부서지고 양옆으로 차례차례 까져 나간다 (실제 서핑 파도의 A자 봉우리). */
+const ENG=(()=>{
+const G=9.8, SB=1/16, SBE=1/10, DMAX=7;
+const sm=t=>t<=0?0:t>=1?1:t*t*(3-2*t);
+/* 옆모습 한 장: ph 0(완만한 너울)→0.5(앞면이 섬)→1.24(혀가 수면을 침)→1.7(흰 물 계단). 단위: 파도 높이 H, 마루 아래가 x=0, 잔잔한 수면 y=0 */
+function boreY(x){ /* 흰 물 계단(앞이 x=0): 앞은 둥글게 서고 뒤로 갈수록 낮아짐 */ if(x>0) return 0; if(x>-0.7) return sm(-x/0.7); return Math.exp(-(-x-0.7)/4.0); }
+function jet(ph,kx,SPL){
+  const x=Math.min(1,Math.max(0,ph)/1.24), a=sm(Math.min(1,x/0.4)), b=Math.max(0,(x-0.4)/0.6), c=sm(Math.max(0,(ph-1.24)/0.46));
+  const L=[0.12*a, 1-0.05*a], XL=Math.max(0.4,0.5*kx), T=0.38*Math.min(1,b*3+0.0001);
+  const jx=t=>L[0]+(XL-L[0])*t, jy=t=>L[1]+0.2*t-(L[1]+0.2-0.06)*t*t;
+  const jd=t=>{ const dx=XL-L[0], dy=0.2-2*(L[1]+0.2-0.06)*t, l=Math.hypot(dx,dy); return [dy/l,-dx/l]; };
+  const P=[];
+  const bw=1.9-0.5*a;   /* 뒤 비탈 폭: 서기 시작하면 조금 좁아짐 */
+  for(let i=0;i<30;i++){ const u=i/29, xx=-6.5+(L[0]-0.1+6.5)*Math.pow(u,0.8); const s=1/Math.cosh(xx/bw); P.push([xx, L[1]*s*s]); }   /* 뒤 비탈 → 마루 */
+  const iP=P.length-1;
+  for(let i=1;i<=24;i++){ const t=b*i/24; P.push([jx(t),jy(t)]); }   /* 바깥면: 포물선 */
+  const iT=P.length-1;
+  for(let i=1;i<=20;i++){ const t=b*(1-i/20), w=T*(0.3+0.7*(1-t/Math.max(b,1e-4))), n=jd(t); P.push([jx(t)+n[0]*w, jy(t)+n[1]*w]); }   /* 안쪽면 */
+  const iI=P.length-1, E=P[iI], xB=0.18+1.6*(1-a)-0.18*b;
+  for(let i=1;i<=12;i++){ const s=i/12, cx=E[0]+0.18*a*(1-b)-0.32*Math.min(1,b*2), cy=E[1]*0.4; const q=1-s; P.push([q*q*E[0]+2*q*s*cx+s*s*xB, q*q*E[1]+2*q*s*cy+s*s*(-0.06)]); }   /* 혀 아래 앞면 → 골 */
+  const sg=sm(Math.max(0,(ph-1.2)/0.25)), sa=sg*(1-sm(Math.max(0,(ph-1.5)/0.25)))*(SPL===undefined?1:SPL), hs=0.6*sa, R=Math.max(0.05,0.6*XL*sg), x1=XL-0.1, Lp=[XL+0.05, -0.02+0.08*sa+0.6*hs];
+  const iS0=P.length;
+  for(let i=1;i<=4;i++){ const s=i/4; P.push([xB+(x1-xB)*s, -0.06+0.05*sm(s)]); }
+  for(let i=1;i<=4;i++){ const s=i/4; P.push([x1+(Lp[0]-x1)*sm(s), -0.01+(Lp[1]+0.01)*Math.sin(s*Math.PI/2)]); }
+  const sy=t=>Lp[1]+0.9*hs*t-(Lp[1]+0.9*hs)*t*t;
+  for(let i=1;i<=6;i++){ const t=i/6; P.push([Lp[0]+R*t, sy(t)]); }
+  const sT=0.16*sa+0.002;
+  for(let i=1;i<=4;i++){ const t=1-i/4; P.push([Lp[0]+R*t-0.2*sT, sy(t)-sT*(0.4+0.6*(1-t))]); }
+  const Q=P[P.length-1]; for(let i=1;i<=2;i++){ const s=i/2; P.push([Q[0]+0.08*sa*s, Q[1]*(1-s)]); }
+  const F0=P[P.length-1]; for(let i=1;i<=10;i++){ const s=i/10; P.push([F0[0]+(4.0-F0[0])*s, F0[1]*(1-s)]); }   /* 앞쪽 물 */
+  const iS1=iS0+4;
+  if(a<1){ const fw=bw*0.85; for(let i=iP+1;i<P.length;i++){ const p=P[i], q=1/Math.cosh(Math.max(0,p[0])/fw); p[1]=L[1]*q*q+(p[1]-L[1]*q*q)*a*a; } }   /* 아직 서기 전: 앞도 완만한 너울 */
+  if(c>0){ const x0=P[iP][0], xe=P[iS1][0]; for(let i=iP+1;i<iS1;i++){ const xt=x0+(xe-x0)*Math.pow((i-iP)/(iS1-iP),1.3); P[i][0]+=(xt-P[i][0])*c; }
+    for(let i=0;i<P.length;i++){ const p=P[i], bo=0.55*boreY(p[0]-XL), cc=i<iS1?c:c*c; p[1]+= (bo-p[1])*cc; } }   /* 친 뒤: 흰 물 계단(보어)으로 — 다음 단계와 똑같은 모양에서 끝난다 */
+  return {P,iT,iP,iI,XL};
+}
+/* 바닥: 깊은 바다(7) → 완만한 비탈 → 백사장(x≥0). 암초 봉우리 두 곳(파도마다 조금씩 옮겨 다님) */
+const REEF=[{z:22,w:16,h:1.6,x:-44},{z:58,w:18,h:1.3,x:-38}];
+function depth(x,z){ if(x>=0) return 0; let d=Math.min(DMAX,-x*SB); for(const r of REEF){ const dz=z-r.z; d-=r.h*Math.exp(-(dz*dz)/(r.w*r.w))*Math.exp(-((x-r.x)*(x-r.x))/300); } return Math.max(0.08,d); }
+function bedY(x,z){ return x>=0? x*SBE : -depth(x,z); }
+/* 너울: 여러 방향, 2차(스토크스)로 마루는 뾰족·골은 넓게 */
+const SW=[[34,0.08,0.22,0.3],[21,-0.35,0.16,1.7],[13,0.5,0.10,4.1],[8.5,-0.8,0.06,2.2],[6,1.1,0.04,5.0],[27,0.3,0.12,3.3]].map(([L,dir,a,ph])=>{ const k=2*Math.PI/L; return {kx:k*Math.cos(dir),kz:k*Math.sin(dir),om:Math.sqrt(G*k),a,ph,k}; });
+function swell(x,z,t,K){ if(x>=0) return 0; const att=Math.min(1,(-x)/25); let y=0; for(const w of SW){ const th=w.kx*x+w.kz*z-w.om*t+w.ph, A=w.a*K; y+=A*(Math.cos(th)+0.5*w.k*A*Math.cos(2*th)); } return y*att; }
+return {G,SB,SBE,DMAX,jet,boreY,depth,bedY,swell,REEF,sm};
+})();
+
+const CTL=[
+  ["tscale","파도 빠르기",0.2,1.2,0.05,0.6,"바다 전체가 움직이는 빠르기. 실제보다 느리게 하면 혀가 말리는 모습을 오래 볼 수 있어요."],
+  ["size","파도 크기",0.5,1.6,0.05,1,"밀려오는 큰 파도의 높이. 클수록 더 멀리서, 더 크게 말립니다."],
+  ["gap","파도 간격",0.5,2,0.05,1,"큰 파도 사이 시간. 몇 개씩 묶여 오다 한동안 잠잠해지는 리듬은 그대로."],
+  ["angle","들어오는 각도",0,1,0.05,0.6,"파도마다 해변에 비스듬히 들어오는 정도. 0이면 모두 똑바로."],
+  ["kx","혀 크기",1.6,4,0.05,3.3,"혀(포물선 물줄기)가 앞으로 날아가는 거리. 클수록 터널이 크고 둥글게."],
+  ["curlSpd","말리는 빠르기",0.3,1.6,0.05,0.75,"혀가 생겨 수면을 치기까지의 빠르기. 낮추면 말리는 모습을 오래 봅니다."],
+  ["dropK","말릴 때 물방울",0,2,0.05,1,"혀가 말리는 동안 혀 끝에서 송골송골 떨어져 나가는 물방울과 비눗방울 (그림처럼)."],
+  ["spl2","두 번째 혀",0,1.5,0.05,0.8,"혀 끝이 친 자리에서 다시 솟아 앞으로 넘어가는 작은 혀."],
+  ["swellK","바다 출렁임",0,2,0.05,1,"여러 방향에서 오는 작은 너울의 크기."],
+  ["swash","밀려 올라오는 정도",0.3,2,0.05,1,"흰 물이 백사장으로 쳐 올라가는 거리."],
+  ["splK","튀는 거품 양",0,2,0.05,1,"혀가 수면을 치는 순간 손가락처럼 튀어 오르는 흰 거품 덩어리의 양 (그림처럼 파란 테두리)."],
+  ["splUp","튀는 높이",0.3,2,0.05,1,"튀는 거품이 솟는 높이."],
+  ["foamK","거품 진하기",0,2,0.05,1,"혀 끝·흰 물·밀려 올라온 물 끝의 거품."],
+  ["faceSh","파도 앞면 그늘",0,1,0.05,0.6,"백사장 쪽을 향해 선 앞면을 어둡게."],
+  ["tubeSh","터널 안 그늘",0,1,0.05,0.85,"말린 혀 아래(터널 안)를 어둡게."],
+  ["hiL","하이라이트",0,1,0.05,0.7,"혀 위·마루에 생기는 밝은 빛줄기."],
+  ["wetT","젖은 모래 마르는 시간",1,20,0.5,7,"물이 빠진 뒤 모래가 젖어 보이는 시간(초)."]
+];
+const KEY="nu-surf-4c"; const S={paint:0}; for(const c of CTL) S[c[0]]=c[5]; try{ Object.assign(S,JSON.parse(localStorage.getItem(KEY)||"{}")); }catch(_){}
+const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(_){} };
+for(const c of CTL){ const l=document.createElement("label"); l.innerHTML=`${c[1]} <output></output><input type="range" min="${c[2]}" max="${c[3]}" step="${c[4]}"><span>${c[6]}</span>`; const inp=l.querySelector("input"), o=l.querySelector("output"); inp.value=S[c[0]]; o.textContent=(+S[c[0]]).toFixed(2); inp.oninput=()=>{ S[c[0]]=+inp.value; o.textContent=(+inp.value).toFixed(2); save(); }; $("set").appendChild(l); }
+
+/* ── WebGL (휴대폰에서도 열리게 WebGL1 기본 기능만 쓴다) ── */
+const MOB=(window.matchMedia&&matchMedia("(pointer:coarse)").matches)||innerWidth<820;   /* 휴대폰: 줄·점 수를 줄여 가볍게 */
+const cv=$("gl"), gl=cv.getContext("webgl",{antialias:!MOB,powerPreference:"high-performance"})||cv.getContext("experimental-webgl"); if(!gl){ $("load").textContent="이 기기에서는 3D 화면(WebGL)을 쓸 수 없어요"; return; }
+const VS=`attribute vec3 aP; attribute vec3 aN; attribute vec2 aF; uniform mat4 uVP; uniform vec2 uT; varying vec3 vP; varying vec3 vN; varying vec2 vF;
+void main(){ vec3 p=aP, n=aN; if(uT.y>0.5){ p.z=uT.x-p.z; n.z=-n.z; } else p.z+=uT.x; vP=p; vN=n; vF=aF; gl_Position=uVP*vec4(p,1.0); }`;
+const FS=`precision highp float; varying vec3 vP; varying vec3 vN; varying vec2 vF; uniform vec3 uEye; uniform vec4 uK; uniform float uTime; uniform float uP;
+/* 윤성 그림 색 (그림에서 뽑음): 아쿠아 몸통 · 밝은 아쿠아 무늬 · 접힌 곳·그늘의 짙은 청록 · 먼 바다 하늘색 줄 · 흰 거품과 파란 테두리 */
+float h21(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y); }
+void main(){ vec3 AQ=vec3(0.29,0.84,0.89), LT=vec3(0.62,0.94,0.95), TE=vec3(0.0,0.71,0.81), DT=vec3(0.0,0.55,0.72), AZ=vec3(0.05,0.56,0.88), AZ2=vec3(0.39,0.75,0.98), OUT=vec3(0.10,0.61,0.94), SA=vec3(0.99,0.97,0.93), SW=vec3(0.86,0.90,0.92), HZ=vec3(0.81,0.89,0.98);
+  vec3 n=normalize(vN); vec3 V=normalize(uEye-vP);   /* 바깥 방향 그대로 (터널 천장은 아래, 터널 뒷벽은 백사장 쪽을 향한다) */
+  float fd=length(uEye-vP);
+  if(vF.y>0.5){ vec3 c=mix(SA,SW,clamp(vF.y-1.0,0.0,1.0)); if(uP<0.5) c*=0.82+0.18*max(0.0,n.y); c=mix(c,HZ,smoothstep(90.0,300.0,fd)*0.6); gl_FragColor=vec4(c,1.0); return; }
+  vec3 Lg=normalize(vec3(-0.3,0.8,0.5)); float ndl=dot(n,Lg), fr=pow(1.0-abs(dot(n,V)),3.0);
+  float face=smoothstep(0.25,0.75,n.x)*(1.0-smoothstep(0.55,0.95,n.y)), under=smoothstep(0.0,-0.5,n.y);
+  float fo=vF.x*uK.w, hn=vn(vec2(vP.x*1.7+uTime*0.3, vP.z*1.1))*0.7+vn(vec2(vP.x*4.0, vP.z*3.0))*0.3;
+  vec3 c;
+  if(uP<0.5){
+    /* 기본 3D 명암: 깊은 청록 ↔ 밝은 청록, 하늘 반사(비스듬할수록), 얇은 혀는 빛이 비쳐 밝게, 아래를 향한 면은 그늘 */
+    float l=0.25+0.75*max(0.0,ndl); l-=0.25*face*uK.x; l-=0.45*under*uK.y;
+    vec3 deep=vec3(0.01,0.30,0.42), shal=vec3(0.16,0.72,0.78); c=mix(deep,shal,clamp(l,0.0,1.0));
+    c=mix(c,vec3(0.72,0.86,0.95),fr*0.55*(1.0-under));
+    vec3 Rf=reflect(-V,n); float spc=pow(max(0.0,dot(Rf,normalize(vec3(-0.2,0.6,0.75)))),60.0); c+=vec3(0.9)*spc*uK.z;
+    c=mix(c,vec3(0.95,0.98,1.0),smoothstep(0.35,0.75,fo)*(0.75+0.25*hn));   /* 거품 */
+    c=mix(c,HZ,smoothstep(120.0,400.0,fd)*0.8);
+  } else {
+    /* 그림 필터: 윤성 그림 색을 몇 단계로, 파란 테두리, 흘러가는 밝은 무늬, 먼 바다 줄무늬, 테두리 있는 거품 */
+    float l=0.35+0.65*max(0.0,ndl); l-=0.22*face*uK.x; if(n.y<0.0) l-=0.35*uK.y*smoothstep(0.0,-0.4,n.y)+0.12;
+    c=l>0.86?LT:(l>0.66?AQ:(l>0.48?TE:(l>0.3?DT:vec3(0.0,0.40,0.62))));
+    float st=vn(vec2(vP.x*0.32-uTime*0.35, vP.z*0.11))*0.65+vn(vec2(vP.x*0.9-uTime*0.6, vP.z*0.3+3.0))*0.35; if(st>0.66 && n.y>0.8 && l>0.6) c=LT;
+    vec3 Rf=reflect(-V,n); float sp=pow(max(0.0,dot(Rf,normalize(vec3(-0.2,0.6,0.75)))),24.0); if(sp>0.5 && n.y>0.15 && uK.z>0.05) c=mix(c,LT,min(1.0,uK.z*1.4));
+    if(abs(dot(n,V))<0.16 && fd<140.0) c=vec3(0.04,0.40,0.72);
+    float far=smoothstep(-130.0,-200.0,vP.x); if(far>0.0){ float bd=fract(-vP.x/38.0+0.15*sin(vP.z*0.03)); vec3 fc=bd<0.3?AZ:(bd<0.5?AZ2:AQ); c=mix(c,fc,step(0.5,far)); }
+    if(fo>0.6){ c=vec3(1.0); if(fo<0.95 && hn>0.68) c=(hn>0.72)?TE:OUT; } else if(fo>0.53) c=OUT;
+    c=mix(c,HZ,smoothstep(90.0,320.0,fd)*0.75);
+  }
+  gl_FragColor=vec4(c,1.0); }`;
+const VS2=`attribute vec3 aP; attribute float aS; uniform mat4 uVP; uniform float uPx; varying float vR; void main(){ gl_Position=uVP*vec4(aP,1.0); vR=aS<0.0?1.0:0.0; gl_PointSize=clamp(uPx*abs(aS)/gl_Position.w,2.0,30.0); }`;
+const FS2=`precision mediump float; varying float vR; void main(){ vec2 q=gl_PointCoord*2.0-1.0; float r=dot(q,q); if(r>1.0) discard;
+  if(vR>0.5){ if(r<0.62){ if(length(q-vec2(-0.3,-0.3))<0.18) { gl_FragColor=vec4(1.0); return; } discard; } gl_FragColor=vec4(r>0.82?vec3(0.62,0.9,0.98):vec3(1.0),1.0); return; }   /* 비눗방울 테 */
+  gl_FragColor=vec4(r>0.62?vec3(0.10,0.61,0.94):vec3(1.0),1.0); }`;   /* 흰 물방울 + 파란 테두리 */
+const VS3=`attribute vec2 aP; varying vec2 vQ; void main(){ vQ=aP; gl_Position=vec4(aP,0.999,1.0); }`;
+const FS3=`precision highp float; varying vec2 vQ; uniform vec3 uCam; uniform float uTime;
+float h21(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y); }
+float fb(vec2 p){ return vn(p)*0.55+vn(p*2.1)*0.28+vn(p*4.3)*0.17; }
+/* 윤성 그림 하늘: 짙은 코발트 · 흰 실구름 줄기 · 수평선 위 뭉게구름(아래는 하늘색 그늘) · 반짝임 */
+uniform float uP;
+void main(){ float el=atan(vQ.y*0.365)+uCam.y, az=vQ.x*0.365*uCam.z+uCam.x;
+  if(uP<0.5){ vec3 c=mix(vec3(0.80,0.88,0.95),vec3(0.30,0.55,0.86),smoothstep(-0.02,0.5,el)); float cl=fb(vec2((az+uTime*0.004)*1.5, el*4.0)); c=mix(c,vec3(0.97),smoothstep(0.55,0.75,cl)*smoothstep(0.0,0.05,el)*(1.0-smoothstep(0.25,0.45,el))*0.8); gl_FragColor=vec4(c,1.0); return; }   /* 기본 하늘 */
+  vec3 CO=vec3(0.08,0.19,0.71), CL=vec3(0.81,0.89,0.98), c=CO;
+  float hz=smoothstep(0.0,0.02,el); c=mix(CL,CO,hz);
+  /* 실구름: 가로로 길게 휘는 흰 줄 */
+  float w=fb(vec2(az*1.2+uTime*0.004, el*3.0)); float ln=abs(sin(el*26.0+w*7.0)); if(el>0.12 && ln>0.985 && fb(vec2(az*2.0,el*5.0))>0.45) c=vec3(1.0);
+  /* 뭉게구름: 수평선 위 */
+  float ax=az+uTime*0.004; float Hc=0.015+0.17*smoothstep(0.38,0.78,fb(vec2(ax*0.8,3.0)))+0.03*vn(vec2(ax*7.0,1.0))+0.018*vn(vec2(ax*17.0,2.0))+0.008*vn(vec2(ax*40.0,5.0));   /* 뭉게구름: 수평선 위로 둥글게 부푼 덩어리들 (윗선이 울퉁불퉁) */
+  if(el>-0.01 && el<Hc){ float sh=Hc*0.42+0.012*vn(vec2(ax*14.0,7.0)); c=el<sh?CL:vec3(1.0); if(el>Hc-0.004) c=CL; }
+  /* 구름 사이 작은 조각 */
+  float pc=fb(vec2(ax*3.0, el*9.0)); if(el>Hc && el<0.32 && pc>0.74+el) c=(pc<0.77+el)?CL:vec3(1.0);
+  /* 반짝임 */
+  vec2 g=vec2(az*40.0, el*40.0); if(el>0.15 && h21(floor(g))>0.997 && length(fract(g)-0.5)<0.12) c=vec3(1.0);
+  gl_FragColor=vec4(c,1.0); }`;
+function prog(vs,fs){ const p=gl.createProgram(); for(const [t,s] of [[gl.VERTEX_SHADER,vs],[gl.FRAGMENT_SHADER,fs]]){ const sh=gl.createShader(t); gl.shaderSource(sh,s); gl.compileShader(sh); if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh)); gl.attachShader(p,sh); } gl.linkProgram(p); if(!gl.getProgramParameter(p,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p)); return p; }
+const PW=prog(VS,FS), PS=prog(VS2,FS2), PB=prog(VS3,FS3);
+const UC=new Map(), U=(p,n)=>{ const k=n+(p===PW?0:p===PS?1:p===PB?2:3); if(!UC.has(k)) UC.set(k,gl.getUniformLocation(p,n)); return UC.get(k); };
+const att=(p,name,buf,n)=>{ const l=gl.getAttribLocation(p,name); if(l<0) return; gl.bindBuffer(gl.ARRAY_BUFFER,buf); gl.enableVertexAttribArray(l); gl.vertexAttribPointer(l,n,gl.FLOAT,false,0,0); };
+const offAll=()=>{ for(let i=0;i<4;i++) gl.disableVertexAttribArray(i); };
+
+
+/* ── 그물: 줄(해변 따라) × 점(바다→백사장) ── */
+const ZW=80, NR=MOB?64:100, dz=ZW/(NR-1), TILES=MOB?2:3, D=0;
+const XG=(()=>{ const a=[]; for(let i=0;i<24;i++){ const u=i/24; a.push(-440+(440-96)*(1-Math.pow(1-u,1.8))); } const st=MOB?0.3:0.18; for(let x=-96;x<=14.001;x+=st) a.push(x); for(let i=1;i<=14;i++) a.push(14+i*i*0.35); return Float32Array.from(a); })();
+const NC=XG.length;
+let VPOS, VNRM, VATT, IDX, bufP, bufN, bufA, bufI, nIdx=0, WET, WB0=-4, WBS=0.25, WBN=120;
+function buildMesh(){ const nv=NR*NC; if(nv>65535) throw new Error("점이 너무 많아요 "+nv); VPOS=new Float32Array(nv*3); VNRM=new Float32Array(nv*3); VATT=new Float32Array(nv*2);
+  IDX=new Uint16Array((NR-1)*(NC-1)*6); let q=0; for(let j=0;j<NR-1;j++) for(let i=0;i<NC-1;i++){ const a=j*NC+i, b=a+1, c=a+NC, d=c+1; IDX[q++]=a; IDX[q++]=c; IDX[q++]=b; IDX[q++]=b; IDX[q++]=c; IDX[q++]=d; } nIdx=q;
+  const mk=arr=>{ const b=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,b); gl.bufferData(gl.ARRAY_BUFFER,arr,gl.DYNAMIC_DRAW); return b; };
+  bufP=mk(VPOS); bufN=mk(VNRM); bufA=mk(VATT); bufI=gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,bufI); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,IDX,gl.STATIC_DRAW);
+  WET=new Float32Array(NR*WBN); }
+const bgB=(()=>{ const b=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,b); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW); return b; })();
+let spCount=0;   /* (계산 녹화 물보라는 이제 없음 — 튀는 거품이 대신) */
+
+/* ── 큰 파도들 ── */
+const {G,SBE,DMAX}=ENG, sm=ENG.sm;
+const EVS=[]; let nextT=0, lull=0;
+function hz(e,j,d){ const z=j*dz; return e.H0*(1+0.16*Math.sin(z*0.09+e.sd)+0.09*Math.sin(z*0.23+e.sd*2.3))*Math.min(1.8,Math.pow(DMAX/Math.max(d,0.4),0.25)); }
+function spawn(t){ const H0=(2.1+1.2*Math.pow(Math.random(),1.2))*S.size, ang=(Math.random()-0.5)*0.5*S.angle;
+  const e={H0,ang,sd:Math.random()*100,x:new Float32Array(NR),tb:new Float32Array(NR),Hb:new Float32Array(NR),xf:new Float32Array(NR),ts:new Float32Array(NR),Hs:new Float32Array(NR),ph:new Float32Array(NR),st:new Uint8Array(NR)};
+  for(let j=0;j<NR;j++) e.x[j]=-330+Math.tan(ang)*(j*dz-ZW/2);
+  EVS.push(e);
+  /* 간격: 몇 개씩 묶여 오다(세트) 한동안 잠잠 */
+  if(--lull<=0){ lull=3+Math.floor(Math.random()*4); nextT=t+(14+10*Math.random())*S.gap; } else nextT=t+(6+6*Math.random())*S.gap; }
+const Tcurl=Hb=>3.6*Math.sqrt(Hb/2)/S.curlSpd;
+function stepEvents(t,dt){ if(t>=nextT) spawn(t);
+  for(let q=EVS.length-1;q>=0;q--){ const e=EVS[q]; let alive=false;
+    for(let j=0;j<NR;j++){ const z=j*dz; let st=e.st[j];
+      if(st===0){ const d=ENG.depth(e.x[j],z); e.x[j]+=Math.sqrt(G*Math.min(d,DMAX))*0.92*dt; const H=hz(e,j,d), qq=H/(0.78*d); e.ph[j]=0.496*Math.pow(Math.min(1,qq),4); e.Hb[j]=H; if(qq>=1 && e.x[j]>-90){ e.st[j]=st=1; e.tb[j]=t; } }
+      if(st===1){ const Hb=e.Hb[j], d=ENG.depth(e.x[j],z); e.x[j]+=Math.sqrt(G*(Math.max(d,0.2)+Hb))*0.62*dt; const pp=e.ph[j]; e.ph[j]=0.496+1.204*Math.min(1,(t-e.tb[j])/Tcurl(Hb));
+        if(pp<1.24 && e.ph[j]>=1.24 && !(j%2)) splashAt(e.x[j]+ENG.jet(1.24,S.kx).XL*Hb, z, Hb);
+        if(e.ph[j]>=1.7){ e.st[j]=st=2; e.xf[j]=e.x[j]+Math.max(0.4,0.5*S.kx)*Hb; e.Hs[j]=0.55*Hb; } }
+      if(st===2){ const d=ENG.depth(e.xf[j],z); e.Hs[j]*=Math.exp(-dt/14); e.xf[j]+=Math.sqrt(G*(Math.max(d,0.15)+e.Hs[j]))*0.7*dt; if(e.xf[j]>=0){ e.st[j]=st=3; e.ts[j]=t; } }
+      if(st===3){ if((t-e.ts[j])>5+2.5*e.Hs[j]) e.st[j]=st=4; }
+      if(st<4) alive=true; }
+    if(!alive) EVS.splice(q,1); } }
+
+/* ── 줄 하나의 옆모습 만들기 ── */
+const RY=new Float32Array(NC), RF=new Float32Array(NC), RS_=new Uint8Array(NC), BASE=new Float32Array(NC);
+function lowerIdx(x){ let lo=0, hi=NC-1; while(lo<hi){ const m=(lo+hi)>>1; if(XG[m]<x) lo=m+1; else hi=m; } return lo; }
+function baseAt(x){ const i=Math.min(NC-1,Math.max(1,lowerIdx(x))), a=XG[i-1], b=XG[i], f=Math.min(1,Math.max(0,(x-a)/Math.max(1e-6,b-a))); return BASE[i-1]+(BASE[i]-BASE[i-1])*f; }
+let DROPDT=0;
+function buildRow(j,t){ const z=j*dz, K=S.swellK, base=j*NC;
+  for(let i=0;i<NC;i++){ const x=XG[i]; RY[i]=x<0?ENG.swell(x,z,t,K):ENG.bedY(x,z); RF[i]=0; RS_[i]=x>=0?1:0; }
+  const WIN=[];
+  for(const e of EVS){ const st=e.st[j];
+    if(st===0){ const x=e.x[j], H=e.Hb[j]; if(x>-96){ WIN.push({x,H,ph:e.ph[j]}); } else { const i0=lowerIdx(x-8*H), i1=lowerIdx(x+8*H); for(let i=i0;i<=i1&&i<NC;i++){ if(XG[i]>=0) break; const s=1/Math.cosh((XG[i]-x)/(1.9*H)); RY[i]+=H*s*s; } } }
+    else if(st===1){ WIN.push({x:e.x[j],H:e.Hb[j],ph:e.ph[j]}); }
+    else if(st===2){ const xf=e.xf[j], Hs=e.Hs[j], Hb=e.Hb[j], i0=lowerIdx(xf-30), i1=lowerIdx(Math.min(xf+1,0));
+      for(let i=i0;i<=i1&&i<NC;i++){ const x=XG[i]; if(x>=0) break; RY[i]+=Hs*ENG.boreY((x-xf)/Hb); const fb=x<=xf+0.1?Math.exp(-(xf-x)/(0.7*Hb))*(0.9+0.1*Math.sin(x*1.3+z*0.7)):0; RF[i]=Math.max(RF[i],fb); } }   /* 흰 물 계단: 앞쪽이 하얗고 뒤로 갈수록 거품이 옅어진다 */
+    else if(st===3){ const s=(t-e.ts[j])/(5+2.5*e.Hs[j]), Hs=e.Hs[j], R=S.swash*1.6*Hs/SBE, xs=R*Math.pow(Math.sin(Math.PI*Math.min(1,s)),0.8)*(s<0.5?1:1), th0=Hs*0.45*(1-0.7*s);
+      for(let i=lowerIdx(-6);i<NC;i++){ const x=XG[i]; if(x<0){ RY[i]+=th0*0.4*Math.exp(x/3)*(1-s); continue; } if(x>xs) break; const th=th0*Math.pow(Math.max(0,1-x/Math.max(0.1,xs)),0.7); if(th>0.004){ RY[i]=ENG.bedY(x,z)+th; RS_[i]=0; RF[i]=Math.max(RF[i],x>xs-1.4?0.9:(s<0.5?0.35*(1-s*2):0)); } } } }   /* 백사장으로 쳐 올라갔다 빠짐: 맨 앞은 흰 거품 줄 */
+  BASE.set(RY);
+  /* 말리는 파도: 옆모습(혀 포함)을 그 자리 점들에 늘어놓는다 */
+  for(const w of WIN){ const J=ENG.jet(w.ph,S.kx,S.spl2), P=J.P, H=w.H, xa=w.x-6.5*H, xb=w.x+4*H, i0=lowerIdx(xa), i1=Math.min(NC-1,lowerIdx(xb)-1); if(i1-i0<8) continue;
+    const n=P.length, seg=new Float32Array(n); let tot=0; for(let k=1;k<n;k++){ tot+=Math.hypot(P[k][0]-P[k-1][0],P[k][1]-P[k-1][1]); seg[k]=tot; }
+    const cnt=i1-i0+1; let k=0;
+    for(let m=0;m<cnt;m++){ const s=tot*m/(cnt-1); while(k<n-2 && seg[k+1]<s) k++; const f=(s-seg[k])/Math.max(1e-6,seg[k+1]-seg[k]), px=P[k][0]+(P[k+1][0]-P[k][0])*f, py=P[k][1]+(P[k+1][1]-P[k][1])*f;
+      const X=w.x+px*H, i=i0+m; RY[i]=py*H+baseAt(X); XW[i]=X; RS_[i]=0;
+      /* 거품: 혀 끝이 날아갈 때 끝에, 수면을 친 뒤엔 앞쪽 전체 */
+      let fo=0; if(w.ph>0.9){ if(k>=J.iP && k<=J.iI){ const tt=(k-J.iP)/Math.max(1,J.iT-J.iP); fo=0.8*Math.max(0,Math.min(1,(w.ph-0.95)/0.25))*sm((tt-0.82)/0.18); } if(w.ph>1.24 && px>J.XL*0.4-1.0) fo=Math.max(fo,Math.min(1,(w.ph-1.24)/0.15)*Math.exp(-Math.max(0,J.XL-px)/1.8)); }
+      RF[i]=Math.max(RF[i],fo); }
+    if(w.ph>0.7 && w.ph<1.3 && !(j%2) && DROPDT>0){ const tp=P[J.iT]; dropsAt(w.x+tp[0]*H, baseAt(w.x+tp[0]*H)+tp[1]*H, z, H, Math.sqrt(G*H)*0.8, DROPDT); } }   /* 말리는 동안 혀 끝에서 물방울이 떨어져 나간다 */
+  /* 그물에 쓰기 */
+  for(let i=0;i<NC;i++){ const v=(base+i)*3, x=XW[i]; VPOS[v]=x; VPOS[v+1]=RY[i]; VPOS[v+2]=z;
+    let wv=0; const isSand=RS_[i]===1; const wb=Math.floor((x-WB0)/WBS); if(wb>=0&&wb<WBN){ const w=j*WBN+wb; if(!isSand && x>-4) WET[w]=1; wv=WET[w]; }
+    VATT[(base+i)*2]=isSand?0:RF[i]; VATT[(base+i)*2+1]=isSand?1+wv:0; XW[i]=XG[i]; } }
+const XW=Float32Array.from(XG);
+function update(t){ for(let j=0;j<NR;j++) buildRow(j,t);
+  for(let j=0;j<NR;j++) for(let i=0;i<NC;i++){ const a=j*NC+i, il=j*NC+Math.max(0,i-1), ir=j*NC+Math.min(NC-1,i+1), jd=Math.max(0,j-1)*NC+i, ju=Math.min(NR-1,j+1)*NC+i;
+    const ux=VPOS[ir*3]-VPOS[il*3], uy=VPOS[ir*3+1]-VPOS[il*3+1], uz=VPOS[ir*3+2]-VPOS[il*3+2], wx=VPOS[ju*3]-VPOS[jd*3], wy=VPOS[ju*3+1]-VPOS[jd*3+1], wz=VPOS[ju*3+2]-VPOS[jd*3+2];
+    let nx=wy*uz-wz*uy, ny=wz*ux-wx*uz, nz=wx*uy-wy*ux; const l=Math.hypot(nx,ny,nz)||1; VNRM[a*3]=nx/l; VNRM[a*3+1]=ny/l; VNRM[a*3+2]=nz/l; } }
+
+/* ── 그림 같은 튀는 거품: 혀가 수면을 치는 순간(계산에서 찾은 때·자리) 위·앞으로 손가락처럼 튀어 오르는 흰 덩어리 ── */
+const SPL={n:0,max:MOB?900:2400}; SPL.a=new Float32Array(SPL.max*10);   /* x,y,z, vx,vy,vz, 나이, 수명, 크기, 종류(0 손가락·1 물방울·2 비눗방울) */
+function addP(x,y,z,vx,vy,vz,life,r,type){ if(SPL.n>=SPL.max) return; const o=SPL.n*10, A=SPL.a; A[o]=x;A[o+1]=y;A[o+2]=z;A[o+3]=vx;A[o+4]=vy;A[o+5]=vz;A[o+6]=0;A[o+7]=life;A[o+8]=r;A[o+9]=type; SPL.n++; }
+/* 수면을 치는 순간: 위·앞으로 튀는 손가락 + 물방울 (크기에 맞게, 너무 많지 않게) */
+function splashAt(x,z,Hb){ if(!(S.splK>0)) return; const sz=Math.min(1.6,Hb/2), nb=Math.round((5+7*sz)*S.splK*(MOB?0.6:1)), c=Math.sqrt(9.8*Hb)*0.9;
+  for(let q=0;q<nb;q++){ const up=Math.random(), drop=Math.random()<0.45; addP(x+(Math.random()-0.4)*0.8*sz, 0.05, z+(Math.random()-0.5)*dz*2.4, c*(0.2+0.6*Math.random()), (1.8+3.2*up*up)*Math.sqrt(sz+0.3)*S.splUp, (Math.random()-0.5)*1.4, 1.1+1.3*Math.random(), drop?(0.06+0.1*Math.random())*(0.7+0.4*sz):(0.08+0.16*Math.pow(Math.random(),2.5))*(0.7+0.4*sz), drop?(Math.random()<0.15?2:1):0); } }
+/* 말리는 동안 혀 끝에서 송골송골 떨어져 나가는 물방울 (그림처럼) */
+function dropsAt(x,y,z,Hb,vx,dt){ if(!(S.dropK>0)) return; const rate=S.dropK*(MOB?10:22)*Math.min(1.5,Hb/2); let nn=rate*dt; while(nn>0){ if(Math.random()<nn){ const ty=Math.random()<0.18?2:1; addP(x+(Math.random()-0.5)*0.3, y+(Math.random()-0.5)*0.25, z+(Math.random()-0.5)*dz*2, vx*(0.6+0.5*Math.random()), 0.8+2.2*Math.random(), (Math.random()-0.5)*0.8, 0.9+1.2*Math.random(), (ty===2?0.1:0.05)+0.09*Math.random(), ty); } nn-=1; } }
+function splashStep(dt){ const A=SPL.a; let n=SPL.n; for(let i=0;i<n;i++){ const o=i*10; A[o+6]+=dt; if(A[o+6]>A[o+7]){ n--; A.copyWithin(o,n*10,n*10+10); i--; continue; }
+    A[o+4]-=9.8*(A[o+9]===2?0.25:0.8)*dt; A[o]+=A[o+3]*dt; A[o+1]+=A[o+4]*dt; A[o+2]+=A[o+5]*dt; const wl=0.15; if(A[o+1]<wl){ A[o+1]=wl; A[o+4]=0; A[o+3]*=Math.exp(-dt*2.5); if(A[o+9]!==0) A[o+6]=Math.max(A[o+6],A[o+7]-0.15); } }   /* 물방울은 물에 닿으면 금방 섞인다 */
+  SPL.n=n; }
+/* 빌보드: 손가락은 날아가는 방향으로 길쭉, 물방울은 둥글게(꼬리 살짝), 비눗방울은 테 */
+const QV=`attribute vec2 aC; attribute vec3 aX; attribute vec4 aV; attribute float aT; uniform mat4 uVP; uniform vec3 uEye; varying vec2 vC; varying float vT;
+void main(){ vec3 vel=aV.xyz; float sp=length(vel); vec3 ax=sp>0.01?vel/sp:vec3(0,1,0); vec3 vd=normalize(uEye-aX); vec3 rt=normalize(cross(ax,vd)+vec3(1e-4)); float r=aV.w, L=r*(aT<0.5?(1.0+min(3.5,sp*0.35)):(aT<1.5?1.0+min(0.6,sp*0.06):1.0));
+  vec3 p=aX+rt*aC.x*r+ax*aC.y*L; vC=aC; vT=aT; gl_Position=uVP*vec4(p,1.0); }`;
+const QF=`precision mediump float; varying vec2 vC; varying float vT; uniform float uP;
+void main(){ vec2 q=vC; vec3 ol=uP>0.5?vec3(0.10,0.61,0.94):vec3(0.80,0.92,0.98), wh=vec3(1.0);
+  if(vT>1.5){ float r=length(q); if(r>1.0||r<0.72){ if(length(q-vec2(-0.35,0.35))<0.2){ gl_FragColor=vec4(wh,1.0); return; } discard; } gl_FragColor=vec4(uP>0.5?mix(wh,ol,0.4):vec3(0.85,0.95,1.0),1.0); return; }
+  if(vT>0.5){ float y=q.y*0.5+0.5; float wdt=mix(0.55,1.0,smoothstep(0.0,0.5,y)); float d=length(vec2(q.x/wdt,(q.y>0.0)?q.y:q.y*0.7)); if(d>1.0) discard;
+    vec3 c=d>0.72?ol:wh; if(length(q-vec2(-0.3,0.35))<0.22) c=wh; if(uP<0.5) c=mix(vec3(0.75,0.92,0.97),wh,1.0-d*0.6); gl_FragColor=vec4(c,1.0); return; }
+  float y=q.y*0.5+0.5; float wdt=mix(0.18,1.0,smoothstep(0.0,0.8,y*y));
+  float d=length(vec2(q.x/wdt, (q.y>0.6)?(q.y-0.6)/0.4:0.0)); if(abs(q.x)>wdt || d>1.0) discard; float edge=max(abs(q.x)/wdt, d); gl_FragColor=vec4(edge>0.78?ol:wh,1.0); }`;
+const PQ=prog(QV,QF); const qC=gl.createBuffer(), qX=gl.createBuffer(), qVb=gl.createBuffer(), qTb=gl.createBuffer(), qI=gl.createBuffer(); let QC,QX,QVa,QTa,QIa;
+(function(){ const m=SPL.max; QC=new Float32Array(m*8); QX=new Float32Array(m*12); QVa=new Float32Array(m*16); QTa=new Float32Array(m*4); QIa=new Uint16Array(m*6); for(let i=0;i<m;i++){ QC.set([-1,-1,1,-1,1,1,-1,1],i*8); QIa.set([i*4,i*4+1,i*4+2,i*4,i*4+2,i*4+3],i*6); }
+  gl.bindBuffer(gl.ARRAY_BUFFER,qC); gl.bufferData(gl.ARRAY_BUFFER,QC,gl.STATIC_DRAW); gl.bindBuffer(gl.ARRAY_BUFFER,qX); gl.bufferData(gl.ARRAY_BUFFER,QX,gl.DYNAMIC_DRAW); gl.bindBuffer(gl.ARRAY_BUFFER,qVb); gl.bufferData(gl.ARRAY_BUFFER,QVa,gl.DYNAMIC_DRAW); gl.bindBuffer(gl.ARRAY_BUFFER,qTb); gl.bufferData(gl.ARRAY_BUFFER,QTa,gl.DYNAMIC_DRAW); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,qI); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,QIa,gl.STATIC_DRAW); })();
+function drawSplash(VP,eye){ const n=SPL.n; if(!n) return; const A=SPL.a;
+  for(let i=0;i<n;i++){ const o=i*10, life=A[o+6]/A[o+7], fade=life>0.75?1-(life-0.75)/0.25:1, r=A[o+8]*fade; for(let k=0;k<4;k++){ QX.set([A[o],A[o+1],A[o+2]],(i*4+k)*3); QVa.set([A[o+3]*0.25,A[o+4],A[o+5]*0.25,r],(i*4+k)*4); QTa[i*4+k]=A[o+9]; } }
+  offAll(); gl.useProgram(PQ); gl.uniformMatrix4fv(U(PQ,"uVP"),false,new Float32Array(VP)); gl.uniform3fv(U(PQ,"uEye"),new Float32Array(eye)); gl.uniform1f(U(PQ,"uP"),S.paint);
+  gl.bindBuffer(gl.ARRAY_BUFFER,qX); gl.bufferSubData(gl.ARRAY_BUFFER,0,QX.subarray(0,n*12)); gl.bindBuffer(gl.ARRAY_BUFFER,qVb); gl.bufferSubData(gl.ARRAY_BUFFER,0,QVa.subarray(0,n*16)); gl.bindBuffer(gl.ARRAY_BUFFER,qTb); gl.bufferSubData(gl.ARRAY_BUFFER,0,QTa.subarray(0,n*4));
+  att(PQ,"aC",qC,2); att(PQ,"aX",qX,3); att(PQ,"aV",qVb,4); att(PQ,"aT",qTb,1); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,qI); gl.drawElements(gl.TRIANGLES,n*6,gl.UNSIGNED_SHORT,0); }
+
+
+function dryWet(dt){ if(!WET) return; const k=dt/Math.max(0.5,S.wetT); for(let i=0;i<WET.length;i++) if(WET[i]>0) WET[i]=Math.max(0,WET[i]-k); }
+/* ── 카메라 ── */
+const VIEWS={ diag:{n:"비스듬히",yaw:58,pit:14,dist:52,tx:-34,ty:1.2,tz:-6}, front:{n:"백사장에서",yaw:90,pit:7,dist:44,tx:-30,ty:1.4,tz:0}, tube:{n:"터널 옆",yaw:32,pit:4,dist:26,tx:-36,ty:1.6,tz:-14}, top:{n:"위",yaw:60,pit:62,dist:90,tx:-30,ty:0,tz:0}, far:{n:"멀리",yaw:-30,pit:12,dist:120,tx:-40,ty:0,tz:0} };
+const CAM=Object.assign({},VIEWS.diag), GO={v:null};
+/* 터널 보기: 지금 말리는 혀를 찾아, 이미 부서진 쪽 옆에서 혀를 따라 바라본다 */
+function curlNow(){ let best=null; for(const e of EVS){ let n=0,sx=0,sz=0,wz=0,wp=0; for(let j=0;j<NR;j++){ if(e.st[j]===1&&e.ph[j]>0.8&&e.ph[j]<1.35){ n++; sx+=e.x[j]; sz+=j*dz; wz+=j*dz*e.ph[j]; wp+=e.ph[j]; } } if(n>3&&(!best||n>best.n)){ const zc=sz/n, zw=wz/wp; best={n,x:sx/n,z:zc-ZW/2,dir:zw>zc?1:-1,H:e.H0}; } } return best; }
+VIEWS.curl={n:"터널 보기",follow:1};
+for(const k in VIEWS){ const b=document.createElement("button"); b.type="button"; b.textContent=VIEWS[k].n; b.onclick=()=>{ GO.v=VIEWS[k]; }; $("views").appendChild(b); }
+let drag=null; cv.addEventListener("pointerdown",e=>{ drag={x:e.clientX,y:e.clientY}; cv.setPointerCapture(e.pointerId); GO.v=null; });
+cv.addEventListener("pointermove",e=>{ if(!drag) return; CAM.yaw+=(e.clientX-drag.x)*0.3; CAM.pit=Math.max(-2,Math.min(85,CAM.pit+(e.clientY-drag.y)*0.25)); drag={x:e.clientX,y:e.clientY}; });
+cv.addEventListener("pointerup",()=>{ drag=null; });
+const tp=new Map(); let pd=0;
+cv.addEventListener("touchstart",e=>{ if(e.touches.length===2){ pd=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY); } },{passive:true});
+cv.addEventListener("touchmove",e=>{ if(e.touches.length===2&&pd>0){ const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY); CAM.dist=Math.max(6,Math.min(160,CAM.dist*pd/d)); pd=d; drag=null; GO.v=null; e.preventDefault(); } },{passive:false});   /* 두 손가락으로 벌리고 오므려 가까이·멀리 */
+cv.addEventListener("wheel",e=>{ e.preventDefault(); CAM.dist=Math.max(6,Math.min(160,CAM.dist*Math.exp(e.deltaY*0.001))); GO.v=null; },{passive:false});
+const m4={ persp(f,a,n,fa){ const t=1/Math.tan(f/2); return [t/a,0,0,0, 0,t,0,0, 0,0,(fa+n)/(n-fa),-1, 0,0,2*fa*n/(n-fa),0]; },
+  look(e,c,u){ let zx=e[0]-c[0],zy=e[1]-c[1],zz=e[2]-c[2]; let l=Math.hypot(zx,zy,zz); zx/=l;zy/=l;zz/=l; let xx=u[1]*zz-u[2]*zy, xy=u[2]*zx-u[0]*zz, xz=u[0]*zy-u[1]*zx; l=Math.hypot(xx,xy,xz); xx/=l;xy/=l;xz/=l; const yx=zy*xz-zz*xy, yy=zz*xx-zx*xz, yz=zx*xy-zy*xx;
+    return [xx,yx,zx,0, xy,yy,zy,0, xz,yz,zz,0, -(xx*e[0]+xy*e[1]+xz*e[2]),-(yx*e[0]+yy*e[1]+yz*e[2]),-(zx*e[0]+zy*e[1]+zz*e[2]),1]; },
+  mul(a,b){ const o=new Array(16); for(let i=0;i<4;i++) for(let j=0;j<4;j++){ let s=0; for(let k=0;k<4;k++) s+=a[k*4+j]*b[i*4+k]; o[i*4+j]=s; } return o; } };
+
+
+let speed=1, paused=false, simT=0, last=performance.now(), fps=60;
+for(const b of document.querySelectorAll("[data-sp]")) b.onclick=()=>{ speed=+b.dataset.sp; for(const c of document.querySelectorAll("[data-sp]")) c.setAttribute("aria-pressed",c===b?"true":"false"); };
+$("bPause").onclick=()=>{ paused=!paused; $("bPause").setAttribute("aria-pressed",paused); };
+S.paint=0;   /* 그림 필터는 없앴음 (기본 3D 명암만) */
+
+let ERR=null; function frame(now){ if(ERR) return; requestAnimationFrame(frame); try{ frame1(now); }catch(e){ ERR=e; const d=document.createElement("div"); d.id="load"; d.textContent="화면 그리기 오류: "+e.message; $("stage").appendChild(d); console.error(e); } }
+function frame1(now){ const dt=Math.min(0.05,(now-last)/1000); last=now; fps=fps*0.95+0.05/Math.max(1e-3,dt);
+  if(!paused){ const d2=Math.min(0.05,dt*speed)*S.tscale; simT+=d2; stepEvents(simT,d2); dryWet(d2); splashStep(d2); DROPDT=d2; } else DROPDT=0;
+  if(GO.v&&GO.v.follow){ const c=curlNow(); if(c){ CAM.fol=CAM.fol||{x:c.x,z:c.z,d:c.dir}; const f=CAM.fol, a=Math.min(1,dt*1.5); f.x+=(c.x-f.x)*a; f.z+=(c.z-f.z)*a; f.d+=(c.dir-f.d)*Math.min(1,dt*0.8); const g={yaw:f.d>=0?150:30,pit:5,dist:12+3*c.H,tx:f.x+1.5,ty:0.9+0.45*c.H,tz:f.z};   /* 아직 안 부서진 어깨 쪽 앞에서 터널 입구를 들여다본다 */ const b=Math.min(1,dt*3); let dy=((g.yaw-CAM.yaw)%360+540)%360-180; CAM.yaw+=dy*b; CAM.pit+=(g.pit-CAM.pit)*b; CAM.dist+=(g.dist-CAM.dist)*b; CAM.tx+=(g.tx-CAM.tx)*b; CAM.ty+=(g.ty-CAM.ty)*b; CAM.tz+=(g.tz-CAM.tz)*b; } }
+  else if(GO.v){ const g=GO.v, a=Math.min(1,dt*4); let dy=((g.yaw-CAM.yaw)%360+540)%360-180; CAM.yaw+=dy*a; CAM.pit+=(g.pit-CAM.pit)*a; CAM.dist+=(g.dist-CAM.dist)*a; CAM.tx+=(g.tx-CAM.tx)*a; CAM.ty+=(g.ty-CAM.ty)*a; CAM.tz+=((g.tz||0)-CAM.tz)*a; }
+  update(simT);
+  const pr=Math.min(MOB?1.5:2,devicePixelRatio||1), w=cv.clientWidth*pr, h=cv.clientHeight*pr; if(cv.width!==Math.round(w)||cv.height!==Math.round(h)){ cv.width=Math.round(w); cv.height=Math.round(h); }
+  gl.viewport(0,0,cv.width,cv.height); gl.clearColor(0.08,0.19,0.71,1); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  const yaw=CAM.yaw*Math.PI/180, pit=CAM.pit*Math.PI/180, tgt=[CAM.tx,CAM.ty,ZW/2+(CAM.tz||0)], eye=[tgt[0]+Math.sin(yaw)*Math.cos(pit)*CAM.dist, tgt[1]+Math.sin(pit)*CAM.dist, tgt[2]+Math.cos(yaw)*Math.cos(pit)*CAM.dist];
+  const VP=m4.mul(m4.persp(0.7,cv.width/cv.height,0.3,1500),m4.look(eye,tgt,[0,1,0]));
+  gl.disable(gl.DEPTH_TEST); offAll(); gl.useProgram(PB); gl.uniform3f(U(PB,"uCam"),-CAM.yaw*Math.PI/180,-Math.atan2(CAM.pit>0?Math.sin(CAM.pit*Math.PI/180)*CAM.dist-(CAM.ty-1.5):0,Math.cos(CAM.pit*Math.PI/180)*CAM.dist),cv.width/cv.height);   /* 하늘은 카메라가 보는 방향에 맞춰 (내려다보면 수평선이 위로) */ gl.uniform1f(U(PB,"uTime"),simT); gl.uniform1f(U(PB,"uP"),S.paint); att(PB,"aP",bgB,2); gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+  gl.enable(gl.DEPTH_TEST); offAll();
+  gl.useProgram(PW); gl.uniformMatrix4fv(U(PW,"uVP"),false,new Float32Array(VP)); gl.uniform3fv(U(PW,"uEye"),new Float32Array(eye)); gl.uniform4f(U(PW,"uK"),S.faceSh,S.tubeSh,S.hiL,S.foamK); gl.uniform1f(U(PW,"uTime"),simT); gl.uniform1f(U(PW,"uP"),S.paint);
+  gl.bindBuffer(gl.ARRAY_BUFFER,bufP); gl.bufferSubData(gl.ARRAY_BUFFER,0,VPOS); gl.bindBuffer(gl.ARRAY_BUFFER,bufN); gl.bufferSubData(gl.ARRAY_BUFFER,0,VNRM); gl.bindBuffer(gl.ARRAY_BUFFER,bufA); gl.bufferSubData(gl.ARRAY_BUFFER,0,VATT);
+  att(PW,"aP",bufP,3); att(PW,"aN",bufN,3); att(PW,"aF",bufA,2); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,bufI);
+  for(let k=-TILES;k<=TILES;k++){ const mir=Math.abs(k)%2===1; gl.uniform2f(U(PW,"uT"),mir?(k+1)*ZW:k*ZW,mir?1:0); gl.drawElements(gl.TRIANGLES,nIdx,gl.UNSIGNED_SHORT,0); }   /* 해변을 따라 거울처럼 번갈아 이어 붙여 끝없이 */
+  drawSplash(VP,eye);
+  if(spCount>0){ offAll(); gl.useProgram(PS); gl.uniformMatrix4fv(U(PS,"uVP"),false,new Float32Array(VP)); gl.uniform1f(U(PS,"uPx"),cv.height*1.2); gl.bindBuffer(gl.ARRAY_BUFFER,spB1); gl.bufferSubData(gl.ARRAY_BUFFER,0,SPP); gl.bindBuffer(gl.ARRAY_BUFFER,spB2); gl.bufferSubData(gl.ARRAY_BUFFER,0,SPS); att(PS,"aP",spB1,3); att(PS,"aS",spB2,1); gl.drawArrays(gl.POINTS,0,spCount); }
+  $("stat").textContent=`${Math.round(fps)}fps · 줄 ${NR}개 × 점 ${NC}개 · 밀려오는 큰 파도 ${EVS.length}개`;
+}
+
+(()=>{ try{ buildMesh(); for(let i=0;i<900;i++){ simT+=0.1; stepEvents(simT,0.1); }   /* 처음부터 바다에 파도가 오고 있게 미리 돌려 둔다 */
+  $("load").remove(); window.__v4={get S(){return S;},get t(){return simT;},CAM,VIEWS,GO}; window.__row=j=>{ const a=[]; for(let i=0;i<NC;i++){ const v=(j*NC+i)*3; a.push([VPOS[v],VPOS[v+1],VATT[(j*NC+i)*2]]); } return a; }; window.__cur=()=>{ let best=null; for(const e of EVS){ let n=0; for(let j=0;j<NR;j++) if(e.st[j]===1&&e.ph[j]>0.95&&e.ph[j]<1.3) n++; if(n>3&&(!best||n>best.n)){ let sx=0,sj=0; for(let j=0;j<NR;j++) if(e.st[j]===1&&e.ph[j]>0.95&&e.ph[j]<1.3){ sx+=e.x[j]; sj+=j; } let bz=0,bn=0; for(let j=0;j<NR;j++) if(e.st[j]>=2){ bz+=j*dz-ZW/2; bn++; } best={n,x:sx/n,z:sj/n*dz-ZW/2,j:Math.round(sj/n),bz:bn?bz/bn:null}; } } return best; }; window.__dbg=()=>EVS.map(e=>{ let c=[0,0,0,0,0], xs=[]; for(let j=0;j<NR;j++){ c[e.st[j]]++; } return {H0:+e.H0.toFixed(2),st:c,x:[+e.x[0].toFixed(1),+e.x[NR>>1].toFixed(1)],ph:+e.ph[NR>>1].toFixed(2),xf:+e.xf[NR>>1].toFixed(1)}; }); window.__setT=v=>{ const d=v-simT; if(d>0){ for(let k=0;k<d/0.05;k++){ simT+=0.05; stepEvents(simT,0.05); } } }; requestAnimationFrame(frame); }catch(e){ $("load").textContent="불러오기 실패: "+e.message; console.error(e); } })();
+})();
+</script>
+</body>
+</html>
