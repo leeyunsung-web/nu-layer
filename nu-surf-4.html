@@ -60,7 +60,27 @@ const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(_){} }
 for(const c of CTL){ const l=document.createElement("label"); l.innerHTML=`${c[1]} <output></output><input type="range" min="${c[2]}" max="${c[3]}" step="${c[4]}"><span>${c[6]}</span>`; const inp=l.querySelector("input"), o=l.querySelector("output"); inp.value=S[c[0]]; o.textContent=(+S[c[0]]).toFixed(2); inp.oninput=()=>{ S[c[0]]=+inp.value; o.textContent=(+inp.value).toFixed(2); save(); }; $("set").appendChild(l); }
 
 /* ── 계산해 둔 파도 풀기 ── */
-async function unpack(w){ const bin=Uint8Array.from(atob(w.gz),c=>c.charCodeAt(0)); const ab=await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
+/* 작은 gzip 풀기 (브라우저 기능 없이도 열리게 — DEFLATE, RFC 1951) */
+function gunzip(src){
+  let p=10; const flg=src[3]; if(flg&4){ p+=2+(src[10]|src[11]<<8); } if(flg&8){ while(src[p++]); } if(flg&16){ while(src[p++]); } if(flg&2) p+=2;
+  const isz=src[src.length-4]|src[src.length-3]<<8|src[src.length-2]<<16|src[src.length-1]<<24; const out=new Uint8Array(isz>>>0); let op=0;
+  let bb=0, bc=0; const bit=n=>{ while(bc<n){ bb|=src[p++]<<bc; bc+=8; } const v=bb&((1<<n)-1); bb>>>=n; bc-=n; return v; };
+  const mk=(lens)=>{ const cnt=new Uint16Array(16), off=new Uint16Array(16), sym=new Uint16Array(lens.length); for(const l of lens) cnt[l]++; cnt[0]=0; for(let i=1;i<16;i++) off[i]=off[i-1]+cnt[i-1]; for(let i=0;i<lens.length;i++) if(lens[i]) sym[off[lens[i]]++]=i; return {cnt,sym}; };
+  const dec=(t)=>{ let code=0, first=0, idx=0; for(let l=1;l<16;l++){ code|=bit(1); const c=t.cnt[l]; if(code-first<c) return t.sym[idx+code-first]; idx+=c; first+=c; first<<=1; code<<=1; } throw new Error("bad code"); };
+  const LB=[3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258], LE=[0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0];
+  const DB=[1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577], DE=[0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];
+  let fl=null, fd=null; const fixed=()=>{ if(!fl){ const l=new Uint8Array(288); l.fill(8,0,144); l.fill(9,144,256); l.fill(7,256,280); l.fill(8,280,288); fl=mk(l); fd=mk(new Uint8Array(30).fill(5)); } return [fl,fd]; };
+  let last=0;
+  while(!last){ last=bit(1); const type=bit(2);
+    if(type===0){ bb=0; bc=0; const len=src[p]|src[p+1]<<8; p+=4; out.set(src.subarray(p,p+len),op); p+=len; op+=len; continue; }
+    let lt, dt;
+    if(type===1){ [lt,dt]=fixed(); }
+    else { const hl=bit(5)+257, hd=bit(5)+1, hc=bit(4)+4, ord=[16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15], cl=new Uint8Array(19); for(let i=0;i<hc;i++) cl[ord[i]]=bit(3); const ct=mk(cl), ls=new Uint8Array(hl+hd);
+      for(let i=0;i<hl+hd;){ const s=dec(ct); if(s<16) ls[i++]=s; else if(s===16){ const r=3+bit(2), v=ls[i-1]; for(let k=0;k<r;k++) ls[i++]=v; } else if(s===17){ i+=3+bit(3); } else { i+=11+bit(7); } }
+      lt=mk(ls.subarray(0,hl)); dt=mk(ls.subarray(hl)); }
+    for(;;){ const s=dec(lt); if(s<256){ out[op++]=s; continue; } if(s===256) break; const li=s-257, len=LB[li]+bit(LE[li]), di=dec(dt), dist=DB[di]+bit(DE[di]); for(let k=0;k<len;k++,op++) out[op]=out[op-dist]; } }
+  return out; }
+function unpack(w){ const s=atob(w.gz), bin=new Uint8Array(s.length); for(let i=0;i<s.length;i++) bin[i]=s.charCodeAt(i); const ab=gunzip(bin).buffer;   /* 브라우저 풀기 기능 없이 직접 푼다 (어느 브라우저에서도 열리게) */
   const NF=w.NF, M=w.M, SP=w.SP, dl=new Int16Array(ab,0,NF*M*2), pos=new Float32Array(NF*M*2);
   for(let f=0;f<NF;f++){ let x=0,y=0; for(let i=0;i<M;i++){ const o=(f*M+i)*2; x+=dl[o]; y+=dl[o+1]; pos[o]=x/500; pos[o+1]=y/500; } }
   const foam=new Uint8Array(ab,NF*M*4,NF*M), sp=new Int16Array(ab.slice(NF*M*5,NF*M*5+NF*SP*4));
@@ -193,7 +213,7 @@ function frame(now){ requestAnimationFrame(frame); const dt=Math.min(0.05,(now-l
   if(spCount>0){ gl.useProgram(PS); gl.uniformMatrix4fv(U(PS,"uVP"),false,VP); gl.uniform1f(U(PS,"uPx"),cv.height*1.2); gl.bindVertexArray(spVao); gl.bindBuffer(gl.ARRAY_BUFFER,spB1); gl.bufferSubData(gl.ARRAY_BUFFER,0,SPP); gl.bindBuffer(gl.ARRAY_BUFFER,spB2); gl.bufferSubData(gl.ARRAY_BUFFER,0,SPS); gl.drawArrays(gl.POINTS,0,spCount); }
   $("stat").textContent=`${Math.round(fps)}fps · 줄 ${NR}개 · 계산 녹화 ${R.length}벌 · ${(simT%(R[0].NF/R[0].FPS)).toFixed(1)}초 / ${(R[0].NF/R[0].FPS).toFixed(0)}초 반복`;
 }
-(async()=>{ try{ R=await Promise.all(WAVES.map(unpack)); const w0=WAVES[0]; bedA=w0.bed; BCS=w0.bedCS; BX0=w0.X0; D=w0.D; X1=w0.X1; M=R[0].M;
+(async()=>{ try{ R=[]; for(let q=0;q<WAVES.length;q++){ $("load").textContent=`계산해 둔 파도를 펼치는 중… ${q+1}/${WAVES.length}`; await new Promise(r=>setTimeout(r,30)); R.push(unpack(WAVES[q])); } const w0=WAVES[0]; bedA=w0.bed; BCS=w0.bedCS; BX0=w0.X0; D=w0.D; X1=w0.X1; M=R[0].M;
   buildMesh(); buildSpray(); $("load").remove(); window.__v4={get S(){return S;},get t(){return simT;},CAM,VIEWS,GO}; window.__setT=v=>{ simT=v; }; requestAnimationFrame(frame); }catch(e){ $("load").textContent="불러오기 실패: "+e.message; console.error(e); } })();
 })();
 </script>
