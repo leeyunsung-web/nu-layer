@@ -375,6 +375,7 @@ const CTL=[
  ["secSurf","녹아드는 길이","lipMelt",0,1,0.05,0.6,"","무너진 둔덕이 원래 물 표면으로 스며드는 구간의 길이. 클수록 툭 바뀌지 않고 서서히 녹아듭니다.",0],
  ["secSurf","다 말린 모양 유지","lipHold",0,0.3,0.01,0.14,"","그래프로 그린 다 말린 모양을 무너지기 전에 잠깐 유지하는 길이 (단계). 클수록 오래 보입니다.",0],
  ["secSurf","혀 크기","simScale",1,4,0.1,2.4,"","혀(포물선 물줄기)가 앞으로 날아가는 거리. 클수록 터널이 크고 둥글게.",0],
+ ["secSurf","두 번째 혀 (튀어 오름)","splUp",0,2,0.05,1,"배","혀 끝이 수면을 친 자리에서 물이 다시 솟아 작은 혀로 앞으로 넘어가는 크기. 0이면 없음.",0],
  ["secSurf","말리며 낮아짐","lipDrop",0,0.6,0.02,0.25,"","가장 높은 때는 말리기 직전. 혀가 앞으로 쓰러지며 말리는 동안 파도 높이가 이만큼 낮아집니다.",0],
  ["secSurf","앞으로 기울기","lipLean",0,1,0.05,0.35,"","말리면서 파도 꼭대기가 앞으로 쓰러지듯 기우는 정도.",0],
  ["secSurf","말릴 때 골 낮아짐","lipDip",0,0.5,0.02,0.15,"","말리는 동안 파도 앞쪽 골(바닥)이 더 낮아지는 정도. 물이 앞면으로 빨려 올라가는 느낌.",0],
@@ -485,7 +486,7 @@ const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(_){} }
 const fmt=(c,v)=>{ const d=c[5]<0.1?2:c[5]<1?1:0; return (+v).toFixed(d)+(c[7]?(c[7]==="%"?"":" ")+c[7]:""); };
 const inputs={}; let rebuildT=0;
 /* 간결한 메뉴: 지금 보이는 손잡이 (나머지는 숨긴 칸에서 지금 값 그대로) */
-const SHOW={amp:"nWave",per:"nWave",irr:"nWave",lat:"nWave",spd:"nWave", bar:"nCurl",barAng:"nCurl",barrel:"nCurl",lipLen:"nCurl",lipCurl:"nCurl",lipTh:"nCurl",lipRatio:"nCurl",lipT:"nCurl",lipC:"nCurl",lipMelt:"nCurl",lipHold:"nCurl",simScale:"nCurl",lipDrop:"nCurl",lipLean:"nCurl",lipDip:"nCurl",lipShade:"nCurl",peel:"nCurl", jfN:"nSpr",jfJel:"nSpr",jfWob:"nSpr",jfR:"nSpr",jfVar:"nSpr",jfCover:"nSpr",jfLipF:"nSpr",jfSplash:"nSpr",bore:"nSpr",edgeL:"nSpr",bwStr:"nSpr",sandF:"nSpr",jfMerge:"nSpr",jfShd:"nSpr",jfShO:"nSpr",jfCap:"nSpr",jfUp:"nSpr",jfG:"nSpr",jfSpr:"nSpr",jfSlide:"nSpr",fReach:"nSpr",jfLine:"nSpr",jfLife:"nSpr", sea:"nLook",endless:"nLook",wsmooth:"nLook",faceSh:"nLook",thinG:"nLook",hiL:"nLook",hiC:"nLook",chop:"nLook",tiles:"nLook",wpat:"nLook",wpflow:"nLook",wpsz:"nLook",deco:"nLook", level:"nTank",beach:"nTank",hidez:"nTank",swash:"nTank",bwash:"nTank",btr:"nTank",wetK:"nTank",wdry:"nTank",btd:"nTank"};
+const SHOW={amp:"nWave",per:"nWave",irr:"nWave",lat:"nWave",spd:"nWave", bar:"nCurl",barAng:"nCurl",barrel:"nCurl",lipLen:"nCurl",lipCurl:"nCurl",lipTh:"nCurl",lipRatio:"nCurl",lipT:"nCurl",lipC:"nCurl",lipMelt:"nCurl",lipHold:"nCurl",simScale:"nCurl",splUp:"nCurl",lipDrop:"nCurl",lipLean:"nCurl",lipDip:"nCurl",lipShade:"nCurl",peel:"nCurl", jfN:"nSpr",jfJel:"nSpr",jfWob:"nSpr",jfR:"nSpr",jfVar:"nSpr",jfCover:"nSpr",jfLipF:"nSpr",jfSplash:"nSpr",bore:"nSpr",edgeL:"nSpr",bwStr:"nSpr",sandF:"nSpr",jfMerge:"nSpr",jfShd:"nSpr",jfShO:"nSpr",jfCap:"nSpr",jfUp:"nSpr",jfG:"nSpr",jfSpr:"nSpr",jfSlide:"nSpr",fReach:"nSpr",jfLine:"nSpr",jfLife:"nSpr", sea:"nLook",endless:"nLook",wsmooth:"nLook",faceSh:"nLook",thinG:"nLook",hiL:"nLook",hiC:"nLook",chop:"nLook",tiles:"nLook",wpat:"nLook",wpflow:"nLook",wpsz:"nLook",deco:"nLook", level:"nTank",beach:"nTank",hidez:"nTank",swash:"nTank",bwash:"nTank",btr:"nTank",wetK:"nTank",wdry:"nTank",btd:"nTank"};
 const ORDER=Object.keys(SHOW); CTL.sort((a,b)=>(ORDER.indexOf(a[2])+1||999)-(ORDER.indexOf(b[2])+1||999));
 for(const c of CTL){ const box=$(SHOW[c[2]]||c[0]); const d=document.createElement("div"); d.className="ctl";
   d.innerHTML=`<label for="k_${c[2]}">${c[1]}</label><input id="k_${c[2]}" type="range" min="${c[3]}" max="${c[4]}" step="${c[5]}"><output></output>`+(c[8]?`<div class="desc">${c[8]}</div>`:"");
@@ -1377,7 +1378,7 @@ function clipAt(ph){ const C=SIMCLIP; if(!C) return null; const F=C.frames, n=F.
   let i=0; while(i<n-2 && F[i+1].t<tt) i++; const a=F[i], b=F[i+1], f=Math.min(1,Math.max(0,(tt-a.t)/Math.max(1e-6,b.t-a.t)));
   return a.p.map((q,k)=>[q[0]+(b.p[k][0]-q[0])*f, q[1]+(b.p[k][1]-q[1])*f]); }
 /* 포물선 물줄기 혀: 마루에서 앞으로 던져진 물이 중력으로 떨어지는 길(포물선) — 플런징 파도의 혀 끝이 그리는 실제 모양 */
-function jetAt(ph,kx){
+function jetAt(ph,kx,SPL){
   const sm=t=>t<=0?0:t>=1?1:t*t*(3-2*t), x=Math.min(1,Math.max(0,ph)/1.24), a=sm(Math.min(1,x/0.4)), b=Math.max(0,(x-0.4)/0.6), c=sm(Math.max(0,(ph-1.24)/0.46));
   const L=[0.12*a, 1-0.05*a], XL=Math.max(0.4,0.5*kx), T=0.30*Math.min(1,b*3+0.0001);
   const jx=t=>L[0]+(XL-L[0])*t, jy=t=>L[1]+0.2*t-(L[1]+0.2-0.06)*t*t;   /* 처음엔 살짝 위로, 끝은 수면(0.06)에 */
@@ -1390,8 +1391,21 @@ function jetAt(ph,kx){
   for(let i=1;i<=20;i++){ const t=b*(1-i/20), w=T*(0.3+0.7*(1-t/Math.max(b,1e-4))), n=jd(t); P.push([jx(t)+n[0]*w, jy(t)+n[1]*w]); }   /* 안쪽면: 끝에선 얇고 뿌리에선 두툼 */
   const iI=P.length-1, E=P[iI], xB=0.18+1.1*(1-a)-0.18*b;
   for(let i=1;i<=12;i++){ const s=i/12, cx=E[0]+0.18*a*(1-b)-0.32*Math.min(1,b*2), cy=E[1]*0.4; const q=1-s; P.push([q*q*E[0]+2*q*s*cx+s*s*xB, q*q*E[1]+2*q*s*cy+s*s*(-0.04)]); }   /* 혀 아래 앞면 → 골 */
-  for(let i=1;i<=12;i++){ const s=i/12; P.push([xB+(2.8-xB)*s, -0.04+0.04*sm(s)]); }   /* 앞쪽 물 */
-  if(c>0){ const n=P.length, x0=P[iP][0]; for(let i=iP+1;i<n;i++){ const xt=x0+(2.8-x0)*Math.pow((i-iP)/(n-1-iP),1.3); P[i][0]+=(xt-P[i][0])*c; } for(const p of P){ const bore=0.12+0.5*(1-sm((p[0]+0.4)/2.2)); p[1]=p[1]+(bore-p[1])*c; } }   /* 친 뒤: 흰 물 계단(보어)으로 */
+  /* 두 번째 혀(스플래시 업): 혀 끝이 친 자리에서 물이 다시 솟아 작은 혀로 앞으로 넘어간다 */
+  const sg=sm(Math.max(0,(ph-1.2)/0.25)), sa=sg*(1-sm(Math.max(0,(ph-1.5)/0.25)))*(SPL===undefined?1:SPL), hs=0.7*sa, R=Math.max(0.05,0.6*XL*sg), x1=XL-0.1, Lp=[XL+0.05, -0.02+0.08*sa+0.6*hs];
+  const iS0=P.length;
+  for(let i=1;i<=4;i++){ const s=i/4; P.push([xB+(x1-xB)*s, -0.04+0.03*sm(s)]); }   /* 앞쪽 물 (친 자리까지) */
+  for(let i=1;i<=4;i++){ const s=i/4; P.push([x1+(Lp[0]-x1)*sm(s), -0.01+(Lp[1]+0.01)*Math.sin(s*Math.PI/2)]); }   /* 솟는 뒷면 */
+  const sy=t=>Lp[1]+0.9*hs*t-(Lp[1]+0.9*hs-0.0)*t*t;
+  for(let i=1;i<=6;i++){ const t=i/6; P.push([Lp[0]+R*t, sy(t)]); }   /* 바깥면 */
+  const sT=0.16*sa+0.002;
+  for(let i=1;i<=4;i++){ const t=1-i/4; P.push([Lp[0]+R*t-0.2*sT, sy(t)-sT*(0.4+0.6*(1-t))]); }   /* 안쪽면 */
+  const Q=P[P.length-1];
+  for(let i=1;i<=2;i++){ const s=i/2; P.push([Q[0]+0.08*sa*s, Q[1]*(1-s)]); }   /* 아래로 */
+  const F0=P[P.length-1];
+  for(let i=1;i<=6;i++){ const s=i/6; P.push([F0[0]+(2.8-F0[0])*s, F0[1]*(1-s)]); }   /* 앞쪽 물 */
+  const iS1=iS0+4;
+  if(c>0){ const x0=P[iP][0], xe=P[iS1][0]; for(let i=iP+1;i<iS1;i++){ const xt=x0+(xe-x0)*Math.pow((i-iP)/(iS1-iP),1.3); P[i][0]+=(xt-P[i][0])*c; } P.forEach((p,i)=>{ const bore=0.12+0.5*(1-sm((p[0]+0.4)/2.2)), cc=i<iS1?c:c*c; p[1]=p[1]+(bore-p[1])*cc; }); }   /* 친 뒤: 흰 물 계단(보어)으로 */
   return {P,iT,iP,iI};
 }
 const SHP_DEF=[[-0.9,0.55],[-0.4,0.9],[0.1,1.0],[0.65,0.92],[1.05,0.62],[0.95,0.32],[0.62,0.52],[0.3,0.42],[0.22,0.12],[0.6,0.0]];
@@ -1488,7 +1502,7 @@ function surfWarp(){
       if(r%2===0){ A.gxc[r>>1]=gxc; A.gyt[r>>1]=gyt; A.ghs[r>>1]=Hs; A.gge[r>>1]=gE*w; }
       const SC=(S.simLip===undefined?1:S.simLip)&&SIMCLIP?clipAt(Math.max(0,P(on))):null;
       if(SC){ /* 계산된 혀(더 나은 버전): 마루에서 앞으로 던져진 물이 중력으로 떨어지는 포물선 물줄기 — 크기는 '혀 크기', 때(말리기 시작·수면 치기)는 물 알갱이 계산 녹화에서 */
-        const gy0=D+0.0, Hc=Hs, J=jetAt(Math.max(0,P(on)), S.simScale===undefined?2.4:S.simScale), SC=J.P;
+        const gy0=D+0.0, Hc=Hs, J=jetAt(Math.max(0,P(on)), S.simScale===undefined?2.4:S.simScale, S.splUp===undefined?1:S.splUp), SC=J.P;
         GI={P:SC,iTip:J.iT,iTop:J.iP,iIn:J.iI,fr:SC.map((q,i)=>i/(SC.length-1))};
         const wl=Math.max(0,1-Math.max(0,P(on)-1.5)/0.2), gE2=w>0?Math.min(1,P(on)/0.1)*wl:0;
         GI.P=SC.map(q=>[ (q[0]*Hc), (q[1]*Hc) ]); GI.raw=true; GI.gE=gE2; GI.base=gy0; }
