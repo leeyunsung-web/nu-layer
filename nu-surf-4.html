@@ -28,7 +28,7 @@ button[aria-pressed="true"]{background:var(--pink);color:#33123A}
 </head>
 <body>
 <div class="wrap">
-  <h1>NU SURF 3D <small>버전 4 · v2</small></h1>
+  <h1>NU SURF 3D <small>버전 4 · v3</small></h1>
   <p>여러 방향에서 오는 너울이 겹친 바다에, 큰 파도가 불규칙한 간격으로 밀려옵니다. 파도는 얕아질수록 느려지고 높아지다가 깊이의 0.78배를 넘으면 부서집니다. 마루에서 앞으로 던져진 물이 포물선을 그리며 떨어져 혀가 크게 말리고, 암초가 얕은 봉우리에서 먼저 말리기 시작해 양옆으로 차례차례 까져 나갑니다. 수면을 친 뒤에는 흰 물이 백사장으로 쳐 올라갔다 빠집니다.</p>
   <div id="stage"><canvas id="gl" aria-label="파도 3D 화면"></canvas><div id="load">바다를 채우는 중…</div></div>
   <div class="bar">
@@ -86,12 +86,13 @@ function jet(ph,kx,SPL){
 }
 /* 바닥: 깊은 바다(7) → 완만한 비탈 → 백사장(x≥0). 암초 봉우리 두 곳(파도마다 조금씩 옮겨 다님) */
 const REEF=[{z:22,w:16,h:1.6,x:-44},{z:58,w:18,h:1.3,x:-38}];
-function depth(x,z){ if(x>=0) return 0; let d=Math.min(DMAX,-x*SB); for(const r of REEF){ const dz=z-r.z; d-=r.h*Math.exp(-(dz*dz)/(r.w*r.w))*Math.exp(-((x-r.x)*(x-r.x))/300); } return Math.max(0.08,d); }
-function bedY(x,z){ return x>=0? x*SBE : -depth(x,z); }
+function shore(z){ return 1.3*Math.sin(z*0.33+0.5)+0.8*Math.sin(z*0.91+2.1); }   /* 물가선: 반달 모양으로 들쭉날쭉 (해변 커스프) */
+function depth(x,z){ x-=shore(z); if(x>=0) return 0; let d=Math.min(DMAX,-x*SB); for(const r of REEF){ const dz=z-r.z; d-=r.h*Math.exp(-(dz*dz)/(r.w*r.w))*Math.exp(-((x+shore(z)-r.x)*(x+shore(z)-r.x))/300); } return Math.max(0.08,d); }
+function bedY(x,z){ const xx=x-shore(z); return xx>=0? xx*SBE*(1+0.15*Math.sin(z*0.5)) : -depth(x,z); }
 /* 너울: 여러 방향, 2차(스토크스)로 마루는 뾰족·골은 넓게 */
 const SW=[[34,0.08,0.22,0.3],[21,-0.35,0.16,1.7],[13,0.5,0.10,4.1],[8.5,-0.8,0.06,2.2],[6,1.1,0.04,5.0],[27,0.3,0.12,3.3]].map(([L,dir,a,ph])=>{ const k=2*Math.PI/L; return {kx:k*Math.cos(dir),kz:k*Math.sin(dir),om:Math.sqrt(G*k),a,ph,k}; });
-function swell(x,z,t,K){ if(x>=0) return 0; const att=Math.min(1,(-x)/25); let y=0; for(const w of SW){ const th=w.kx*x+w.kz*z-w.om*t+w.ph, A=w.a*K; y+=A*(Math.cos(th)+0.5*w.k*A*Math.cos(2*th)); } return y*att; }
-return {G,SB,SBE,DMAX,jet,boreY,depth,bedY,swell,REEF,sm};
+function swell(x,z,t,K){ const xx=x-shore(z); if(xx>=0) return 0; const att=Math.min(1,(-xx)/25); let y=0; for(const w of SW){ const th=w.kx*x+w.kz*z-w.om*t+w.ph, A=w.a*K; y+=A*(Math.cos(th)+0.5*w.k*A*Math.cos(2*th)); } return y*att; }
+return {G,SB,SBE,DMAX,jet,boreY,depth,bedY,swell,REEF,sm,shore};
 })();
 
 const CTL=[
@@ -202,41 +203,48 @@ let spCount=0;   /* (계산 녹화 물보라는 이제 없음 — 튀는 거품�
 /* ── 큰 파도들 ── */
 const {G,SBE,DMAX}=ENG, sm=ENG.sm;
 const EVS=[]; let nextT=0, lull=0;
-function hz(e,j,d){ const z=j*dz; return e.fade*e.H0*(1+0.16*Math.sin(z*0.09+e.sd)+0.09*Math.sin(z*0.23+e.sd*2.3))*Math.min(1.8,Math.pow(DMAX/Math.max(d,0.4),0.25)); }
-function spawn(t){ const H0=(2.1+1.2*Math.pow(Math.random(),1.2))*S.size, ang=(Math.random()-0.5)*0.5*S.angle;
-  const e={t0:t,fade:0,H0,ang,sd:Math.random()*100,x:new Float32Array(NR),tb:new Float32Array(NR),Hb:new Float32Array(NR),xf:new Float32Array(NR),ts:new Float32Array(NR),Hs:new Float32Array(NR),ph:new Float32Array(NR),st:new Uint8Array(NR)};
-  for(let j=0;j<NR;j++) e.x[j]=-330+Math.tan(ang)*(j*dz-ZW/2);
+function hz(e,j,d){ const z=j*dz; return e.fade*e.H0*Math.max(0.35,1+e.v1*Math.sin(z*e.k1+e.sd)+e.v2*Math.sin(z*e.k2+e.sd*2.3)+e.v3*Math.sin(z*e.k3+e.sd*0.7))*Math.min(1.8,Math.pow(DMAX/Math.max(d,0.4),0.25)); }
+function spawn(t){ const rnd=Math.random, big=lull<=1?1.15:1, H0=(1.5+2.0*Math.pow(rnd(),1.4))*big*S.size, ang=(rnd()-0.5)*0.9*S.angle;   /* 파도마다 높이·기울기·휘어짐이 제각각 */
+  const e={t0:t,fade:0,H0,ang,v1:0.12+0.2*rnd(),v2:0.06+0.14*rnd(),v3:0.04+0.08*rnd(),k1:0.04+0.08*rnd(),k2:0.13+0.2*rnd(),k3:0.35+0.3*rnd(),bend:(rnd()-0.5)*14,kb:0.03+0.06*rnd(),pb:rnd()*6.3,sd:Math.random()*100,x:new Float32Array(NR),tb:new Float32Array(NR),Hb:new Float32Array(NR),xf:new Float32Array(NR),ts:new Float32Array(NR),Hs:new Float32Array(NR),ph:new Float32Array(NR),st:new Uint8Array(NR)};
+  for(let j=0;j<NR;j++){ const z=j*dz; e.x[j]=-330+Math.tan(ang)*(z-ZW/2)+e.bend*Math.sin(z*e.kb+e.pb); }
   EVS.push(e);
   /* 간격: 몇 개씩 묶여 오다(세트) 한동안 잠잠 */
   if(--lull<=0){ lull=3+Math.floor(Math.random()*4); nextT=t+(14+10*Math.random())*S.gap; } else nextT=t+(6+6*Math.random())*S.gap; }
+/* 말림이 옆으로 번지는 빠르기 제한: 옆 줄이 부서진 지 조금 지나야 부서진다 (봉우리처럼 주변보다 먼저 서는 곳만 혼자 시작) */
+function canBreak(e,j,t,qq){ const need=dz/Math.max(0.5,S.peelV||4); let nb=false; for(const k of [j-1,j+1]){ if(k<0||k>=NR) continue; if(e.st[k]>=1){ nb=true; if(t-e.tb[k]>=need) return true; } } if(nb) return false;
+  for(let d=1;d<=4;d++){ for(const k of [j-d,j+d]){ if(k<0||k>=NR) continue; if(e.st[k]===0 && e.Hb[k]/(0.78*ENG.depth(e.x[k],k*dz))>qq) return false; } } return true; }
 const Tcurl=Hb=>3.6*Math.sqrt(Hb/2)/S.curlSpd;
 function stepEvents(t,dt){ if(t>=nextT) spawn(t);
   for(let q=EVS.length-1;q>=0;q--){ const e=EVS[q]; let alive=false; e.fade=sm((t-e.t0)/10);   /* 먼 바다에서 서서히 생겨난다 */
     for(let j=0;j<NR;j++){ const z=j*dz; let st=e.st[j];
-      if(st===0){ const d=ENG.depth(e.x[j],z); e.x[j]+=Math.sqrt(G*Math.min(d,DMAX))*0.92*dt; const H=hz(e,j,d), qq=H/(0.78*d); e.ph[j]=0.496*Math.pow(Math.min(1,qq),4); e.Hb[j]=H; if(qq>=1 && e.x[j]>-90){ e.st[j]=st=1; e.tb[j]=t; } }
+      if(st===0){ const d=ENG.depth(e.x[j],z); e.x[j]+=Math.sqrt(G*Math.min(d,DMAX))*0.92*dt; const H=hz(e,j,d), qq=H/(0.78*d); e.ph[j]=0.496*Math.pow(Math.min(1,qq),4); e.Hb[j]=H; if(qq>=1 && e.x[j]>-90 && canBreak(e,j,t,qq)){ e.st[j]=st=1; e.tb[j]=t; } }
       if(st===1){ const Hb=e.Hb[j], d=ENG.depth(e.x[j],z); e.x[j]+=Math.sqrt(G*(Math.max(d,0.2)+Hb))*0.62*dt; const pp=e.ph[j]; e.ph[j]=0.496+1.204*Math.min(1,(t-e.tb[j])/Tcurl(Hb));
         if(pp<1.24 && e.ph[j]>=1.24 && !(j%2)) splashAt(e.x[j]+ENG.jet(1.24,S.kx).XL*Hb, z, Hb);
         if(e.ph[j]>=1.7){ e.st[j]=st=2; e.xf[j]=e.x[j]+Math.max(0.4,0.5*S.kx)*Hb; e.Hs[j]=0.55*Hb; } }
-      if(st===2){ const d=ENG.depth(e.xf[j],z); e.Hs[j]*=Math.exp(-dt/14); e.xf[j]+=Math.sqrt(G*(Math.max(d,0.15)+e.Hs[j]))*0.7*dt; if(e.xf[j]>=0){ e.st[j]=st=3; e.ts[j]=t; } }
+      if(st===2){ const d=ENG.depth(e.xf[j],z); e.Hs[j]*=Math.exp(-dt/(12+4*Math.sin(z*0.21+e.sd))); e.xf[j]+=Math.sqrt(G*(Math.max(d,0.15)+e.Hs[j]))*0.7*(1+0.12*Math.sin(z*0.27+e.sd)+0.06*Math.sin(z*0.71+e.sd*3))*dt; if(e.xf[j]>=ENG.shore(z)){ e.st[j]=st=3; e.ts[j]=t; } }
       if(st===3){ if((t-e.ts[j])>4+2*e.Hs[j]) e.st[j]=st=4; }
       if(st<4) alive=true; }
+    smoothRows(e);
     if(!alive) EVS.splice(q,1); } }
+/* 옆 줄끼리 위치·높이를 부드럽게 맞춘다 (같은 단계인 줄끼리만) — 줄마다 따로 놀아 톱니처럼 들쭉날쭉해지지 않게 */
+const TMPR=new Float32Array(1024);
+function smoothRows(e){ for(const key of ['x','xf','Hs','Hb']){ const A=e[key]; for(let pass=0;pass<2;pass++){ for(let j=0;j<NR;j++){ const st=e.st[j]; let sum=2*A[j], w=2; for(const k of [j-1,j+1]){ if(k>=0&&k<NR&&e.st[k]===st){ sum+=A[k]; w++; } } TMPR[j]=sum/w; } for(let j=0;j<NR;j++){ if(key==='Hb'&&e.st[j]!==0) continue; A[j]=TMPR[j]; } } } }
 
 /* ── 줄 하나의 옆모습 만들기 ── */
 const RY=new Float32Array(NC), RF=new Float32Array(NC), RS_=new Uint8Array(NC), BASE=new Float32Array(NC);
 function lowerIdx(x){ let lo=0, hi=NC-1; while(lo<hi){ const m=(lo+hi)>>1; if(XG[m]<x) lo=m+1; else hi=m; } return lo; }
 function baseAt(x){ const i=Math.min(NC-1,Math.max(1,lowerIdx(x))), a=XG[i-1], b=XG[i], f=Math.min(1,Math.max(0,(x-a)/Math.max(1e-6,b-a))); return BASE[i-1]+(BASE[i]-BASE[i-1])*f; }
 let DROPDT=0;
-function buildRow(j,t){ const z=j*dz, K=S.swellK, base=j*NC;
-  for(let i=0;i<NC;i++){ const x=XG[i]; RY[i]=x<0?ENG.swell(x,z,t,K):ENG.bedY(x,z); RF[i]=0; RS_[i]=x>=0?1:0; }
+function buildRow(j,t){ const z=j*dz, K=S.swellK, base=j*NC, so=ENG.shore(z);
+  for(let i=0;i<NC;i++){ const x=XG[i]; RY[i]=x<so?ENG.swell(x,z,t,K):ENG.bedY(x,z); RF[i]=0; RS_[i]=x>=so?1:0; }
   const WIN=[];
   for(const e of EVS){ const st=e.st[j];
-    if(st===0){ const x=e.x[j], H=e.Hb[j]; if(x>-96){ WIN.push({x,H,ph:e.ph[j]}); } else { const i0=lowerIdx(x-8*H), i1=lowerIdx(x+8*H); for(let i=i0;i<=i1&&i<NC;i++){ if(XG[i]>=0) break; const dx=XG[i]-x, s=1/Math.cosh(dx/((dx<0?1.9:1.615)*H)); RY[i]+=H*s*s;   /* 먼 바다 너울: 가까이 와서 쓰는 옆모습과 같은 모양 (바뀔 때 툭 튀지 않게) */ } } }
+    if(st===0){ const x=e.x[j], H=e.Hb[j]; if(x>-96){ WIN.push({x,H,ph:e.ph[j]}); } else { const i0=lowerIdx(x-8*H), i1=lowerIdx(x+8*H); for(let i=i0;i<=i1&&i<NC;i++){ if(XG[i]>=so) break; const dx=XG[i]-x, s=1/Math.cosh(dx/((dx<0?1.9:1.615)*H)); RY[i]+=H*s*s;   /* 먼 바다 너울: 가까이 와서 쓰는 옆모습과 같은 모양 (바뀔 때 툭 튀지 않게) */ } } }
     else if(st===1){ WIN.push({x:e.x[j],H:e.Hb[j],ph:e.ph[j]}); }
-    else if(st===2){ const xf=e.xf[j], Hs=e.Hs[j], Hb=e.Hb[j], i0=lowerIdx(xf-30), i1=lowerIdx(Math.min(xf+1,0));
-      for(let i=i0;i<=i1&&i<NC;i++){ const x=XG[i]; if(x>=0) break; RY[i]+=Hs*ENG.boreY((x-xf)/Hb); const fb=x<=xf+0.1?Math.exp(-(xf-x)/(0.7*Hb))*(0.9+0.1*Math.sin(x*1.3+z*0.7)):0; RF[i]=Math.max(RF[i],fb); } }   /* 흰 물 계단: 앞쪽이 하얗고 뒤로 갈수록 거품이 옅어진다 */
+    else if(st===2){ const xf=e.xf[j], Hs=e.Hs[j], Hb=e.Hb[j], i0=lowerIdx(xf-30), i1=lowerIdx(Math.min(xf+1,so));
+      for(let i=i0;i<=i1&&i<NC;i++){ const x=XG[i]; if(x>=so) break; RY[i]+=Hs*ENG.boreY((x-xf)/Hb); const fb=x<=xf+0.1?Math.exp(-(xf-x)/(0.7*Hb))*(0.9+0.1*Math.sin(x*1.3+z*0.7)):0; RF[i]=Math.max(RF[i],fb); } }   /* 흰 물 계단: 앞쪽이 하얗고 뒤로 갈수록 거품이 옅어진다 */
     else if(st===3){ const Ts=4+2*e.Hs[j], s=Math.min(1,(t-e.ts[j])/Ts), Hs=e.Hs[j], Hb=e.Hb[j], R=Math.min(10,S.swash*0.75*Hs/SBE)*(1+0.22*Math.sin(z*0.31+e.sd)+0.12*Math.sin(z*0.83+e.sd*1.7)), xs=R*Math.sin(Math.PI*Math.pow(s,0.75)), th0=Hs*0.32*Math.pow(1-s,0.8);
-      for(let i=lowerIdx(-30);i<NC;i++){ const x=XG[i]; if(x<0){ RY[i]+=Hs*ENG.boreY(x/Hb)*(1-sm(s/0.35)); RF[i]=Math.max(RF[i],x>-0.7*Hb?(1-sm(s/0.3)):0); continue; } if(x>xs) break; const th=th0*Math.pow(Math.max(0,1-x/Math.max(0.1,xs)),0.6); if(th>0.003){ RY[i]=ENG.bedY(x,z)+th; RS_[i]=0; RF[i]=Math.max(RF[i],x>xs-0.9?0.85*(1-sm((s-0.35)/0.6)):0); } } } }   /* 백사장으로 쳐 올라갔다 빠짐: 줄마다 거리가 다르고, 끝나면 얇아져 스며든다 */
+      for(let i=lowerIdx(so-30);i<NC;i++){ const x=XG[i], xr=x-so; if(xr<0){ RY[i]+=Hs*ENG.boreY(xr/Hb)*(1-sm(s/0.35)); RF[i]=Math.max(RF[i],xr>-0.7*Hb?Math.exp(xr/(0.7*Hb))*(1-sm(s/0.12)):0); continue; } if(xr>xs) break; const th=th0*Math.pow(Math.max(0,1-xr/Math.max(0.1,xs)),0.6); if(th>0.003){ RY[i]=ENG.bedY(x,z)+th; RS_[i]=0; RF[i]=Math.max(RF[i],xr>xs-0.9?0.85*(1-sm((s-0.35)/0.6)):0); } } } }   /* 백사장으로 쳐 올라갔다 빠짐: 줄마다 거리가 다르고, 끝나면 얇아져 스며든다 */
   BASE.set(RY);
   /* 말리는 파도: 옆모습(혀 포함)을 그 자리 점들에 늘어놓는다 */
   for(const w of WIN){ const J=ENG.jet(w.ph,S.kx,S.spl2), P=J.P, H=w.H, xa=w.x-6.5*H, xb=w.x+4*H, i0=lowerIdx(xa), i1=Math.min(NC-1,lowerIdx(xb)-1); if(i1-i0<8) continue;
@@ -250,9 +258,9 @@ function buildRow(j,t){ const z=j*dz, K=S.swellK, base=j*NC;
     if(w.ph>0.7 && w.ph<1.3 && !(j%2) && DROPDT>0){ const tp=P[J.iT]; dropsAt(w.x+tp[0]*H, baseAt(w.x+tp[0]*H)+tp[1]*H, z, H, Math.sqrt(G*H)*0.8, DROPDT); } }   /* 말리는 동안 혀 끝에서 물방울이 떨어져 나간다 */
   /* 그물에 쓰기 */
   for(let i=0;i<NC;i++){ const v=(base+i)*3, x=XW[i]; VPOS[v]=x; VPOS[v+1]=RY[i]; VPOS[v+2]=z;
-    let wv=0; const isSand=RS_[i]===1; const wb=Math.floor((x-WB0)/WBS); if(wb>=0&&wb<WBN){ const w=j*WBN+wb; if(!isSand && x>-4) WET[w]=1; wv=WET[w]; }
+    let wv=0; const isSand=RS_[i]===1; const wb=Math.floor((x-WB0)/WBS); if(wb>=0&&wb<WBN){ const w=j*WBN+wb; if(!isSand && x>so-4) WET[w]=1; wv=WET[w]; }
     const fi=j*NC+i, ft=isSand?0:RF[i]; FSM[fi]+=(ft-FSM[fi])*Math.min(1,FOAMDT*(ft>FSM[fi]?7:1.1)); VATT[(base+i)*2]=FSM[fi];   /* 거품은 갑자기 생기거나 사라지지 않고 서서히 */
-    const sdn=x<0?0:(isSand?1:1-sm(Math.max(0,RY[i]-ENG.bedY(x,z))/0.05)); VATT[(base+i)*2]=isSand?0:VATT[(base+i)*2]; VATT[(base+i)*2+1]=sdn*(1+wv);   /* 물 가장자리는 얇아지는 만큼 모래로 (계단 없이) */ XW[i]=XG[i]; } }
+    const sdn=x<so?0:(isSand?1:1-sm(Math.max(0,RY[i]-ENG.bedY(x,z))/0.05)); VATT[(base+i)*2]=isSand?0:VATT[(base+i)*2]; VATT[(base+i)*2+1]=sdn*(1+wv);   /* 물 가장자리는 얇아지는 만큼 모래로 (계단 없이) */ XW[i]=XG[i]; } }
 const XW=Float32Array.from(XG); let FSM=null, FOAMDT=0;
 function update(t){ if(!FSM) FSM=new Float32Array(NR*NC); for(let j=0;j<NR;j++) buildRow(j,t);
   for(let j=0;j<NR;j++) for(let i=0;i<NC;i++){ const a=j*NC+i, il=j*NC+Math.max(0,i-1), ir=j*NC+Math.min(NC-1,i+1), jd=Math.max(0,j-1)*NC+i, ju=Math.min(NR-1,j+1)*NC+i;
