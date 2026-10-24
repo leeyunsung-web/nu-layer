@@ -340,7 +340,7 @@ function makeWave(P,seed){
         if(h[j]<0.15) f=f*Math.pow(keep,1+3*thin*slow*slow);   /* 백사장 맨 끝 얇은 물에서 거의 멈춘 거품만 모래로 스며든다 */
         const sw=(h[j]<0.5 && wx>0.6 && b[j]>D-1.5)?Math.min(1,(wx-0.6)*0.5):0;   /* 백사장으로 밀려 올라가는 얇은 물도 거품을 만든다 */
         /* 생성 (Ihmsen 2012): 운동에너지 × (마루 넘어짐 + 공기 갇힘) — 부서지는 동안 빠르게 쌓인다 (관측의 A단계) */
-        f+=P.foam*cvAt(P,"foam",(i+0.5)/NX)*(genWC[j]*2.6+genTA[j]*1.8+sw*0.8)*dtF*0.3;
+        f+=P.foam*cvAt(P,"foam",(i+0.5)/NX)*(genWC[j]*2.6+genTA[j]*1.8+sw*0.8)*dtF*0.22;
         /* 남은 거품 (B단계, Callaghan 등 2012): 지수적으로 줄고, e-folding 시간 평균 ≈3.5~4초. 큰 덩어리일수록 오래 (크기의 ~0.4제곱) */
         { const tau=(P.fTau===undefined?3.5:P.fTau)*Math.max(0.75,Math.min(1.6,Math.pow(Math.max(0.05,f)/0.5,0.4))); f*=Math.exp(-dtF/Math.max(0.4,tau)); }
       } else { ax*=sandV; az*=sandV;   /* 마른 모래 위: 앞으로 미끄러지다(퍼지는 거리) 멈추며 */
@@ -731,7 +731,7 @@ void main(){
   if(sp>0.986 && n.y>0.6) col=uC2;
   /* 마루 하이라이트: 솟아오른 파도 꼭대기 능선을 따라 흰 빛 줄 (파도 앞쪽으로 살짝, 끊어지며) */
   if(uHi.y>0.0){ float rise2=vP.y-uTank.z, br2=vn2(vec2(vQ.y*0.35, vQ.x*0.05+uTime*0.08))*0.7+vn2(vec2(vQ.y*1.3+7.0, uTime*0.2))*0.3;
-    if(rise2>1.1-0.4*uHi.y && n.y>0.955 && n.y<0.995 && n.x>0.02 && br2>0.62-0.25*uHi.y){ col=vec3(1.0); mul=vec3(1.0); } }   /* 반짝임은 위를 향한 면에만 (쏟아지는 혀 앞면이 하얗게 번지지 않게) */
+    if(rise2>1.5-0.4*uHi.y && n.y>0.972 && n.y<0.99 && n.x>0.08 && n.x<0.2 && br2>0.66-0.2*uHi.y){ col=vec3(1.0); mul=vec3(1.0); } }   /* 반짝임은 위를 향한 면에만 (쏟아지는 혀 앞면이 하얗게 번지지 않게) */
   /* 파도 앞면 그늘 (윤성 그림): 파도가 솟아오르면 백사장 쪽을 향한 면(보는 사람 쪽)이 빛을 등져 어두워진다. 높이 솟을수록 한 단계 더 */
   if(uFace.x>0.0){ float rise=vP.y-uTank.z, fx=n.x+(nz-0.5)*0.25;
     if(fx>0.32-0.12*uFace.x && n.y<0.9 && rise>0.35+(nz-0.5)*0.5){ vec3 fc=(rise>1.8+(nz-0.5)*0.8 && fx>0.5)?mix(uC1,uC3,0.3):uC1; mul=min(mul,min(vec3(1.0),mix(B0,fc,uFace.x)/B0)); } }
@@ -765,11 +765,15 @@ void main(){
      ③ 되빠짐 줄무늬: 빠지는 얇은 물 위에 바다 쪽으로 끌려가는 가는 거품 줄 */
   { float f=fm.r, onS=smoothstep(uSurf2.y-14.0,uSurf2.y+2.0,vP.x);
     float nzb=vn2(vQ*vec2(0.3,0.45)+vec2(-uTime*0.5,0.0))*0.6+vn2(vQ*vec2(0.85,1.2)+vec2(3.1,uTime*0.35))*0.4;
-    if(uBore.x>0.0 && vH.x>0.25){ float fb=f*uBore.x*(0.55+0.45*onS), th=0.3+(nzb-0.5)*0.42;
-      /* 짙은 거품(부서지는 중, A단계)은 꽉 찬 흰색, 옅어진 남은 거품(B단계)은 군데군데 비어 물빛이 비치는 조각으로 */
-      float holes=vn2(vQ*vec2(0.9,1.1)+fm.ba*uTime*0.15)*0.6+vn2(vQ*vec2(2.1,2.6)+vec2(5.0,1.0))*0.4, residual=1.0-smoothstep(0.45,0.7,fb);
-      if(fb>th && holes>0.5*residual*residual+0.02*residual){ bool fc=n.x>0.3 && n.y<0.85; col=fc?vec3(0.78,0.89,0.97):(fb<th+0.07||residual>0.6?vec3(0.87,0.95,0.99):vec3(0.995)); idv=0.75; }
-      else if(fb>th-0.05) { col=mix(col,vec3(0.86,0.95,0.99),0.6); } }
+    /* 윤성 그림식 거품: 부서지는 중인 짙은 거품(A단계)만 또렷한 흰 덩어리 + 옅은 하늘색 테두리 선으로.
+       남은 거품(B단계)은 흰 얼룩으로 칠하지 않고, 물빛보다 한 톤 밝은 조각으로만 비친다 (바다가 하얘지지 않게) */
+    float nzc=vn2(vQ*vec2(0.16,0.26)+fm.ba*0.0+vec2(-uTime*0.12,uTime*0.03))*0.7+vn2(vQ*vec2(0.45,0.6)+vec2(7.0,2.0))*0.3;   /* 거품을 덩어리로 나누는 큰 무늬 (덩어리 사이로 물이 보이게) */
+    if(uBore.x>0.0 && vH.x>0.25){ float fb=f*uBore.x*(0.55+0.45*onS), th=0.62+(nzc-0.5)*0.55, lw=0.035;
+      float hole=vn2(vQ*vec2(0.55,0.7)+vec2(3.3,1.7))*0.65+vn2(vQ*vec2(1.3,1.6)+vec2(-uTime*0.05,0.0))*0.35;
+      bool inHole=fb>th+0.12 && hole>0.68;   /* 짙은 거품 속 동그란 구멍 (드문드문, 또렷하게) */
+      if(fb>th+lw && !inHole){ bool fc=n.x>0.3 && n.y<0.85; col=fc?vec3(0.80,0.90,0.98):(fb<th+lw+0.05?vec3(0.86,0.94,0.99):vec3(0.995)); idv=0.75; }
+      else if((!inHole && fb>th) || (inHole && hole<0.705)){ col=vec3(0.55,0.80,0.96); idv=0.75; }   /* 테두리 선 */
+      else if(fb>th-0.22 && fb>0.22){ col=mix(col,uC2,0.55); } }   /* 남은 거품: 밝은 물빛 조각 */
     if(uBore.y>0.0 && onS>0.5){ float nzE=vn2(vec2(vQ.y*0.45,uTime*0.22+vQ.x*0.08))*0.65+vn2(vec2(vQ.y*1.6+5.0,uTime*0.45))*0.35;
       float wd=(0.05+0.2*uBore.y)*(0.3+1.4*nzE)*(0.6+0.8*min(1.0,f*2.0+0.3));
       if(vH.x<wd){ col=vH.x<wd*0.55?vec3(1.0):vec3(0.86,0.95,0.99); idv=0.75; } else if(vH.x<wd*1.9) col=mix(col,vec3(0.9,0.97,0.99),0.3); }
