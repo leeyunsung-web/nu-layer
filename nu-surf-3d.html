@@ -369,6 +369,7 @@ const CTL=[
  ["secSurf","모래톱 폭","barW",3,20,0.5,8,"칸","모래톱 둔덕의 폭. 좁으면 갑자기 서서 세게 말리고, 넓으면 부드럽게.",2],
  ["secSurf","말림 길이","lipLen",0,2.5,0.05,1.25,"배","말려 나가는 혀의 길이 (파도 높이 대비). 0이면 혀 없음.",0],
  ["secSurf","말림 정도","lipCurl",0,1.4,0.05,1,"배","혀가 얼마나 둥글게 휘어 내려가는지. 1이면 터널처럼 감깁니다.",0],
+ ["secSurf","혀 비율","lipRatio",0,1,0.05,0.9,"%","말리는 동안 파도가 그래프로 그린 혓바닥 모양을 얼마나 띠는지. 90%면 말리기 시작하자마자 거의 다 말린 혀 모양이 되고, 마지막에 100%로 철퍽 칩니다. 0이면 말리는 리듬대로 천천히.",0],
  ["secSurf","말리는 시간","lipT",0.3,4,0.05,1.3,"초","혀가 뻗어 나가 수면을 칠 때까지 걸리는 시간.",0],
  ["secSurf","오므라드는 시간","lipC",0.3,4,0.05,1.4,"초","혀가 수면을 치고 터널이 오므라들며 무너지는 데 걸리는 시간. 길수록 천천히 부드럽게 닫힙니다.",0],
  ["secSurf","녹아드는 길이","lipMelt",0,1,0.05,0.6,"","무너진 둔덕이 원래 물 표면으로 스며드는 구간의 길이. 클수록 툭 바뀌지 않고 서서히 녹아듭니다.",0],
@@ -472,7 +473,7 @@ const VIEWS={ front:{n:"정면 (백사장 쪽)",y:108,p:7,z:2.7,t:0}, diag:{n:"�
 const SHAPE0={S:[-2.4,-0.3],A:[0,0.32],L:[0.95,0.05],E:[0.72,-0.75],B:[0.1,-1]};   /* 마루 꼭대기 = (0,0), 단위 = 파도 높이 */
 const CURVES=[["fspd","거품 속도"],["foam","거품 양"],["lift","떠 있는 높이"],["curl","거품 말림"],["steep","앞면 세우기"]];
 /* 윤성이 정한 처음 값 (2026-10-21, 설정 복사로 받은 값) */
-const SAVED={"col":"maldives","sky":"day","cyaw":108,"cpit":7,"czoom":2.7,"ctx":0,"shape":{"S":[-2.1206135936661297,-0.34271001073537316],"A":[-0.2346266103059582,0.2271873322597961],"L":[0.633009594739667,0.10347893183038112],"E":[1.1346366747181964,-0.28781702898550715],"B":[0,-1]},"curves":{"fspd":[1,1,1,1,1],"foam":[1,1,1,1,1],"lift":[1,1,1,1,1],"curl":[1,1,1,1,1],"steep":[1,1,1,1,1]},"amp":5,"per":4.5,"skew":0.4,"irr":0.35,"spd":1,"fcurl":0,"curl":0.85,"cth":0.5,"foam":1.1,"fsurge":0.55,"fswirl":0.4,"flift":0.9,"flife":0.5,"fsz":0.5,"flace":0,"fwig":0.08,"flsz":0.4,"frim":0.5,"frc":0.25,"tx":140,"tz":50,"level":8,"bstart":0.35,"beach":0.2,"res":1,"grav":1,"fric":0.15,"visc":0.02,"soak":0.65,"bback":0.8,"tile":1,"swob":0.5,"swsz":0.5,"swsp":0.5,"rev":0,"revc":0.35,"revhue":0,"revsat":1,"revbri":1,"revop":1,"revsoft":0.3,"revdir":-1,"lcol":0,"shal":0.6,"cloud":0.6,"cspd":0.35,"sandc":0,"px":1,"lat":0.2,"cusp":0.2,"bar":0.6,"barX":0.32,"barW":6,"barAng":25,"lipLen":1.7,"lipCurl":1.1,"hidez":0.15,"brate":0.3,"mig1":1,"mig2":1,"mig3":1,"mig4":1,"mig5":1,"mig6":1,"mig7":1,"mig8":1,"mig9":1,"mig10":1,"mig11":1,"bar":0,"cusp":0,"jfSlide":0.85,"lipRh":[0.01,0.02,0.07,0.19],"lipLen":1.7,"lipCurl":1.1,"lipT":2,"lipC":4,"lipMelt":0.6,"lipDrop":0.25,"lipLean":0.35,"lipDip":0.15,"lipShade":0.6,"barrel":1,"lipTh":0.28,"peel":10,"lipThr":0.35,"beach":0.1,"bstart":0.25,"mig12":1,"mig13":1,"mig15":1,"amp":6.5,"sea":3,"irr":1,"lat":0.5,"endless":1,"tiles":10,"px":1,"col":"art","sky":"art","cfollow":0,"ctz":0,"amp":6.5,"lipDrop":0.12,"lipLen":2.1,"lipTh":0.32,"lipShade":1.0,"shapeOn":1,"lipShape":[[-0.9,0.55],[-0.4,0.9],[0.1,1.0],[0.65,0.92],[1.05,0.62],[0.95,0.32],[0.62,0.52],[0.3,0.42],[0.22,0.12],[0.6,0.0]]};
+const SAVED={"col":"maldives","sky":"day","cyaw":108,"cpit":7,"czoom":2.7,"ctx":0,"shape":{"S":[-2.1206135936661297,-0.34271001073537316],"A":[-0.2346266103059582,0.2271873322597961],"L":[0.633009594739667,0.10347893183038112],"E":[1.1346366747181964,-0.28781702898550715],"B":[0,-1]},"curves":{"fspd":[1,1,1,1,1],"foam":[1,1,1,1,1],"lift":[1,1,1,1,1],"curl":[1,1,1,1,1],"steep":[1,1,1,1,1]},"amp":5,"per":4.5,"skew":0.4,"irr":0.35,"spd":1,"fcurl":0,"curl":0.85,"cth":0.5,"foam":1.1,"fsurge":0.55,"fswirl":0.4,"flift":0.9,"flife":0.5,"fsz":0.5,"flace":0,"fwig":0.08,"flsz":0.4,"frim":0.5,"frc":0.25,"tx":140,"tz":50,"level":8,"bstart":0.35,"beach":0.2,"res":1,"grav":1,"fric":0.15,"visc":0.02,"soak":0.65,"bback":0.8,"tile":1,"swob":0.5,"swsz":0.5,"swsp":0.5,"rev":0,"revc":0.35,"revhue":0,"revsat":1,"revbri":1,"revop":1,"revsoft":0.3,"revdir":-1,"lcol":0,"shal":0.6,"cloud":0.6,"cspd":0.35,"sandc":0,"px":1,"lat":0.2,"cusp":0.2,"bar":0.6,"barX":0.32,"barW":6,"barAng":25,"lipLen":1.7,"lipCurl":1.1,"hidez":0.15,"brate":0.3,"mig1":1,"mig2":1,"mig3":1,"mig4":1,"mig5":1,"mig6":1,"mig7":1,"mig8":1,"mig9":1,"mig10":1,"mig11":1,"bar":0,"cusp":0,"jfSlide":0.85,"lipRh":[0.01,0.02,0.07,0.19],"lipLen":1.7,"lipCurl":1.1,"lipT":2,"lipC":4,"lipMelt":0.6,"lipDrop":0.25,"lipLean":0.35,"lipDip":0.15,"lipShade":0.6,"barrel":1,"lipTh":0.28,"peel":10,"lipThr":0.35,"beach":0.1,"bstart":0.25,"mig12":1,"mig13":1,"mig15":1,"amp":6.5,"sea":3,"irr":1,"lat":0.5,"endless":1,"tiles":10,"px":1,"col":"art","sky":"art","cfollow":0,"ctz":0,"amp":6.5,"lipDrop":0.12,"lipLen":2.1,"lipTh":0.32,"lipShade":1.0,"shapeOn":1,"lipShape":[[-0.9,0.55],[-0.4,0.9],[0.1,1.0],[0.65,0.92],[1.05,0.62],[0.95,0.32],[0.62,0.52],[0.3,0.42],[0.22,0.12],[0.6,0.0]],"lipRatio":0.9};
 const DEF=(()=>{ const o={col:"maldives",sky:"day",cyaw:-32,cpit:22,czoom:1,ctx:0,shape:JSON.parse(JSON.stringify(SHAPE0)),curves:{}}; for(const [k] of CURVES) o.curves[k]=[1,1,1,1,1]; for(const c of CTL) o[c[2]]=c[6]; return Object.assign(o,JSON.parse(JSON.stringify(SAVED))); })();
 const clone=o=>JSON.parse(JSON.stringify(o));
 const KEY="nu-surf-3d-v2";   /* 기본값이 바뀌어 새 이름으로 (예전 저장값은 그대로 남아 있음) */
@@ -482,7 +483,7 @@ const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(_){} }
 const fmt=(c,v)=>{ const d=c[5]<0.1?2:c[5]<1?1:0; return (+v).toFixed(d)+(c[7]?(c[7]==="%"?"":" ")+c[7]:""); };
 const inputs={}; let rebuildT=0;
 /* 간결한 메뉴: 지금 보이는 손잡이 (나머지는 숨긴 칸에서 지금 값 그대로) */
-const SHOW={amp:"nWave",per:"nWave",irr:"nWave",lat:"nWave",spd:"nWave", bar:"nCurl",barAng:"nCurl",barrel:"nCurl",lipLen:"nCurl",lipCurl:"nCurl",lipTh:"nCurl",lipT:"nCurl",lipC:"nCurl",lipMelt:"nCurl",lipHold:"nCurl",lipDrop:"nCurl",lipLean:"nCurl",lipDip:"nCurl",lipShade:"nCurl",peel:"nCurl", jfN:"nSpr",jfJel:"nSpr",jfWob:"nSpr",jfR:"nSpr",jfVar:"nSpr",jfCover:"nSpr",jfLipF:"nSpr",bore:"nSpr",edgeL:"nSpr",bwStr:"nSpr",sandF:"nSpr",jfMerge:"nSpr",jfShd:"nSpr",jfShO:"nSpr",jfCap:"nSpr",jfUp:"nSpr",jfG:"nSpr",jfSpr:"nSpr",jfSlide:"nSpr",fReach:"nSpr",jfLine:"nSpr",jfLife:"nSpr", sea:"nLook",endless:"nLook",wsmooth:"nLook",faceSh:"nLook",thinG:"nLook",hiL:"nLook",hiC:"nLook",chop:"nLook",tiles:"nLook",wpat:"nLook",wpflow:"nLook",wpsz:"nLook",deco:"nLook", level:"nTank",beach:"nTank",hidez:"nTank",swash:"nTank",bwash:"nTank",btr:"nTank",wetK:"nTank",wdry:"nTank",btd:"nTank"};
+const SHOW={amp:"nWave",per:"nWave",irr:"nWave",lat:"nWave",spd:"nWave", bar:"nCurl",barAng:"nCurl",barrel:"nCurl",lipLen:"nCurl",lipCurl:"nCurl",lipTh:"nCurl",lipRatio:"nCurl",lipT:"nCurl",lipC:"nCurl",lipMelt:"nCurl",lipHold:"nCurl",lipDrop:"nCurl",lipLean:"nCurl",lipDip:"nCurl",lipShade:"nCurl",peel:"nCurl", jfN:"nSpr",jfJel:"nSpr",jfWob:"nSpr",jfR:"nSpr",jfVar:"nSpr",jfCover:"nSpr",jfLipF:"nSpr",bore:"nSpr",edgeL:"nSpr",bwStr:"nSpr",sandF:"nSpr",jfMerge:"nSpr",jfShd:"nSpr",jfShO:"nSpr",jfCap:"nSpr",jfUp:"nSpr",jfG:"nSpr",jfSpr:"nSpr",jfSlide:"nSpr",fReach:"nSpr",jfLine:"nSpr",jfLife:"nSpr", sea:"nLook",endless:"nLook",wsmooth:"nLook",faceSh:"nLook",thinG:"nLook",hiL:"nLook",hiC:"nLook",chop:"nLook",tiles:"nLook",wpat:"nLook",wpflow:"nLook",wpsz:"nLook",deco:"nLook", level:"nTank",beach:"nTank",hidez:"nTank",swash:"nTank",bwash:"nTank",btr:"nTank",wetK:"nTank",wdry:"nTank",btd:"nTank"};
 const ORDER=Object.keys(SHOW); CTL.sort((a,b)=>(ORDER.indexOf(a[2])+1||999)-(ORDER.indexOf(b[2])+1||999));
 for(const c of CTL){ const box=$(SHOW[c[2]]||c[0]); const d=document.createElement("div"); d.className="ctl";
   d.innerHTML=`<label for="k_${c[2]}">${c[1]}</label><input id="k_${c[2]}" type="range" min="${c[3]}" max="${c[4]}" step="${c[5]}"><output></output>`+(c[8]?`<div class="desc">${c[8]}</div>`:"");
@@ -1287,13 +1288,15 @@ function lipUpdate(dt){
   const SBf=G.smb&&G.smb.length===NX*NZ?G.smb:null, EV=j=>SBf&&h[j]>0.05?SBf[j]:h[j]+b[j];   /* 혀가 따라갈 마루는 화면에 그려지는 매끈한 물 표면에서 찾는다 (계산 물의 마루는 그보다 앞서 있어, 혀만 앞으로 들려 보였다) */
   const i0=Math.floor(NX*0.06), i1=Math.floor(NX*0.85), thr=S.lipThr, rate=1/Math.max(0.2,S.lipT);
   /* 말림은 한 번에 한 덩어리만: 지금 말리는 덩어리가 끝나야 새로 시작 (서로 다른 파도의 말림이 섞여 이어지지 않게) */
-  LIP.any=false; for(let k=0;k<NZ;k++) if(LIP.ph[k]>0){ LIP.any=true; break; }
+  LIP.any=false; let rsx=0, rsn=0; for(let k=0;k<NZ;k++) if(LIP.ph[k]>0){ LIP.any=true; rsx+=LIP.xc[k]; rsn++; } LIP.refx=rsn?rsx/rsn:0;
+  /* 혀 비율: 같은 파도 줄 안에서는 여러 군데가 동시에 말려도 된다 — 줄을 6줄씩 묶어, 파도마다 정해진 비율만큼의 묶음이 말린다 */
+  const RT=S.lipRatio===undefined?0.9:S.lipRatio, cyc=(W&&W.cyc)||0, blkOK=k=>{ const b2=Math.floor(k/6), hsh=Math.abs(Math.sin(b2*12.9898+cyc*78.233)*43758.5453)%1; return hsh<RT; };
   for(let k=0;k<NZ;k++){ const r0=k*NX; LIP.cd[k]=Math.max(0,LIP.cd[k]-dt);
     let bi=-1, bm=thr; for(let i=i0;i<i1;i++){ if(b[r0+i]>D*0.7) break; const v=brk[r0+i]; if(v>bm && h[r0+i]>0.3){ bm=v; bi=i; } }   /* 말리는 건 바다 쪽(모래톱 둘레)에서만 — 백사장 위 얇은 물은 말리지 않는다 */
     let ph=LIP.ph[k];
     if(bi>=0){ let ic=bi, cr=-9; for(let q=Math.max(0,bi-R);q<=Math.min(NX-1,bi+2);q++){ const e=h[r0+q]+b[r0+q]; if(e>cr){ cr=e; ic=q; } }
       const xc=(ic+0.5)*dx, hc=cr-D;
-      const busy=LIP.any||LIP.cd[k]>0;   /* 이미 말리는 줄 둘레는 옆으로 번져서만 (따로 생기지 않게 — 한 덩어리로) */
+      const busy=(LIP.any && !(RT>0 && Math.abs(xc-LIP.refx)<Math.max(3,2.5*hc) && blkOK(k)))||LIP.cd[k]>0;   /* 다른 파도가 말리는 중이면 기다리고, 같은 파도 줄이면 비율만큼 함께 말린다 */   /* 이미 말리는 줄 둘레는 옆으로 번져서만 (따로 생기지 않게 — 한 덩어리로) */
       if(ph<=0 && !busy && hc>0.3){ ph=0.001; LIP.any=true; LIP.xc[k]=xc; LIP.yc[k]=cr; LIP.hc[k]=hc; LIP.vx[k]=Math.sqrt(g*Math.max(0.3,h[r0+ic])); LIP.fast[k]=0; LIP.fon[k]=0; }
       }   /* 자리는 아래에서 한 번만 (두 군데서 잡아당기면 덜컥거린다) */
     if(ph>0){   /* 언제나 지금 물 마루에 붙어서 따라간다 (앞으로만) — 혀가 물과 따로 놀지 않게 */
@@ -1405,7 +1408,7 @@ function surfWarp(){
     /* 지금 물 표면의 실제 마루 (무너짐 끝에 둔덕을 여기로 맞춰, 봉우리가 둘로 갈라지지 않게) */
     { const r0=k*NX, q0=Math.max(0,Math.round((xc-0.5*hc)/dx)), q1=Math.min(NX-1,Math.round((xc+2*hc)/dx)); let bx=xc, by=-1e9; for(let q=q0;q<=q1;q++){ if(sm[r0+q]>by){ by=sm[r0+q]; bx=(q+0.5)*dx; } } A.xh[k]=bx; A.yh[k]=by; }
     { const gx=(S.shapeOn===undefined||S.shapeOn)?shpPts():null; let mn=-1.25, mx=Math.max(1.8,0.5*S.lipLen+1.1); if(gx){ for(const q of gx){ mn=Math.min(mn,q[0]-0.35); mx=Math.max(mx,q[0]+0.8); } } A.xa[k]=Math.max(2,xc+mn*hc); A.xb[k]=Math.min(L-4,xc+mx*hc); }
-    const p=A.ph[k], up=Math.min(1,p/0.25), ds0=Math.min(1.66,Math.max(1.6,1.7-0.5*(S.lipMelt===undefined?0.6:S.lipMelt))), dn=1-Math.min(1,Math.max(0,((on[k]>0?on[k]:0)-ds0)/(1.7-ds0)));   /* 원래 물 표면으로 녹아드는 구간을 길게 */   /* 둔덕이 다 된 뒤에야 원래 물 표면으로 */
+    const RT=S.lipRatio===undefined?0.9:S.lipRatio, p=A.ph[k], up=Math.min(1,Math.max(p/0.25, RT>0?(on[k]>0?on[k]:0)/0.15:0)),   /* 혀 비율: 말림이 시작되면 바로 혀 모양이 나타나게 */ ds0=Math.min(1.66,Math.max(1.6,1.7-0.5*(S.lipMelt===undefined?0.6:S.lipMelt))), dn=1-Math.min(1,Math.max(0,((on[k]>0?on[k]:0)-ds0)/(1.7-ds0)));   /* 원래 물 표면으로 녹아드는 구간을 길게 */   /* 둔덕이 다 된 뒤에야 원래 물 표면으로 */
     A.w[k]=(p>0?up*up*(3-2*up)*dn*dn*(3-2*dn):0)*Math.min(1,S.barrel); }
   { const TR=6; for(let k=0;k<NZ;k++){ if(!(on[k]>0)){ A.w[k]=0; continue; } let dd=TR; for(let r=1;r<TR;r++){ if((k-r>=0&&!(on[k-r]>0))||(k+r<NZ&&!(on[k+r]>0))){ dd=r; break; } }
       const t=dd/TR; A.w[k]*=t*t*(3-2*t); } }
@@ -1451,7 +1454,7 @@ function surfWarp(){
       const t=(u-UI)/(1-UI), e=t*t*(3-2*t), S0=toC([ex,yt]); return [lerp(S0[0],xb,t), lerp(S0[1],qb[0],e)]; };
     /* 그래프 모양: 윤성이 그린 점들을 지금 파도 크기·자리에 맞춰 세계 좌표로 */
     let GC=null, GI=null; const gOn=S.shapeOn===undefined?1:S.shapeOn;
-    if(gOn && w>0.001){ GI=G.shpI||(G.shpI=shpInfo()); const gE=gg*(1-e2);
+    if(gOn && w>0.001){ GI=G.shpI||(G.shpI=shpInfo()); const RT=S.lipRatio===undefined?0.9:S.lipRatio, pr=P(on), r0=Math.min(1,Math.max(0,pr)/0.15), gE=Math.max(gg, RT*r0*r0*(3-2*r0))*(1-e2);   /* 혀 비율(기본 90%): 말리는 동안 처음부터 그린 혀 모양의 90%로 — 마지막에 100%로 철퍽 */
       /* 그래프 모양은 그린 그대로: 기울기·낮아짐·골 낮아짐 같은 자동 변형은 빼고, 크기(파도 높이)와 자리(마루)만 맞춘다. 가로·세로 같은 비율 */
       const gxc=xc0+(Math.max(xc0,xh)-xc0)*e2, gyt=yt0, Hs=Math.max(0.3*hc, Math.min(hc, yh-yt0+0.05));
       if(r%2===0){ A.gxc[r>>1]=gxc; A.gyt[r>>1]=gyt; A.ghs[r>>1]=Hs; A.gge[r>>1]=gE*w; }
