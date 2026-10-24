@@ -141,6 +141,7 @@ function makeWave(P,seed){
   const fx=new Float32Array(u.length), fz=new Float32Array(w.length), sc=new Float32Array(N);
   const foam=new Float32Array(N), foam2=new Float32Array(N), fu=new Float32Array(N), fw=new Float32Array(N), fu2=new Float32Array(N), fw2=new Float32Array(N);
   const wet=new Float32Array(N), brk=new Float32Array(N), brkS=new Float32Array(N), gen=new Float32Array(N);
+  const etaP=new Float32Array(N), pWC=new Float32Array(N), pTA=new Float32Array(N), pEK=new Float32Array(N), pB=new Float32Array(N), genWC=new Float32Array(N), genTA=new Float32Array(N);
   const D=P.level, xb=L*P.bstart, Db=new Float32Array(N), nl=new Float32Array(N);
   /* 백사장 굴곡: 실제 해변처럼 모래 바닥이 좌우로 완만하게 오르내린다 → 밀려 올라온 물 끝이 혀처럼 넘실댄다 */
   const cl1=per(14+rnd()*6), cl2=per(6+rnd()*3), cp1=rnd()*6.3, cp2=rnd()*6.3, cusp=(P.cusp===undefined?0.5:P.cusp);
@@ -174,7 +175,7 @@ function makeWave(P,seed){
       zphT[k]=lat*P.per*(0.22*(0.55*Math.sin(z*6.28*f[0]+a[0])+0.3*Math.sin(z*6.28*f[1]+a[1])+0.15*Math.sin(z*6.28*f[2]+a[2]))+0.18*obl*(z-0.5));
       zamT[k]=Math.max(0.2,1+lat*0.55*(0.6*Math.sin(z*6.28*f[0]*(PER?1:0.8)+a[3])+0.4*Math.sin(z*6.28*f[1]+a[2]))); } }
   zTargets(); zph.set(zphT); zam.set(zamT);
-  const S={seed,NX,NZ,N,dx,g,D,L,W,WT,TILE,xb,h,b,eta,u,w,foam,fu,fw,wet,brk:brkS,t:0,pad:0,padV:0,cyc:0,cycAmp:1,cycStart:0,cycEnd:P.per,curPer:P.per,setLeft:3,setBig:false,slap:0,waveOn:true,P};
+  const S={pWC,pTA,pEK,pB,genWC,genTA,seed,NX,NZ,N,dx,g,D,L,W,WT,TILE,xb,h,b,eta,u,w,foam,fu,fw,wet,brk:brkS,t:0,pad:0,padV:0,cyc:0,cycAmp:1,cycStart:0,cycEnd:P.per,curPer:P.per,setLeft:3,setBig:false,slap:0,waveOn:true,P};
   const padX=(t,P,A)=>{ const ph=(((t-S.cycStart)/S.curPer)%1+1)%1, p=0.5-0.35*P.skew, s=ph<p?0.5*ph/p:0.5+0.5*(ph-p)/(1-p); return A*(0.5-0.5*Math.cos(s*6.2832)); };
   /* 실제 바다처럼: 주기·방향·세기가 조금씩 다른 너울 여러 개를 겹쳐 민다.
      서로 겹쳤다 엇갈렸다 하며 큰 파도 묶음(세트)과 잔잔한 때가 저절로 생기고, 파도 사이 간격과 마루 길이도 제각각이 된다 (넘실넘실) */
@@ -257,6 +258,37 @@ function makeWave(P,seed){
       if(h[j]>0.05 && uc>0.15 && Hc>0){ const t=Math.min(1,Math.max(0,(s-P.cth*(1+0.35*(P.swob||0)*rn[j]))/0.3)); B=t*t*(3-2*t)*Math.min(1,Hc/(0.15*D+0.05))*Math.min(1,nl[j]*2.5); }   /* 부서짐은 얕아지는 곳에서만 */
       brk[j]=B; const a=B>brkS[j]?rise:fall; brkS[j]+=(B-brkS[j])*a; }
   }
+  /* ── 거품이 생기는 조건 (과학적 근거) ──
+     Ihmsen 등(2012) 유체 거품 생성: 생성량 = 운동에너지(Φk) × (공기 갇힘 Φta·k_ta + 마루 넘어짐 Φwc·k_wc) × Δt
+       · 마루 넘어짐: 볼록한 마루(곡률 κ) 중에서 수면 법선 쪽으로 움직이는 곳만 (v̂·n̂ ≥ 0.6)
+       · 공기 갇힘: 이웃 물과의 상대 속도 Σ|v_ij|(1−v̂_ij·x̂_ij) — 물끼리 부딪치고 엇갈리는 곳
+     Barthelemy 등(2018) 부서짐 시작: 마루 물 속도 / 파도 속도 B ≥ 0.85 → 이때부터 마루가 넘어지며 거품
+     Φ(I,a,b) = (min(I,b) − min(I,a)) / (b − a)  (0~1로 자르기) */
+  const PH=(I,a,bb)=>(Math.min(I,bb)-Math.min(I,a))/(bb-a);
+  function potentials(dtF){
+    const P=S.P, c0=Math.sqrt(g*D), Bth=P.fBth===undefined?0.85:P.fBth, inv=1/Math.max(1e-4,dtF);
+    for(let k=0;k<NZ;k++) for(let i=1;i<NX-1;i++){ const j=k*NX+i;
+      if(h[j]<0.08 || i<NX*0.12){ pWC[j]=pTA[j]=pEK[j]=pB[j]=genWC[j]=genTA[j]=0; continue; }   /* 파도 판(물을 미는 장치) 둘레의 억지 흐름은 제외 */
+      const jn=k>0?j-NX:(PER?j+(NZ-1)*NX:j), js=k<NZ-1?j+NX:(PER?j-(NZ-1)*NX:j);
+      const uc=0.5*(u[k*(NX+1)+i]+u[k*(NX+1)+i+1]), wc=0.5*(w[k*NX+i]+w[(k+1)*NX+i]), et=(eta[j]-etaP[j])*inv;   /* 수면이 오르내리는 빠르기 */
+      const ex=(eta[j+1]-eta[j-1])/(2*dx), ez=(eta[js]-eta[jn])/(2*dx), nl2=Math.hypot(ex,1,ez), vm=Math.hypot(uc,et,wc)+1e-6;
+      const vn=(-ex*uc+et-ez*wc)/(nl2*vm);   /* v̂·n̂ */
+      const kap=-(eta[j+1]+eta[j-1]+eta[jn]+eta[js]-4*eta[j])/(dx*dx);   /* 볼록할수록 + */
+      const cl=Math.sqrt(g*Math.max(0.1,h[j])), Bk=Math.max(0,uc)/cl;   /* 마루 물 속도 / 파도 속도 */
+      /* 이웃과의 상대 속도 (x̂ 방향으로 마주 오는 성분은 덜, 엇갈리거나 비스듬히 부딪치는 성분은 더) */
+      let vd=0; const nb=[[j-1,-1,0],[j+1,1,0],[jn,0,-1],[js,0,1]];
+      for(const [q,dxh,dzh] of nb){ const iq=q%NX, kq=(q/NX)|0; if(h[q]<0.05) continue;
+        const uq=0.5*(u[kq*(NX+1)+iq]+u[kq*(NX+1)+iq+1]), wq=0.5*(w[kq*NX+iq]+w[(kq+1)*NX+iq]), eq=(eta[q]-etaP[q])*inv;
+        const rx=uc-uq, ry=et-eq, rz=wc-wq, rl=Math.hypot(rx,ry,rz); if(rl<1e-5) continue;
+        vd+=rl*(1-(rx*(-dxh)+rz*(-dzh))/rl); }   /* x̂_ij = 내 자리 − 이웃 자리 */
+      const Ek=0.5*(uc*uc+et*et+wc*wc)/(0.5*c0*c0);
+      pB[j]=Bk; pEK[j]=PH(Ek,0.1,1.5); if(S.dbg){ }
+      /* 이 계산(얕은 물 방정식)은 마루 물 속도를 실제보다 낮게 내므로, 실제로 부서지는 칸에서 잰 값(B≈0.4~0.66)에 맞춰 0.55배로 보정해 비교한다 */
+      const Be=Bk/0.55;
+      pWC[j]=PH(Math.max(0,kap)*D*(vn>=0.6?1:0),3,12)*Math.min(1,Math.max(0,(Be-(Bth-0.2))/0.2));   /* 볼록한 마루 + 법선으로 움직임 + 부서짐 기준 */
+      pTA[j]=PH(vd/c0,1.2,4.5);   /* 잔잔한 깊은 바다는 거의 0, 부서지는 곳은 0.6~1 (잰 값 기준) */
+      genWC[j]=pEK[j]*pWC[j]; genTA[j]=pEK[j]*pTA[j]*(P.fTA===undefined?1:P.fTA); }
+  }
   /* 거품: 자기 속도를 가진 2D 그림. 물을 따라 흐르다가, 물이 뒤로 빠져도 앞으로 가던 힘으로 모래 위까지 미끄러져 스며들어 사라진다 */
   function foamStep(dtF){
     const P=S.P, keep=Math.exp(-dtF/(0.8+7*P.flife)), keepS=Math.exp(-dtF/(0.3+5*(P.bsoak===undefined?0.3:P.bsoak))), cell=dtF/dx, eps=2e-3;
@@ -286,12 +318,15 @@ function makeWave(P,seed){
           const top=Math.min(1,Math.max(0,1-Math.abs(sl)/0.08));
           if(back<0){ const vt=cl*(1+ka*back); ax=ax+(vt-ax)*att*0.6; }
           else if(top>0.3){ ax=ax+(cl-ax)*att*top*0.5; }
-          else { f*=Math.pow(keep,1+3*back); } }   /* 뒤에 남은 거품은 처지며 옅어진다 */
+          }   /* 지나간 파도 뒤에 남은 거품은 그 자리에서 물을 따라 떠다니며 B단계 감쇠로만 줄어든다 (관측: 남은 거품이 바다를 더 넓게 덮음) */
         if(b[j]>0) ax=Math.max(ax,(0.5+1.2*shallow)*ms);   /* 백사장 비탈 위 거품은 뒤로 가지 않고 늘 백사장 쪽으로 */
         const thin=1-Math.min(1,Math.max(0,(h[j]-0.08)/0.4)), slow=1-Math.min(1,Math.max(0,(Math.hypot(ax,az)-0.3)/1.2));
-        f=f*Math.pow(keep,1+3*thin*slow*slow);   /* 얇은 물 위에서는 거의 멈춘 끝에서만 스며든다 */
+        if(h[j]<0.15) f=f*Math.pow(keep,1+3*thin*slow*slow);   /* 백사장 맨 끝 얇은 물에서 거의 멈춘 거품만 모래로 스며든다 */
         const sw=(h[j]<0.5 && wx>0.6 && b[j]>D-1.5)?Math.min(1,(wx-0.6)*0.5):0;   /* 백사장으로 밀려 올라가는 얇은 물도 거품을 만든다 */
-        f+=P.foam*cvAt(P,"foam",(i+0.5)/NX)*(brk[j]*3.2+sw*1.2)*dtF*3;   /* 부서지는 마루의 거품은 흐르는 거품 그림으로 남아 백사장까지 실려 간다 */
+        /* 생성 (Ihmsen 2012): 운동에너지 × (마루 넘어짐 + 공기 갇힘) — 부서지는 동안 빠르게 쌓인다 (관측의 A단계) */
+        f+=P.foam*cvAt(P,"foam",(i+0.5)/NX)*(genWC[j]*2.6+genTA[j]*1.8+sw*0.8)*dtF*0.3;
+        /* 남은 거품 (B단계, Callaghan 등 2012): 지수적으로 줄고, e-folding 시간 평균 ≈3.5~4초. 큰 덩어리일수록 오래 (크기의 ~0.4제곱) */
+        { const tau=(P.fTau===undefined?3.5:P.fTau)*Math.max(0.75,Math.min(1.6,Math.pow(Math.max(0.05,f)/0.5,0.4))); f*=Math.exp(-dtF/Math.max(0.4,tau)); }
       } else { ax*=sandV; az*=sandV;   /* 마른 모래 위: 앞으로 미끄러지다(퍼지는 거리) 멈추며 */
         if(bsp>0){ const nb=(bil(foam,NX,NZ,i+1,k)+bil(foam,NX,NZ,i-1,k)+bil(foam,NX,NZ,i,k+1)+bil(foam,NX,NZ,i,k-1))*0.25; f=f+(Math.max(f,nb)-f)*bsp*0.35; }   /* 옆으로 번지고(퍼지는 폭) */
         f*=keepS; }   /* 모래에 스며든다(스며드는 시간) */
@@ -308,7 +343,7 @@ function makeWave(P,seed){
     /* 물 양 지키기: 파도 판이 밀 때와 당길 때 드나드는 양이 조금씩 어긋나 물이 늘거나 줄지 않게, 바다 쪽 깊은 물에서 고르게 맞춘다 */
     { let m=0, n0=0; for(let j=0;j<N;j++){ m+=h[j]; if(b[j]===0) n0++; } const d=(S.m0-m)/Math.max(1,n0); for(let j=0;j<N;j++) if(b[j]===0) h[j]=Math.max(0,h[j]+d); }
     for(let j=0;j<N;j++) eta[j]=h[j]+b[j];
-    breaking(simT); foamStep(simT); S.steps=n; return n;
+    potentials(simT); breaking(simT); foamStep(simT); etaP.set(eta); S.steps=n; return n;
   };
   { let m=0; for(let j=0;j<N;j++) m+=h[j]; S.m0=m; }
   S.mass=()=>{ let m=0; for(let j=0;j<N;j++) m+=h[j]; return m*dx*dx; };
@@ -393,6 +428,9 @@ const CTL=[
  ["secJF","조각 크기","wpsz",0.4,2.5,0.05,1,"배","값이 클수록 잘게.",0],
  ["secJF","방울·반짝이","deco",0,2,0.05,1,"배","거품에서 떠오르는 비눗방울과 반짝이 별의 양. 0이면 끄기.",0],
  ["secJF","거품 양","jfN",0,3,0.05,1,"배","말리는 마루 꼭대기와 부서지는 앞머리에서 생기는 흰 거품의 양.",0],
+ ["secJF","부서짐 기준","fBth",0.6,1.1,0.01,0.85,"","마루 물 속도가 파도 속도의 몇 배를 넘으면 마루가 넘어지며 거품이 생기는지 (관측값 0.85). 낮추면 더 일찍·많이 생깁니다.",0],
+ ["secJF","공기 갇힘 세기","fTA",0,2,0.05,1,"배","물끼리 부딪치고 엇갈리며 공기가 갇혀 생기는 거품의 양 (혀 끝이 수면을 치는 곳에서 가장 많음).",0],
+ ["secJF","남은 거품 시간","fTau",1,8,0.1,3.5,"초","부서짐이 끝난 뒤 남은 거품이 줄어드는 시간 (관측 평균 약 3.5초). 큰 덩어리는 이보다 오래 남습니다.",0],
  ["secJF","젤리 정도","jfJel",0,2,0.05,1,"배","거품 알갱이끼리 당기는 힘. 높일수록 한 덩어리로 뭉쳐 말랑하게 움직이고, 낮추면 잘게 흩어집니다.",0],
  ["secJF","출렁임","jfWob",0,1,0.05,0.6,"%","덩어리가 탱글탱글 출렁이는 정도. 낮추면 끈적하게 천천히 움직입니다.",0],
  ["secJF","거품 알갱이 크기","jfR",0.5,1.5,0.05,1,"배","거품을 이루는 알갱이 하나의 크기. 0.5면 지금의 절반 — 더 잘고 섬세한 거품.",0],
@@ -479,7 +517,7 @@ const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(_){} }
 const fmt=(c,v)=>{ const d=c[5]<0.1?2:c[5]<1?1:0; return (+v).toFixed(d)+(c[7]?(c[7]==="%"?"":" ")+c[7]:""); };
 const inputs={}; let rebuildT=0;
 /* 간결한 메뉴: 지금 보이는 손잡이 (나머지는 숨긴 칸에서 지금 값 그대로) */
-const SHOW={amp:"nWave",per:"nWave",irr:"nWave",lat:"nWave",spd:"nWave", bar:"nCurl",barAng:"nCurl",barrel:"nCurl",lipLen:"nCurl",lipCurl:"nCurl",lipTh:"nCurl",lipT:"nCurl",lipC:"nCurl",lipMelt:"nCurl",lipDrop:"nCurl",lipLean:"nCurl",lipDip:"nCurl",lipShade:"nCurl",peel:"nCurl", jfN:"nSpr",jfJel:"nSpr",jfWob:"nSpr",jfR:"nSpr",jfVar:"nSpr",jfCover:"nSpr",jfLipF:"nSpr",bore:"nSpr",edgeL:"nSpr",bwStr:"nSpr",sandF:"nSpr",jfMerge:"nSpr",jfShd:"nSpr",jfShO:"nSpr",jfCap:"nSpr",jfUp:"nSpr",jfG:"nSpr",jfSpr:"nSpr",jfSlide:"nSpr",jfLine:"nSpr",jfLife:"nSpr", sea:"nLook",endless:"nLook",wsmooth:"nLook",faceSh:"nLook",thinG:"nLook",hiL:"nLook",hiC:"nLook",tiles:"nLook",wpat:"nLook",wpflow:"nLook",wpsz:"nLook",deco:"nLook", level:"nTank",beach:"nTank",hidez:"nTank",swash:"nTank",bwash:"nTank",btr:"nTank",wetK:"nTank",wdry:"nTank",btd:"nTank"};
+const SHOW={amp:"nWave",per:"nWave",irr:"nWave",lat:"nWave",spd:"nWave", bar:"nCurl",barAng:"nCurl",barrel:"nCurl",lipLen:"nCurl",lipCurl:"nCurl",lipTh:"nCurl",lipT:"nCurl",lipC:"nCurl",lipMelt:"nCurl",lipDrop:"nCurl",lipLean:"nCurl",lipDip:"nCurl",lipShade:"nCurl",peel:"nCurl", jfN:"nSpr",fBth:"nSpr",fTA:"nSpr",fTau:"nSpr",jfJel:"nSpr",jfWob:"nSpr",jfR:"nSpr",jfVar:"nSpr",jfCover:"nSpr",jfLipF:"nSpr",bore:"nSpr",edgeL:"nSpr",bwStr:"nSpr",sandF:"nSpr",jfMerge:"nSpr",jfShd:"nSpr",jfShO:"nSpr",jfCap:"nSpr",jfUp:"nSpr",jfG:"nSpr",jfSpr:"nSpr",jfSlide:"nSpr",jfLine:"nSpr",jfLife:"nSpr", sea:"nLook",endless:"nLook",wsmooth:"nLook",faceSh:"nLook",thinG:"nLook",hiL:"nLook",hiC:"nLook",tiles:"nLook",wpat:"nLook",wpflow:"nLook",wpsz:"nLook",deco:"nLook", level:"nTank",beach:"nTank",hidez:"nTank",swash:"nTank",bwash:"nTank",btr:"nTank",wetK:"nTank",wdry:"nTank",btd:"nTank"};
 const ORDER=Object.keys(SHOW); CTL.sort((a,b)=>(ORDER.indexOf(a[2])+1||999)-(ORDER.indexOf(b[2])+1||999));
 for(const c of CTL){ const box=$(SHOW[c[2]]||c[0]); const d=document.createElement("div"); d.className="ctl";
   d.innerHTML=`<label for="k_${c[2]}">${c[1]}</label><input id="k_${c[2]}" type="range" min="${c[3]}" max="${c[4]}" step="${c[5]}"><output></output>`+(c[8]?`<div class="desc">${c[8]}</div>`:"");
@@ -710,7 +748,9 @@ void main(){
   { float f=fm.r, onS=smoothstep(uSurf2.y-14.0,uSurf2.y+2.0,vP.x);
     float nzb=vn2(vQ*vec2(0.3,0.45)+vec2(-uTime*0.5,0.0))*0.6+vn2(vQ*vec2(0.85,1.2)+vec2(3.1,uTime*0.35))*0.4;
     if(uBore.x>0.0 && vH.x>0.25){ float fb=f*uBore.x*(0.55+0.45*onS), th=0.3+(nzb-0.5)*0.42;
-      if(fb>th){ bool fc=n.x>0.3 && n.y<0.85; col=fc?vec3(0.78,0.89,0.97):(fb<th+0.07?vec3(0.87,0.95,0.99):vec3(0.995)); idv=0.75; }
+      /* 짙은 거품(부서지는 중, A단계)은 꽉 찬 흰색, 옅어진 남은 거품(B단계)은 군데군데 비어 물빛이 비치는 조각으로 */
+      float holes=vn2(vQ*vec2(0.9,1.1)+fm.ba*uTime*0.15)*0.6+vn2(vQ*vec2(2.1,2.6)+vec2(5.0,1.0))*0.4, residual=1.0-smoothstep(0.45,0.7,fb);
+      if(fb>th && holes>0.5*residual*residual+0.02*residual){ bool fc=n.x>0.3 && n.y<0.85; col=fc?vec3(0.78,0.89,0.97):(fb<th+0.07||residual>0.6?vec3(0.87,0.95,0.99):vec3(0.995)); idv=0.75; }
       else if(fb>th-0.05) { col=mix(col,vec3(0.86,0.95,0.99),0.6); } }
     if(uBore.y>0.0 && onS>0.5){ float nzE=vn2(vec2(vQ.y*0.45,uTime*0.22+vQ.x*0.08))*0.65+vn2(vec2(vQ.y*1.6+5.0,uTime*0.45))*0.35;
       float wd=(0.05+0.2*uBore.y)*(0.3+1.4*nzE)*(0.6+0.8*min(1.0,f*2.0+0.3));
@@ -1319,7 +1359,11 @@ function lipUpdate(dt){
       if(LIP.xc[k]>LIP.xc[kk]+lim) LIP.xc[k]=LIP.xc[kk]+lim; else if(LIP.xc[k]<LIP.xc[kk]-lim) LIP.xc[k]=LIP.xc[kk]-lim;
       const lh=0.16*dx; if(LIP.hc[k]>LIP.hc[kk]+lh) LIP.hc[k]=LIP.hc[kk]+lh; else if(LIP.hc[k]<LIP.hc[kk]-lh) LIP.hc[k]=LIP.hc[kk]-lh;
       if(LIP.yc[k]>LIP.yc[kk]+lh) LIP.yc[k]=LIP.yc[kk]+lh; else if(LIP.yc[k]<LIP.yc[kk]-lh) LIP.yc[k]=LIP.yc[kk]-lh; } }
-  if(LIP.hit){ for(const k of LIP.hit) sprBurst(k); LIP.hit=null; }
+  if(LIP.hit){ for(const k of LIP.hit){ sprBurst(k);
+      /* 혀 끝이 앞 수면을 치는 순간 = 공기가 가장 많이 갇히는 곳 (plunging 충돌) → 그 자리 물에 거품을 크게 넣는다 */
+      if(W && W.foam){ const tp=lipTip(k), ii=Math.round(tp[0]/dx-0.5), kw=k%W.NZ, amt=0.9*(S.fTA===undefined?1:S.fTA);
+        for(let q=-1;q<=3;q++){ const i2=ii+q; if(i2<0||i2>=NX) continue; const jj=kw*NX+i2; W.foam[jj]=Math.min(1,W.foam[jj]+amt*(1-Math.abs(q-1)*0.2)); } } }
+    LIP.hit=null; }
   LIP.dirty=true;
 }
 /* 배럴: 혀가 말리는 줄에서 파도 앞면을 오목하게 세운다 — 아래는 앞으로 둥글게 퍼지고(¼ 원), 위는 곧게 선 벽.
@@ -1539,12 +1583,16 @@ function jfUpdate(dt){
       const ramp=Math.min(1,(ph-0.8)/0.25); let nn=34*cov*ramp*dt; while(nn>0){ if(Math.random()<nn){ const r=Math.min(RZ-1,Math.max(0,2*k+((Math.random()*3)|0)-1));
           const ub=A.ubr[r], ul=A.ulr[r], ui=A.uir[r]; if(ui>ub){ const uu=ub+(ul-ub)*0.35+Math.random()*(ui-(ub+(ul-ub)*0.35)), P=jfMeshU(r,uu,0.25);
             if(P){ jfAdd({x:P[0],y:P[1],z:P[2],st:3,rr:r,cu:uu,cl:1.15}); } } } nn-=1; } }
-    /* 말림 없이 부서지는 앞머리(모래톱 너머·백사장 앞)에서도 마루 꼭대기에 */
-    const step=2; for(let k=0;k<NZ;k+=step){ const r0=k*NX; let bi=-1, bm=0.5; for(let i=Math.floor(NX*0.08);i<NX-2;i++){ const v=brk[r0+i]; if(v>bm && h[r0+i]>0.25){ bm=v; bi=i; } }
-      if(bi<0 || (LIP.ph && LIP.ph[k]>0) || Math.random()>dt*5*S.jfN) continue;
-      let ic=bi, cr=-9; for(let q=Math.max(0,bi-6);q<=Math.min(NX-1,bi+2);q++){ if(sm[r0+q]>cr){ cr=sm[r0+q]; ic=q; } }
-      const cw=Math.sqrt(g*Math.max(0.2,h[r0+ic]));
-      for(let q=0;q<2;q++) jfAdd({x:(ic+0.5+Math.random())*dx, y:cr+0.1, z:(k+Math.random()*step)*dx, vx:cw*0.9, st:2}); }
+    /* 물 계산에서 나온 거품 생성량으로 젤리 거품을 만든다 (Ihmsen 2012): 생성량 = 운동에너지 × (마루 넘어짐 + 공기 갇힘).
+       마루가 넘어지며 위로 솟는 곳은 일부가 물보라(포물선으로 날아감)가 되고, 나머지는 수면 거품(물 흐름을 따라감) */
+    if(W && W.genWC){ const GW=W.genWC, GT=W.genTA, NZw=W.NZ, U0=W.u, k0=(JF.gk=((JF.gk||0)+1)%2);
+      for(let k=k0;k<NZ;k+=2){ if(LIP.ph && LIP.ph[k]>0) continue;   /* 말리는 줄은 혀 거품이 맡는다 */
+        const r0=k*NX, rw=(k%NZw)*NX;
+        for(let i=2;i<NX-2;i++){ const gw=GW[rw+i], gt=GT[rw+i], gs=gw+gt; if(gs<0.05) continue;
+          if(Math.random()>dt*gs*6*S.jfN*2) continue;
+          const j=r0+i, uc=0.5*(U[k*(NX+1)+i]+U[k*(NX+1)+i+1]), y=sm[j], spray=gw>gt && Math.random()<0.35*(S.jfUp===undefined?1:S.jfUp);
+          if(spray) jfAdd({x:(i+0.5)*dx, y:y+0.15, z:(k+Math.random()*2)*dx, vx:uc*1.1, vy:(1.2+2.2*Math.random())*Math.sqrt(Math.max(0.3,gw))*2, vz:(Math.random()-0.5)*0.8, st:1, cl:0.7});
+          else jfAdd({x:(i+0.5)*dx, y:y+0.1, z:(k+Math.random()*2)*dx, vx:uc, st:2, cl:0.6+0.6*Math.min(1,gs)}); } } }
     /* 먼바다 물마루 거품: 깊은 바다에서도 큰 너울 꼭대기가 솟으면 흰 거품이 살짝 생겼다가, 마루에서 뒤로 처지며 스르륵 사라진다.
        기준은 지금 바다에서 가장 높은 마루 대비 (큰 파도일수록 많이, 잔잔할 땐 거의 없음) */
     const wc=S.jfCap===undefined?0.6:S.jfCap;
