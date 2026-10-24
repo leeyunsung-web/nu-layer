@@ -1302,7 +1302,7 @@ function lipUpdate(dt){
          (마루를 쫓아가기만 하면 늘 뒤처졌다 따라잡기를 반복해 심장 뛰듯 툭툭 튄다). 마루를 잃거나 백사장에 닿아도 멈추지 않고 그 빠르기로 계속 간다 */
       const cw=Math.sqrt(g*Math.max(0.3,ic>=0?h[r0+ic]:D*0.5)), pred=LIP.xc[k]+LIP.vx[k]*dt;
       if(ic>=0 && b[r0+ic]>D*0.7) LIP.fon[k]=1;   /* 백사장에 닿으면 빨리(하지만 부드럽게) 무너짐으로 */
-      if(ic>=0 && cr-D>0.2 && !LIP.fon[k]){ let off=0; if(ic>0&&ic<NX-1){ const y0=EV(r0+ic-1), y2=EV(r0+ic+1), dd=y0-2*cr+y2; if(dd<-1e-4) off=Math.max(-0.5,Math.min(0.5,0.5*(y0-y2)/dd)); }
+      if(ic>=0 && cr-D>0.2){ let off=0; if(ic>0&&ic<NX-1){ const y0=EV(r0+ic-1), y2=EV(r0+ic+1), dd=y0-2*cr+y2; if(dd<-1e-4) off=Math.max(-0.5,Math.min(0.5,0.5*(y0-y2)/dd)); }
         const meas=(ic+0.5+off)*dx, er=meas-pred, al=Math.min(1,dt*3), be=Math.min(1,dt*1.2);
         const y0=ic>0?EV(r0+ic-1):cr, y2=ic<NX-1?EV(r0+ic+1):cr, pk=cr-0.25*(y0-y2)*off;   /* 칸 사이 진짜 마루 높이 (칸 가운데 값만 쓰면 톱니처럼 오르내린다) */
         const ay=Math.min(1,dt*2.5);
@@ -1386,7 +1386,7 @@ function surfWarp(){
     for(let k=0;k<NZ;k++){ const r0=k*NX; for(let i=0;i<NX;i++){ const j=r0+i, a=k>0?j-NX:j, c=k<NZ-1?j+NX:j; SB[j]=(h[j]<0.03||h[a]<0.03||h[c]<0.03)?ST[j]:0.25*ST[a]+0.5*ST[j]+0.25*ST[c]; } } }   /* 물가(마른 자리 옆)는 섞지 않아 물 끝 모양은 또렷하게 */
   const sm=SB;
   const A=G.wp&&G.wp.X.length===N?G.wp:(G.wp={X:new Float32Array(N),Y:new Float32Array(N),Z:new Float32Array(N),H:new Float32Array(N),K:new Float32Array(N),Q:new Float32Array(N),Bd:new Float32Array(N),
-    xa:new Float32Array(NZ),xb:new Float32Array(NZ),pcx:new Float32Array(NZ),pcy:new Float32Array(NZ),ubr:new Float32Array(RZ),ulr:new Float32Array(RZ),uir:new Float32Array(RZ),xc:new Float32Array(NZ),xh:new Float32Array(NZ),yh:new Float32Array(NZ),yt:new Float32Array(NZ),hc:new Float32Array(NZ),ph:new Float32Array(NZ),w:new Float32Array(NZ)});
+    xa:new Float32Array(NZ),xb:new Float32Array(NZ),pcx:new Float32Array(NZ),pcy:new Float32Array(NZ),gxc:new Float32Array(NZ),gyt:new Float32Array(NZ),ghs:new Float32Array(NZ),gge:new Float32Array(NZ),ubr:new Float32Array(RZ),ulr:new Float32Array(RZ),uir:new Float32Array(RZ),xc:new Float32Array(NZ),xh:new Float32Array(NZ),yh:new Float32Array(NZ),yt:new Float32Array(NZ),hc:new Float32Array(NZ),ph:new Float32Array(NZ),w:new Float32Array(NZ)});
   const zOf=k=>k<=0?0:k>=NZ-1?Wd:(k+0.5)*dx;
   /* 계산 격자에서 (줄 위치 kf, x) 의 높이·깊이·부서짐·바닥 — 옆 줄 사이도 부드럽게 */
   const smp=(kf,x)=>{ const f=Math.min(NX-1.0001,Math.max(0,x/dx-0.5)), i=f|0, t=f-i, k0=Math.min(NZ-2,Math.max(0,Math.floor(kf))), s2=Math.min(1,Math.max(0,kf-k0));
@@ -1394,7 +1394,7 @@ function surfWarp(){
   const put=(r,c,x,y,hh,kk,bd,z)=>{ const j=r*RX+c;
     if(bd<D-2.5){ const mn=bd+(D-bd)*0.3; if(y<mn){ y=mn; } if(hh<0.3) hh=0.3; }   /* 물이 빠져도 바닥이 드러날 만큼은 내려가지 않게 (원래 물에 잠긴 곳) */ A.X[j]=x; A.Y[j]=y; A.Z[j]=z; A.H[j]=hh; A.K[j]=kk; A.Q[j]=x; A.Bd[j]=bd; };
   const on=LIP.ph; let any=false; if(on) for(let k=0;k<NZ;k++) if(on[k]>0){ any=true; break; }
-  A.cA=0; A.NS=0;
+  A.cA=0; A.NS=0; if(A.gge) A.gge.fill(0);
   if(!any || !(S.barrel>0)){ G.cAf=null; for(let r=0;r<RZ;r++){ const kf=r*(NZ-1)/(RZ-1), k0=Math.min(NZ-2,Math.floor(kf)), z=zOf(k0)+(zOf(k0+1)-zOf(k0))*(kf-k0);
       for(let c=0;c<RX;c++){ const x=c*L/(RX-1), q=smp(kf,x); put(r,c,x,q[0],q[1],q[2],q[3],z); } } return A; }
   /* 줄마다 말림 값 */
@@ -1451,18 +1451,23 @@ function surfWarp(){
       const t=(u-UI)/(1-UI), e=t*t*(3-2*t), S0=toC([ex,yt]); return [lerp(S0[0],xb,t), lerp(S0[1],qb[0],e)]; };
     /* 그래프 모양: 윤성이 그린 점들을 지금 파도 크기·자리에 맞춰 세계 좌표로 */
     let GC=null, GI=null; const gOn=S.shapeOn===undefined?1:S.shapeOn;
-    if(gOn && w>0.001){ GI=G.shpI||(G.shpI=shpInfo()); const xs=H0, gE=gg*(1-e2);   /* 가로·세로를 같은 비율로 (그래프에서 그린 모양 그대로) */
-      const Wp=[[xa,qa[0]]].concat(GI.P.map((p,i)=>{ const wx=Math.min(Math.max(xc+p[0]*xs+lean*p[1],xa+0.02),xb-0.02), wy=i<=GI.iTop?Math.max(yt+p[1]*H0,smp(kf,wx)[0]):yt+p[1]*H0;   /* 마루 뒤쪽 점은 실제 물보다 낮아지지 않게 (뒤가 움푹 꺼지지 않게) */ const fx=xa+(xb-xa)*GI.fr[i], fy=smp(kf,fx)[0]; return [fx+(wx-fx)*gE, fy+(wy-fy)*gE]; }),[[xb,qb[0]]]);
+    if(gOn && w>0.001){ GI=G.shpI||(G.shpI=shpInfo()); const gE=gg*(1-e2);
+      /* 그래프 모양은 그린 그대로: 기울기·낮아짐·골 낮아짐 같은 자동 변형은 빼고, 크기(파도 높이)와 자리(마루)만 맞춘다. 가로·세로 같은 비율 */
+      const gxc=xc0+(Math.max(xc0,xh)-xc0)*e2, gyt=yt0, Hs=Math.max(0.3*hc, Math.min(hc, yh-yt0+0.05));
+      if(r%2===0){ A.gxc[r>>1]=gxc; A.gyt[r>>1]=gyt; A.ghs[r>>1]=Hs; A.gge[r>>1]=gE*w; }
+      const Wm=GI.P.map((p,i)=>{ const wx=Math.min(Math.max(gxc+p[0]*Hs,xa+0.02),xb-0.02), wy=i<=GI.iTop?Math.max(gyt+p[1]*Hs,smp(kf,wx)[0]):gyt+p[1]*Hs;   /* 마루 뒤쪽 점은 실제 물보다 낮아지지 않게 (뒤가 움푹 꺼지지 않게) */ const fx=xa+(xb-xa)*GI.fr[i], fy=smp(kf,fx)[0]; return [fx+(wx-fx)*gE, fy+(wy-fy)*gE]; });
+      /* 앞·뒤 끝은 곧은 선 대신 실제 물 표면을 따라 이어 붙인다 (앞쪽 물이 높아도 비스듬한 막대가 생기지 않게) */
+      const Wp=[]; { const x0=Wm[0][0]; for(let q=0;q<4;q++){ const xx=xa+(x0-xa)*q/4; Wp.push([xx,smp(kf,xx)[0]]); } } for(const q of Wm) Wp.push(q); { const x1=Wm[Wm.length-1][0], y1=Wm[Wm.length-1][1]; for(let q=1;q<=5;q++){ const xx=x1+(xb-x1)*q/5, wy=smp(kf,xx)[0], t=q/5; Wp.push([xx, y1+(wy-y1)*Math.min(1,t*1.6)]); } }
       GC=crPath(Wp,8);
       if(r%2===0){ const tp=crAt(GC,0); let bx=-1e9, by=0; for(const q of GC.out) if(q[0]>bx){ bx=q[0]; by=q[1]; } A.pcx[r>>1]=w>0.05?bx:0; A.pcy[r>>1]=by; }
       /* 거품이 붙는 자리(꼭대기·혀 끝·안쪽 끝)를 곡선 위 비율로 */
-      const uOf=ii=>{ for(let m=0;m<GC.idx.length;m++) if(GC.idx[m]>=ii+1) return GC.len[m]/GC.tot; return 1; };
+      const uOf=ii=>{ for(let m=0;m<GC.idx.length;m++) if(GC.idx[m]>=ii+4) return GC.len[m]/GC.tot; return 1; };
       A.ubr[r]=uOf(GI.iTop); A.ulr[r]=uOf(GI.iTip); A.uir[r]=uOf(GI.iIn); }
     for(let c=cA0+1;c<cB0;c++){ const u=(c-cA)/NS, xh=xa+(xb-xa)*u, q=smp(kf,xh);
       let x=xh, y=q[0], hh=q[1];
       if(GC){ const Pq=crAt(GC,u); x+=(Pq[0]-xh)*w; y+=(Pq[1]-y)*w; hh=Math.max(hh,0.6*w);
         /* 표시: 안으로 굽은 면 = 그늘, 꼭대기~혀 끝 = 하이라이트·얇은 물 비침 */
-        const pi=Pq[2]-1, ge=w*gg*(1-e2); let kk=q[2];
+        const pi=Pq[2]-4, ge=w*gg*(1-e2); let kk=q[2];
         if(ge>0.05){ if(pi>GI.iTip && pi<=GI.iIn+0.3){ const t2=(pi-GI.iTip)/Math.max(0.5,GI.iIn+0.3-GI.iTip); const sd=Math.min(1,2.0*Math.sin(Math.PI*Math.min(1,t2*1.05)))*ge*Math.min(1,(S.lipShade===undefined?1:S.lipShade)*1.5); if(sd>0.05) kk=-sd; }
           else if(pi>GI.iTop && pi<=GI.iTip){ const t3=(pi-GI.iTop)/Math.max(0.5,GI.iTip-GI.iTop); const hlA=(t3>0.06&&t3<0.3)?Math.sin(Math.PI*(t3-0.06)/0.24)*ge*(S.hiL===undefined?0.8:S.hiL):0;
             if(hlA>0.18) kk=-4-Math.min(1,hlA); else { const gl=Math.min(1,Math.max(0,(t3-0.45)/0.55))*ge*(S.thinG===undefined?0.8:S.thinG)*1.25; if(gl>0.1) kk=-2-Math.min(1,gl); } } }
@@ -1847,6 +1852,12 @@ function frame(now){
   const end=()=>{ if(drag>=0){ drag=-1; save(); } }; cv2.addEventListener("pointerup",end); cv2.addEventListener("pointercancel",end);
   $("shpReset").addEventListener("click",()=>{ S.lipShape=SHP_DEF.map(p=>p.slice()); G.shpI=null; save(); drawS(); });
   $("shpOn").addEventListener("click",()=>{ S.shapeOn=(S.shapeOn===undefined?1:S.shapeOn)?0:1; save(); syncOn(); });
+  /* 지금 화면의 실제 파도 옆모습을 그래프 위에 겹쳐 그린다 (보라 선) — 그린 모양과 바로 비교 */
+  function overlay(){ const A=G.wp, d=G.data; if(!A||!A.gge||!d||!A.NS||!WV) return; let k=-1, best=0.05; for(let q=0;q<A.gge.length;q++) if(A.gge[q]>best){ best=A.gge[q]; k=q; } if(k<0) return;
+    const RX=G.RX, r=2*k, hs=A.ghs[k]||1; g2.lineWidth=3; g2.strokeStyle="rgba(122,40,160,0.9)"; g2.beginPath(); let on=false;
+    for(let c=Math.max(0,Math.floor(A.cA)-20);c<Math.min(RX,Math.ceil(A.cA+A.NS)+20);c++){ const o=(r*RX+c)*10, X=(d[o]-A.gxc[k])/hs, Y=(d[o+1]-A.gyt[k])/hs; if(X<X0||X>X1) { on=false; continue; } const [a,b]=toS(X,Math.max(Y0,Math.min(Y1,Y))); on?g2.lineTo(a,b):g2.moveTo(a,b); on=true; }
+    g2.stroke(); g2.fillStyle="rgba(122,40,160,0.95)"; g2.font="15px sans-serif"; g2.textAlign="right"; g2.fillText("보라 선 = 지금 실제 파도 ("+Math.round(best*100)+"% 말림)",cv2.width-PAD,PAD+4); }
+  setInterval(()=>{ if(drag>=0 || !cv2.isConnected || cv2.offsetParent===null) return; drawS(); overlay(); },120);
   syncOn(); drawS(); }
 try{ build(); $("msg").hidden=true; requestAnimationFrame(frame); }
 catch(e){ $("msg").textContent="준비 중 문제: "+e.message; console.error(e); }
