@@ -275,8 +275,8 @@ function makeWave(P,seed){
   }
   /* 거품: 자기 속도를 가진 2D 그림. 물을 따라 흐르다가, 물이 뒤로 빠져도 앞으로 가던 힘으로 모래 위까지 미끄러져 스며들어 사라진다 */
   function foamStep(dtF){
-    const P=S.P, keep=Math.exp(-dtF/(0.8+7*P.flife)), keepS=Math.exp(-dtF/(0.3+5*(P.bsoak===undefined?0.3:P.bsoak))), cell=dtF/dx, eps=2e-3;
-    const bd=(P.bdist===undefined?0.5:P.bdist), bsp=(P.bspread===undefined?0.4:P.bspread), sandV=Math.exp(-dtF*(0.3+6*(1-bd)));   /* 백사장: 퍼지는 거리·폭·스며드는 시간 */
+    const P=S.P, R=Math.max(0.3,P.fReach===undefined?2:P.fReach), keep=Math.exp(-dtF/(0.8+7*P.flife)), keepS=Math.exp(-dtF/((0.3+5*(P.bsoak===undefined?0.3:P.bsoak))*R)), cell=dtF/dx, eps=2e-3;   /* R = 흰 거품이 백사장으로 퍼져 나가는 거리 배율 */
+    const bd=(P.bdist===undefined?0.5:P.bdist), bsp=(P.bspread===undefined?0.4:P.bspread), sandV=Math.exp(-dtF*(0.3+6*(1-bd))/R);   /* 백사장: 퍼지는 거리·폭·스며드는 시간 */
     for(let k=0;k<NZ;k++) for(let i=0;i<NX;i++){ const j=k*NX+i;
       const wetNow=h[j]>eps; let vx=fu[j], vz=fw[j];
       if(!wetNow && vx*vx+vz*vz<1e-6){ const a=i>0?j-1:j, c=i<NX-1?j+1:j, d=k>0?j-NX:(PER?j+(NZ-1)*NX:j), e=k<NZ-1?j+NX:(PER?j-(NZ-1)*NX:j); vx=0.25*(fu[a]+fu[c]+fu[d]+fu[e]); vz=0.25*(fw[a]+fw[c]+fw[d]+fw[e]); }
@@ -303,7 +303,7 @@ function makeWave(P,seed){
           if(back<0){ const vt=cl*(1+ka*back); ax=ax+(vt-ax)*att*0.6; }
           else if(top>0.3){ ax=ax+(cl-ax)*att*top*0.5; }
           else { f*=Math.pow(keep,1+3*back); } }   /* 뒤에 남은 거품은 처지며 옅어진다 */
-        if(b[j]>0) ax=Math.max(ax,(0.5+1.2*shallow)*ms);   /* 백사장 비탈 위 거품은 뒤로 가지 않고 늘 백사장 쪽으로 */
+        if(b[j]>0) ax=Math.max(ax,(0.5+1.2*shallow)*ms*Math.sqrt(R));   /* 백사장 비탈 위 거품은 뒤로 가지 않고 늘 백사장 쪽으로 */
         const thin=1-Math.min(1,Math.max(0,(h[j]-0.08)/0.4)), slow=1-Math.min(1,Math.max(0,(Math.hypot(ax,az)-0.3)/1.2));
         f=f*Math.pow(keep,1+3*thin*slow*slow);   /* 얇은 물 위에서는 거의 멈춘 끝에서만 스며든다 */
         const sw=(h[j]<0.5 && wx>0.6 && b[j]>D-1.5)?Math.min(1,(wx-0.6)*0.5):0;   /* 백사장으로 밀려 올라가는 얇은 물도 거품을 만든다 */
@@ -427,6 +427,7 @@ const CTL=[
  ["secJF","거품 솟구침","jfUp",0,3,0.05,1,"배","파도가 칠 때 거품이 위로 치솟는 힘과, 달리는 앞머리에서 튀어 오르는 횟수.",0],
  ["secJF","거품 중력","jfG",0.2,3,0.05,1,"배","공중에 뜬 거품·물방울이 떨어지는 빠르기. 낮추면 오래 떠 있다가 천천히 내려앉습니다.",0],
  ["secJF","백사장 미끄러지는 거리","jfSlide",0,1,0.05,0.85,"%","물 끝을 넘어 모래 위로 거품이 미끄러져 나가는 거리. 높일수록 멀리 주욱.",0],
+ ["secJF","흰 거품 퍼지는 거리","fReach",0.5,3,0.05,2,"배","파도가 백사장에 닿아 흰 거품이 되어 모래 위로 퍼져 나가는 거리 (그려진 거품·젤리 거품 모두). 클수록 멀리, 오래 미끄러집니다.",0],
  ["secJF","물결 라인","jfLine",0,1,0.05,0.6,"%","백사장에서 밀려 올라온 물의 맨 앞에 거품이 모여 구불구불한 띠를 그리는 정도. 높일수록 가늘고 또렷한 선, 낮추면 넓게 흩어진 거품.",0],
  ["secJF","해변에서 퍼짐","jfSpr",0,1,0.05,0.7,"%","얕은 물·백사장에 올라가면 덩어리가 풀려 넓게 퍼지는 정도.",0],
  ["secJF","사라지는 시간","jfLife",0,1,0.05,0.5,"%","물 위에 남아 있는 시간. 물이 빠진 모래 위에서는 이보다 빨리 스며듭니다.",0],
@@ -498,7 +499,7 @@ const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(_){} }
 const fmt=(c,v)=>{ const d=c[5]<0.1?2:c[5]<1?1:0; return (+v).toFixed(d)+(c[7]?(c[7]==="%"?"":" ")+c[7]:""); };
 const inputs={}; let rebuildT=0;
 /* 간결한 메뉴: 지금 보이는 손잡이 (나머지는 숨긴 칸에서 지금 값 그대로) */
-const SHOW={amp:"nWave",per:"nWave",irr:"nWave",lat:"nWave",spd:"nWave", bar:"nCurl",barAng:"nCurl",barrel:"nCurl",lipLen:"nCurl",lipCurl:"nCurl",lipTh:"nCurl",lipT:"nCurl",lipC:"nCurl",lipMelt:"nCurl",lipDrop:"nCurl",lipLean:"nCurl",lipDip:"nCurl",lipShade:"nCurl",peel:"nCurl", jfN:"nSpr",jfJel:"nSpr",jfWob:"nSpr",jfR:"nSpr",jfVar:"nSpr",jfCover:"nSpr",jfLipF:"nSpr",bore:"nSpr",edgeL:"nSpr",bwStr:"nSpr",sandF:"nSpr",jfMerge:"nSpr",jfShd:"nSpr",jfShO:"nSpr",jfCap:"nSpr",jfUp:"nSpr",jfG:"nSpr",jfSpr:"nSpr",jfSlide:"nSpr",jfLine:"nSpr",jfLife:"nSpr", sea:"nLook",endless:"nLook",wsmooth:"nLook",faceSh:"nLook",thinG:"nLook",hiL:"nLook",hiC:"nLook",chop:"nLook",tiles:"nLook",wpat:"nLook",wpflow:"nLook",wpsz:"nLook",deco:"nLook", level:"nTank",beach:"nTank",hidez:"nTank",swash:"nTank",bwash:"nTank",btr:"nTank",wetK:"nTank",wdry:"nTank",btd:"nTank"};
+const SHOW={amp:"nWave",per:"nWave",irr:"nWave",lat:"nWave",spd:"nWave", bar:"nCurl",barAng:"nCurl",barrel:"nCurl",lipLen:"nCurl",lipCurl:"nCurl",lipTh:"nCurl",lipT:"nCurl",lipC:"nCurl",lipMelt:"nCurl",lipDrop:"nCurl",lipLean:"nCurl",lipDip:"nCurl",lipShade:"nCurl",peel:"nCurl", jfN:"nSpr",jfJel:"nSpr",jfWob:"nSpr",jfR:"nSpr",jfVar:"nSpr",jfCover:"nSpr",jfLipF:"nSpr",bore:"nSpr",edgeL:"nSpr",bwStr:"nSpr",sandF:"nSpr",jfMerge:"nSpr",jfShd:"nSpr",jfShO:"nSpr",jfCap:"nSpr",jfUp:"nSpr",jfG:"nSpr",jfSpr:"nSpr",jfSlide:"nSpr",fReach:"nSpr",jfLine:"nSpr",jfLife:"nSpr", sea:"nLook",endless:"nLook",wsmooth:"nLook",faceSh:"nLook",thinG:"nLook",hiL:"nLook",hiC:"nLook",chop:"nLook",tiles:"nLook",wpat:"nLook",wpflow:"nLook",wpsz:"nLook",deco:"nLook", level:"nTank",beach:"nTank",hidez:"nTank",swash:"nTank",bwash:"nTank",btr:"nTank",wetK:"nTank",wdry:"nTank",btd:"nTank"};
 const ORDER=Object.keys(SHOW); CTL.sort((a,b)=>(ORDER.indexOf(a[2])+1||999)-(ORDER.indexOf(b[2])+1||999));
 for(const c of CTL){ const box=$(SHOW[c[2]]||c[0]); const d=document.createElement("div"); d.className="ctl";
   d.innerHTML=`<label for="k_${c[2]}">${c[1]}</label><input id="k_${c[2]}" type="range" min="${c[3]}" max="${c[4]}" step="${c[5]}"><output></output>`+(c[8]?`<div class="desc">${c[8]}</div>`:"");
@@ -1645,7 +1646,7 @@ function jfUpdate(dt){
     const j=cell(X[i],Z[i]), i0=j%NX, k0=(j/NX)|0, hh=h[j];
     const uw=0.5*(U[k0*(NX+1)+i0]+U[k0*(NX+1)+i0+1]), ww=0.5*(Wv[k0*NX+i0]+Wv[Math.min(NZ,k0+1)*NX+i0]);
     const cw=Math.sqrt(g*Math.max(0.15,hh)), front=Math.min(1,brk[j]*2.5);
-    const dec=0.12+3.2*(1-slideB);   /* 물 끝을 넘어 모래 위로 미끄러지는 거리: 작을수록 금방 멈춘다 */
+    const dec=(0.12+3.2*(1-slideB))/Math.max(0.3,S.fReach===undefined?2:S.fReach);   /* 물 끝을 넘어 모래 위로 미끄러지는 거리: 작을수록 금방 멈춘다 */
     const onBeach=b[j]>D-1.2, uwb=onBeach&&uw<0?uw*(0.6-0.5*slideB):uw;   /* 백사장에서는 빠지는 물에 덜 끌려가 위쪽에 남는다 */
     let tx=hh>0.03?Math.max(uwb, front*cw*0.97+(1-front)*uwb):VX[i]*Math.exp(-dt*dec), tz=hh>0.03?ww:VZ[i]*Math.exp(-dt*dec);
     /* 물결 라인: 백사장에서는 밀려 올라온 물의 맨 앞에 거품이 모여 붙어, 물 끝 모양 그대로 구불구불한 띠를 그리며 함께 미끄러진다 */
