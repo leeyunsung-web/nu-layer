@@ -1503,7 +1503,7 @@ function surfWarp(){
       if(r%2===0){ A.gxc[r>>1]=gxc; A.gyt[r>>1]=gyt; A.ghs[r>>1]=Hs; A.gge[r>>1]=gE*w; }
       const SC=(S.simLip===undefined?1:S.simLip)&&SIMCLIP?clipAt(Math.max(0,P(on))):null;
       if(SC){ /* 계산된 혀(더 나은 버전): 마루에서 앞으로 던져진 물이 중력으로 떨어지는 포물선 물줄기 — 크기는 '혀 크기', 때(말리기 시작·수면 치기)는 물 알갱이 계산 녹화에서 */
-        const gy0=D+0.0, Hc=Hs, cyc=(W&&W.cyc)||0, vz=(a,b)=>0.5+0.5*Math.sin(kf*a+cyc*b)*Math.cos(kf*a*0.41-cyc*b*0.7), vk=S.lipVar===undefined?1:S.lipVar, J=jetAt(Math.max(0,P(on))*(1+vk*0.12*(vz(0.17,5.3)-0.5)), (S.simScale===undefined?2.4:S.simScale)*(1+vk*0.5*(vz(0.31,2.1)-0.5)), (S.splUp===undefined?1:S.splUp)*Math.max(0,1+vk*1.2*(vz(0.23,3.7)-0.5)))   /* 줄마다 혀 크기·박자·두 번째 혀가 조금씩 다르게 (같은 장면 반복 느낌 없애기) */, SC=J.P;
+        const gy0=D+0.0, bz=gy0+(G.wab&&G.wab.length===RZ?G.wab[r]:0), Hc=Math.max(0.3*hc,Math.min(1.3*hc,yh-bz)), cyc=(W&&W.cyc)||0, vz=(a,b)=>0.5+0.5*Math.sin(kf*a+cyc*b)*Math.cos(kf*a*0.41-cyc*b*0.7), vk=S.lipVar===undefined?1:S.lipVar, J=jetAt(Math.max(0,P(on))*(1+vk*0.12*(vz(0.17,5.3)-0.5)), (S.simScale===undefined?2.4:S.simScale)*(1+vk*0.5*(vz(0.31,2.1)-0.5)), (S.splUp===undefined?1:S.splUp)*Math.max(0,1+vk*1.2*(vz(0.23,3.7)-0.5)))   /* 줄마다 혀 크기·박자·두 번째 혀가 조금씩 다르게 (같은 장면 반복 느낌 없애기) */, SC=J.P;
         GI={P:SC,iTip:J.iT,iTop:J.iP,iIn:J.iI,fr:SC.map((q,i)=>i/(SC.length-1))};
         const wl=Math.max(0,1-Math.max(0,P(on)-1.5)/0.2), gE2=w>0?Math.min(1,P(on)/0.1)*wl:0;
         GI.P=SC.map(q=>[ (q[0]*Hc), (q[1]*Hc) ]); { let xe=SC[GI.iTip][0]; for(let i=GI.iIn;i<SC.length;i++) if(SC[i][1]>0.03) xe=Math.max(xe,SC[i][0]); GI.xEnd=gxc+(xe+0.15)*Hc; GI.hs=Math.max(0.3,Hc); } GI.raw=true; GI.gE=gE2; { const wa=smp(kf,Math.min(xb-0.1,GI.xEnd+0.6*Hc))[0]; G.wab=G.wab||new Float32Array(RZ); const tgt=Math.min(0.6*Hc,Math.max(0,wa-gy0)); G.wab[r]+= (tgt-G.wab[r])*0.15; GI.base=gy0+G.wab[r]; }   /* 혀가 떨어지는 앞쪽 물이 높으면(앞 파도의 흰 물) 그 위에 떨어지게 */ }
@@ -1520,8 +1520,9 @@ function surfWarp(){
       let x=xh, y=q[0], hh=q[1];
       if(GC){ const Pq=crAt(GC,u); x+=(Pq[0]-xh)*w; y+=(Pq[1]-y)*w; hh=Math.max(hh,0.6*w);
         /* 표시: 안으로 굽은 면 = 그늘, 꼭대기~혀 끝 = 하이라이트·얇은 물 비침 */
-        const pi=Pq[2]-4, ge=w*gg*(1-e2); let kk=q[2];
-        if(ge>0.05){ if(pi>GI.iTip && pi<=GI.iIn+0.3){ const t2=(pi-GI.iTip)/Math.max(0.5,GI.iIn+0.3-GI.iTip); const sd=Math.min(1,2.0*Math.sin(Math.PI*Math.min(1,t2*1.05)))*ge*Math.min(1,(S.lipShade===undefined?1:S.lipShade)*1.5); if(sd>0.05) kk=-sd; }
+        const pi=Pq[2]-4, ge=GI.raw?w*GI.gE:w*gg*(1-e2); let kk=q[2];
+        if(ge>0.05 && GI.raw && pi>GI.iIn+0.3 && pi<=GI.iIn+12){ const tf=(pi-GI.iIn)/12, sk=Math.min(1,(S.lipShade===undefined?1:S.lipShade)*1.2); const sd=ge*sk*(0.95-0.6*tf)*Math.min(1,(GI.P[GI.iTip][0]-GI.P[GI.iIn][0])/(0.25*GI.hs)+0.25); kk=-Math.max(0.14,sd); }   /* 터널 속 뒷벽(혀 아래 앞면): 앞에서 보이는 둥근 그늘 — 혀가 덮을수록 짙게 */
+        else if(ge>0.05){ if(pi>GI.iTip && pi<=GI.iIn+0.3){ const t2=(pi-GI.iTip)/Math.max(0.5,GI.iIn+0.3-GI.iTip); const sd=Math.min(1,2.0*Math.sin(Math.PI*Math.min(1,t2*1.05)))*ge*Math.min(1,(S.lipShade===undefined?1:S.lipShade)*1.5); if(sd>0.05) kk=-sd; else if(GI.raw) kk=-0.14; }   /* 혀 안쪽 면은 부서짐 흰색으로 칠하지 않는다 */
           else if(pi>GI.iTop && pi<=GI.iTip){ const t3=(pi-GI.iTop)/Math.max(0.5,GI.iTip-GI.iTop); const hlA=(t3>0.06&&t3<0.3)?Math.sin(Math.PI*(t3-0.06)/0.24)*ge*(S.hiL===undefined?0.8:S.hiL):0;
             if(hlA>0.18) kk=-4-Math.min(1,hlA); else { const gl=Math.min(1,Math.max(0,(t3-0.45)/0.55))*ge*(S.thinG===undefined?0.8:S.thinG)*1.25; if(gl>0.1) kk=-2-Math.min(1,gl); } } }
         put(r,c,x,y,hh,kk,smp(kf,Math.min(Math.max(x,0),L))[3],z); continue; }
