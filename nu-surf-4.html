@@ -218,7 +218,7 @@ function hz(e,j,d,t){ const z=j*dz, a=t-e.t0;   /* 높낮이 무늬가 시간에
   const m=e.v1*(1+0.35*Math.sin(a*e.b1+e.sd))*Math.sin(z*e.k1+e.sd+e.w1*a)+e.v2*(1+0.4*Math.sin(a*e.b2+e.sd*1.3))*Math.sin(z*e.k2+e.sd*2.3+e.w2*a)+e.v3*Math.sin(z*e.k3+e.sd*0.7+e.w3*a);
   return e.fade*e.H0*Math.max(0.3,1+m)*Math.min(1.8,Math.pow(DMAX/Math.max(d,0.4),0.25)); }
 function spawn(t){ const rnd=Math.random, big=lull<=1?1.15:1, H0=(1.5+2.0*Math.pow(rnd(),1.4))*big*S.size, ang=(rnd()-0.5)*0.9*S.angle;   /* 파도마다 높이·기울기·휘어짐이 제각각 */
-  const e={t0:t,fade:0,H0,ang,v1:0.22+0.25*rnd(),v2:0.1+0.15*rnd(),v3:0.05+0.08*rnd(),kx:S.kx*(0.75+0.5*rnd()),kv:0.15+0.2*rnd(),kk:0.05+0.12*rnd(),kw:(rnd()-0.5)*0.8,ct:0.7+0.6*rnd(),br:0.7+0.16*rnd(),k1:0.04+0.08*rnd(),k2:0.13+0.2*rnd(),k3:0.35+0.3*rnd(),w1:(rnd()-0.5)*1.2,w2:(rnd()-0.5)*1.8,w3:(rnd()-0.5)*2.4,b1:0.2+0.3*rnd(),b2:0.3+0.4*rnd(),bend:(rnd()-0.5)*14,kb:0.03+0.06*rnd(),pb:rnd()*6.3,sd:Math.random()*100,x:new Float32Array(NR),qq:new Float32Array(NR),kq:new Float32Array(NR).fill(1),tb:new Float32Array(NR),Hb:new Float32Array(NR),xf:new Float32Array(NR),ts:new Float32Array(NR),Hs:new Float32Array(NR),ph:new Float32Array(NR),st:new Uint8Array(NR)};
+  const e={t0:t,fade:0,H0,ang,v1:0.22+0.25*rnd(),v2:0.1+0.15*rnd(),v3:0.05+0.08*rnd(),kx:S.kx*(0.75+0.5*rnd()),kv:0.15+0.2*rnd(),kk:0.05+0.12*rnd(),kw:(rnd()-0.5)*0.8,ct:0.7+0.6*rnd(),br:0.7+0.16*rnd(),k1:0.04+0.08*rnd(),k2:0.13+0.2*rnd(),k3:0.35+0.3*rnd(),w1:(rnd()-0.5)*1.2,w2:(rnd()-0.5)*1.8,w3:(rnd()-0.5)*2.4,b1:0.2+0.3*rnd(),b2:0.3+0.4*rnd(),bend:(rnd()-0.5)*14,kb:0.03+0.06*rnd(),pb:rnd()*6.3,sd:Math.random()*100,x:new Float32Array(NR),qq:new Float32Array(NR),tpx:new Float32Array(NR),tpy:new Float32Array(NR),kq:new Float32Array(NR).fill(1),tb:new Float32Array(NR),Hb:new Float32Array(NR),xf:new Float32Array(NR),ts:new Float32Array(NR),Hs:new Float32Array(NR),ph:new Float32Array(NR),st:new Uint8Array(NR)};
   for(let j=0;j<NR;j++){ const z=j*dz; e.x[j]=-330+Math.tan(ang)*(z-ZW/2)+e.bend*Math.sin(z*e.kb+e.pb); }
   EVS.push(e);
   /* 간격: 몇 개씩 묶여 오다(세트) 한동안 잠잠 */
@@ -254,7 +254,8 @@ function stepEvents(t,dt){ if(t>=nextT) spawn(t); const pv=Math.max(0.5,S.peelV|
     /* 4) 적용 + 다음 단계로 (모양이 이어지는 자리에서만 넘어간다) */
     for(let j=0;j<NR;j++){ const z=j*dz; let st=e.st[j]; const pp=e.ph[j], ph=TMP2[j]; e.ph[j]=ph;
       if(st===0&&ph>=0.496){ st=1; e.tb[j]=t; }
-      if(st===1){ const kx=kxRow(e,j,t); if(pp<1.24&&ph>=1.24){ const xi=e.x[j]+ENG.jet(1.24,kx).XL*e.Hb[j]; if(!(j%2)) splashAt(xi, z, e.Hb[j]); foamBurst(e,j,xi,e.Hb[j]); }
+      if(st===1){ const kx=kxRow(e,j,t); if(ph>0.8&&ph<1.3){ const J=ENG.jet(ph,kx,S.spl2), P=J.P[J.iT]; e.tpx[j]=e.x[j]+P[0]*e.Hb[j]; e.tpy[j]=P[1]*e.Hb[j]; }   /* 혀 끝 자리 (거품이 붙어 다님) */
+        if(pp<1.24&&ph>=1.24){ const xi=e.x[j]+ENG.jet(1.24,kx).XL*e.Hb[j]; if(!(j%2)) splashAt(xi, z, e.Hb[j]); foamBurst(e,j,xi,e.Hb[j]); }
         e.xf[j]=e.x[j]+Math.max(0.4,0.5*kx)*e.Hb[j]; e.Hs[j]=0.55*e.Hb[j]; if(ph>=1.7) st=2; }   /* 흰 물 앞자리·높이를 미리 이어 둔다 (넘어갈 때 툭 바뀌지 않게) */
       else if(st===2){ const d=ENG.depth(e.xf[j],z); e.Hs[j]*=Math.exp(-dt/(12+4*Math.sin(z*0.21+e.sd))); e.xf[j]+=Math.sqrt(G*(Math.max(d,0.15)+e.Hs[j]))*0.7*(1+0.1*Math.sin(z*0.27+e.sd+0.2*t))*dt; if(e.xf[j]>=ENG.shore(z)){ st=3; e.ts[j]=t; } }
       else if(st===3){ if((t-e.ts[j])>14) st=4; }   /* (보통은 물이 다 빠지면 끝난다 — swashRows) */
@@ -362,13 +363,15 @@ function drawSplash(VP,eye){ const A=SPL.a; let n=0;
    혀가 수면을 칠 때·흰 물 앞에서 생겨 파도와 같은 빠르기로 앞으로 달린다 (뒤로 가지 않음). 조금씩 뒤처지고, 많이 처진 것은 작아지며 사라진다.
    해변에 닿으면 팍 퍼졌다가 스르륵 줄어 없어진다. 그릴 때는 덩어리마다 둥근 '농도'를 겹쳐 그려, 가까우면 서로 이어지고 멀면 떨어진다 (테두리는 그림처럼 파란 선). */
 const FO=[], FMAX=MOB?900:2200;
-function foamSpawn(e,j,x,r){ if(FO.length>=FMAX||!(r>0)) return; FO.push({e,j,x,z:Math.min(ZW,Math.max(0,j*dz+(Math.random()-0.5)*dz*1.8)),y:0,r0:r,r:r*0.3,lag:Math.max(0,e.xf[j]-x),fade:1,mode:0,vz:(Math.random()-0.5)*0.6,ks:0.35+0.65*Math.random(),sp:0,hx:(Math.random()-0.5)*0.5,hy:(Math.random()-0.5)*0.4,hr:Math.random()<0.55?0.11+0.11*Math.random():0}); }   /* 절반쯤은 안에 작은 구멍 (모양·자리 제각각) */
+function foamSpawn(e,j,x,r){ if(FO.length>=FMAX||!(r>0)) return null; const o=({e,j,x,z:Math.min(ZW,Math.max(0,j*dz+(Math.random()-0.5)*dz*1.8)),y:0,r0:r,r:r*0.3,lag:Math.max(0,e.xf[j]-x),fade:1,mode:0,vz:(Math.random()-0.5)*0.6,ks:0.35+0.65*Math.random(),sp:0,hx:(Math.random()-0.5)*0.5,hy:(Math.random()-0.5)*0.4,hr:Math.random()<0.55?0.11+0.11*Math.random():0}); FO.push(o); return o; }   /* 절반쯤은 안에 작은 구멍 (모양·자리 제각각) */
 function foamBurst(e,j,x,Hb){ if(!(S.foamK>0)) return; let n=(1.5+2*Math.random())*S.foamK*(MOB?0.6:1); while(n>0){ if(Math.random()<n) foamSpawn(e,j,x-Math.random()*0.5*Hb, Hb*S.foamSz*(0.13+0.22*Math.pow(Math.random(),1.6))); n-=1; } }
 function surfY(x,z){ if(!VPOS) return 0; const j=Math.min(NR-1,Math.max(0,Math.round(z/dz))), b=j*NC; let lo=0,hi=NC-1; while(lo<hi){ const m=(lo+hi)>>1; if(VPOS[(b+m)*3]<x) lo=m+1; else hi=m; } let y=-1e9; for(let i=Math.max(0,lo-4);i<=Math.min(NC-1,lo+4);i++){ const v=(b+i)*3; if(Math.abs(VPOS[v]-x)<0.5&&VPOS[v+1]>y) y=VPOS[v+1]; } return y>-1e8?y:VPOS[(b+lo)*3+1]; }
 function foamStep(dt){ if(dt<=0) return;
+  if(S.foamK>0) for(const e of EVS) for(let j=0;j<NR;j++){ if(e.st[j]!==1||e.ph[j]<0.9||e.ph[j]>1.22) continue; let n=S.foamK*(MOB?1.2:2.0)*Math.min(1.5,e.Hb[j]*0.6)*dt*sm((e.ph[j]-0.9)/0.12); while(n>0){ if(Math.random()<n){ const f=foamSpawn(e,j,e.tpx[j],e.Hb[j]*S.foamSz*(0.07+0.13*Math.pow(Math.random(),1.6))); if(f){ f.mode=2; f.ox=Math.random()*0.35*e.Hb[j]; f.oy=(Math.random()-0.3)*0.12*e.Hb[j]; f.z=j*dz+(Math.random()-0.5)*dz*1.2; } } n-=1; } }   /* 말리는 동안 혀 끝에 붙어 생기는 거품 */
   if(S.foamK>0) for(const e of EVS) for(let j=0;j<NR;j++){ if(e.st[j]!==2) continue; let n=S.foamK*(MOB?0.8:1.3)*Math.min(1.5,e.Hs[j]+0.2)*dt; while(n>0){ if(Math.random()<n) foamSpawn(e,j,e.xf[j]-Math.random()*0.5*e.Hb[j], e.Hb[j]*S.foamSz*(0.10+0.2*Math.pow(Math.random(),1.6))); n-=1; } }   /* 흰 물 앞에서 계속 생긴다 */
   for(let q=FO.length-1;q>=0;q--){ const f=FO[q], e=f.e, j=Math.min(NR-1,Math.max(0,Math.round(f.z/dz))), st=e.st[j], Hb=Math.max(0.3,e.Hb[j]);
     f.r+=(f.r0*(f.mode===1?1.3:1)-f.r)*Math.min(1,dt*(f.mode===1?2.5:4));   /* 생길 때 부풀고, 해변에서 퍼진다 (떨리지 않게 천천히) */
+    if(f.mode===2){ if(st===1&&e.ph[f.j]<1.24){ const jj=f.j; f.x=e.tpx[jj]-f.ox; f.y=ENG.swell(f.x,f.z,simT,S.swellK)+e.tpy[jj]+f.oy; continue; } f.mode=0; f.lag=Math.max(0,e.xf[f.j]-f.x); }   /* 혀 끝을 그대로 따라가다, 혀가 수면을 치면 흰 물과 함께 달린다 */
     if(f.mode===0){ if(st===1||st===2){ f.lag+=dt*(0.08+0.32*(1-f.ks))*Hb; const tx=e.xf[j]-f.lag; if(tx>f.x) f.x=tx; if(f.lag>2.4*Hb) f.fade-=dt*0.9; }
       else if(st>=3){ f.mode=1; } else f.fade-=dt*0.8; }
     if(f.mode===1){ f.sp+=dt; const tx=ENG.shore(f.z)+(e.sx?e.sx[j]:0)*f.ks*0.85; if(tx>f.x) f.x+=(tx-f.x)*Math.min(1,dt*2.5); f.z+=f.vz*dt; if(f.sp>0.5+1.1*f.ks) f.fade-=dt*1.0; }
