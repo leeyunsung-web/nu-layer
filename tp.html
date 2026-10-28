@@ -197,6 +197,9 @@
   /* 톤 갤러리 (모달) */
   .reg select.ovl{flex:none; width:auto; min-width:0; font-size:10px; padding:1px 2px; margin-left:4px;
     border:1px solid var(--line-2); border-radius:4px; background:var(--panel); color:var(--ink);}
+  .reg input.gapIn{flex:none; width:40px; min-width:0; font-size:10px; padding:1px 3px; margin-left:3px;
+    border:1px solid var(--line-2); border-radius:4px; background:var(--panel); color:var(--ink);}
+  .reg input.gapIn::placeholder{color:var(--ink-dim, #888); opacity:.8}
   .tchip{flex:none; background:var(--ink); border:1px solid var(--line-2); border-radius:4px;
     padding:2px 8px; font-size:10px; color:var(--cy); letter-spacing:.02em; white-space:nowrap}
   .tchip:hover{border-color:var(--cy)}
@@ -1740,11 +1743,16 @@ function regOverlap(reg){
   return S.overlap === 'over' ? 'thru' : 'over';
 }
 
-function overlapMasks(penPx, gapPx){
+// 이 영역이 파일 때 쓰는 틈(mm). 줄에서 정한 것이 있으면 그것, 없으면 전역 틈.
+function regGapMm(reg){
+  return (reg.gap !== undefined && reg.gap !== null && reg.gap !== '' && isFinite(reg.gap)) ? +reg.gap : (S.overlapGap || 0);
+}
+function overlapMasks(penPx, gapPx, pxPerMm){
   const W = S.iw, H = S.ih;
   const out = new Map();
   // 음수면 파고든다. 펜 절반을 빼고도 남는 만큼 위 영역 안으로 들어간다.
-  const grow = Math.round(penPx/2 + (gapPx || 0));
+  // 영역마다 제 틈을 쓸 수 있다 -- 넓게 벌릴 곳과 꼭 붙일 곳을 따로.
+  const growOf = reg => Math.round(penPx/2 + (pxPerMm ? regGapMm(reg) * pxPerMm : (gapPx || 0)));
   // 위에서부터 내려오며 '파내는' 영역들의 합집합을 쌓는다. 투명·독립은
   // 합집합에 넣지 않고, 독립은 합집합에 파이지도 않는다.
   const union = new Uint8Array(W*H);
@@ -1755,6 +1763,7 @@ function overlapMasks(penPx, gapPx){
     if(!reg.mask){ out.set(reg, { mask: reg.mask, blocked: null }); continue; }
     if(!anyAbove || mode === 'solo'){ out.set(reg, { mask: reg.mask, blocked: null }); }
     else {
+      const grow = growOf(reg);
       const blocked = grow > 0 ? dilateMask(union, W, H, grow)
                     : grow < 0 ? erodeMask(union, W, H, -grow)
                     : union.slice();
@@ -1948,7 +1957,7 @@ function generate(){
   const budget = { over:false };
   // 펜 굵기가 바뀌면 파내는 폭도 달라진다. 그래서 받을 때가 아니라 여기서 만든다.
   const effMasks = overlapMasks(S.pen.widthMm * docMetrics().pxPerMm,
-                                (S.overlapGap || 0) * docMetrics().pxPerMm);
+                                (S.overlapGap || 0) * docMetrics().pxPerMm, docMetrics().pxPerMm);
 
   for(const reg of S.regions){
     if(!reg.enabled) continue;
@@ -1969,7 +1978,7 @@ function generate(){
       reg.penMm,
       reg.burstReach,
       reg.lineTone, (reg.erasers || []).length,
-      S.overlap, S.overlapGap, S.svgGroup,
+      S.overlap, S.overlapGap, reg.gap, S.svgGroup,
       pen.widthMm, S.join, S.keepLines, S.thickFill, S.thickMode, S.thickEdge,
       S.paper, S.orient, S.margin, S.drawScale, S.iw, S.ih
     ].join('|');
@@ -3497,7 +3506,8 @@ function renderRegions(){
       + '<span class="pct">'+(r.share*100).toFixed(0)+'%</span>'
       + '<select class="ovl" title="이 영역의 겹침 · 자동 = 위의 겹침 메뉴를 따름 · 위 = 아래 영역을 파냄 · 투명 = 파내지 않고 겹쳐 그림 · 독립 = 파내지도 파이지도 않음">'
       +   '<option value="">자동</option><option value="over">위</option>'
-      +   '<option value="thru">투명</option><option value="solo">독립</option></select>';
+      +   '<option value="thru">투명</option><option value="solo">독립</option></select>'
+      + '<input class="gapIn" type="number" step="0.1" min="-2" max="5" placeholder="틈" title="이 영역의 틈(mm) · 비우면 위의 전역 틈을 따름 · 위 영역이 이 영역을 파낼 때 펜 가장자리에서 그만큼 더 벌림(양수) 또는 파고듦(음수)">';
     // 위치로 꺼내면 안 된다: 이름 span이 r.name이 있을 때만 끼어들어 인덱스가
     // 한 칸씩 밀린다. 레이어 연동·컴포지션에서는 항상 이름이 있으므로, 톤 칩
     // 핸들러가 이름 span에 붙어 클릭이 통째로 먹통이었다 -- 톤을 바꿀 수 없으니
@@ -3516,6 +3526,19 @@ function renderRegions(){
       e.stopPropagation();
       r.ovl = e.target.value || undefined;
       S.regions.forEach(g => { g._stamp = null; });   // 파내는 폭이 바뀐다
+      renderRegions(); refresh();
+    };
+    const gi = d.querySelector('input.gapIn');
+    gi.value = (r.gap !== undefined && r.gap !== null) ? r.gap : '';
+    if(!gi.value) gi.placeholder = '틈 ' + (S.overlapGap || 0);
+    gi.onclick = e => e.stopPropagation();
+    gi.onpointerdown = e => e.stopPropagation();
+    gi.onchange = e => {
+      e.stopPropagation();
+      const v = e.target.value.trim();
+      if(v === ''){ delete r.gap; }
+      else { r.gap = Math.max(-2, Math.min(5, parseFloat(v) || 0)); e.target.value = r.gap; }
+      r._stamp = null;
       renderRegions(); refresh();
     };
     tb.onclick = e => { e.stopPropagation(); openToneModal(i); };
@@ -4361,6 +4384,7 @@ $('overlap').onchange = e => {
 $('overlapGap').onchange = e => {
   S.overlapGap = Math.max(-2, Math.min(5, parseFloat(e.target.value) || 0));
   e.target.value = S.overlapGap;
+  if(typeof renderRegions === 'function') renderRegions();
   S.regions.forEach(r => { r._stamp = null; });
   refresh();
 };
@@ -4393,11 +4417,11 @@ function regKey(r){
 }
 // 설정 항목: 저장 목록에서 신원(hex·name)을 뺀 것. 영역별 겹침·선 두께 포함.
 const REG_SETTINGS = ['type','lineTone','dens','angle','dotMm','dotGrad','gradAng',
-                      'enabled','seed','penMm','burstReach','dotShape','invert','ovl'];
+                      'enabled','seed','penMm','burstReach','dotShape','invert','ovl','gap'];
 function copyRegSettings(from, to){
   for(const k of REG_SETTINGS){
     if(from[k] !== undefined) to[k] = from[k];
-    else if(k === 'ovl' || k === 'lineTone' || k === 'penMm') delete to[k];   // '정하지 않음'도 그대로
+    else if(k === 'ovl' || k === 'lineTone' || k === 'penMm' || k === 'gap') delete to[k];   // '정하지 않음'도 그대로
   }
   to._stamp = null;
 }
