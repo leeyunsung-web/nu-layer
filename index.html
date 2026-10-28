@@ -6536,7 +6536,16 @@ showLayerMenu(ev.clientX, ev.clientY, [
         if(a.type === 'stroke'){
           renderStrokeFull(target, scaledStroke(a, k));
         } else if(a.type === 'fill'){
-          if(a.poly){
+          // 다각형과 굳은 마스크가 다른 자리를 가리키면(옛 파일) 보이는 그림과 같은 마스크를 쓴다
+          let usePoly = !!a.poly;
+          if(usePoly && a._mb && (a.m || a._mask)){
+            let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+            for(const p of a.poly){ if(p[0] < x0) x0 = p[0]; if(p[0] > x1) x1 = p[0]; if(p[1] < y0) y0 = p[1]; if(p[1] > y1) y1 = p[1]; }
+            // _mb 도 다각형도 ox/oy 를 더하기 전의 좌표다 -- 그대로 비교한다
+            if(Math.abs(x0 - a._mb.mnX) > 3 || Math.abs(y0 - a._mb.mnY) > 3 ||
+               Math.abs(x1 - a._mb.mxX) > 3 || Math.abs(y1 - a._mb.mxY) > 3) usePoly = false;
+          }
+          if(usePoly){
             paintVectorFill(target, { ...a,
               poly: a.poly.map(p => [p[0]*k, p[1]*k]),
               holes: (a.holes || []).map(h => h.map(p => [p[0]*k, p[1]*k])),
@@ -15710,7 +15719,16 @@ showLayerMenu(ev.clientX, ev.clientY, [
             }
             if(a.m){ act.m = a.m; act.ox = (a.ox||0) + offX; act.oy = (a.oy||0) + offY;
                      if(a.mw){ act.mw = a.mw; act.mh = a.mh; } }
-            if(a.poly){ act.poly = a.poly; act.holes = a.holes || []; }
+            if(a.poly){
+              // 저장할 때 다각형에는 ox/oy 를 이미 더해 두었다 (플로터·SVG 용으로 절대 좌표).
+              // 그런데 그림을 내는 마스크의 ox/oy 를 이 액션에도 그대로 달아 두니, 다각형으로
+              // 그리는 길(확대 보기·정확한 보기)에서는 그 몫이 두 번 더해져 자리가 어긋났다.
+              // 다각형에서 그 몫을 빼서 '다각형 + ox' 가 마스크와 같은 자리가 되게 한다.
+              const pox = a.m ? (a.ox || 0) : 0, poy = a.m ? (a.oy || 0) : 0;
+              act.poly = a.poly.map(p => [p[0] - pox, p[1] - poy]);
+              act.holes = (a.holes || []).map(h => h.map(p => [p[0] - pox, p[1] - poy]));
+              if(!a.m){ act.ox = offX; act.oy = offY; }     // 마스크가 없으면 불러온 자리만큼만
+            }
             if(a.m){ act.frozen = true; }                 // 마스크가 그림을 낸다
             else if(!(a.sli && a.sli.length)) act.vfRepair = true;   // 옛 파일: 결과가 없다
             actions.push(act);
