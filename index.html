@@ -4621,7 +4621,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       results.push(userRole !== 'master'
         ? 'Overwriting the original is master-only — the archive original is unchanged.'
         : (ghConfig && ghConfig.token)
-          ? '원본의 아카이브 경로를 찾지 못해 새 파일로 저장했습니다 — 다음 저장부터는 이 파일에 덮어씁니다.'
+          ? '원본 파일을 찾지 못해 새 파일로 저장했습니다 (원본은 그대로) — 다음 저장부터는 이 파일에 덮어씁니다.'
           : 'No GitHub config, so the archive original is unchanged.');
     toast(results.join(' · '));
     updateFolderChip();
@@ -6912,6 +6912,17 @@ showLayerMenu(ev.clientX, ev.clientY, [
     if(/^MASK · /.test(l.name)) l.name = l.name.replace(/^MASK · /, '');
     toast('마스크를 풀었습니다 — 그린 것은 그대로, 잘림만 없어집니다.');
     renderLayersPanel(); compositeLayers();
+  }
+
+  // 등록·저장·라이브 연동이 쓰는 '그림 그 자체'. 화면(drawCanvas)은 정확한 보기에서는
+  // 흐린 밑그림 + 흰 막이 깔린 것이라 그걸 떠 가면 갤러리·컴포지션의 그림이 달라 보인다.
+  // 보기 방식과 상관없이 보이는 레이어들을 1080 그대로 합친다 (마스크도 적용).
+  function drawingSnapshot(){
+    const c = document.createElement('canvas');
+    c.width = drawCanvas.width; c.height = drawCanvas.height;
+    const g = c.getContext('2d');
+    for(const l of layers){ if(l.visible) drawLayerImage(g, l); }
+    return c;
   }
 
   function compositeLayers(){
@@ -15900,7 +15911,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
     hideTraceAfterRegister();
     toast(`Folder registered as OBJ-${String(objCounter).padStart(2,'0')} (${cropped.width}×${cropped.height})`);
     try {
-      await savePatternToFolder(cropped, obj.id, recipe);
+      const saved = await savePatternToFolder(cropped, obj.id, recipe);
+      if(saved){ obj.filename = saved.filename; obj.saveFolder = saved.dateFolder;
+                 if(saved.ghPath) obj.ghPath = saved.ghPath;
+                 loadedFilenames.add(saved.filename); }
     } catch (err) {
       console.error(err);
       toast('Save error: ' + (err.message || err));
@@ -15909,12 +15923,13 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
   async function registerNewObject(){
     if(replaying){ toast('Replaying — please wait.'); return; }
-    const bbox = getBBox(drawCanvas);
+    const snap = drawingSnapshot();
+    const bbox = getBBox(snap);
     if(!bbox){
       toast('Draw something on canvas first.');
       return;
     }
-    const cropped = cropCanvas(drawCanvas, bbox);
+    const cropped = cropCanvas(snap, bbox);
     const recipe = buildRecipeForBBox(bbox);
     const obj = addObject(cropped, recipe);
     hideTraceAfterRegister();
@@ -15989,9 +16004,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
       toast('The source sample was removed — use REGISTER OBJECT instead.');
       return;
     }
-    const bbox = getBBox(drawCanvas);
+    const snap = drawingSnapshot();
+    const bbox = getBBox(snap);
     if(!bbox){ toast('Canvas is empty — nothing to save.'); return; }
-    const cropped = cropCanvas(drawCanvas, bbox);
+    const cropped = cropCanvas(snap, bbox);
     const recipe = buildRecipeForBBox(bbox);
     hideTraceAfterRegister();
     target.canvas = cropped;
@@ -16010,6 +16026,19 @@ showLayerMenu(ev.clientX, ev.clientY, [
       if(!target.ghPath && target.filename){
         try { await resolveArchivePath(target); } catch(e){}
       }
+      // 알고 있는 경로에 파일이 아직 있는지 본다 -- 아카이브 매니저로 옮겼거나 폴더 이름을 바꿨으면
+      // 옛 자리에 새 파일이 생기고 원본은 그대로 남는다. 그럴 땐 이름으로 새 자리를 찾는다.
+      if(target.ghPath && ghConfig && ghConfig.token){
+        let st = null;
+        try { st = await ghStatFile(target.ghPath); } catch(e){ st = undefined; }   // undefined = 못 물어봄
+        if(st === null){
+          const old = target.ghPath;
+          target.ghPath = null;
+          if(!target.filename) target.filename = String(old).split('/').pop();
+          try { await getArchiveIndex(true); await resolveArchivePath(target); } catch(e){}
+          if(target.ghPath) toast('원본이 옮겨져 있어 새 자리에 덮어씁니다: ' + target.ghPath);
+        }
+      }
       // 아카이브에서 온 오브젝트는 폴더를 따로 모른다 -- 경로에서 읽는다.
       // 파일 이름도 경로의 것이 정확하다. 그래야 로컬 폴더에도 같은 자리에 쓴다.
       let fname = target.filename, folder = target.saveFolder;
@@ -16017,9 +16046,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
         const parts = String(target.ghPath).split('/');
         if(parts.length >= 2){ fname = fname || parts[parts.length - 1]; folder = folder || parts[parts.length - 2]; }
       }
-      const reuse = (fname || target.ghPath)
-        ? { filename: fname, dateFolder: folder, ghPath: target.ghPath }
-        : null;
+      const reuse = { filename: fname || undefined, dateFolder: folder || undefined, ghPath: target.ghPath || undefined };
       const saved = await savePatternToFolder(cropped, target.id, recipe, reuse);
       if(saved){
         if(saved.overwrote || !target.ghPath){
@@ -16788,9 +16815,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
   function syncLiveEdit(includeGallery){
     const obj = liveEditTarget;
     if(!obj) return;
-    const bbox = getBBox(drawCanvas);
+    const snap = drawingSnapshot();
+    const bbox = getBBox(snap);
     if(!bbox) return; // don't blank the object while the canvas is empty
-    const cropped = cropCanvas(drawCanvas, bbox);
+    const cropped = cropCanvas(snap, bbox);
     obj.canvas = cropped;
     obj.w = cropped.width;
     obj.h = cropped.height;
