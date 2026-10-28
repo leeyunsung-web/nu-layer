@@ -197,9 +197,7 @@
   /* 톤 갤러리 (모달) */
   .reg select.ovl{flex:none; width:auto; min-width:0; font-size:10px; padding:1px 2px; margin-left:4px;
     border:1px solid var(--line-2); border-radius:4px; background:var(--panel); color:var(--ink);}
-  .reg input.gapIn{flex:none; width:40px; min-width:0; font-size:10px; padding:1px 3px; margin-left:3px;
-    border:1px solid var(--line-2); border-radius:4px; background:var(--panel); color:var(--ink);}
-  .reg input.gapIn::placeholder{color:var(--ink-dim, #888); opacity:.8}
+
   .tchip{flex:none; background:var(--ink); border:1px solid var(--line-2); border-radius:4px;
     padding:2px 8px; font-size:10px; color:var(--cy); letter-spacing:.02em; white-space:nowrap}
   .tchip:hover{border-color:var(--cy)}
@@ -377,6 +375,12 @@
       <span class="unit">mm</span>
     </div>
     <div class="row">
+      <label class="lb" for="overlapGap">틈</label>
+      <input type="number" id="overlapGap" value="0" min="-2" max="5" step="0.1"
+        title="영역이 맞닿는 자리의 공통 틈. 0이면 펜의 가장자리가 딱 맞닿습니다. 양수는 그만큼 더 벌리고, 음수는 아래 영역이 위 영역 안으로 그만큼 파고듭니다 — 경계에 남는 실낱 같은 흰 줄을 덮을 때 씁니다. 톤 패널의 '틈'으로 영역마다 따로 정할 수 있고, 이 값을 움직이면 개별 틈은 모두 이 값으로 돌아갑니다">
+      <span class="unit">mm</span>
+    </div>
+    <div class="row">
       <label class="lb" for="ps">속도</label>
       <input id="ps" type="number" step="5" min="5" max="300" value="60">
       <span class="unit">mm/s</span>
@@ -426,6 +430,13 @@
         title="이 톤만의 선 두께(0.05~2.00mm). 펜 메뉴의 두께를 움직이면 모든 톤이 그 값으로 다시 맞춰집니다">
       <span class="val" id="regPenWVal"></span>
     </div>
+    <div class="row" id="regGapRow">
+      <label class="lb" for="regGap">틈</label>
+      <input id="regGap" type="range" min="-20" max="50" step="1" data-num-scale="0.1" data-num-unit="mm"
+        title="이 영역만의 틈(−2~5mm) — 위 영역이 이 영역을 파낼 때 펜 가장자리에서 그만큼 더 벌림(양수) 또는 파고듦(음수). 펜 메뉴의 틈을 움직이면 모든 영역이 그 값으로 다시 맞춰집니다">
+      <span class="val" id="regGapVal"></span>
+      <button id="regGapReset" class="ghost" style="padding:2px 6px; font-size:11px" title="이 영역의 틈을 지우고 펜 메뉴의 공통 틈을 따릅니다">전역</button>
+    </div>
     <div class="row" id="reachRow">
       <label class="lb" for="burstReach">중심 도달</label>
       <input id="burstReach" type="range" min="0" max="100" step="1">
@@ -458,9 +469,6 @@
         <option value="none">겹치지 않게</option>
         <option value="over">겹치게</option>
       </select>
-      <label class="lb" for="overlapGap" style="margin-left:6px">틈</label>
-      <input type="number" id="overlapGap" value="0" min="-2" max="5" step="0.1"
-        style="width:56px" title="0이면 펜의 가장자리가 딱 맞닿습니다. 양수는 그만큼 더 벌리고, 음수는 아래 영역이 위 영역 안으로 그만큼 파고듭니다 — 경계에 남는 실낱 같은 흰 줄을 덮을 때 씁니다">
     </div>
     <div class="row"><label class="chk"
       title="끄면 선은 펜 굵기 그대로 한 줄로 그어집니다 (기본). 켜면 펜보다 굵은 획을 여러 줄로 메워 원본 굵기를 흉내냅니다 — 그린 적 없는 형태가 생기고 펜 시간도 그만큼 늘어납니다">
@@ -3506,8 +3514,7 @@ function renderRegions(){
       + '<span class="pct">'+(r.share*100).toFixed(0)+'%</span>'
       + '<select class="ovl" title="이 영역의 겹침 · 자동 = 위의 겹침 메뉴를 따름 · 위 = 아래 영역을 파냄 · 투명 = 파내지 않고 겹쳐 그림 · 독립 = 파내지도 파이지도 않음">'
       +   '<option value="">자동</option><option value="over">위</option>'
-      +   '<option value="thru">투명</option><option value="solo">독립</option></select>'
-      + '<input class="gapIn" type="number" step="0.1" min="-2" max="5" placeholder="틈" title="이 영역의 틈(mm) · 비우면 위의 전역 틈을 따름 · 위 영역이 이 영역을 파낼 때 펜 가장자리에서 그만큼 더 벌림(양수) 또는 파고듦(음수)">';
+      +   '<option value="thru">투명</option><option value="solo">독립</option></select>';
     // 위치로 꺼내면 안 된다: 이름 span이 r.name이 있을 때만 끼어들어 인덱스가
     // 한 칸씩 밀린다. 레이어 연동·컴포지션에서는 항상 이름이 있으므로, 톤 칩
     // 핸들러가 이름 span에 붙어 클릭이 통째로 먹통이었다 -- 톤을 바꿀 수 없으니
@@ -3528,19 +3535,7 @@ function renderRegions(){
       S.regions.forEach(g => { g._stamp = null; });   // 파내는 폭이 바뀐다
       renderRegions(); refresh();
     };
-    const gi = d.querySelector('input.gapIn');
-    gi.value = (r.gap !== undefined && r.gap !== null) ? r.gap : '';
-    if(!gi.value) gi.placeholder = '틈 ' + (S.overlapGap || 0);
-    gi.onclick = e => e.stopPropagation();
-    gi.onpointerdown = e => e.stopPropagation();
-    gi.onchange = e => {
-      e.stopPropagation();
-      const v = e.target.value.trim();
-      if(v === ''){ delete r.gap; }
-      else { r.gap = Math.max(-2, Math.min(5, parseFloat(v) || 0)); e.target.value = r.gap; }
-      r._stamp = null;
-      renderRegions(); refresh();
-    };
+
     tb.onclick = e => { e.stopPropagation(); openToneModal(i); };
     cb.onchange = e => {
       r.enabled = e.target.checked;
@@ -3586,6 +3581,14 @@ function syncTone(){
     const w = r.penMm || S.pen.widthMm;
     $('regPenW').value = Math.round(w * 100);
     $('regPenWVal').textContent = w.toFixed(2) + 'mm' + (r.penMm ? '' : ' (전역)');
+  }
+  $('regGapRow').style.display = r ? '' : 'none';
+  if(r){
+    const own = (r.gap !== undefined && r.gap !== null && isFinite(r.gap));
+    const g = own ? +r.gap : (S.overlapGap || 0);
+    $('regGap').value = Math.round(g * 10);
+    $('regGapVal').textContent = (g >= 0 ? '+' : '') + g.toFixed(1) + 'mm' + (own ? '' : ' (전역)');
+    $('regGapReset').style.visibility = own ? '' : 'hidden';
   }
   // 굵은 선 관련 줄은 실제로 굵은 획이 있을 때만 띄운다. 없는데 띄우면
   // 만져도 아무 일이 안 일어나는 컨트롤이 되고, 그건 고장과 구별되지 않는다.
@@ -4074,6 +4077,19 @@ $('regPenW').oninput = e => {
   r._stamp = null;
   refresh();
 };
+$('regGap').oninput = e => {
+  const r = activeRegion(); if(!r) return;
+  r.gap = Math.max(-2, Math.min(5, (parseInt(e.target.value,10)||0) / 10));
+  $('regGapVal').textContent = (r.gap >= 0 ? '+' : '') + r.gap.toFixed(1) + 'mm';
+  $('regGapReset').style.visibility = '';
+  r._stamp = null;
+  refresh();
+};
+$('regGapReset').onclick = () => {
+  const r = activeRegion(); if(!r) return;
+  delete r.gap; r._stamp = null;
+  syncTone(); refresh();
+};
 $('burstReach').oninput = e => {
   const r = activeRegion(); if(!r) return;
   r.burstReach = +e.target.value;
@@ -4384,7 +4400,11 @@ $('overlap').onchange = e => {
 $('overlapGap').onchange = e => {
   S.overlapGap = Math.max(-2, Math.min(5, parseFloat(e.target.value) || 0));
   e.target.value = S.overlapGap;
-  if(typeof renderRegions === 'function') renderRegions();
+  // 공통 틈을 만지는 것은 '다시 균일하게'라는 뜻이다 (선 두께와 같은 규칙). 몇 개가 지워졌는지 알려 준다.
+  const had = S.regions.filter(r => r.gap !== undefined && r.gap !== null).length;
+  S.regions.forEach(r => { if(r.gap !== undefined){ delete r.gap; } });
+  if(had && $('penNote')) $('penNote').textContent = '개별 틈 ' + had + '개가 공통 틈(' + S.overlapGap.toFixed(1) + 'mm)으로 초기화되었습니다.';
+  if(typeof syncTone === 'function') syncTone();
   S.regions.forEach(r => { r._stamp = null; });
   refresh();
 };
