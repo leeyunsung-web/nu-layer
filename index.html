@@ -1317,6 +1317,11 @@
           <input type="range" id="vfAngle" min="10" max="90" value="60">
           <span class="val" id="vfAngleVal">60°</span>
         </div>
+        <div class="range-row" title="자동 닫기 — 찍은 자리가 닫혀 있지 않으면 허용 거리를 이만큼까지 단계적으로 키워 가며 틈을 이어 닫습니다. 끝점은 제 방향으로 연장해 만나는 자리에서 잇습니다. 0 = 끄기">
+          <span>AUTO</span>
+          <input type="range" id="vfAuto" min="0" max="200" step="5" value="80">
+          <span class="val" id="vfAutoVal">80</span>
+        </div>
         </div>
       </div>
       </div>
@@ -7392,6 +7397,21 @@ showLayerMenu(ev.clientX, ev.clientY, [
 
   // 이은 자리를 덧그림판에 보여 준다. 값을 돌릴 때 켜 두면 잘못 잇는 자리가
   // 바로 보인다 -- 숫자만 보고는 알 수 없다.
+  // 자동 닫기가 이은 자리를 1.2초 보여 준다 -- 어디를 알아서 이었는지 알아야 믿고 쓸 수 있다
+  let vfFlashTimer = 0;
+  function vfFlashBridges(bridges){
+    const oc = $('lassoOverlay'); if(!oc || !bridges || !bridges.length) return;
+    const c = oc.getContext('2d');
+    const z = viewZoom || 1;
+    c.save();
+    c.lineWidth = 2.5 / z; c.strokeStyle = '#1f7bff'; c.setLineDash([5/z, 4/z]);
+    for(const b of bridges){ c.beginPath(); c.moveTo(b.x0, b.y0); c.lineTo(b.x1, b.y1); c.stroke(); }
+    c.setLineDash([]); c.fillStyle = '#1f7bff';
+    for(const b of bridges){ c.beginPath(); c.arc(b.x1, b.y1, 3.5/z, 0, Math.PI*2); c.fill(); }
+    c.restore();
+    clearTimeout(vfFlashTimer);
+    vfFlashTimer = setTimeout(() => { if(typeof drawBridgeOverlay === 'function') drawBridgeOverlay(); }, 1200);
+  }
   function drawBridgeOverlay(){
     const oc = $('lassoOverlay');
     if(!oc) return;
@@ -7431,16 +7451,17 @@ showLayerMenu(ev.clientX, ev.clientY, [
   }
 
   {
-    const on = $('vfillOn'), ee = $('vfEndEnd'), eb = $('vfEndBody'), an = $('vfAngle'), sh = $('vfShow');
+    const on = $('vfillOn'), ee = $('vfEndEnd'), eb = $('vfEndBody'), an = $('vfAngle'), sh = $('vfShow'), au = $('vfAuto');
     try {
       const saved = JSON.parse(localStorage.getItem('nulayer_vfill') || 'null');
       if(saved){
         vectorFillOn = saved.on !== false;
-        vfOpts = { endEnd: saved.endEnd ?? 10, endBody: saved.endBody ?? 6, angle: saved.angle ?? 60 };
+        vfOpts = { endEnd: saved.endEnd ?? 10, endBody: saved.endBody ?? 6, angle: saved.angle ?? 60, autoMax: saved.autoMax ?? 80 };
         setPressed(on, vectorFillOn);
         if(ee){ ee.value = vfOpts.endEnd; $('vfEndEndVal').textContent = vfOpts.endEnd; }
         if(eb){ eb.value = vfOpts.endBody; $('vfEndBodyVal').textContent = vfOpts.endBody; }
         if(an){ an.value = vfOpts.angle; $('vfAngleVal').textContent = vfOpts.angle + '°'; }
+        if(au){ au.value = vfOpts.autoMax; $('vfAutoVal').textContent = vfOpts.autoMax; }
       }
     } catch(err){}
     const save = () => { try { localStorage.setItem('nulayer_vfill',
@@ -7451,14 +7472,15 @@ showLayerMenu(ev.clientX, ev.clientY, [
     });
     const upd = () => {
       vfOpts = { endEnd: parseInt(ee.value, 10) || 0, endBody: parseInt(eb.value, 10) || 0,
-                 angle: parseInt(an.value, 10) || 60 };
+                 angle: parseInt(an.value, 10) || 60, autoMax: au ? (parseInt(au.value, 10) || 0) : 80 };
       $('vfEndEndVal').textContent = vfOpts.endEnd;
       $('vfEndBodyVal').textContent = vfOpts.endBody;
       $('vfAngleVal').textContent = vfOpts.angle + '°';
+      if(au) $('vfAutoVal').textContent = vfOpts.autoMax;
       save();
       drawBridgeOverlay();
     };
-    if(ee && eb && an){ for(const el of [ee, eb, an]) el.addEventListener('input', upd); }
+    if(ee && eb && an){ for(const el of [ee, eb, an].concat(au ? [au] : [])) el.addEventListener('input', upd); }
     if(sh) sh.addEventListener('click', () => {
       setPressed(sh, !isPressed(sh));
       drawBridgeOverlay();
@@ -10997,10 +11019,80 @@ showLayerMenu(ev.clientX, ev.clientY, [
     }
     const bridges = [];
     vfLastBridges = bridges;                  // 화면에 보여 주려고 남긴다
+    // 끝의 진행 방향 (마지막 몇 점의 평균 -- 한 점만 보면 손떨림에 흔들린다)
+    for(const e of ends){
+      const a = strokes.find(q => q.id === e.sid); const p = a ? a.points : null;
+      let ux = e.x - e.ex, uy = e.y - e.ey;
+      if(p && p.length >= 4){
+        const head = (Math.abs(p[0].x - e.x) < VF_EPS && Math.abs(p[0].y - e.y) < VF_EPS);
+        const q = head ? p[Math.min(3, p.length - 1)] : p[Math.max(0, p.length - 4)];
+        const vx = e.x - q.x, vy = e.y - q.y;
+        if(Math.hypot(vx, vy) > 1){ ux = vx; uy = vy; }
+      }
+      const ul = Math.hypot(ux, uy) || 1; e.ux = ux / ul; e.uy = uy / ul;
+    }
+    // ---- 연장: 끝을 제 방향으로 뻗어 (가) 다른 끝의 연장과 만나거나 (나) 다른 선에 닿는 자리 ----
+    // 가까운 점으로 다리를 놓는 것보다, 두 선이 원래 만났을 자리에서 잇는 쪽이 모양이 자연스럽다.
+    const extTol = tol;
+    const extOf = new Map();                  // end → { x, y, t, segI, segT, partner }
+    const rayRay = (a, b) => {                // a.p + t*a.u = b.p + s*b.u
+      const den = a.ux * b.uy - a.uy * b.ux;
+      if(Math.abs(den) < 1e-6) return null;   // 나란하다
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const t = (dx * b.uy - dy * b.ux) / den, u = (dx * a.uy - dy * a.ux) / den;
+      if(t < VF_EPS || u < VF_EPS || t > extTol || u > extTol) return null;
+      return { t, u, x: a.x + a.ux * t, y: a.y + a.uy * t };
+    };
+    for(let i = 0; i < ends.length; i++){
+      for(let j = i + 1; j < ends.length; j++){
+        const A = ends[i], B = ends[j];
+        if(A.sid === B.sid && Math.hypot(A.x - B.x, A.y - B.y) < 2) continue;
+        const h = rayRay(A, B); if(!h) continue;
+        const cur = extOf.get(A), curB = extOf.get(B);
+        if((!cur || h.t < cur.t) && (!curB || h.u < curB.t)){
+          // 짝이 바뀌면 옛 짝은 풀어 준다 (한쪽만 허공을 가리키지 않게)
+          if(cur && cur.partner && extOf.get(cur.partner) && extOf.get(cur.partner).partner === A) extOf.delete(cur.partner);
+          if(curB && curB.partner && extOf.get(curB.partner) && extOf.get(curB.partner).partner === B) extOf.delete(curB.partner);
+          extOf.set(A, { x: h.x, y: h.y, t: h.t, partner: B });
+          extOf.set(B, { x: h.x, y: h.y, t: h.u, partner: A });
+        }
+      }
+    }
+    // (나) 선에 닿기 -- 광선이 지나는 칸들만 본다
+    for(const e of ends){
+      if(extOf.has(e)) continue;
+      let best = null;
+      const steps = Math.ceil(extTol / cell) + 1, seen = new Set();
+      for(let k = 0; k <= steps; k++){
+        const sx = e.x + e.ux * Math.min(extTol, k * cell), sy = e.y + e.uy * Math.min(extTol, k * cell);
+        const gx = Math.floor(sx / cell), gy = Math.floor(sy / cell);
+        for(let ay = -1; ay <= 1; ay++) for(let ax = -1; ax <= 1; ax++){
+          const key = (gx+ax + GO) * GK + (gy+ay + GO);
+          if(seen.has(key)) continue; seen.add(key);
+          const bucket = grid.get(key); if(!bucket) continue;
+          for(const i of bucket){
+            const s = segs[i];
+            if(s.sid === e.sid){
+              const touches = (Math.abs(s.x0-e.x) < VF_EPS && Math.abs(s.y0-e.y) < VF_EPS) ||
+                              (Math.abs(s.x1-e.x) < VF_EPS && Math.abs(s.y1-e.y) < VF_EPS);
+              if(touches) continue;
+            }
+            const dx = s.x1 - s.x0, dy = s.y1 - s.y0;
+            const den = e.ux * dy - e.uy * dx;
+            if(Math.abs(den) < 1e-6) continue;
+            const t = ((s.x0 - e.x) * dy - (s.y0 - e.y) * dx) / den;          // 광선 위
+            const u = ((s.x0 - e.x) * e.uy - (s.y0 - e.y) * e.ux) / den;      // 선분 위 0..1
+            if(t < VF_EPS || t > extTol || u < -1e-6 || u > 1 + 1e-6) continue;
+            if(!best || t < best.t) best = { t, segI: i, segT: Math.max(0, Math.min(1, u)), x: e.x + e.ux * t, y: e.y + e.uy * t };
+          }
+        }
+      }
+      if(best) extOf.set(e, best);
+    }
+    const extDone = new Set();
     for(const e of ends){
       // 끝의 진행 방향 (마지막 두 점). 이 방향으로 나아가 닿는 것만 잇는다.
-      let ux = e.x - e.ex, uy = e.y - e.ey;
-      const ul = Math.hypot(ux, uy) || 1; ux /= ul; uy /= ul;
+      const ux = e.ux, uy = e.uy;
       const gx = Math.floor(e.x / cell), gy = Math.floor(e.y / cell);
       let best = null, bestScore = Infinity;
       for(let ay = -1; ay <= 1; ay++) for(let ax = -1; ax <= 1; ax++){
@@ -11033,6 +11125,22 @@ showLayerMenu(ev.clientX, ev.clientY, [
           if(score < bestScore){ bestScore = score; best = { px, py, i, t, d, atEnd }; }
         }
       }
+      // 연장해서 만나는 자리가 있으면 그쪽을 먼저 쓴다 (가까운 점보다 훨씬 멀지 않다면)
+      const ex = extOf.get(e);
+      if(ex && !extDone.has(e) && (!best || ex.t <= best.d * 1.6 + 2)){
+        extDone.add(e);
+        if(ex.partner){
+          // 두 끝의 연장이 한 점에서 만난다 -- 둘 다 그 점으로 잇는다
+          extDone.add(ex.partner);
+          bridges.push({ x0: e.x, y0: e.y, x1: ex.x, y1: ex.y, sid: -1, cuts: [], kind: 'ext', d: ex.t });
+          bridges.push({ x0: ex.partner.x, y0: ex.partner.y, x1: ex.x, y1: ex.y, sid: -1, cuts: [], kind: 'ext', d: Math.hypot(ex.partner.x - ex.x, ex.partner.y - ex.y) });
+        } else {
+          segs[ex.segI].cuts.push(ex.segT);
+          bridges.push({ x0: e.x, y0: e.y, x1: ex.x, y1: ex.y, sid: -1, cuts: [], kind: 'ext', d: ex.t });
+        }
+        continue;
+      }
+      if(extDone.has(e)) continue;
       if(!best) continue;
       segs[best.i].cuts.push(best.t);
       bridges.push({ x0: e.x, y0: e.y, x1: best.px, y1: best.py, sid: -1, cuts: [],
@@ -11150,7 +11258,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // 클릭한 점을 담는 가장 작은 유계 면. 없으면 null -- 닫혀 있지 않다는 뜻.
   let vfLastBridges = [];
   // 기본값. 화면 손잡이가 덮어쓴다.
-  let vfOpts = { endEnd: 10, endBody: 6, angle: 60 };
+  let vfOpts = { endEnd: 10, endBody: 6, angle: 60, autoMax: 80 };
 
   // 획 목록의 서명. 획이 늘거나 줄거나, 어느 획이든 점이 바뀌면 달라진다.
   function vfSignature(strokes, o){
@@ -12198,8 +12306,22 @@ showLayerMenu(ev.clientX, ev.clientY, [
       // 못 찾으면 페인트통으로 떨어진다 -- 그래서 켜 둬도 손해가 없다.
       const vis = new Set(layers.filter(l => l.visible).map(l => l.id));
       const strokes = actions.filter(a => a.type === 'stroke' && a.tool !== 'eraser' && vis.has(a.layer));
-      let region = null;
+      let region = null, usedTol = null;
       try { region = findClosedRegion(strokes, p.x, p.y, null, vfOpts); } catch(err){ console.error('vector fill', err); }
+      if(!region && vfOpts.autoMax > 0){
+        // 자동 닫기: 끝-끝·끝-몸통 허용 거리를 단계적으로 키운다. 닫히는 첫 단계에서 멈춘다 --
+        // 더 키우면 멀쩡한 이웃까지 이어 버린다.
+        const base = Math.max(vfOpts.endEnd, vfOpts.endBody, 4);
+        const steps = [];
+        for(let t = base * 1.5; t < vfOpts.autoMax; t *= 1.5) steps.push(Math.round(t));
+        steps.push(vfOpts.autoMax);
+        for(const t of steps){
+          const o = { endEnd: t, endBody: Math.round(t * 0.7), angle: Math.max(vfOpts.angle, 70), autoMax: vfOpts.autoMax };
+          try { region = findClosedRegion(strokes, p.x, p.y, null, o); } catch(err){ region = null; }
+          if(region){ usedTol = t; break; }
+        }
+        if(region) vfFlashBridges(vfLastBridges);
+      }
       if(region){
         let fl = reusableFillLayer(fillColor, 'v');
         const reused = !!fl;
@@ -12224,7 +12346,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
         if(typeof syncLiveEdit === 'function') syncLiveEdit(true);
         toast((reused ? '벡터 채움 → ' + fl.name + ' 에 이어서' : '벡터 채움 → ' + fl.name) +
               ' (면적 ' + Math.round(region.area) + 'px²' +
-              (region.holes && region.holes.length ? ', 구멍 ' + region.holes.length : '') + ')');
+              (region.holes && region.holes.length ? ', 구멍 ' + region.holes.length : '') +
+              (usedTol ? ', 틈 ' + usedTol + 'px 까지 이어 닫음' : '') + ')');
         return;
       }
       toast('닫힌 영역을 못 찾아 페인트통으로 채웁니다.');
