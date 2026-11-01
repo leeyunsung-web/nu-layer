@@ -6848,7 +6848,7 @@ const DEF={upAxis:'Y',target:'600000',fov:20,
   method:'스크린톤',cell:4,spacing:1.05,angle:45,
   penCount:'1',pen1:.3,pen2:.6,pen3:1,cap1:.55,cap2:.8,penColors:true,dotTime:.25,travel:60,
   paper:'A4',paperW:210,paperH:297,orient:'세로',margin:20,drawScale:1,posX:0,posY:0,jpgDpi:'300',
-  lineOuter:false,lineInner:false,lineCrease:false,creaseAngle:40,lineSlice:false,sliceCount:30,sliceAxis:'높이',linePen:.3,lineMin:1,lineSmooth:2};
+  lineOuter:false,lineInner:false,lineCrease:false,creaseAngle:40,lineSlice:false,sliceCount:30,sliceAxis:'높이',linePen:.3,lineMin:2,lineSmooth:2,innerJump:.05};
 let P;try{P={...DEF,...JSON.parse(localStorage.getItem('sculptDotP1')||'{}')}}catch(e){P={...DEF}}
 const save=()=>{try{localStorage.setItem('sculptDotP1',JSON.stringify(P))}catch(e){}try{saveLast()}catch(e){}};
 const pct=v=>Math.round(v*100)+'%';
@@ -6886,6 +6886,7 @@ const TABS=[
  {name:'선',hint:'망점 위에 선을 더합니다. 선은 따로 SVG 레이어로 나뉘고, 같은 펜으로 그려도 됩니다.',c:[
    {k:'lineOuter',l:'바깥 윤곽선',chk:1,re:'render'},
    {k:'lineInner',l:'안쪽 윤곽선 (앞쪽 형태가 뒤를 가리는 경계)',chk:1,re:'render'},
+   {k:'innerJump',l:'안쪽 윤곽선 기준',min:.005,max:.15,step:.005,fmt:v=>(v<.02?'작은 굴곡까지':v<.06?'보통':'큰 경계만')+` (${Math.round(v*1000)/10})`,re:'render',show:()=>P.lineInner},
    {k:'lineCrease',l:'꺾인 선',chk:1,re:'render'},
    {k:'creaseAngle',l:'꺾임 기준',min:10,max:90,step:1,u:'°',re:'render',show:()=>P.lineCrease},
    {k:'lineSlice',l:'등고선',chk:1,re:'render'},
@@ -7125,24 +7126,37 @@ function geomLines(cam,lin,M,W,H,out){
   const{pos,idx,F,fN,fC,E,eA,eB,eF1,eF2,eCos}=getAdj();
   const m=new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix,cam.matrixWorldInverse).elements,cp=cam.position,eps=.004;
   // pixels near the background belong to the outer outline; inner contours skip them when that line is on
-  const Bd=new Uint8Array(W*H);if(P.lineOuter){const r=2;for(let y=0;y<H;y++)for(let x=0;x<W;x++){if(!M[y*W+x])continue;let edge=false;
+  const Bd=new Uint8Array(W*H);if(P.lineOuter){const r=3;for(let y=0;y<H;y++)for(let x=0;x<W;x++){if(!M[y*W+x])continue;let edge=false;
     for(let oy=-r;oy<=r&&!edge;oy++)for(let ox=-r;ox<=r;ox++){const qx=x+ox,qy=y+oy;if(qx<0||qy<0||qx>=W||qy>=H||!M[qy*W+qx]){edge=true;break}}Bd[y*W+x]=edge?1:0}}
   const pr=(x,y,z,o)=>{const w=m[3]*x+m[7]*y+m[11]*z+m[15];o[0]=((m[0]*x+m[4]*y+m[8]*z+m[12])/w*.5+.5)*W;o[1]=(1-((m[1]*x+m[5]*y+m[9]*z+m[13])/w*.5+.5))*H;o[2]=w};
   const A=[0,0,0],B=[0,0,0];
-  function visSeg(ax,ay,az,bx,by,bz,dst,skipEdge){
+  // depth-jump map: an inner contour is only drawn where the surface in front really covers something farther behind
+  let J=null;if(P.lineInner){J=new Uint8Array(W*H);const thr=P.innerJump,R=[1,2,3];
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x;if(!M[i])continue;const d=lin[i];let hit=0;
+      for(const r of R){for(const[dx,dy]of[[r,0],[-r,0],[0,r],[0,-r]]){const qx=x+dx,qy=y+dy;if(qx<0||qy<0||qx>=W||qy>=H)continue;const q=lin[qy*W+qx];if(q<1e8&&q-d>thr){hit=1;break}}if(hit)break}
+      J[i]=hit}}
+  function visSeg(ax,ay,az,bx,by,bz,dst,skipEdge,needJump){
     pr(ax,ay,az,A);pr(bx,by,bz,B);if(A[2]<=0||B[2]<=0)return;
     const len=Math.hypot(B[0]-A[0],B[1]-A[1]),n=Math.max(1,Math.ceil(len/1.2));let run=-1,lx=0,ly=0;
     for(let i=0;i<=n;i++){const t=i/n,sx=A[0]+(B[0]-A[0])*t,sy=A[1]+(B[1]-A[1])*t,sw=A[2]+(B[2]-A[2])*t,ix=Math.floor(sx),iy=Math.floor(sy);let vis=false;
       if(ix>=0&&iy>=0&&ix<W&&iy<H){if(sw<=lin[iy*W+ix]+eps)vis=true;else{for(let oy=-1;oy<=1&&!vis;oy++)for(let ox=-1;ox<=1;ox++){const jx=ix+ox,jy=iy+oy;if(jx<0||jy<0||jx>=W||jy>=H)continue;if(sw<=lin[jy*W+jx]+eps){vis=true;break}}}
-        if(vis&&skipEdge&&Bd[iy*W+ix])vis=false}
+        if(vis&&skipEdge&&Bd[iy*W+ix])vis=false;
+        if(vis&&needJump){let ok=false;for(let oy=-1;oy<=1&&!ok;oy++)for(let ox=-1;ox<=1;ox++){const jx=ix+ox,jy=iy+oy;if(jx>=0&&jy>=0&&jx<W&&jy<H&&J[jy*W+jx]){ok=true;break}}vis=ok}}
       if(vis){if(run<0){run=i;lx=sx;ly=sy}}
       else if(run>=0){const pt=(i-1)/n;if(i-1>run)dst.push(lx,ly,A[0]+(B[0]-A[0])*pt,A[1]+(B[1]-A[1])*pt);run=-1}}
     if(run>=0&&n>run)dst.push(lx,ly,B[0],B[1])}
   const front=f=>fN[f*3]*(cp.x-fC[f*3])+fN[f*3+1]*(cp.y-fC[f*3+1])+fN[f*3+2]*(cp.z-fC[f*3+2])>0;
   const cosT=Math.cos(THREE.MathUtils.degToRad(P.creaseAngle));
-  if(P.lineInner||P.lineCrease)for(let e=0;e<E;e++){const f1=eF1[e],f2=eF2[e];if(f2<0)continue;const a=front(f1),b=front(f2);let dst=null,skip=false;
-    if(a!==b){if(P.lineInner){dst=out.inner;skip=P.lineOuter}}else if(a&&P.lineCrease&&eCos[e]<cosT)dst=out.crease;
-    if(!dst)continue;const i=eA[e]*3,j=eB[e]*3;visSeg(pos[i],pos[i+1],pos[i+2],pos[j],pos[j+1],pos[j+2],dst,skip)}
+  // smooth inner contours: zero crossings of (vertex normal · view direction) across each triangle, not jagged mesh edges
+  if(P.lineInner){const nrm=mesh.geometry.attributes.normal.array,V=pos.length/3,g=new Float32Array(V);
+    for(let v=0;v<V;v++){const dx=cp.x-pos[v*3],dy=cp.y-pos[v*3+1],dz=cp.z-pos[v*3+2],l=Math.hypot(dx,dy,dz)||1;g[v]=(nrm[v*3]*dx+nrm[v*3+1]*dy+nrm[v*3+2]*dz)/l}
+    const pt=[];
+    for(let f=0;f<F;f++){const ia=idx[f*3],ib=idx[f*3+1],ic=idx[f*3+2],ga=g[ia],gb=g[ib],gc=g[ic];
+      if((ga>0&&gb>0&&gc>0)||(ga<0&&gb<0&&gc<0))continue;pt.length=0;
+      for(const[u,w,gu,gw]of[[ia,ib,ga,gb],[ib,ic,gb,gc],[ic,ia,gc,ga]]){if((gu>0)!==(gw>0)){const t=gu/(gu-gw);pt.push(pos[u*3]+(pos[w*3]-pos[u*3])*t,pos[u*3+1]+(pos[w*3+1]-pos[u*3+1])*t,pos[u*3+2]+(pos[w*3+2]-pos[u*3+2])*t)}}
+      if(pt.length>=6)visSeg(pt[0],pt[1],pt[2],pt[3],pt[4],pt[5],out.inner,P.lineOuter,true)}}
+  if(P.lineCrease)for(let e=0;e<E;e++){const f1=eF1[e],f2=eF2[e];if(f2<0)continue;if(!(front(f1)&&front(f2)&&eCos[e]<cosT))continue;
+    const i=eA[e]*3,j=eB[e]*3;visSeg(pos[i],pos[i+1],pos[i+2],pos[j],pos[j+1],pos[j+2],out.crease,false,false)}
   if(P.lineSlice){const ax=P.sliceAxis==='높이'?1:P.sliceAxis==='옆'?0:2,N=P.sliceCount,step=2/(N+1);
     for(let f=0;f<F;f++){const v=[idx[f*3]*3,idx[f*3+1]*3,idx[f*3+2]*3],h=v.map(o=>pos[o+ax]),lo=Math.min(h[0],h[1],h[2]),hi=Math.max(h[0],h[1],h[2]);
       for(let k=Math.max(1,Math.ceil((lo+1)/step));k<=Math.min(N,Math.floor((hi+1)/step));k++){const c=-1+k*step,pts=[];
