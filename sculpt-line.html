@@ -7,7 +7,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=IBM+Plex+Sans+KR:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: drafting table — 3D model monitor and plotter-paper preview side by side, tabbed control rack beneath; stacks on phones */
+/* Layout: drafting table — 3D model monitor beside the plotter-paper dot preview, tabbed control rack beneath; stacks on phones */
 :root{
   --bg:#ECEEF1; --panel:#F8F9FB; --line:#D3D7DE; --fg:#14161B; --mute:#5E6573;
   --accent:#2F49F5; --accent-ink:#FFFFFF; --stage:#DCDFE4; --paper:#FFFFFF; --ink:#16181C; --warn:#B4541A;
@@ -36,8 +36,8 @@ h1{font-family:var(--f-display);font-weight:800;font-size:clamp(28px,5vw,44px);l
 .mon h2 .tag{font-family:var(--f-mono);font-weight:400;letter-spacing:0}
 .view{position:relative;aspect-ratio:1/1;max-width:100%;background:var(--stage);border-radius:4px;overflow:hidden}
 .view canvas{display:block;width:100%;height:100%;touch-action:none}
-.paperwrap{position:relative;aspect-ratio:1/1;max-width:100%;background:var(--stage);border-radius:4px;display:grid;place-items:center;overflow:hidden;padding:4%}
-.paperwrap svg{max-width:100%;max-height:100%;width:auto;height:auto;background:var(--paper);box-shadow:0 1px 3px rgba(0,0,0,.18)}
+.paperwrap{position:relative;aspect-ratio:1/1;max-width:100%;background:var(--stage);border-radius:4px;overflow:hidden}
+.paperwrap canvas{display:block;width:100%;height:100%;cursor:zoom-in}
 .overlay{position:absolute;inset:0;display:grid;place-items:center;background:color-mix(in srgb,var(--stage) 75%,transparent);font-size:13px;color:var(--fg);text-align:center;padding:16px}
 .stale{color:var(--warn);font-size:12.5px}
 .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -75,26 +75,27 @@ select{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:4
 <body>
 
 
+
 <div class="wrap">
   <header>
     <h1>SCULPT LINE</h1>
-    <p class="sub">조각 3D 파일을 올리고 각도를 고르면, 보이는 윤곽과 꺾이는 선만 뽑아 펜 플로터용 SVG 선화로 만듭니다.</p>
+    <p class="sub">조각 3D 파일을 올리고 각도와 빛을 정하면, 같은 굵기의 펜으로 찍는 망점의 밀도만으로 명암을 만들어 펜 플로터용 SVG로 저장합니다.</p>
   </header>
 
   <div class="bar">
     <label class="filebtn">3D 파일 올리기<input type="file" id="file" accept=".stl,.obj,.ply,.glb,.gltf"></label>
-    <button class="primary" id="run">고화질로 다시 뽑기</button>
-    <span class="stale" id="stale" hidden>미리보기 화질입니다. 저장할 때 자동으로 고화질로 다시 뽑습니다.</span>
+    <button class="primary" id="run">고화질로 다시 계산</button>
+    <span class="stale" id="stale" hidden>미리보기 화질입니다. 저장할 때 자동으로 고화질로 다시 계산합니다.</span>
   </div>
 
   <div class="monitors">
     <section class="mon">
       <h2><span>3D 모델 · 끌어서 돌리기</span><span class="tag" id="modelTag">샘플</span></h2>
-      <div class="view" id="view"><canvas id="cv"></canvas><div class="overlay" id="loadOv" hidden>불러오는 중…</div></div>
+      <div class="view" id="view"><canvas id="cv"></canvas><div class="overlay" id="loadOv" hidden><span id="loadMsg">불러오는 중…</span></div></div>
     </section>
     <section class="mon">
-      <h2><span>선화 미리보기</span><span class="tag" id="paperTag">A4 세로</span></h2>
-      <div class="paperwrap" id="paper"><div class="overlay" id="runOv" hidden>선을 뽑는 중…</div></div>
+      <h2><span>망점 미리보기 · 눌러서 확대</span><span class="tag" id="paperTag">A4 세로</span></h2>
+      <div class="paperwrap" id="paper"><canvas id="pv"></canvas><div class="overlay" id="runOv" hidden>계산 중…</div></div>
     </section>
   </div>
 
@@ -6823,129 +6824,108 @@ select{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:4
 <script>
 (()=>{
 const $=id=>document.getElementById(id);
+const tick=()=>new Promise(r=>setTimeout(r,20));
 const PAPERS={'A5':[148,210],'A4':[210,297],'A3':[297,420],'30×40 cm':[300,400],'50×70 cm':[500,700]};
-const LAYERS=[{k:'sil',name:'윤곽선',color:'#16181C'},{k:'crease',name:'꺾인 선',color:'#2F49F5'},{k:'border',name:'열린 가장자리',color:'#7A3FB0'},{k:'slice',name:'등고선',color:'#C2410C'},{k:'hatch',name:'명암 결',color:'#0F7B6C'},{k:'screen',name:'망점',color:'#B0306A'}];
-const DEF={screenMode:'스크린톤',screenLines:true,screen:true,screenGap:.7,screenAngle:45,screenMin:.06,lineStyle:'플로터 겹선',lineMin:.08,lineMax:.55,contourW:.45,taper:3,hatch:false,hatchGap:.9,hatchCross:35,hatchBreak:true,hatchLozenge:true,midtone:.3,wrap:.35,fill:.3,cavity:.5,hatchDir:'높이',hatchLayers:2,hatchDark:0,lightAz:-50,lightEl:35,upAxis:'Y',fov:25,sil:true,crease:true,creaseAngle:40,border:false,slice:false,sliceCount:40,sliceAxis:'높이',
-  minLen:1.5,simplify:.6,smooth:1,eps:1,res:'2048',paper:'A4',orient:'세로',margin:20,pen:.3,colorLayers:false,speed:40};
-let P;try{P={...DEF,...JSON.parse(localStorage.getItem('sculptLineP2')||'{}')}}catch(e){P={...DEF}}
-if(!['스크린톤','규칙 밀도','점묘'].includes(P.screenMode))P.screenMode='스크린톤';if(P.screenGap>2)P.screenGap=.7;
-const save=()=>{try{localStorage.setItem('sculptLineP2',JSON.stringify(P))}catch(e){}};
+const DEF={upAxis:'Y',target:'600000',fov:20,
+  lightAz:-45,lightEl:35,wrap:.4,fill:.3,midtone:0,dark:0,floor:.05,
+  curv:.7,cavity:.5,local:.5,res:'2048',
+  method:'스크린톤',cell:4,spacing:1.05,angle:45,
+  penCount:'1',pen1:.3,pen2:.6,pen3:1,cap1:.55,cap2:.8,penColors:true,dotTime:.15,travel:60,
+  paper:'A4',orient:'세로',margin:20};
+let P;try{P={...DEF,...JSON.parse(localStorage.getItem('sculptDotP1')||'{}')}}catch(e){P={...DEF}}
+const save=()=>{try{localStorage.setItem('sculptDotP1',JSON.stringify(P))}catch(e){}};
+const pct=v=>Math.round(v*100)+'%';
+const PEN_COLORS=['#16181C','#2F49F5','#C2410C'];
 
 // ---------- tabs ----------
 const TABS=[
- {name:'파일',hint:'STL·OBJ·PLY·GLB 파일을 올리세요. 아무것도 올리지 않으면 샘플 형태가 보입니다. 모델이 누워 있으면 위쪽 축을 바꾸세요.',c:[
+ {name:'파일',hint:'STL·OBJ·PLY·GLB 파일을 올리세요. 면이 아주 많은 파일은 간소화 목표에 맞춰 자동으로 줄여 빠르게 작업합니다. 모델이 누워 있으면 위쪽 축을 바꾸세요.',c:[
+   {k:'target',l:'간소화 목표',sel:['원본 그대로','1000000','600000','300000','150000'],fmt:v=>v==='원본 그대로'?v:(+v).toLocaleString()+' 면 이하',re:'model'},
    {k:'upAxis',l:'위쪽 축',sel:['Y','Z'],fmt:v=>v==='Y'?'Y (대부분의 OBJ·GLB)':'Z (대부분의 STL)',re:'model'},
-   {btn:'yaw',l:'모델 90° 돌리기'},{info:'modelInfo'},
-   {samples:1}]},
- {name:'각도',hint:'왼쪽 화면을 끌어서 돌리고, 두 손가락이나 휠로 확대합니다. 아래 버튼으로 기본 각도로 갈 수 있습니다.',c:[
-   {views:1},
-   {k:'fov',l:'원근감',min:5,max:60,step:1,u:'°',re:'cam'}]},
- {name:'선 종류',hint:'어떤 선을 그릴지 고릅니다. 꺾인 선 각도를 낮추면 면이 조금만 꺾여도 선이 생깁니다.',c:[
-   {k:'sil',l:'윤곽선',chk:1,re:'run'},
-   {k:'crease',l:'꺾인 선',chk:1,re:'run'},
-   {k:'creaseAngle',l:'꺾임 기준',min:10,max:90,step:1,u:'°',re:'run'},
-   {k:'border',l:'열린 가장자리',chk:1,re:'run'},
-   {k:'slice',l:'등고선',chk:1,re:'run'},
-   {k:'sliceCount',l:'등고선 개수',min:5,max:150,step:1,u:'줄',re:'run'},
-   {k:'sliceAxis',l:'등고선 방향',sel:['높이','옆','앞뒤'],re:'run'}]},
- {name:'명암 결',hint:'지폐 초상처럼, 몸을 감싸며 휘는 결로 명암을 넣습니다. 결 간격은 종이 위에서 고르게 유지되고, 어두울수록 결이 굵어지고 교차 결이 겹칩니다.',c:[
-   {styles:1},
-   {k:'hatch',l:'명암 결 넣기',chk:1,re:'run'},
-   {k:'lightAz',l:'빛 좌우',min:-90,max:90,step:1,fmt:v=>v<0?`왼쪽 ${-v}°`:v>0?`오른쪽 ${v}°`:'정면',re:'run'},
-   {k:'lightEl',l:'빛 높이',min:-30,max:80,step:1,u:'°',re:'run'},
-   {k:'midtone',l:'중간톤',min:-1,max:1,step:.05,fmt:v=>v>0?`진하게 ${Math.round(v*100)}`:v<0?`밝게 ${Math.round(-v*100)}`:'기본',re:'run'},
-   {k:'wrap',l:'그림자 부드럽게',min:0,max:1,step:.05,fmt:v=>Math.round(v*100)+'%',re:'run'},
-   {k:'fill',l:'반사광',min:0,max:1,step:.05,fmt:v=>Math.round(v*100)+'%',re:'run'},
-   {k:'cavity',l:'오목한 곳 어둡게',min:0,max:1,step:.05,fmt:v=>Math.round(v*100)+'%',re:'run'},
-   {k:'hatchGap',l:'결 간격',min:.4,max:3,step:.05,u:'mm',d:2,re:'run'},
-   {k:'hatchDir',l:'첫 결 방향',sel:['높이','옆','앞뒤'],fmt:v=>v==='높이'?'가로로 감기는 결':v==='옆'?'세로로 흐르는 결':'앞뒤로 도는 결',re:'run'},
-   {k:'hatchLayers',l:'교차 단계',min:1,max:3,step:1,fmt:v=>['','한 겹','두 겹 교차','세 겹 교차'][v],re:'run'},
-   {k:'hatchCross',l:'교차 각도',min:15,max:60,step:1,u:'°',re:'run'},
-   {k:'hatchDark',l:'전체 진하기',min:-.3,max:.3,step:.01,fmt:v=>(v>0?'+':'')+Math.round(v*100),re:'run'},
-   {k:'hatchBreak',l:'밝은 곳은 대시와 점으로 흩어지게',chk:1,re:'post'},
-   {k:'hatchLozenge',l:'어두운 곳 결 사이에 점 찍기 (지폐식)',chk:1,re:'post'}]},
- {name:'망점',hint:'모든 점은 펜이 한 번 찍는 같은 크기입니다. 명암은 점을 찍는 밀도로만 냅니다. 점 간격은 펜 굵기보다 넓게 두면 점이 서로 붙지 않습니다. 빛 방향·중간톤·오목한 곳 설정은 4번 명암 결 탭 값을 같이 씁니다.',c:[
-   {btn:'screenOnly',l:'망점만 쓰기 (명암 결 끄기)'},
-   {k:'screen',l:'망점 넣기',chk:1,re:'run'},
-   {k:'screenMode',l:'점 배치',sel:['스크린톤','규칙 밀도','점묘'],fmt:v=>v==='스크린톤'?'스크린톤 (점이 무리 지어 늘어남)':v==='규칙 밀도'?'규칙 밀도 (고르게 퍼짐)':'점묘 (무작위로 흩뿌림)',re:'run'},
-   {k:'screenLines',l:'가장 어두운 곳은 결 선으로 보강',chk:1,re:'run'},
-   {k:'screenGap',l:'점 간격',min:.2,max:2,step:.05,u:'mm',d:2,re:'run'},
-   {k:'screenAngle',l:'망점 각도',min:0,max:90,step:1,u:'°',re:'run'},
-   {k:'screenMin',l:'밝은 곳 비우기',min:0,max:.3,step:.01,fmt:v=>Math.round(v*100)+'%',re:'run'}]},
- {name:'선 굵기',hint:'판화처럼 선 하나 안에서 굵기가 변합니다. 어두운 곳은 굵게, 밝은 곳으로 갈수록 가늘어지다 사라집니다.',c:[
-   {k:'lineStyle',l:'선 표현',sel:['판화','플로터 겹선','단순 선'],fmt:v=>v==='판화'?'판화 (굵기 변화, 인쇄용)':v==='플로터 겹선'?'플로터 겹선 (굵은 곳을 여러 번 그음)':'단순 선 (한 가지 굵기)',re:'post'},
-   {k:'lineMax',l:'가장 굵은 결',min:.2,max:2,step:.02,u:'mm',d:2,re:'post'},
-   {k:'lineMin',l:'가장 가는 결',min:.03,max:.5,step:.01,u:'mm',d:2,re:'post'},
-   {k:'contourW',l:'윤곽선 굵기',min:.1,max:1.5,step:.05,u:'mm',d:2,re:'post'},
-   {k:'taper',l:'끝 가늘게',min:0,max:10,step:.5,u:'mm',d:1,re:'post'}]},
- {name:'다듬기',hint:'뽑은 선을 정리합니다. 이 탭은 바로 반영됩니다.',c:[
-   {k:'minLen',l:'짧은 선 지우기',min:0,max:10,step:.1,u:'mm',d:1,re:'post'},
-   {k:'simplify',l:'단순하게',min:0,max:3,step:.05,u:'px',d:2,re:'post'},
-   {k:'smooth',l:'부드럽게',min:0,max:3,step:1,u:'번',re:'post'},
-   {k:'eps',l:'가림 판정 여유',min:.2,max:4,step:.1,u:'×',d:1,re:'run'},
-   {k:'res',l:'정밀도',sel:['1024','2048','4096'],fmt:v=>v+' px',re:'run'}]},
+   {btn:'yaw',l:'모델 90° 돌리기'},{info:'modelInfo'},{samples:1}]},
+ {name:'각도',hint:'왼쪽 화면을 끌어서 돌리고, 두 손가락이나 휠로 확대합니다. 손을 떼면 망점이 다시 계산됩니다.',c:[
+   {views:1},{k:'fov',l:'원근감',min:5,max:60,step:1,u:'°',re:'cam'}]},
+ {name:'빛·명암',hint:'빛 방향과 명암 곡선을 정합니다. 밝은 곳 최소 점을 올리면 빛을 받는 면도 점이 남아 형태가 날아가지 않습니다.',c:[
+   {k:'lightAz',l:'빛 좌우',min:-90,max:90,step:1,fmt:v=>v<0?`왼쪽 ${-v}°`:v>0?`오른쪽 ${v}°`:'정면',re:'render'},
+   {k:'lightEl',l:'빛 높이',min:-30,max:80,step:1,u:'°',re:'render'},
+   {k:'wrap',l:'그림자 부드럽게',min:0,max:1,step:.05,fmt:pct,re:'render'},
+   {k:'fill',l:'반사광',min:0,max:1,step:.05,fmt:pct,re:'render'},
+   {k:'midtone',l:'중간톤',min:-1,max:1,step:.05,fmt:v=>v>0?`진하게 ${Math.round(v*100)}`:v<0?`밝게 ${Math.round(-v*100)}`:'기본',re:'render'},
+   {k:'dark',l:'전체 진하기',min:-.3,max:.3,step:.01,fmt:v=>(v>0?'+':'')+Math.round(v*100),re:'render'},
+   {k:'floor',l:'밝은 곳 최소 점',min:0,max:.25,step:.01,fmt:pct,re:'render'}]},
+ {name:'디테일',hint:'조각의 작은 굴곡을 살립니다. 곡률 강조는 튀어나온 곳을 밝게, 파인 곳을 어둡게 해서 빛 방향과 상관없이 형태를 드러냅니다.',c:[
+   {k:'curv',l:'곡률 강조',min:0,max:1.5,step:.05,fmt:pct,re:'render'},
+   {k:'cavity',l:'오목한 곳 어둡게',min:0,max:1,step:.05,fmt:pct,re:'render'},
+   {k:'local',l:'국소 대비',min:0,max:1.5,step:.05,fmt:pct,re:'render'},
+   {k:'res',l:'정밀도',sel:['1024','2048','3072'],fmt:v=>v+' px',re:'render'}]},
+ {name:'망점',hint:'모든 점은 펜이 한 번 찍는 같은 크기입니다. 명암은 점을 찍는 밀도로만 냅니다.',c:[
+   {k:'method',l:'점 배치',sel:['스크린톤','오차 확산','점묘','규칙'],fmt:v=>({'스크린톤':'스크린톤 (점이 무리 지어 자람)','오차 확산':'오차 확산 (디테일 최대)','점묘':'점묘 (무작위로 흩뿌림)','규칙':'규칙 (고르게 퍼짐)'})[v],re:'layout'},
+   {k:'cell',l:'망점 칸 크기',min:2,max:8,step:1,fmt:v=>`${v}×${v}점 · ${v*v+1}단계`,re:'layout',show:()=>P.method==='스크린톤'},
+   {k:'spacing',l:'점 간격',min:.8,max:2.5,step:.05,fmt:v=>`펜 굵기 ×${(+v).toFixed(2)}`,re:'layout'},
+   {k:'angle',l:'망점 각도',min:0,max:90,step:1,u:'°',re:'layout'},
+   {info:'dotInfo'}]},
+ {name:'펜',hint:'기본은 펜 한 자루입니다. 한 가지 굵기로 그리는 쪽이 가장 섬세합니다. 두세 자루를 고르면 어두운 곳에만 굵은 펜이 덧찍어 점 수와 시간을 줄입니다. 펜마다 SVG 레이어가 따로 나뉩니다.',c:[
+   {k:'penCount',l:'펜 개수',sel:['1','2','3'],fmt:v=>v==='1'?'1자루 (추천)':v+'자루',re:'layout'},
+   {k:'pen1',l:'펜 1 굵기',min:.1,max:1.5,step:.05,u:'mm',d:2,re:'layout'},
+   {k:'pen2',l:'펜 2 굵기',min:.1,max:2,step:.05,u:'mm',d:2,re:'layout',show:()=>+P.penCount>=2},
+   {k:'cap1',l:'펜 1이 맡는 진하기',min:.2,max:.9,step:.05,fmt:pct,re:'layout',show:()=>+P.penCount>=2},
+   {k:'pen3',l:'펜 3 굵기',min:.1,max:2.5,step:.05,u:'mm',d:2,re:'layout',show:()=>+P.penCount>=3},
+   {k:'cap2',l:'펜 2까지 맡는 진하기',min:.4,max:.95,step:.05,fmt:pct,re:'layout',show:()=>+P.penCount>=3},
+   {k:'penColors',l:'펜마다 다른 색으로 보기',chk:1,re:'draw',show:()=>+P.penCount>=2},
+   {k:'dotTime',l:'점 하나 찍는 시간',min:.1,max:1,step:.01,u:'초',d:2,re:'stats'},
+   {k:'travel',l:'펜 이동 속도',min:10,max:150,step:5,u:'mm/s',re:'stats'}]},
  {name:'종이',hint:'플로터에 올릴 종이 크기입니다. SVG가 실제 mm 크기로 저장됩니다.',c:[
-   {k:'paper',l:'종이',sel:Object.keys(PAPERS),re:'post'},
-   {k:'orient',l:'방향',sel:['세로','가로'],re:'post'},
-   {k:'margin',l:'여백',min:0,max:80,step:1,u:'mm',re:'post'},
-   {k:'pen',l:'펜 굵기',min:.1,max:1.5,step:.05,u:'mm',d:2,re:'post'},
-   {k:'colorLayers',l:'선 종류별 색으로 보기',chk:1,re:'post'}]},
- {name:'내보내기',out:true,c:[
-   {k:'speed',l:'플로터 속도',min:10,max:150,step:5,u:'mm/s',re:'stats'}]}
+   {k:'paper',l:'종이',sel:Object.keys(PAPERS),re:'layout'},
+   {k:'orient',l:'방향',sel:['세로','가로'],re:'layout'},
+   {k:'margin',l:'여백',min:0,max:80,step:1,u:'mm',re:'layout'}]},
+ {name:'내보내기',out:true,c:[]}
 ];
-const tabsEl=$('tabs'),panesEl=$('panes'),inputs={};
-const fmtVal=(c,v)=>c.fmt?c.fmt(v):(c.d?(+v).toFixed(c.d):v)+(c.u?(c.u==='°'||c.u==='×'?c.u:' '+c.u):'');
+const tabsEl=$('tabs'),panesEl=$('panes'),inputs={},shows=[];
+const fmtVal=(c,v)=>c.fmt?c.fmt(v):(c.d?(+v).toFixed(c.d):v)+(c.u?(c.u==='°'?c.u:' '+c.u):'');
 TABS.forEach((t,i)=>{
   const b=document.createElement('button');b.role='tab';b.id='tab'+i;b.innerHTML=`<span class="n">${i+1}</span>${t.name}`;b.onclick=()=>showTab(i);tabsEl.appendChild(b);
   const pane=document.createElement('div');pane.className='pane';pane.id='pane'+i;pane.hidden=true;
   if(t.hint){const h=document.createElement('p');h.className='hint';h.textContent=t.hint;pane.appendChild(h)}
   t.c.forEach(c=>{
-    if(c.btn){const bb=document.createElement('button');bb.id='b_'+c.btn;bb.textContent=c.l;bb.style.alignSelf='flex-start';pane.appendChild(bb);return}
-    if(c.info){const p=document.createElement('p');p.className='hint';p.id=c.info;pane.appendChild(p);return}
-    if(c.styles){const v=document.createElement('div');v.className='bar';const lab=document.createElement('span');lab.className='hint';lab.textContent='스타일 한 번에 맞추기';v.appendChild(lab);
-      const ST={'지폐 판화':{hatch:true,hatchLayers:2,hatchCross:35,hatchBreak:true,hatchLozenge:true,lineStyle:'판화',lineMin:.08,lineMax:.55,hatchGap:.9,taper:3},
-        '에칭':{hatch:true,hatchLayers:3,hatchCross:50,hatchBreak:false,hatchLozenge:false,lineStyle:'단순 선',pen:.2,hatchGap:1.1,taper:0}};
-      Object.keys(ST).forEach(n=>{const bb=document.createElement('button');bb.className='chip';bb.textContent=n;bb.onclick=()=>{Object.assign(P,ST[n]);save();syncInputs();run()};v.appendChild(bb)});pane.appendChild(v);return}
-    if(c.samples){const v=document.createElement('div');v.className='bar';const lab=document.createElement('span');lab.className='hint';lab.textContent='샘플로 시험해 보기';v.appendChild(lab);
-      [['두상','head'],['매듭','knot']].forEach(([n,k])=>{const bb=document.createElement('button');bb.className='chip';bb.textContent=n;bb.onclick=()=>loadSample(k);v.appendChild(bb)});pane.appendChild(v);return}
-    if(c.views){const v=document.createElement('div');v.className='bar';
-      [['정면',0,0],['오른쪽',90,0],['뒤',180,0],['왼쪽',270,0],['사선',35,12],['위에서',20,55]].forEach(([n,az,el])=>{const bb=document.createElement('button');bb.className='chip';bb.textContent=n;bb.onclick=()=>setView(az,el);v.appendChild(bb)});
-      pane.appendChild(v);return}
-    if(c.chk){const lab=document.createElement('label');lab.className='check';const cb=document.createElement('input');cb.type='checkbox';cb.id='i_'+c.k;cb.checked=!!P[c.k];
-      cb.onchange=()=>{P[c.k]=cb.checked;changed(c.re)};lab.append(cb,c.l);pane.appendChild(lab);inputs[c.k]={c,el:cb};return}
-    const row=document.createElement('div');row.className='row';const lab=document.createElement('label');lab.htmlFor='i_'+c.k;lab.textContent=c.l;
-    let el;const out=document.createElement('output');
-    if(c.sel){el=document.createElement('select');c.sel.forEach(o=>{const op=document.createElement('option');op.value=o;op.textContent=c.fmt?c.fmt(o):o;el.appendChild(op)});el.value=P[c.k]}
-    else{el=document.createElement('input');el.type='range';el.min=c.min;el.max=c.max;el.step=c.step;el.value=P[c.k];out.textContent=fmtVal(c,P[c.k])}
-    el.id='i_'+c.k;el.oninput=()=>{P[c.k]=c.sel?el.value:+el.value;if(!c.sel)out.textContent=fmtVal(c,P[c.k]);changed(c.re)};
-    row.append(lab,el,out);pane.appendChild(row);inputs[c.k]={c,el,out};
+    let node;
+    if(c.btn){node=document.createElement('button');node.id='b_'+c.btn;node.textContent=c.l;node.style.alignSelf='flex-start'}
+    else if(c.info){node=document.createElement('p');node.className='hint';node.id=c.info}
+    else if(c.views){node=document.createElement('div');node.className='bar';
+      [['정면',0,0],['오른쪽',90,0],['뒤',180,0],['왼쪽',270,0],['사선',30,6],['위에서',20,55]].forEach(([n,az,el])=>{const bb=document.createElement('button');bb.className='chip';bb.textContent=n;bb.onclick=()=>setView(az,el);node.appendChild(bb)})}
+    else if(c.samples){node=document.createElement('div');node.className='bar';const lab=document.createElement('span');lab.className='hint';lab.textContent='샘플로 시험해 보기';node.appendChild(lab);
+      [['두상','head'],['매듭','knot']].forEach(([n,k])=>{const bb=document.createElement('button');bb.className='chip';bb.textContent=n;bb.onclick=()=>loadSample(k);node.appendChild(bb)})}
+    else if(c.chk){node=document.createElement('label');node.className='check';const cb=document.createElement('input');cb.type='checkbox';cb.id='i_'+c.k;cb.checked=!!P[c.k];
+      cb.onchange=()=>{P[c.k]=cb.checked;changed(c.re)};node.append(cb,c.l);inputs[c.k]={c,el:cb}}
+    else{node=document.createElement('div');node.className='row';const lab=document.createElement('label');lab.htmlFor='i_'+c.k;lab.textContent=c.l;
+      let el;const out=document.createElement('output');
+      if(c.sel){el=document.createElement('select');c.sel.forEach(o=>{const op=document.createElement('option');op.value=o;op.textContent=c.fmt?c.fmt(o):o;el.appendChild(op)});el.value=P[c.k]}
+      else{el=document.createElement('input');el.type='range';el.min=c.min;el.max=c.max;el.step=c.step;el.value=P[c.k];out.textContent=fmtVal(c,P[c.k])}
+      el.id='i_'+c.k;el.oninput=()=>{P[c.k]=c.sel?el.value:+el.value;if(!c.sel)out.textContent=fmtVal(c,P[c.k]);changed(c.re)};
+      node.append(lab,el,out);inputs[c.k]={c,el,out}}
+    if(c.show)shows.push([node,c.show]);
+    pane.appendChild(node);
   });
-  if(t.out){
-    const st=document.createElement('div');st.className='stats';st.id='stats';
-    const lg=document.createElement('div');lg.className='legend';lg.id='legend';
-    const ac=document.createElement('div');ac.className='bar';ac.innerHTML='<button class="primary" id="saveSvg">SVG 저장</button>';
-    const s=document.createElement('div');s.className='status';s.id='status';
-    pane.prepend(st);pane.append(lg,ac,s);
-  }
+  if(t.out){pane.insertAdjacentHTML('beforeend','<div class="stats" id="stats"></div><p class="hint" id="statNote"></p><div class="bar"><button class="primary" id="saveSvg">SVG 저장</button></div><div class="status" id="status"></div>')}
   panesEl.appendChild(pane);
 });
-function syncInputs(){for(const k in inputs){const{c,el,out}=inputs[k];if(c.chk)el.checked=!!P[k];else{el.value=P[k];if(out&&!c.sel)out.textContent=fmtVal(c,P[k])}}}
-function showTab(i){TABS.forEach((t,j)=>{$('tab'+j).classList.toggle('on',i===j);$('tab'+j).setAttribute('aria-selected',i===j);$('pane'+j).hidden=i!==j});try{localStorage.setItem('sculptLineTab',i)}catch(e){}}
-try{showTab(+(localStorage.getItem('sculptLineTab')||0))}catch(e){showTab(0)}
+function updateShows(){for(const[n,f]of shows)n.hidden=!f()}
+function syncInputs(){for(const k in inputs){const{c,el,out}=inputs[k];if(c.chk)el.checked=!!P[k];else{el.value=P[k];if(out&&!c.sel)out.textContent=fmtVal(c,P[k])}}updateShows()}
+function showTab(i){TABS.forEach((t,j)=>{$('tab'+j).classList.toggle('on',i===j);$('tab'+j).setAttribute('aria-selected',i===j);$('pane'+j).hidden=i!==j});try{localStorage.setItem('sculptDotTab',i)}catch(e){}}
+try{showTab(+(localStorage.getItem('sculptDotTab')||0))}catch(e){showTab(0)}
+updateShows();
 function setStatus(t,err){const s=$('status');s.textContent=t;s.classList.toggle('err',!!err)}
-let stale=false;
-function changed(re){save();
-  if(re==='model'){rebuildFromRaw();return}
-  if(re==='cam'){camera.fov=P.fov;fitDistance();return}
-  if(re==='run'){autoRun();return}
-  if(re==='post'){postProcess();return}
-  if(re==='stats'){renderStats()}}
-function markStale(){autoRun()}
-let autoT=0;function autoRun(){clearTimeout(autoT);autoT=setTimeout(()=>run(true),220)}
+let layoutT=0;
+function changed(re){save();updateShows();
+  if(re==='model'){rebuild();return}
+  if(re==='cam'){camera.fov=P.fov;fitDistance();autoRun();return}
+  if(re==='render'){autoRun();return}
+  if(re==='layout'){clearTimeout(layoutT);layoutT=setTimeout(()=>{layout();drawPreview();renderStats()},40);return}
+  if(re==='draw'){drawPreview();return}
+  if(re==='stats')renderStats()}
 
 // ---------- three.js view ----------
 const cv=$('cv'),viewEl=$('view');
-const renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true,preserveDrawingBuffer:false});
+const renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true});
 renderer.setPixelRatio(Math.min(2,devicePixelRatio||1));
 const scene=new THREE.Scene();
 const camera=new THREE.PerspectiveCamera(P.fov,1,.01,100);
@@ -6953,401 +6933,253 @@ scene.add(new THREE.HemisphereLight(0xffffff,0x8a8f99,.85));
 const dl=new THREE.DirectionalLight(0xffffff,.75);dl.position.set(2,3,4);camera.add(dl);scene.add(camera);
 const mat=new THREE.MeshStandardMaterial({color:0xE9E7E3,roughness:.85,metalness:0,side:THREE.DoubleSide});
 let mesh=null;
-const controls=new THREE.OrbitControls(camera,cv);controls.enableDamping=false;controls.addEventListener('change',()=>{draw();if(!dragging)markStale()});let dragging=false;controls.addEventListener('start',()=>{dragging=true});controls.addEventListener('end',()=>{dragging=false;markStale()});
+const controls=new THREE.OrbitControls(camera,cv);controls.enableDamping=false;
+let dragging=false;
+controls.addEventListener('change',()=>{draw();if(!dragging)autoRun()});
+controls.addEventListener('start',()=>{dragging=true});controls.addEventListener('end',()=>{dragging=false;autoRun()});
 function size(){const w=viewEl.clientWidth,h=viewEl.clientHeight;if(!w)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();draw()}
 new ResizeObserver(size).observe(viewEl);
-function draw(){renderer.setClearColor(new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--stage').trim()||'#dcdfe4'),1);renderer.render(scene,camera)}
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change',draw);
+const cssVar=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function draw(){renderer.setClearColor(new THREE.Color(cssVar('--stage')||'#dcdfe4'),1);renderer.render(scene,camera)}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{draw();drawPreview()});
 function fitDistance(){const d=1/Math.sin(THREE.MathUtils.degToRad(P.fov)/2)*1.12;const dir=camera.position.clone().sub(controls.target).normalize();camera.position.copy(dir.multiplyScalar(d));camera.near=d*.05;camera.far=d*4;camera.updateProjectionMatrix();controls.update();draw()}
-function setView(az,el){const a=THREE.MathUtils.degToRad(az),e=THREE.MathUtils.degToRad(el);camera.position.set(Math.sin(a)*Math.cos(e),Math.sin(e),Math.cos(a)*Math.cos(e));controls.target.set(0,0,0);fitDistance();markStale()}
+function setView(az,el){const a=THREE.MathUtils.degToRad(az),e=THREE.MathUtils.degToRad(el);camera.position.set(Math.sin(a)*Math.cos(e),Math.sin(e),Math.cos(a)*Math.cos(e));controls.target.set(0,0,0);camera.fov=P.fov;fitDistance();autoRun()}
 
-// ---------- model prep ----------
-let rawPos=null,yawTurns=0;       // unprocessed triangle soup from the file
-let pos,idx,F,fN,fC,E,eA,eB,eF1,eF2,eCos;
-function rebuildFromRaw(){if(!rawPos)return;prepare(rawPos);markStale()}
-function prepare(src){
-  const n=src.length/3, p=new Float32Array(src.length);
+// ---------- model prep: orient, normalise, weld or simplify by vertex clustering ----------
+let rawPos=null,yawTurns=0,modelName='sample';
+function orient(src){
+  const n=src.length/3,p=new Float32Array(src.length);
   for(let i=0;i<n;i++){let x=src[i*3],y=src[i*3+1],z=src[i*3+2];
     if(P.upAxis==='Z'){const t=y;y=z;z=-t}
     for(let r=0;r<yawTurns%4;r++){const t=x;x=z;z=-t}
     p[i*3]=x;p[i*3+1]=y;p[i*3+2]=z}
-  // center and scale to unit radius
-  let mn=[1e9,1e9,1e9],mx=[-1e9,-1e9,-1e9];
+  const mn=[1e30,1e30,1e30],mx=[-1e30,-1e30,-1e30];
   for(let i=0;i<n;i++)for(let k=0;k<3;k++){const v=p[i*3+k];if(v<mn[k])mn[k]=v;if(v>mx[k])mx[k]=v}
   const c=[0,1,2].map(k=>(mn[k]+mx[k])/2);let r=0;
-  for(let i=0;i<n;i++){const dx=p[i*3]-c[0],dy=p[i*3+1]-c[1],dz=p[i*3+2]-c[2];r=Math.max(r,dx*dx+dy*dy+dz*dz)}r=Math.sqrt(r)||1;
+  for(let i=0;i<n;i++){const dx=p[i*3]-c[0],dy=p[i*3+1]-c[1],dz=p[i*3+2]-c[2],d=dx*dx+dy*dy+dz*dz;if(d>r)r=d}r=Math.sqrt(r)||1;
   for(let i=0;i<n;i++)for(let k=0;k<3;k++)p[i*3+k]=(p[i*3+k]-c[k])/r;
-  // weld duplicate vertices
-  const Q=2e5,map=new Map(),tmp=[];idx=new Uint32Array(n);let vc=0;
-  for(let i=0;i<n;i++){const qx=Math.round((p[i*3]+1.1)*Q),qy=Math.round((p[i*3+1]+1.1)*Q),qz=Math.round((p[i*3+2]+1.1)*Q);
-    const key=(qx*524288+qy)*524288+qz;let v=map.get(key);if(v===undefined){v=vc++;map.set(key,v);tmp.push(p[i*3],p[i*3+1],p[i*3+2])}idx[i]=v}
-  pos=new Float32Array(tmp);F=n/3;
-  fN=new Float32Array(F*3);fC=new Float32Array(F*3);
-  for(let f=0;f<F;f++){const a=idx[f*3]*3,b=idx[f*3+1]*3,d=idx[f*3+2]*3;
-    const ux=pos[b]-pos[a],uy=pos[b+1]-pos[a+1],uz=pos[b+2]-pos[a+2],vx=pos[d]-pos[a],vy=pos[d+1]-pos[a+1],vz=pos[d+2]-pos[a+2];
-    let nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;const l=Math.hypot(nx,ny,nz)||1;fN[f*3]=nx/l;fN[f*3+1]=ny/l;fN[f*3+2]=nz/l;
-    fC[f*3]=(pos[a]+pos[b]+pos[d])/3;fC[f*3+1]=(pos[a+1]+pos[b+1]+pos[d+1])/3;fC[f*3+2]=(pos[a+2]+pos[b+2]+pos[d+2])/3}
-  // make face normals point outward even when the file's triangles are wound inward
-  let vol=0;for(let f=0;f<F;f++){const a=idx[f*3]*3,b=idx[f*3+1]*3,d=idx[f*3+2]*3;
-    vol+=pos[a]*(pos[b+1]*pos[d+2]-pos[b+2]*pos[d+1])-pos[a+1]*(pos[b]*pos[d+2]-pos[b+2]*pos[d])+pos[a+2]*(pos[b]*pos[d+1]-pos[b+1]*pos[d])}
-  if(vol<0)for(let i=0;i<fN.length;i++)fN[i]=-fN[i];
-  // edges with their two faces
-  const em=new Map();eA=new Uint32Array(F*3);eB=new Uint32Array(F*3);eF1=new Int32Array(F*3);eF2=new Int32Array(F*3).fill(-1);E=0;
-  for(let f=0;f<F;f++)for(let k=0;k<3;k++){let a=idx[f*3+k],b=idx[f*3+(k+1)%3];if(a===b)continue;if(a>b){const t=a;a=b;b=t}
-    const key=a*vc+b;const e=em.get(key);if(e===undefined){em.set(key,E);eA[E]=a;eB[E]=b;eF1[E]=f;E++}else if(eF2[e]<0)eF2[e]=f}
-  eCos=new Float32Array(E);
-  for(let e=0;e<E;e++){const f1=eF1[e],f2=eF2[e];eCos[e]=f2<0?1:fN[f1*3]*fN[f2*3]+fN[f1*3+1]*fN[f2*3+1]+fN[f1*3+2]*fN[f2*3+2]}
-  // display mesh
-  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setIndex(new THREE.BufferAttribute(idx,1));g.computeVertexNormals();
+  return p}
+function cluster(p,G,step,full){
+  const n=p.length/9,K=G+1,map=new Map(),idx=[];let vc=0;const sums=full?[]:null;
+  for(let f=0;f<n;f+=step){let a=-1,b=-1;
+    for(let k=0;k<3;k++){const o=(f*3+k)*3;
+      const qx=Math.min(G-1,Math.max(0,Math.floor((p[o]+1)*.5*G))),qy=Math.min(G-1,Math.max(0,Math.floor((p[o+1]+1)*.5*G))),qz=Math.min(G-1,Math.max(0,Math.floor((p[o+2]+1)*.5*G)));
+      const key=(qx*K+qy)*K+qz;let v=map.get(key);
+      if(v===undefined){v=vc++;map.set(key,v);if(full)sums.push(0,0,0,0)}
+      if(full){sums[v*4]+=p[o];sums[v*4+1]+=p[o+1];sums[v*4+2]+=p[o+2];sums[v*4+3]++}
+      if(k===0)a=v;else if(k===1)b=v;else if(a!==b&&b!==v&&a!==v)idx.push(a,b,v)}}
+  return{idx,sums,vc}}
+async function prepare(msg){
+  const t0=performance.now();
+  if(msg){$('loadMsg').textContent=msg;$('loadOv').hidden=false;await tick()}
+  const p=orient(rawPos),n=p.length/9,target=P.target==='원본 그대로'?Infinity:+P.target;
+  let G=65536;
+  if(n>target){
+    $('loadMsg').textContent=`면 ${n.toLocaleString()}개를 ${target.toLocaleString()}개 이하로 줄이는 중…`;await tick();
+    const step=Math.max(1,Math.floor(n/250000));let lo=8,hi=8192;
+    for(let it=0;it<11;it++){const mid=Math.round(Math.sqrt(lo*hi));const est=cluster(p,mid,step,false).idx.length/3*step;if(est>target)hi=mid;else lo=mid}
+    G=lo}
+  const r=cluster(p,G,1,true);
+  const pos=new Float32Array(r.vc*3);for(let v=0;v<r.vc;v++){const c=r.sums[v*4+3];pos[v*3]=r.sums[v*4]/c;pos[v*3+1]=r.sums[v*4+1]/c;pos[v*3+2]=r.sums[v*4+2]/c}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setIndex(new THREE.BufferAttribute(new Uint32Array(r.idx),1));g.computeVertexNormals();
   if(mesh){scene.remove(mesh);mesh.geometry.dispose()}mesh=new THREE.Mesh(g,mat);scene.add(mesh);
-  $('modelInfo').textContent=`삼각형 ${F.toLocaleString()}개 · 꼭짓점 ${vc.toLocaleString()}개`;
-  draw();
+  const F=r.idx.length/3;
+  $('modelInfo').textContent=F<n*.98?`원본 ${n.toLocaleString()}면 → 작업용 ${F.toLocaleString()}면으로 간소화 (${((performance.now()-t0)/1000).toFixed(1)}초)`:`면 ${F.toLocaleString()}개 · 간소화 없이 원본 그대로`;
+  $('loadOv').hidden=true;draw();
 }
+async function rebuild(){if(!rawPos)return;await prepare('모델을 다시 준비하는 중…');autoRun()}
 
-// ---------- line extraction ----------
-let raw=null;   // {W,H,layers:{k:[x1,y1,x2,y2,...]}} in depth-map pixels, y down
-function extract(preview){
-  const DW=preview?Math.min(1024,+P.res):+P.res,asp=camera.aspect,W=asp>=1?DW:Math.round(DW*asp),H=asp>=1?Math.round(DW/asp):DW;
+// ---------- tone: light, curvature, cavity, local contrast ----------
+let raw=null;
+const depthMat=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking,side:THREE.DoubleSide});
+const normMat=new THREE.ShaderMaterial({side:THREE.DoubleSide,
+  vertexShader:'varying vec3 vN;void main(){vN=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+  fragmentShader:'varying vec3 vN;void main(){vec3 n=normalize(vN);if(!gl_FrontFacing)n=-n;gl_FragColor=vec4(n*0.5+0.5,1.0);}'});
+function compute(preview){
+  const DW=preview?1024:+P.res,asp=camera.aspect,W=asp>=1?DW:Math.round(DW*asp),H=asp>=1?Math.round(DW/asp):DW;
   const cam=camera.clone();const dist=cam.position.distanceTo(controls.target);cam.near=Math.max(.01,dist-1.2);cam.far=dist+1.2;cam.aspect=W/H;cam.updateProjectionMatrix();cam.updateMatrixWorld();
-  // depth pass
-  const rt=new THREE.WebGLRenderTarget(W,H);
-  const dmat=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking,side:THREE.DoubleSide});
-  const ds=new THREE.Scene();const dm=new THREE.Mesh(mesh.geometry,dmat);ds.add(dm);
-  renderer.setRenderTarget(rt);renderer.setClearColor(0xffffff,1);renderer.clear();renderer.render(ds,cam);
-  const px=new Uint8Array(W*H*4);renderer.readRenderTargetPixels(rt,0,0,W,H,px);renderer.setRenderTarget(null);rt.dispose();dmat.dispose();
-  // tone pass: smooth light-and-shade of the surface, used to decide where hatching runs and how thick each line swells
   const right=new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld,0),upv=new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld,1),back=new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld,2);
   const az=THREE.MathUtils.degToRad(P.lightAz),el=THREE.MathUtils.degToRad(P.lightEl);
   const Lv=right.multiplyScalar(Math.sin(az)*Math.cos(el)).add(upv.multiplyScalar(Math.sin(el))).add(back.multiplyScalar(Math.cos(az)*Math.cos(el))).normalize();
-  const tmat=new THREE.ShaderMaterial({side:THREE.DoubleSide,uniforms:{L:{value:Lv},dark:{value:P.hatchDark},wrap:{value:P.wrap},fillk:{value:P.fill},gam:{value:Math.pow(2,-P.midtone)}},
+  const toneMat=new THREE.ShaderMaterial({side:THREE.DoubleSide,uniforms:{L:{value:Lv},wrap:{value:P.wrap},fillk:{value:P.fill}},
     vertexShader:'varying vec3 vN;void main(){vN=normal;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
-    fragmentShader:'uniform vec3 L;uniform float dark;uniform float wrap;uniform float fillk;uniform float gam;varying vec3 vN;void main(){vec3 n=normalize(vN);if(!gl_FrontFacing)n=-n;float c=dot(n,L);float d=clamp((c+wrap)/(1.0+wrap),0.0,1.0);float lit=0.1+0.9*d+fillk*0.28*max(0.0,-c)*(1.0-d);float t=clamp(1.0-lit,0.0,1.0);t=pow(t,gam);t=clamp(t+dark,0.0,1.0);gl_FragColor=vec4(t,t,t,1.0);}'});
-  const rt2=new THREE.WebGLRenderTarget(W,H);dm.material=tmat;renderer.setRenderTarget(rt2);renderer.setClearColor(0x000000,1);renderer.clear();renderer.render(ds,cam);
-  const tp=new Uint8Array(W*H*4);renderer.readRenderTargetPixels(rt2,0,0,W,H,tp);renderer.setRenderTarget(null);rt2.dispose();tmat.dispose();draw();
-  const toneTD=new Uint8Array(W*H);for(let y=0;y<H;y++)for(let x=0;x<W;x++)toneTD[y*W+x]=tp[((H-1-y)*W+x)*4];
-  const near=cam.near,far=cam.far,lin=new Float32Array(W*H)
-  for(let i=0;i<W*H;i++){const d=(255/256)*(px[i*4]/255/16777216+px[i*4+1]/255/65536+px[i*4+2]/255/256+px[i*4+3]/255);
-    lin[i]=d>=.9999?1e9:(near*far)/(far-(far-near)*d)}
-  // ambient-occlusion stand-in: pixels sitting deeper than their surroundings (eye sockets, under the nose, folds) get darker
-  if(P.cavity>0){const R=Math.max(3,Math.round(Math.min(W,H)*.012)),SW=W+1,sum=new Float64Array(SW*(H+1)),cnt=new Float64Array(SW*(H+1));
-    for(let y=0;y<H;y++){let rs=0,rc=0;for(let x=0;x<W;x++){const v=lin[(H-1-y)*W+x];if(v<1e8){rs+=v;rc++}sum[(y+1)*SW+x+1]=sum[y*SW+x+1]+rs;cnt[(y+1)*SW+x+1]=cnt[y*SW+x+1]+rc}}
-    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const v=lin[(H-1-y)*W+x];if(v>=1e8)continue;
-      const x0=Math.max(0,x-R),x1=Math.min(W,x+R+1),y0=Math.max(0,y-R),y1=Math.min(H,y+R+1);
-      const c=cnt[y1*SW+x1]-cnt[y0*SW+x1]-cnt[y1*SW+x0]+cnt[y0*SW+x0];if(c<1)continue;
-      const m=(sum[y1*SW+x1]-sum[y0*SW+x1]-sum[y1*SW+x0]+sum[y0*SW+x0])/c,cav=Math.min(1,Math.max(0,(v-m)/.035));
-      const i=y*W+x;toneTD[i]=Math.min(255,toneTD[i]+Math.round(P.cavity*cav*170))}}
-  const m=new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix,cam.matrixWorldInverse).elements;
-  const cp=cam.position,eps=.004*P.eps;
-  const layers={sil:[],crease:[],border:[],slice:[],hatch:[]};
-  // project a 3D point: returns [sx, sy(top-down), w]
-  const pr=(x,y,z,o)=>{const w=m[3]*x+m[7]*y+m[11]*z+m[15];o[0]=((m[0]*x+m[4]*y+m[8]*z+m[12])/w*.5+.5)*W;o[1]=(1-((m[1]*x+m[5]*y+m[9]*z+m[13])/w*.5+.5))*H;o[2]=w};
-  const A=[0,0,0],B=[0,0,0],S=[0,0,0];
-  function visSeg(ax,ay,az,bx,by,bz,out,thr){
-    pr(ax,ay,az,A);pr(bx,by,bz,B);if(A[2]<=0||B[2]<=0)return;
-    const len=Math.hypot(B[0]-A[0],B[1]-A[1]),n=Math.max(1,Math.ceil(len/1.2));let run=-1,lx=0,ly=0;
-    for(let i=0;i<=n;i++){const t=i/n;const sx=A[0]+(B[0]-A[0])*t,sy=A[1]+(B[1]-A[1])*t,sw=A[2]+(B[2]-A[2])*t;
-      const ix=Math.floor(sx),iy=Math.floor(sy);let vis=false;
-      if(ix>=0&&iy>=0&&ix<W&&iy<H){let dz=lin[(H-1-iy)*W+ix];
-        // also accept if any neighbour pixel is farther (point sits on a depth edge)
-        if(sw<=dz+eps)vis=true;else{for(let oy=-1;oy<=1&&!vis;oy++)for(let ox=-1;ox<=1;ox++){const jx=ix+ox,jy=iy+oy;if(jx<0||jy<0||jx>=W||jy>=H)continue;if(sw<=lin[(H-1-jy)*W+jx]+eps){vis=true;break}}}}
-      if(vis&&thr!==undefined)vis=toneTD[iy*W+ix]/255>thr;
-      if(vis){if(run<0){run=i;lx=sx;ly=sy}}
-      else if(run>=0){const pt=(i-1)/n;if(i-1>run)out.push(lx,ly,A[0]+(B[0]-A[0])*pt,A[1]+(B[1]-A[1])*pt);run=-1}}
-    if(run>=0&&n>run)out.push(lx,ly,B[0],B[1]);
-  }
-  const front=f=>fN[f*3]*(cp.x-fC[f*3])+fN[f*3+1]*(cp.y-fC[f*3+1])+fN[f*3+2]*(cp.z-fC[f*3+2])>0;
-  const cosT=Math.cos(THREE.MathUtils.degToRad(P.creaseAngle));
-  for(let e=0;e<E;e++){const f1=eF1[e],f2=eF2[e];let L=null;
-    if(f2<0){if(P.border)L=layers.border}
-    else{const a=front(f1),b=front(f2);if(a!==b){if(P.sil)L=layers.sil}else if(a&&P.crease&&eCos[e]<cosT)L=layers.crease}
-    if(!L)continue;const i=eA[e]*3,j=eB[e]*3;visSeg(pos[i],pos[i+1],pos[i+2],pos[j],pos[j+1],pos[j+2],L)}
-  if(P.slice){const ax=P.sliceAxis==='높이'?1:P.sliceAxis==='옆'?0:2,N=P.sliceCount,step=2/(N+1);
-    for(let f=0;f<F;f++){const v=[idx[f*3]*3,idx[f*3+1]*3,idx[f*3+2]*3],h=v.map(o=>pos[o+ax]);
-      const lo=Math.min(...h),hi=Math.max(...h);let k0=Math.ceil((lo+1)/step),k1=Math.floor((hi+1)/step);
-      for(let k=Math.max(1,k0);k<=Math.min(N,k1);k++){const c=-1+k*step,pts=[];
-        for(let s=0;s<3;s++){const a=v[s],b=v[(s+1)%3],ha=h[s],hb=h[(s+1)%3];if((ha-c)*(hb-c)<0||(ha===c&&hb!==c)){const t=(c-ha)/(hb-ha);pts.push(pos[a]+(pos[b]-pos[a])*t,pos[a+1]+(pos[b+1]-pos[a+1])*t,pos[a+2]+(pos[b+2]-pos[a+2])*t)}}
-        if(pts.length>=6)visSeg(pts[0],pts[1],pts[2],pts[3],pts[4],pts[5],layers.slice)}}}
-  let hatchLines=[];
-  const darkOnly=!P.hatch&&P.screen&&P.screenLines;
-  if(P.hatch||darkOnly){
-    // screen-space engraving: evenly spaced streamlines that follow the projected direction of rings wrapped around the body
-    const AXV={'높이':[0,1,0],'옆':[1,0,0],'앞뒤':[0,0,1]}[P.hatchDir];
-    const R0=new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld,0);
-    const dirMat=new THREE.ShaderMaterial({side:THREE.DoubleSide,uniforms:{U:{value:new THREE.Vector3(...AXV)},R:{value:R0},res:{value:new THREE.Vector2(W,H)}},
-      vertexShader:'uniform vec3 U;uniform vec3 R;uniform vec2 res;varying vec2 vD;void main(){vec3 n=normalize(normal);vec3 T=cross(n,U);float l=length(T);if(l<0.3){T=T+cross(n,R)*(0.3-l)*3.0;}T=normalize(T);vec4 p0=projectionMatrix*modelViewMatrix*vec4(position,1.0);vec4 p1=projectionMatrix*modelViewMatrix*vec4(position+T*0.02,1.0);vec2 d=(p1.xy/p1.w-p0.xy/p0.w)*res;float a=atan(d.y,d.x);vD=vec2(cos(2.0*a),sin(2.0*a));gl_Position=p0;}',
-      fragmentShader:'varying vec2 vD;void main(){vec2 v=vD;float l=length(v);v=l>1e-4?v/l:vec2(1.0,0.0);gl_FragColor=vec4(v*0.5+0.5,0.0,1.0);}'});
-    const rt3=new THREE.WebGLRenderTarget(W,H);dm.material=dirMat;renderer.setRenderTarget(rt3);renderer.setClearColor(0x808080,1);renderer.clear();renderer.render(ds,cam);
-    const dp=new Uint8Array(W*H*4);renderer.readRenderTargetPixels(rt3,0,0,W,H,dp);renderer.setRenderTarget(null);rt3.dispose();dirMat.dispose();draw();
-    const DX=new Float32Array(W*H),DY=new Float32Array(W*H),DEP=new Float32Array(W*H);let bx0=W,bx1=0,by0=H,by1=0;
-    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const src=((H-1-y)*W+x),i=y*W+x;DEP[i]=lin[src];
-      const c2=dp[src*4]/255*2-1,s2=dp[src*4+1]/255*2-1,th=Math.atan2(s2,c2)/2;DX[i]=Math.cos(th);DY[i]=-Math.sin(th);
-      if(lin[src]<1e8){if(x<bx0)bx0=x;if(x>bx1)bx1=x;if(y<by0)by0=y;if(y>by1)by1=y}}
-    let[pw,ph]=PAPERS[P.paper];if(P.orient==='가로')[pw,ph]=[ph,pw];
-    const sc=Math.min(Math.max(10,pw-2*P.margin)/Math.max(1,bx1-bx0),Math.max(10,ph-2*P.margin)/Math.max(1,by1-by0));
-    const base=Math.max(2,P.hatchGap/sc),cross=THREE.MathUtils.degToRad(P.hatchCross);
-    const fams=darkOnly?[[0,.55,1]]:[[0,.03,1],[cross,.5,1.3],[-cross,.74,1.6]].slice(0,P.hatchLayers);
-    fams.forEach(([rot,thr,mul],fi)=>{const sep=base*mul;for(const l of traceFamily(rot,thr,sep))hatchLines.push({p:l.p,t:l.t,f:fi})});
-    function traceFamily(rot,thr,dsep){
-      const cr=Math.cos(rot),sr=Math.sin(rot),h=.8,dtest=dsep*.4,cell=dsep,grid=new Map(),out=[];
-      const ok=(x,y)=>{if(x<0||y<0||x>=W-1||y>=H-1)return false;const i=(y|0)*W+(x|0);return DEP[i]<1e8&&toneTD[i]/255>thr-.06};
-      const dir=(x,y,o)=>{const i=(y|0)*W+(x|0),dx=DX[i],dy=DY[i];o[0]=dx*cr-dy*sr;o[1]=dx*sr+dy*cr};
-      const ck=(cx,cy)=>cx*65536+cy;
-      const free=(x,y,d)=>{const cx=Math.floor(x/cell),cy=Math.floor(y/cell),d2=d*d;
-        for(let ox=-1;ox<=1;ox++)for(let oy=-1;oy<=1;oy++){const a=grid.get(ck(cx+ox,cy+oy));if(!a)continue;for(let k=0;k<a.length;k+=2){const ex=a[k]-x,ey=a[k+1]-y;if(ex*ex+ey*ey<d2)return false}}return true};
-      const addPt=(x,y)=>{const k=ck(Math.floor(x/cell),Math.floor(y/cell));let a=grid.get(k);if(!a)grid.set(k,a=[]);a.push(x,y)};
-      const d1=[0,0],d2=[0,0];
-      function walk(x0,y0,sx,sy){const pts=[];let x=x0,y=y0,px=sx,py=sy;
-        for(let n=0;n<12000;n++){dir(x,y,d1);if(d1[0]*px+d1[1]*py<0){d1[0]=-d1[0];d1[1]=-d1[1]}
-          const mx=x+d1[0]*h/2,my=y+d1[1]*h/2;if(!ok(mx,my))break;dir(mx,my,d2);if(d2[0]*d1[0]+d2[1]*d1[1]<0){d2[0]=-d2[0];d2[1]=-d2[1]}
-          const nx=x+d2[0]*h,ny=y+d2[1]*h;if(!ok(nx,ny))break;
-          if(Math.abs(DEP[(ny|0)*W+(nx|0)]-DEP[(y|0)*W+(x|0)])>.04)break;
-          if(!free(nx,ny,dtest))break;
-          if(n>40&&Math.hypot(nx-x0,ny-y0)<h*1.5)break;
-          pts.push(nx,ny);px=d2[0];py=d2[1];x=nx;y=ny}
-        return pts}
-      function trace(x,y){const d=[0,0];dir(x,y,d);const f=walk(x,y,d[0],d[1]),b=walk(x,y,-d[0],-d[1]);
-        const p=[];for(let i=b.length-2;i>=0;i-=2)p.push(b[i],b[i+1]);p.push(x,y);for(let i=0;i<f.length;i++)p.push(f[i]);
-        if(p.length/2*h<dsep*3)return null;return p}
-      const queue=[],scan=[];let qi=0;for(let y=by0;y<=by1;y+=dsep)for(let x=bx0;x<=bx1;x+=dsep)scan.push(x,y);let si=0;
-      for(let guard=0;guard<200000;guard++){let x,y;
-        if(qi<queue.length){x=queue[qi++];y=queue[qi++]}else if(si<scan.length){x=scan[si++];y=scan[si++]}else break;
-        if(!ok(x,y)||!free(x,y,dsep*.98))continue;const p=trace(x,y);if(!p)continue;
-        for(let i=0;i<p.length;i+=4)addPt(p[i],p[i+1]);
-        const t=[];for(let i=0;i<p.length;i+=2)t.push(toneTD[(p[i+1]|0)*W+(p[i]|0)]/255);out.push({p,t});
-        const every=Math.max(2,Math.round(dsep/h))*2;
-        for(let i=2;i<p.length-2;i+=every){const tx=p[i+2]-p[i-2],ty=p[i+3]-p[i-1],tl=Math.hypot(tx,ty)||1,nx=-ty/tl*dsep,ny=tx/tl*dsep;queue.push(p[i]+nx,p[i+1]+ny,p[i]-nx,p[i+1]-ny)}}
-      return out}
-  }
-  let dots=[],screenRuns=[];   // dots: x,y pairs of pen touches
-  if(P.screen){
-    // screentone: a rotated square grid of dots, each one's area matching the local darkness
-    let x0=W,x1=0,y0=H,y1=0;for(let y=0;y<H;y++)for(let x=0;x<W;x++)if(lin[(H-1-y)*W+x]<1e8){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}
-    let[pw,ph]=PAPERS[P.paper];if(P.orient==='가로')[pw,ph]=[ph,pw];
-    const sc=Math.min(Math.max(10,pw-2*P.margin)/Math.max(1,x1-x0),Math.max(10,ph-2*P.margin)/Math.max(1,y1-y0));
-    // every site on a fine rotated grid is either one pen touch or nothing; darkness decides how many sites switch on
-    const sg=Math.max(.75,P.screenGap/sc),a=THREE.MathUtils.degToRad(P.screenAngle),ca=Math.cos(a),sa=Math.sin(a);
-    const cx=(x0+x1)/2,cy=(y0+y1)/2,Rr=Math.hypot(x1-x0,y1-y0)/2+sg,n=Math.ceil(Rr/sg);
-    const CL=[12,5,6,13,4,0,1,7,11,3,2,8,15,10,9,14],BY=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5];
-    const thrAt=(iu,iv)=>{if(P.screenMode==='점묘'){const h=Math.sin(iu*12.9898+iv*78.233)*43758.5453;return h-Math.floor(h)}
-      const M=P.screenMode==='스크린톤'?CL:BY;return(M[((iu%4+4)%4)*4+((iv%4+4)%4)]+.5)/16};
-    for(let iv=-n;iv<=n;iv++){const row=[];
-      for(let iu=-n;iu<=n;iu++){const u=iu*sg,v=iv*sg,x=cx+u*ca-v*sa,y=cy+u*sa+v*ca,ix=Math.round(x),iy=Math.round(y);
-        if(ix<0||iy<0||ix>=W||iy>=H||lin[(H-1-iy)*W+ix]>=1e8)continue;const t=toneTD[iy*W+ix]/255;
-        if(t>P.screenMin&&t>thrAt(iu,iv))row.push(x,y)}
-      if(iv&1)for(let k=row.length-2;k>=0;k-=2)dots.push(row[k],row[k+1]);else for(let k=0;k<row.length;k++)dots.push(row[k])}   // serpentine order keeps pen travel short
-  }
-  raw={W,H,layers,tone:toneTD,hatchLines,dots,screenRuns,darkOnly,preview:!!preview&&+P.res>1024};stale=false;$('stale').hidden=!raw.preview;
+    fragmentShader:'uniform vec3 L;uniform float wrap;uniform float fillk;varying vec3 vN;void main(){vec3 n=normalize(vN);if(!gl_FrontFacing)n=-n;float c=dot(n,L);float d=clamp((c+wrap)/(1.0+wrap),0.0,1.0);float lit=0.08+0.92*d+fillk*0.3*max(0.0,-c)*(1.0-d);float t=clamp(1.0-lit,0.0,1.0)*255.0;gl_FragColor=vec4(floor(t)/255.0,fract(t),0.0,1.0);}'});
+  const rt=new THREE.WebGLRenderTarget(W,H),sc=new THREE.Scene(),m=new THREE.Mesh(mesh.geometry,depthMat);sc.add(m);
+  const read=(mt,clear)=>{m.material=mt;renderer.setRenderTarget(rt);renderer.setClearColor(clear,1);renderer.clear();renderer.render(sc,cam);const px=new Uint8Array(W*H*4);renderer.readRenderTargetPixels(rt,0,0,W,H,px);return px};
+  const dp=read(depthMat,0xffffff),tp=read(toneMat,0x000000),np=read(normMat,0x8080ff);
+  renderer.setRenderTarget(null);rt.dispose();toneMat.dispose();draw();
+  const N=W*H,near=cam.near,far=cam.far,lin=new Float32Array(N),M=new Uint8Array(N),L=new Float32Array(N),NX=new Float32Array(N),NY=new Float32Array(N);
+  let bx0=W,bx1=-1,by0=H,by1=-1;
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const s=((H-1-y)*W+x)*4,i=y*W+x;
+    const d=(255/256)*(dp[s]/255/16777216+dp[s+1]/255/65536+dp[s+2]/255/256+dp[s+3]/255);
+    if(d>=.9999){lin[i]=1e9;continue}
+    lin[i]=(near*far)/(far-(far-near)*d);M[i]=1;
+    L[i]=(tp[s]+tp[s+1]/255)/255;NX[i]=np[s]/127.5-1;NY[i]=np[s+1]/127.5-1;
+    if(x<bx0)bx0=x;if(x>bx1)bx1=x;if(y<by0)by0=y;if(y>by1)by1=y}
+  if(bx1<0){raw=null;return}
+  const SW=W+1;
+  const sat=(A,mask)=>{const S=new Float64Array(SW*(H+1));for(let y=0;y<H;y++){let rs=0;for(let x=0;x<W;x++){const i=y*W+x;if(M[i])rs+=mask?1:A[i];S[(y+1)*SW+x+1]=S[y*SW+x+1]+rs}}return S};
+  const box=(S,x0,y0,x1,y1)=>S[y1*SW+x1]-S[y0*SW+x1]-S[y1*SW+x0]+S[y0*SW+x0];
+  const SM=sat(null,true);
+  // curvature from the view-space normal map: divergence of the normal, convex > 0
+  const r=Math.max(1,Math.round(W/900)),K=new Float32Array(N);
+  for(let y=r;y<H-r;y++)for(let x=r;x<W-r;x++){const i=y*W+x;if(!M[i])continue;
+    const a=M[i+r]?NX[i+r]:NX[i],b=M[i-r]?NX[i-r]:NX[i],c=M[i-r*W]?NY[i-r*W]:NY[i],e=M[i+r*W]?NY[i+r*W]:NY[i];
+    K[i]=((a-b)+(c-e))/(2*r)*W/120}
+  const SK=sat(K,false),kr=r;
+  // depth cavity: deeper than the neighbourhood means occluded
+  const SD=sat(lin,false),R1=Math.max(3,Math.round(Math.min(W,H)*.012));
+  const T=new Float32Array(N);
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x;if(!M[i])continue;
+    let x0=Math.max(0,x-kr),x1=Math.min(W,x+kr+1),y0=Math.max(0,y-kr),y1=Math.min(H,y+kr+1);
+    const kc=box(SM,x0,y0,x1,y1),kv=kc?box(SK,x0,y0,x1,y1)/kc:0;
+    x0=Math.max(0,x-R1);x1=Math.min(W,x+R1+1);y0=Math.max(0,y-R1);y1=Math.min(H,y+R1+1);
+    const dc=box(SM,x0,y0,x1,y1),dm=dc?box(SD,x0,y0,x1,y1)/dc:lin[i],cav=Math.min(1,Math.max(0,(lin[i]-dm)/.035));
+    T[i]=L[i]-P.curv*.35*Math.tanh(kv)+P.cavity*.6*cav}
+  // local contrast (unsharp) keeps small forms readable inside big lit or shaded areas
+  const ST=sat(T,false),R2=Math.max(4,Math.round(Math.min(W,H)*.015)),g=Math.pow(2,-P.midtone);
+  const OUT=new Float32Array(N);
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x;if(!M[i])continue;
+    const x0=Math.max(0,x-R2),x1=Math.min(W,x+R2+1),y0=Math.max(0,y-R2),y1=Math.min(H,y+R2+1),c=box(SM,x0,y0,x1,y1),bl=c?box(ST,x0,y0,x1,y1)/c:T[i];
+    let t=T[i]+P.local*(T[i]-bl);t=Math.min(1,Math.max(0,t));t=Math.pow(t,g);t=Math.min(1,Math.max(0,t+P.dark));
+    OUT[i]=P.floor+(1-P.floor)*t}
+  raw={W,H,SM,ST:sat(OUT,false),bx0,bx1,by0,by1,preview:!!preview&&+P.res>1024,box,SW};
+  $('stale').hidden=!raw.preview;
 }
 
-// ---------- post-processing ----------
-let polys=null,paperSvg='';
-function chain(seg){
-  // join segment ends that meet within 2 px (tiny gaps come from the visibility sampling)
-  const n=seg.length/4,T=2,cell=(x,y)=>Math.floor(x/T)*100003+Math.floor(y/T),grid=new Map(),used=new Uint8Array(n),out=[];
-  for(let e=0;e<n*2;e++){const x=seg[e*2],y=seg[e*2+1],k=cell(x,y);let a=grid.get(k);if(!a)grid.set(k,a=[]);a.push(e)}
-  const next=(x,y)=>{const cx=Math.floor(x/T),cy=Math.floor(y/T);let best=-1,bd=T*T;
-    for(let ox=-1;ox<=1;ox++)for(let oy=-1;oy<=1;oy++){const a=grid.get((cx+ox)*100003+cy+oy);if(!a)continue;
-      for(const e of a){if(used[e>>1])continue;const dx=seg[e*2]-x,dy=seg[e*2+1]-y,d=dx*dx+dy*dy;if(d<=bd){bd=d;best=e}}}
-    return best};
-  for(let s=0;s<n;s++){if(used[s])continue;used[s]=1;const line=[seg[s*4],seg[s*4+1],seg[s*4+2],seg[s*4+3]];
-    for(let dir=0;dir<2;dir++){
-      for(;;){const L=line.length,x=dir?line[0]:line[L-2],y=dir?line[1]:line[L-1];const e=next(x,y);if(e<0)break;const i=e>>1;used[i]=1;
-        const o=(e&1)?0:1,fx=seg[i*4+o*2],fy=seg[i*4+o*2+1];
-        if(dir)line.unshift(fx,fy);else line.push(fx,fy)}}
-    out.push(line)}
-  return out;
-}
-function rdp(pts,tol){if(pts.length<=4||tol<=0)return pts;const n=pts.length/2,keep=new Uint8Array(n);keep[0]=keep[n-1]=1;const st=[[0,n-1]];
-  while(st.length){const[a,b]=st.pop();const ax=pts[a*2],ay=pts[a*2+1],bx=pts[b*2],by=pts[b*2+1],dx=bx-ax,dy=by-ay,l=Math.hypot(dx,dy);let md=0,mi=-1;
-    for(let i=a+1;i<b;i++){const d=l<1e-6?Math.hypot(pts[i*2]-ax,pts[i*2+1]-ay):Math.abs((pts[i*2]-ax)*dy-(pts[i*2+1]-ay)*dx)/l;if(d>md){md=d;mi=i}}
-    if(md>tol){keep[mi]=1;st.push([a,mi],[mi,b])}}
-  const o=[];for(let i=0;i<n;i++)if(keep[i])o.push(pts[i*2],pts[i*2+1]);return o}
-function chaikin(pts,it){for(let k=0;k<it;k++){if(pts.length<6)return pts;const o=[pts[0],pts[1]];
-  for(let i=0;i<pts.length/2-1;i++){const x0=pts[i*2],y0=pts[i*2+1],x1=pts[i*2+2],y1=pts[i*2+3];o.push(.75*x0+.25*x1,.75*y0+.25*y1,.25*x0+.75*x1,.25*y0+.75*y1)}
-  o.push(pts[pts.length-2],pts[pts.length-1]);pts=o}return pts}
-function postProcess(){
-  if(!raw){renderPaper();return}
-  let mnx=1e9,mny=1e9,mxx=-1e9,mxy=-1e9;
-  const grow=a=>{for(let i=0;i<a.length;i+=2){const x=a[i],y=a[i+1];if(x<mnx)mnx=x;if(x>mxx)mxx=x;if(y<mny)mny=y;if(y>mxy)mxy=y}};
-  for(const k in raw.layers)grow(raw.layers[k]);for(const h of raw.hatchLines||[])grow(h.p);
+// ---------- screen: same-size pen dots, density only ----------
+let pens=null,geo=null;
+const hash=(a,b,c)=>{const h=Math.sin(a*12.9898+b*78.233+c*37.719)*43758.5453;return h-Math.floor(h)};
+function clusterMatrix(c){const pts=[],m=(c-1)/2;for(let a=0;a<c;a++)for(let b=0;b<c;b++)pts.push([a,b,Math.hypot(a-m,b-m)+Math.atan2(b-m,a-m)*1e-3]);
+  pts.sort((p,q)=>p[2]-q[2]);const M=new Float32Array(c*c);pts.forEach((p,r)=>{M[p[0]*c+p[1]]=(r+.5)/(c*c)});return M}
+function bayer(n){let M=[[0]];while(M.length<n){const s=M.length,N=[];for(let y=0;y<s*2;y++){N.push([]);for(let x=0;x<s*2;x++)N[y].push(4*M[y%s][x%s]+[0,2,3,1][(y<s?0:2)+(x<s?0:1)])}M=N}
+  const out=new Float32Array(n*n);for(let y=0;y<n;y++)for(let x=0;x<n;x++)out[y*n+x]=(M[y][x]+.5)/(n*n);return out}
+const BAYER=bayer(8);
+function layout(){
+  if(!raw){pens=null;return}
+  const{W,H,SM,ST,bx0,bx1,by0,by1,box}=raw;
   let[pw,ph]=PAPERS[P.paper];if(P.orient==='가로')[pw,ph]=[ph,pw];
-  const bw=Math.max(1,mxx-mnx),bh=Math.max(1,mxy-mny),aw=Math.max(10,pw-2*P.margin),ah=Math.max(10,ph-2*P.margin),s=Math.min(aw/bw,ah/bh);
-  const ox=(pw-bw*s)/2-mnx*s,oy=(ph-bh*s)/2-mny*s;
-  polys={pw,ph,layers:{},s,ox,oy};
-  polys.dots=(raw.dots||[]).map((v,i)=>i%2?v*s+oy:v*s+ox);
-  polys.hatch=(raw.hatchLines||[]).map(h=>({p:h.p.map((v,i)=>i%2?v*s+oy:v*s+ox),t:h.t,f:h.f}));
-  for(const L of LAYERS){if(L.k==='screen')continue;if(L.k==='hatch'){polys.layers.hatch=polys.hatch;continue}const seg=raw.layers[L.k];if(!seg||!seg.length){polys.layers[L.k]=[];continue}
-    const lines=chain(seg).map(l=>chaikin(rdp(l,P.simplify),P.smooth)).map(l=>l.map((v,i)=>i%2?v*s+oy:v*s+ox))
-      .filter(l=>{let len=0;for(let i=2;i<l.length;i+=2)len+=Math.hypot(l[i]-l[i-2],l[i+1]-l[i-1]);return len>=P.minLen});
-    polys.layers[L.k]=lines}
-  polys.layers.screen=new Array(polys.dots.length/2).fill(1);
-  styleLines();renderPaper();renderStats();
+  const bw=bx1-bx0+1,bh=by1-by0+1,s=Math.min(Math.max(10,pw-2*P.margin)/bw,Math.max(10,ph-2*P.margin)/bh);
+  const ox=(pw-bw*s)/2-bx0*s,oy=(ph-bh*s)/2-by0*s;geo={pw,ph,s,ox,oy};
+  const toneAt=(x,y,rmm)=>{const px=(x-ox)/s,py=(y-oy)/s,rr=Math.max(.5,rmm/s);
+    const x0=Math.max(0,Math.floor(px-rr)),x1=Math.min(W,Math.ceil(px+rr)),y0=Math.max(0,Math.floor(py-rr)),y1=Math.min(H,Math.ceil(py+rr));
+    if(x1<=x0||y1<=y0)return -1;const c=box(SM,x0,y0,x1,y1);if(c<(x1-x0)*(y1-y0)*.4)return -1;return box(ST,x0,y0,x1,y1)/c};
+  const NP=+P.penCount,ws=[P.pen1,P.pen2,P.pen3].slice(0,NP);
+  const c1=NP>1?P.cap1:1,c2=NP>2?Math.max(P.cap2,c1+.05):1;
+  const cum=(t,i)=>i===0?0:i===1?Math.min(t,c1):i===2?Math.min(t,c2):t;
+  const CL=clusterMatrix(+P.cell);
+  const ox0=ox+bx0*s,oy0=oy+by0*s,ox1=ox+(bx1+1)*s,oy1=oy+(by1+1)*s;
+  pens=ws.map((w,pi)=>{
+    const p=w*P.spacing,cmax=Math.min(1,Math.PI/4/(P.spacing*P.spacing));
+    const ang=THREE.MathUtils.degToRad(P.angle+[0,30,-30][pi]),ca=Math.cos(ang),sa=Math.sin(ang);
+    let u0=1e9,u1=-1e9,v0=1e9,v1=-1e9;for(const[x,y]of[[ox0,oy0],[ox1,oy0],[ox0,oy1],[ox1,oy1]]){const u=x*ca+y*sa,v=-x*sa+y*ca;u0=Math.min(u0,u);u1=Math.max(u1,u);v0=Math.min(v0,v);v1=Math.max(v1,v)}
+    const iu0=Math.floor(u0/p),iu1=Math.ceil(u1/p),iv0=Math.floor(v0/p),iv1=Math.ceil(v1/p),nu=iu1-iu0+1;
+    const dots=[];let errA=new Float32Array(nu+2),errB=new Float32Array(nu+2);
+    for(let iv=iv0;iv<=iv1;iv++){const rev=(iv-iv0)&1,row=[];
+      for(let k=0;k<nu;k++){const j=rev?nu-1-k:k,iu=iu0+j,u=iu*p,v=iv*p,x=u*ca-v*sa,y=u*sa+v*ca;
+        const t=toneAt(x,y,p/2);let f=0;
+        if(t>=0){const a=cum(t,pi),b=cum(t,pi+1);f=Math.min(1,Math.max(0,(1-(1-b)/(1-a+1e-6))/cmax))}
+        let on=false;
+        if(P.method==='오차 확산'){if(t<0){errB[j+1]=0;continue}const val=f+errA[j+1];on=val>=.5;const e=val-(on?1:0);
+          if(rev){errA[j]+=e*7/16;errB[j+2]+=e*3/16;errB[j+1]+=e*5/16;errB[j]+=e/16}else{errA[j+2]+=e*7/16;errB[j]+=e*3/16;errB[j+1]+=e*5/16;errB[j+2]+=e/16}}
+        else if(t>=0&&f>0){const c=+P.cell;
+          const thr=P.method==='스크린톤'?CL[(((iu%c)+c)%c)*c+(((iv%c)+c)%c)]:P.method==='규칙'?BAYER[(((iv%8)+8)%8)*8+(((iu%8)+8)%8)]:hash(iu,iv,pi);
+          on=f>thr}
+        if(on)row.push(x,y)}
+      for(let q=0;q<row.length;q++)dots.push(row[q]);
+      if(P.method==='오차 확산'){const tmp=errA;errA=errB;errB=tmp;errB.fill(0)}}
+    let travel=0;for(let q=2;q<dots.length;q+=2)travel+=Math.hypot(dots[q]-dots[q-2],dots[q+1]-dots[q-1]);
+    return{w,p,cmax,dots:new Float32Array(dots),travel}});
+  const pr=pens[0];$('dotInfo').textContent=`펜 ${pr.w.toFixed(2)}mm · 점 간격 ${pr.p.toFixed(2)}mm · 가장 어둡게 찍을 수 있는 밀도 약 ${Math.round(pr.cmax*100)}%`+(P.spacing<1?' (점끼리 살짝 겹침)':'');
 }
-// turn centre lines into what is actually drawn: swelling filled strokes, stacked plotter passes, or plain lines
-function resample(l,step){const o=[l[0],l[1]];let carry=0;
-  for(let i=2;i<l.length;i+=2){const x0=l[i-2],y0=l[i-1],x1=l[i],y1=l[i+1],d=Math.hypot(x1-x0,y1-y0);let t=step-carry;
-    while(t<=d){o.push(x0+(x1-x0)*t/d,y0+(y1-y0)*t/d);t+=step}carry=d-(t-step)}
-  const L=o.length;if(o[L-2]!==l[l.length-2]||o[L-1]!==l[l.length-1])o.push(l[l.length-2],l[l.length-1]);return o}
-function styleLines(){
-  const{s,ox,oy}=polys,T=raw.tone,W=raw.W,H=raw.H;
-  const tAt=(x,y)=>{let px=Math.floor((x-ox)/s),py=Math.floor((y-oy)/s);let best=0;
-    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const qx=px+dx,qy=py+dy;if(qx<0||qy<0||qx>=W||qy>=H)continue;const v=T[qy*W+qx];if(v>best)best=v}return best/255};
-  const sm=x=>{x=Math.min(1,Math.max(0,x));return x*x*(3-2*x)};
-  polys.out={};
-  styleHatch(sm);styleScreen();
-  for(const L of LAYERS){if(L.k==='hatch'||L.k==='screen')continue;const lines=polys.layers[L.k],res=[];polys.out[L.k]=res;if(!lines.length)continue;
-    for(const l0 of lines){
-      if(P.lineStyle==='단순 선'){res.push({stroke:l0});continue}
-      const l=resample(l0,.5),n=l.length/2;if(n<2){res.push({stroke:l0});continue}
-      const cum=[0];for(let i=1;i<n;i++)cum.push(cum[i-1]+Math.hypot(l[i*2]-l[i*2-2],l[i*2+1]-l[i*2-1]));const tot=cum[n-1];
-      const w=new Float32Array(n);
-      for(let i=0;i<n;i++){const t=tAt(l[i*2],l[i*2+1]);let wi;
-        if(L.k==='hatch')wi=P.lineMin+(P.lineMax-P.lineMin)*sm((t-.15)/.8);
-        else if(L.k==='sil')wi=P.contourW*(.7+.6*sm(t));
-        else wi=P.lineMin+(P.contourW-P.lineMin)*sm(t);
-        if(P.taper>0){const e=Math.min(cum[i],tot-cum[i]);wi*=.25+.75*sm(e/P.taper)}
-        w[i]=Math.max(P.lineMin*.6,wi)}
-      // per-point normals
-      const nx=new Float32Array(n),ny=new Float32Array(n);
-      for(let i=0;i<n;i++){const a=Math.max(0,i-1),b=Math.min(n-1,i+1);let dx=l[b*2]-l[a*2],dy=l[b*2+1]-l[a*2+1];const d=Math.hypot(dx,dy)||1;nx[i]=-dy/d;ny[i]=dx/d}
-      if(P.lineStyle==='판화'){const left=[],right=[];
-        for(let i=0;i<n;i++){const h=w[i]/2;left.push(l[i*2]+nx[i]*h,l[i*2+1]+ny[i]*h);right.push(l[i*2]-nx[i]*h,l[i*2+1]-ny[i]*h)}
-        res.push({fill:left,back:right})}
-      else{const wmax=Math.max(...w),k=Math.max(1,Math.round(wmax/P.pen));
-        for(let j=0;j<k;j++){const f=k===1?0:(j+.5)/k-.5,o=[];
-          for(let i=0;i<n;i++){const off=f*Math.max(0,w[i]-P.pen);o.push(l[i*2]+nx[i]*off,l[i*2+1]+ny[i]*off)}
-          res.push({stroke:o})}}
-    }}
-}
-// engraving hatch: swelling strokes in shadow, dashes then dots as the surface turns to light
-function hashRand(i){let x=Math.sin(i*127.1+311.7)*43758.5453;return x-Math.floor(x)}
-function widthItem(pts,ws,res){const n=pts.length/2;if(n<2)return;
-  const nx=[],ny=[];for(let i=0;i<n;i++){const a=Math.max(0,i-1),b=Math.min(n-1,i+1);const dx=pts[b*2]-pts[a*2],dy=pts[b*2+1]-pts[a*2+1],d=Math.hypot(dx,dy)||1;nx.push(-dy/d);ny.push(dx/d)}
-  if(P.lineStyle==='판화'){const L=[],R=[];for(let i=0;i<n;i++){const h=ws[i]/2;L.push(pts[i*2]+nx[i]*h,pts[i*2+1]+ny[i]*h);R.push(pts[i*2]-nx[i]*h,pts[i*2+1]-ny[i]*h)}res.push({fill:L,back:R})}
-  else if(P.lineStyle==='단순 선')res.push({stroke:pts});
-  else{const k=Math.max(1,Math.round(Math.max(...ws)/P.pen));for(let j=0;j<k;j++){const f=k===1?0:(j+.5)/k-.5,o=[];for(let i=0;i<n;i++){const off=f*Math.max(0,ws[i]-P.pen);o.push(pts[i*2]+nx[i]*off,pts[i*2+1]+ny[i]*off)}res.push({stroke:o})}}}
-function styleScreen(){
-  const res=[];polys.out.screen=res;const d=polys.dots||[];
-  for(let i=0;i<d.length;i+=2)res.push({pt:[d[i],d[i+1]]});
-}
-function styleHatch(sm){
-  const res=[];polys.out.hatch=res;if(!polys.hatch.length)return;
-  const TC=.32,TD=.15,T0=.06,thrs=[0,.5,.74];
-  polys.hatch.forEach((h,li)=>{
-    // resample to 0.35 mm with tone carried along
-    const p=h.p,t=h.t,P2=[p[0],p[1]],T2=[t[0]];let carry=0;const step=.35;
-    for(let i=1;i<p.length/2;i++){const x0=p[i*2-2],y0=p[i*2-1],x1=p[i*2],y1=p[i*2+1],d=Math.hypot(x1-x0,y1-y0);let u=step-carry;
-      while(u<=d){const k=u/d;P2.push(x0+(x1-x0)*k,y0+(y1-y0)*k);T2.push(t[i-1]+(t[i]-t[i-1])*k);u+=step}carry=d-(u-step)}
-    const n=T2.length;if(n<3)return;
-    const jit=(hashRand(li*7.3+1)-.5)*.09,tc=(raw.darkOnly?.72:TC)+jit,td=TD+jit*.7,t0=T0+jit*.4;
-    const cont=h.f===0?tc:thrs[h.f]+.04+jit,phase=hashRand(li)*3;
-    // continuous swelling runs
-    let i=0;while(i<n){if(T2[i]<cont){i++;continue}let j=i;while(j<n&&T2[j]>=cont)j++;
-      const run=P2.slice(i*2,j*2),len=(j-i)*step,ws=[];
-      for(let k=i;k<j;k++){const e=Math.min(k-i,j-1-k)*step,tp=P.taper>0?.2+.8*sm(e/Math.min(P.taper,len/2)):1;
-        const base=h.f===0?P.lineMin+(P.lineMax-P.lineMin)*sm((T2[k]-tc)/(1-tc)):(P.lineMin+(P.lineMax-P.lineMin)*.55*sm((T2[k]-cont)/(1-cont)));
-        ws.push(Math.max(P.lineMin*.5,base*tp))}
-      if(raw.darkOnly)for(let q=0;q<ws.length;q++)ws[q]=Math.min(ws[q],P.pen);   // supporting lines stay a single pen pass under the dots
-      if(len>=.6)widthItem(run,ws,res);
-      // dot-and-lozenge: in deep shadow a dot sits in the gap between neighbouring lines
-      if(h.f===0&&P.hatchLozenge&&!raw.darkOnly){let acc=hashRand(li*3.1)*P.hatchGap;const per=P.hatchGap*1.15;
-        for(let k=i+1;k<j-1;k++){const tk=T2[k];acc+=step;if(tk<.62+jit||acc<per)continue;acc=0;
-          const dx=P2[k*2+2]-P2[k*2-2],dy=P2[k*2+3]-P2[k*2-1],dl=Math.hypot(dx,dy)||1,off=P.hatchGap/2;
-          res.push({dot:[P2[k*2]-dy/dl*off,P2[k*2+1]+dx/dl*off,Math.max(.04,P.hatchGap*.13*sm((tk-.62)/.38)+P.lineMin*.4)]})}}
-      i=j}
-    if(h.f!==0||!P.hatchBreak||raw.darkOnly)return;
-    // highlights: dashes, then dots, each line with its own phase so neighbours do not line up
-    let acc=phase,on=false,start=0;
-    for(let k=0;k<n;k++){const tk=T2[k];
-      if(tk>=td&&tk<tc){const u=(tk-td)/(tc-td),dash=.4+2.2*u,gap=.55+.3*(1-u);acc+=step;
-        if(!on&&acc>=gap){on=true;acc=0;start=k}else if(on&&acc>=dash){on=false;acc=0;const seg=P2.slice(start*2,k*2+2);if(seg.length>=4)widthItem(seg,seg.map((_,q)=>P.lineMin*(.8+.4*u)).filter((_,q)=>q%2===0),res)}}
-      else{if(on&&k-start>1){const seg=P2.slice(start*2,k*2);if(seg.length>=4)widthItem(seg,seg.map(()=>P.lineMin).filter((_,q)=>q%2===0),res)}on=false;
-        if(tk>=t0&&tk<td){acc+=step;const gap=1.1+1.2*(1-(tk-t0)/(td-t0));if(acc>=gap){acc=0;res.push({dot:[P2[k*2],P2[k*2+1],Math.max(.04,P.lineMin*(.55+.6*(tk-t0)/(td-t0)))]})}}}}
-  });
-}
-function svgString(forPreview){
-  if(!polys)return '';const{pw,ph}=polys;const f=v=>v.toFixed(2);
-  let s=`<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="${pw}mm" height="${ph}mm" viewBox="0 0 ${pw} ${ph}">`;
-  if(!forPreview)s+=`<title>SCULPT LINE — ${modelName}</title>`;
-  for(const L of LAYERS){const items=polys.out[L.k];if(!items||!items.length)continue;
-    const col=P.colorLayers?L.color:'#16181C';
-    s+=`<g id="${L.k}" inkscape:groupmode="layer" inkscape:label="${L.name}">`;
-    let fillD='',strokeD='';
-    for(const it of items){
-      if(it.pt){const[x,y]=it.pt;if(P.lineStyle==='판화'){const r=P.pen/2;fillD+=`M${f(x-r)} ${f(y)}a${f(r)} ${f(r)} 0 1 0 ${f(2*r)} 0a${f(r)} ${f(r)} 0 1 0 ${f(-2*r)} 0Z`}else strokeD+=`M${f(x-.03)} ${f(y)}L${f(x+.03)} ${f(y)}`;continue}
-      if(it.disc){const[x,y,r]=it.disc;fillD+=`M${f(x-r)} ${f(y)}a${f(r)} ${f(r)} 0 1 0 ${f(2*r)} 0a${f(r)} ${f(r)} 0 1 0 ${f(-2*r)} 0Z`;continue}
-      if(it.dot){const[x,y,r]=it.dot;if(P.lineStyle==='판화')fillD+=`M${f(x-r)} ${f(y)}a${f(r)} ${f(r)} 0 1 0 ${f(2*r)} 0a${f(r)} ${f(r)} 0 1 0 ${f(-2*r)} 0Z`;else strokeD+=`M${f(x-P.pen/4)} ${f(y)}L${f(x+P.pen/4)} ${f(y)}`;continue}
-      if(it.fill){const a=it.fill,b=it.back;let d='M'+f(a[0])+' '+f(a[1]);for(let i=2;i<a.length;i+=2)d+='L'+f(a[i])+' '+f(a[i+1]);for(let i=b.length-2;i>=0;i-=2)d+='L'+f(b[i])+' '+f(b[i+1]);fillD+=d+'Z'}
-      else{const l=it.stroke;let d='M'+f(l[0])+' '+f(l[1]);for(let i=2;i<l.length;i+=2)d+='L'+f(l[i])+' '+f(l[i+1]);strokeD+=d}}
-    if(fillD)s+=`<path d="${fillD}" fill="${col}" stroke="none"/>`;
-    if(strokeD)s+=`<path d="${strokeD}" fill="none" stroke="${col}" stroke-width="${P.pen}" stroke-linecap="round" stroke-linejoin="round"/>`;
-    s+='</g>'}
-  return s+'</svg>';
-}
-function renderPaper(){
-  const wrap=$('paper'),ov=$('runOv');[...wrap.querySelectorAll('svg')].forEach(n=>n.remove());
+
+// ---------- preview ----------
+const pv=$('pv'),paperEl=$('paper');let zoom=null;
+function drawPreview(){
+  const dpr=Math.min(2,devicePixelRatio||1),Wc=paperEl.clientWidth,Hc=paperEl.clientHeight;if(!Wc)return;
+  pv.width=Math.round(Wc*dpr);pv.height=Math.round(Hc*dpr);const g=pv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
+  g.fillStyle=cssVar('--stage')||'#dcdfe4';g.fillRect(0,0,Wc,Hc);
   let[pw,ph]=PAPERS[P.paper];if(P.orient==='가로')[pw,ph]=[ph,pw];
-  $('paperTag').textContent=`${P.paper} ${P.orient} · ${pw}×${ph} mm`;
-  const html=polys?svgString(true):`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pw} ${ph}"></svg>`;
-  wrap.insertAdjacentHTML('beforeend',html);const svg=wrap.querySelector('svg');svg.removeAttribute('width');svg.removeAttribute('height');
-  svg.style.aspectRatio=pw+'/'+ph;svg.style.width=pw>=ph?'100%':'auto';svg.style.height=pw>=ph?'auto':'100%';
-  wrap.appendChild(ov);
-  const lg=$('legend');lg.innerHTML='';LAYERS.forEach(L=>{if(polys&&polys.layers[L.k].length){const sp=document.createElement('span');sp.innerHTML=`<i style="background:${P.colorLayers?L.color:'currentColor'}"></i>${L.name} ${polys.layers[L.k].length}개`;lg.appendChild(sp)}});
+  $('paperTag').textContent=`${P.paper} ${P.orient} · ${pw}×${ph} mm`+(zoom?' · 6배 확대':'');
+  let k=Math.min(Wc*.92/pw,Hc*.92/ph),tx=(Wc-pw*k)/2,ty=(Hc-ph*k)/2;
+  if(zoom){k*=6;tx=Wc/2-zoom[0]*k;ty=Hc/2-zoom[1]*k}
+  g.fillStyle=cssVar('--paper')||'#fff';g.shadowColor='rgba(0,0,0,.18)';g.shadowBlur=4;g.fillRect(tx,ty,pw*k,ph*k);g.shadowBlur=0;
+  if(!pens)return;
+  pens.forEach((pn,pi)=>{const r=Math.max(.35,pn.w/2*k),d=pn.dots;g.fillStyle=(+P.penCount>1&&P.penColors)?PEN_COLORS[pi]:'#16181C';
+    g.beginPath();for(let q=0;q<d.length;q+=2){const x=tx+d[q]*k,y=ty+d[q+1]*k;if(x<-2||y<-2||x>Wc+2||y>Hc+2)continue;g.moveTo(x+r,y);g.arc(x,y,r,0,6.2832)}g.fill()});
+  pv._map={k,tx,ty};
 }
+new ResizeObserver(drawPreview).observe(paperEl);
+pv.addEventListener('click',e=>{if(!pv._map)return;const b=pv.getBoundingClientRect(),{k,tx,ty}=pv._map;
+  zoom=zoom?null:[(e.clientX-b.left-tx)/k,(e.clientY-b.top-ty)/k];drawPreview()});
+
 function renderStats(){
-  const st=$('stats');if(!polys||!polys.out){st.innerHTML='';return}
-  let n=0,len=0;for(const k in polys.out)for(const it of polys.out[k]){n++;if(it.dot||it.disc||it.pt)continue;const l=it.stroke||it.fill;for(let i=2;i<l.length;i+=2)len+=Math.hypot(l[i]-l[i-2],l[i+1]-l[i-1])}
-  const sec=len/P.speed+n*.35,mm=Math.floor(sec/60),ss=Math.round(sec%60);
-  const note=P.lineStyle==='판화'?'<p class="hint" style="grid-column:1/-1;margin:0">판화 표현은 면을 채운 선이라 인쇄·디지털용입니다. 펜 플로터로 그릴 때는 선 굵기 탭에서 "플로터 겹선"을 고르세요.</p>':'';
-  st.innerHTML=`<div class="stat"><b>${n.toLocaleString()}</b><span>선 개수</span></div><div class="stat"><b>${(len/1000).toFixed(1)} m</b><span>그릴 총 길이</span></div><div class="stat"><b>${mm}분 ${ss}초</b><span>예상 플로팅 시간</span></div>${note}`;
+  const st=$('stats');if(!pens){st.innerHTML='';$('statNote').textContent='';return}
+  let html='',tot=0,totDots=0;
+  pens.forEach((pn,i)=>{const n=pn.dots.length/2,sec=n*P.dotTime+pn.travel/P.travel;tot+=sec;totDots+=n;
+    html+=`<div class="stat"><b>${n.toLocaleString()}</b><span>펜 ${i+1} · ${pn.w.toFixed(2)}mm 점</span></div>`});
+  const h=Math.floor(tot/3600),m=Math.round(tot%3600/60);
+  html+=`<div class="stat"><b>${h?h+'시간 ':''}${m}분</b><span>예상 플로팅 시간${pens.length>1?' (펜 교체 '+(pens.length-1)+'번)':''}</span></div>`;
+  st.innerHTML=html;
+  $('statNote').textContent=tot>6*3600?'시간이 아주 깁니다. 처음에는 A5로 시험하거나, 점 간격을 넓히거나, 펜 굵기를 키워 보세요.':pens.length>1?'SVG는 펜마다 레이어가 나뉩니다. 펜 1 레이어를 모두 그린 뒤 펜을 바꿔 다음 레이어를 그리세요.':'펜 한 자루로 그리는 기본 설정입니다.';
 }
 
 // ---------- run ----------
-let modelName='sample';
-let busy=false,pending=null;
+let busy=false,pending=null,autoT=0;
+function autoRun(){clearTimeout(autoT);autoT=setTimeout(()=>run(true),200)}
 async function run(preview){
   if(!mesh)return;preview=preview===true;
   if(busy){pending=preview;return}busy=true;
-  if(!preview){$('runOv').hidden=false;$('run').disabled=true}await new Promise(r=>setTimeout(r,20));
-  try{const t=performance.now();extract(preview);postProcess();setStatus(`${preview?'미리보기를':'고화질로'} 뽑았습니다 (${((performance.now()-t)/1000).toFixed(1)}초).`)}
-  catch(e){setStatus('선을 뽑지 못했습니다: '+e.message+' 정밀도를 낮춰 다시 해 보세요.',true)}
+  if(!preview){$('runOv').hidden=false;$('run').disabled=true}await tick();
+  try{const t=performance.now();compute(preview);layout();drawPreview();renderStats();setStatus(`${preview?'미리보기를':'고화질로'} 계산했습니다 (${((performance.now()-t)/1000).toFixed(1)}초).`)}
+  catch(e){console.error(e);setStatus('계산하지 못했습니다: '+e.message+' 정밀도를 낮춰 다시 해 보세요.',true)}
   $('runOv').hidden=true;$('run').disabled=false;busy=false;
   if(pending!==null){const p=pending;pending=null;run(p)}
 }
 $('run').onclick=()=>run(false);
-$('b_screenOnly').onclick=()=>{P.screen=true;P.hatch=false;save();syncInputs();run()};
-$('b_yaw').onclick=()=>{yawTurns++;rebuildFromRaw()};
+$('b_yaw').onclick=()=>{yawTurns++;rebuild()};
 
-// ---------- file loading ----------
+// ---------- files ----------
+function parseSTL(buf){const dv=new DataView(buf);
+  if(buf.byteLength>=84){const n=dv.getUint32(80,true);if(84+n*50===buf.byteLength){const out=new Float32Array(n*9);let o=84;
+    for(let f=0;f<n;f++){o+=12;for(let k=0;k<9;k++){out[f*9+k]=dv.getFloat32(o,true);o+=4}o+=2}return out}}
+  const g=new THREE.STLLoader().parse(buf);return(g.index?g.toNonIndexed():g).attributes.position.array}
 function collectPositions(obj){const parts=[];obj.updateMatrixWorld(true);
-  obj.traverse(o=>{if(!o.isMesh||!o.geometry||!o.geometry.attributes.position)return;let g=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone();g.applyMatrix4(o.matrixWorld);parts.push(g.attributes.position.array)});
-  let n=0;parts.forEach(a=>n+=a.length);const out=new Float32Array(n);let o=0;parts.forEach(a=>{out.set(a,o);o+=a.length});return out}
+  obj.traverse(o=>{if(!o.isMesh||!o.geometry||!o.geometry.attributes.position)return;const g=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone();g.applyMatrix4(o.matrixWorld);parts.push(g.attributes.position.array)});
+  let n=0;parts.forEach(a=>n+=a.length);const out=new Float32Array(n);let q=0;parts.forEach(a=>{out.set(a,q);q+=a.length});return out}
 $('file').onchange=async e=>{const f=e.target.files[0];if(!f)return;const ext=f.name.split('.').pop().toLowerCase();
-  $('loadOv').hidden=false;await new Promise(r=>setTimeout(r,30));
+  $('loadMsg').textContent=`파일을 읽는 중… (${(f.size/1048576).toFixed(0)} MB)`;$('loadOv').hidden=false;await tick();
   try{let positions;
-    if(ext==='stl'){const g=new THREE.STLLoader().parse(await f.arrayBuffer());positions=(g.index?g.toNonIndexed():g).attributes.position.array;if(P.upAxis!=='Z'){P.upAxis='Z';inputs.upAxis.el.value='Z';save()}}
-    else if(ext==='obj'){positions=collectPositions(new THREE.OBJLoader().parse(await f.text()))}
+    if(ext==='stl'){positions=parseSTL(await f.arrayBuffer());if(P.upAxis!=='Z'){P.upAxis='Z';inputs.upAxis.el.value='Z';save()}}
+    else if(ext==='obj')positions=collectPositions(new THREE.OBJLoader().parse(await f.text()));
     else if(ext==='ply'){const g=new THREE.PLYLoader().parse(await f.arrayBuffer());positions=(g.index?g.toNonIndexed():g).attributes.position.array}
     else if(ext==='glb'||ext==='gltf'){const data=ext==='glb'?await f.arrayBuffer():await f.text();const gl=await new Promise((res,rej)=>new THREE.GLTFLoader().parse(data,'',res,rej));positions=collectPositions(gl.scene)}
     else throw new Error('지원하지 않는 형식입니다. STL·OBJ·PLY·GLB로 올려 주세요.');
     if(!positions||!positions.length)throw new Error('파일에서 면을 찾지 못했습니다.');
-    rawPos=positions;yawTurns=0;modelName=f.name.replace(/\.[^.]+$/,'');$('modelTag').textContent=f.name;
-    prepare(rawPos);setView(0,0);polys=null;raw=null;renderPaper();renderStats();await run();
-  }catch(err){setStatus('파일을 열지 못했습니다: '+(err.message||err),true);showTab(8)}
-  $('loadOv').hidden=true;e.target.value=''};
+    rawPos=positions;yawTurns=0;modelName=f.name.replace(/\.[^.]+$/,'');$('modelTag').textContent=f.name;zoom=null;
+    await prepare(`면 ${(positions.length/9).toLocaleString()}개를 준비하는 중…`);setView(0,0);
+  }catch(err){$('loadOv').hidden=true;setStatus('파일을 열지 못했습니다: '+(err.message||err),true);showTab(7)}
+  e.target.value=''};
 
 // ---------- save ----------
+function svgString(){
+  const{pw,ph}=geo;const f=v=>v.toFixed(2);
+  let s=`<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="${pw}mm" height="${ph}mm" viewBox="0 0 ${pw} ${ph}"><title>SCULPT LINE — ${modelName}</title>`;
+  pens.forEach((pn,i)=>{s+=`<g id="pen${i+1}" inkscape:groupmode="layer" inkscape:label="${i+1} 펜 ${pn.w.toFixed(2)}mm" fill="none" stroke="#000" stroke-width="${pn.w}" stroke-linecap="round">`;
+    const d=pn.dots;for(let q=0;q<d.length;q+=4000){let path='';for(let r=q;r<Math.min(d.length,q+4000);r+=2)path+=`M${f(d[r])} ${f(d[r+1])}h.01`;s+=`<path d="${path}"/>`}
+    s+='</g>'});
+  return s+'</svg>'}
 const downloadsP=(window.claude&&window.claude.use)?window.claude.use('downloads').catch(()=>null):Promise.resolve(null);
-$('saveSvg').onclick=async()=>{if(!polys){setStatus('먼저 선을 뽑아 주세요.',true);return}
-  while(busy)await new Promise(r=>setTimeout(r,100));
-  if(raw&&raw.preview){setStatus('고화질로 다시 뽑는 중…');await run(false)}
-  const name=`${modelName}-lines-${P.paper.replace(/[^A-Za-z0-9]/g,'')}.svg`;
-  const dl=await downloadsP;if(!dl){try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([svgString(false)],{type:'image/svg+xml'}));a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);setStatus('저장했습니다: '+name)}catch(e){setStatus('저장하지 못했습니다: '+e.message,true)}return}
-  try{await dl.save({filename:name,data:svgString(false)});setStatus('저장했습니다: '+name)}
+$('saveSvg').onclick=async()=>{if(!pens){setStatus('먼저 모델을 불러와 주세요.',true);return}
+  while(busy)await tick();
+  if(raw&&raw.preview){setStatus('고화질로 다시 계산하는 중…');await run(false)}
+  const name=`${modelName}-screentone-${P.paper.replace(/[^A-Za-z0-9]/g,'')}${pens.length>1?'-'+pens.length+'pens':''}.svg`,data=svgString();
+  const dl=await downloadsP;
+  if(!dl){try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'image/svg+xml'}));a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);setStatus('저장했습니다: '+name)}catch(e){setStatus('저장하지 못했습니다: '+e.message,true)}return}
+  try{await dl.save({filename:name,data});setStatus('저장했습니다: '+name)}
   catch(e){setStatus(e&&e.code==='declined'?'저장을 취소했습니다.':'저장하지 못했습니다'+(e&&e.code?' ('+e.code+')':'')+'. 다시 눌러 주세요.',e&&e.code!=='declined')}};
 
 // ---------- samples ----------
-// a generic classical head built from a sphere: brow, eye sockets, nose, lips, chin and cheekbones are soft bumps and dents
 function makeHead(){
   const g=new THREE.SphereGeometry(1,220,170).toNonIndexed(),a=g.attributes.position.array;
   const G=(x,y,cx,cy,sx,sy)=>Math.exp(-((x-cx)**2/(2*sx*sx)+(y-cy)**2/(2*sy*sy)));
@@ -7371,15 +7203,16 @@ function makeHead(){
     const r=1+d;a[i]=x*.76*jaw*r;a[i+1]=y*1.0*r+(y<0?.05*y*y:0)+(y>.5?.03*(y-.5):0);a[i+2]=z*.9*flat*back*r-.05}
   const neck=new THREE.CylinderGeometry(.42,.5,.85,96,1,true).toNonIndexed();neck.translate(0,-1.05,-.16);
   const out=new Float32Array(a.length+neck.attributes.position.array.length);out.set(a);out.set(neck.attributes.position.array,a.length);return out}
-function loadSample(k){
+
+async function loadSample(k){
   rawPos=k==='head'?makeHead():new THREE.TorusKnotGeometry(1,.34,260,36,2,3).toNonIndexed().attributes.position.array;
-  yawTurns=0;modelName='sample-'+k;$('modelTag').textContent=k==='head'?'샘플 · 두상':'샘플 · 매듭';
-  const up=P.upAxis;P.upAxis='Y';prepare(rawPos);P.upAxis=up;
-  $('modelInfo').textContent+=' · 샘플 형태입니다. 토르소 파일을 올려 주세요.';
-  if(k==='head')setView(28,6);else setView(35,12);run();
+  yawTurns=0;modelName='sample-'+k;$('modelTag').textContent=k==='head'?'샘플 · 두상':'샘플 · 매듭';zoom=null;
+  const up=P.upAxis;P.upAxis='Y';await prepare();P.upAxis=up;
+  $('modelInfo').textContent+=' · 샘플입니다. 토르소 파일을 올려 주세요.';
+  if(k==='head')setView(28,6);else setView(35,12);
 }
 size();loadSample('head');
-window.__sculptLine={get raw(){return raw},get polys(){return polys},run,P:()=>P};
+window.__sl={get raw(){return raw},get pens(){return pens},run,P:()=>P};
 })();
 </script>
 
