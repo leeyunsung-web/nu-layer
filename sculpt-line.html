@@ -7038,7 +7038,7 @@ const normMat=new THREE.ShaderMaterial({side:THREE.DoubleSide,
   fragmentShader:'varying vec3 vN;void main(){vec3 n=normalize(vN);if(!gl_FrontFacing)n=-n;gl_FragColor=vec4(n*0.5+0.5,1.0);}'});
 function compute(preview){
   const DW=preview?1024:+P.res,asp=camera.aspect,W=asp>=1?DW:Math.round(DW*asp),H=asp>=1?Math.round(DW/asp):DW;
-  const cam=camera.clone();const dist=cam.position.distanceTo(controls.target);cam.near=Math.max(.01,dist-1.2);cam.far=dist+1.2;cam.aspect=W/H;cam.updateProjectionMatrix();cam.updateMatrixWorld();
+  const cam=camera.clone();cam.updateMatrixWorld();const dist=-new THREE.Vector3(0,0,0).applyMatrix4(cam.matrixWorldInverse).z;cam.near=Math.max(.01,dist-1.05);cam.far=Math.max(cam.near+.1,dist+1.05);cam.aspect=W/H;cam.updateProjectionMatrix();cam.updateMatrixWorld();
   const right=new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld,0),upv=new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld,1),back=new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld,2);
   const az=THREE.MathUtils.degToRad(P.lightAz),el=THREE.MathUtils.degToRad(P.lightEl);
   const Lv=right.multiplyScalar(Math.sin(az)*Math.cos(el)).add(upv.multiplyScalar(Math.sin(el))).add(back.multiplyScalar(Math.cos(az)*Math.cos(el))).normalize();
@@ -7100,7 +7100,7 @@ function compute(preview){
 function marching(M,W,H,out){
   const at=(x,y)=>x>=0&&y>=0&&x<W&&y<H?M[y*W+x]:0;
   const E=[[.5,0],[1,.5],[.5,1],[0,.5]],T={1:[[3,2]],2:[[2,1]],3:[[3,1]],4:[[0,1]],5:[[3,0],[2,1]],6:[[0,2]],7:[[3,0]],8:[[3,0]],9:[[0,2]],10:[[3,2],[0,1]],11:[[0,1]],12:[[3,1]],13:[[2,1]],14:[[3,2]]};
-  for(let y=-1;y<H;y++)for(let x=-1;x<W;x++){const c=at(x,y)*8+at(x+1,y)*4+at(x+1,y+1)*2+at(x,y+1);if(!c||c===15)continue;
+  for(let y=0;y<H-1;y++)for(let x=0;x<W-1;x++){const c=at(x,y)*8+at(x+1,y)*4+at(x+1,y+1)*2+at(x,y+1);if(!c||c===15)continue;
     for(const[a,b]of T[c])out.push(x+.5+E[a][0],y+.5+E[a][1],x+.5+E[b][0],y+.5+E[b][1])}}
 function getAdj(){
   if(mesh.userData.adj)return mesh.userData.adj;
@@ -7162,17 +7162,20 @@ function geomLines(cam,lin,M,W,H,out){
       for(let k=Math.max(1,Math.ceil((lo+1)/step));k<=Math.min(N,Math.floor((hi+1)/step));k++){const c=-1+k*step,pts=[];
         for(let s=0;s<3;s++){const a=v[s],b=v[(s+1)%3],ha=h[s],hb=h[(s+1)%3];if((ha-c)*(hb-c)<0){const t=(c-ha)/(hb-ha);pts.push(pos[a]+(pos[b]-pos[a])*t,pos[a+1]+(pos[b+1]-pos[a+1])*t,pos[a+2]+(pos[b+2]-pos[a+2])*t)}}
         if(pts.length>=6)visSeg(pts[0],pts[1],pts[2],pts[3],pts[4],pts[5],out.slice,false)}}}}
-function chain(seg){
-  // join segment ends that meet within 2 px (tiny gaps come from the visibility sampling)
-  const n=seg.length/4,T=2,cell=(x,y)=>Math.floor(x/T)*100003+Math.floor(y/T),grid=new Map(),used=new Uint8Array(n),out=[];
+function chain(seg,T=2){
+  // join segment ends that meet within T px (2 px for mesh lines: tiny gaps come from the visibility sampling; exact for the mask outline)
+  const n=seg.length/4,cell=(x,y)=>Math.floor(x/T)*100003+Math.floor(y/T),grid=new Map(),used=new Uint8Array(n),out=[];
   for(let e=0;e<n*2;e++){const x=seg[e*2],y=seg[e*2+1],k=cell(x,y);let a=grid.get(k);if(!a)grid.set(k,a=[]);a.push(e)}
   const next=(x,y)=>{const cx=Math.floor(x/T),cy=Math.floor(y/T);let best=-1,bd=T*T;
     for(let ox=-1;ox<=1;ox++)for(let oy=-1;oy<=1;oy++){const a=grid.get((cx+ox)*100003+cy+oy);if(!a)continue;
       for(const e of a){if(used[e>>1])continue;const dx=seg[e*2]-x,dy=seg[e*2+1]-y,d=dx*dx+dy*dy;if(d<=bd){bd=d;best=e}}}
     return best};
   for(let s=0;s<n;s++){if(used[s])continue;used[s]=1;const line=[seg[s*4],seg[s*4+1],seg[s*4+2],seg[s*4+3]];
-    for(let dir=0;dir<2;dir++){
-      for(;;){const L=line.length,x=dir?line[0]:line[L-2],y=dir?line[1]:line[L-1];const e=next(x,y);if(e<0)break;const i=e>>1;used[i]=1;
+    let closed=false;
+    for(let dir=0;dir<2&&!closed;dir++){
+      for(;;){const L=line.length,x=dir?line[0]:line[L-2],y=dir?line[1]:line[L-1];
+        if(L>=8&&Math.hypot(line[0]-line[L-2],line[1]-line[L-1])<=Math.max(T,1e-3)){line[L-2]=line[0];line[L-1]=line[1];closed=true;break}
+        const e=next(x,y);if(e<0)break;const i=e>>1;used[i]=1;
         const o=(e&1)?0:1,fx=seg[i*4+o*2],fy=seg[i*4+o*2+1];
         if(dir)line.unshift(fx,fy);else line.push(fx,fy)}}
     out.push(line)}
@@ -7183,7 +7186,11 @@ function rdp(pts,tol){if(pts.length<=4||tol<=0)return pts;const n=pts.length/2,k
     for(let i=a+1;i<b;i++){const d=l<1e-6?Math.hypot(pts[i*2]-ax,pts[i*2+1]-ay):Math.abs((pts[i*2]-ax)*dy-(pts[i*2+1]-ay)*dx)/l;if(d>md){md=d;mi=i}}
     if(md>tol){keep[mi]=1;st.push([a,mi],[mi,b])}}
   const o=[];for(let i=0;i<n;i++)if(keep[i])o.push(pts[i*2],pts[i*2+1]);return o}
-function chaikin(pts,it){for(let k=0;k<it;k++){if(pts.length<6)return pts;const o=[pts[0],pts[1]];
+function chaikin(pts,it){const n0=pts.length;
+  if(n0>=8&&pts[0]===pts[n0-2]&&pts[1]===pts[n0-1]){for(let k=0;k<it;k++){const m=pts.length/2-1,o=[];
+      for(let i=0;i<m;i++){const x0=pts[i*2],y0=pts[i*2+1],x1=pts[i*2+2],y1=pts[i*2+3];o.push(.75*x0+.25*x1,.75*y0+.25*y1,.25*x0+.75*x1,.25*y0+.75*y1)}
+      o.push(o[0],o[1]);pts=o}return pts}
+  for(let k=0;k<it;k++){if(pts.length<6)return pts;const o=[pts[0],pts[1]];
   for(let i=0;i<pts.length/2-1;i++){const x0=pts[i*2],y0=pts[i*2+1],x1=pts[i*2+2],y1=pts[i*2+3];o.push(.75*x0+.25*x1,.75*y0+.25*y1,.25*x0+.75*x1,.25*y0+.75*y1)}
   o.push(pts[pts.length-2],pts[pts.length-1]);pts=o}return pts}
 
@@ -7242,7 +7249,7 @@ function layout(){
     return{w,p,cmax,dots:new Float32Array(dots),travel}});
   if(raw.lines){const tol=.6;
     for(const k of['outer','inner','crease','slice']){const seg=raw.lines[k];if(!seg||!seg.length)continue;
-      const polys=chain(seg).map(l=>chaikin(rdp(l,tol),P.lineSmooth)).map(l=>l.map((v,i)=>i%2?v*s+oy:v*s+ox))
+      const polys=chain(seg,k==='outer'?.01:2).map(l=>chaikin(rdp(l,tol),P.lineSmooth)).map(l=>l.map((v,i)=>i%2?v*s+oy:v*s+ox))
         .filter(l=>{let len=0;for(let i=2;i<l.length;i+=2)len+=Math.hypot(l[i]-l[i-2],l[i+1]-l[i-1]);return len>=P.lineMin});
       geo.lines.push(...polys)}}
   const pr=pens[0];$('pen1Info').textContent=`펜 1 굵기(${pr.w.toFixed(2)}mm)는 5번 망점 탭에서 바꿉니다.`;$('dotInfo').textContent=`펜 ${pr.w.toFixed(2)}mm · 점 간격 ${pr.p.toFixed(2)}mm · 가장 어둡게 찍을 수 있는 밀도 약 ${Math.round(pr.cmax*100)}%`+(P.spacing<1?' (점끼리 살짝 겹침)':'');
