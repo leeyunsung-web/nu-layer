@@ -6866,7 +6866,7 @@ const DEF={upAxis:'Y',target:'600000',fov:20,
   lightAz:-45,lightEl:35,wrap:.4,fill:.3,midtone:0,dark:0,floor:.05,
   curv:.7,cavity:.5,local:.5,res:'2048',
   method:'스크린톤',cell:4,spacing:1.05,angle:45,
-  penCount:'1',pen1:.3,pen2:.6,pen3:1,cap1:.55,cap2:.8,penColors:true,dotTime:.25,travel:60,layerMinute:3,cmdSafe:true,
+  penCount:'1',pen1:.3,pen2:.6,pen3:1,cap1:.55,cap2:.8,penColors:true,dotTime:.25,travel:60,layerMinute:3,engMode:'끄기',engAngle:0,engBend:.5,engSpacing:1,engPen:.3,engMaxW:3,engCurve:1,engCut:.06,engCross:false,engCrossT:.72,cmdSafe:true,
   paper:'A4',paperW:210,paperH:297,orient:'세로',margin:20,drawScale:1,posX:0,posY:0,frame:'없음',frameGap:5,frameLines:1,frameStep:1.5,framePen:.3,jpgDpi:'300',
   lineOuter:false,lineInner:false,lineCrease:false,creaseAngle:40,lineSlice:false,sliceCount:30,sliceAxis:'높이',linePen:.3,lineMin:2,lineSmooth:2,innerJump:.05,
   cutW:.6,cutH:.8,cutX:0,cutY:0,cutRot:0,c0x:0,c0y:0,c1x:0,c1y:0,c2x:0,c2y:0,c3x:0,c3y:0,cutNear:0,cutFar:0,cutSrc:'원본 해상도',randMode:'칸 하나',randPanels:5,randSlant:8,randGutter:.02,randSnap:true,cutSeed:1,mergeRes:'384'};
@@ -6928,6 +6928,18 @@ const TABS=[
    {k:'spacing',l:'점 간격',min:.8,max:2.5,step:.05,fmt:v=>`펜 굵기 ×${(+v).toFixed(2)}`,re:'layout'},
    {k:'angle',l:'망점 각도',min:0,max:90,step:1,u:'°',re:'layout'},
    {info:'dotInfo'}]},
+ {name:'판화 선',hint:'지폐 초상처럼 나란한 선이 형태를 따라 휘어 지나가며, 어두운 곳에서는 선이 굵어지고 밝은 곳에서는 가늘어지다 끊깁니다. 펜 한 자루로 굵기를 내기 위해 어두운 곳은 선 옆에 한두 줄을 겹쳐 그어 부풀립니다.',c:[
+   {k:'engMode',l:'쓰기',sel:['끄기','판화 선만','망점과 함께'],fmt:v=>({'끄기':'끄기 (망점만)','판화 선만':'판화 선만','망점과 함께':'망점과 함께'})[v],re:'layout'},
+   {k:'engAngle',l:'선 방향',min:0,max:180,step:1,fmt:v=>(+v===0||+v===180)?'가로':+v===90?'세로':v+'°',re:'layout',show:()=>P.engMode!=='끄기'},{dirChips:1,show:()=>P.engMode!=='끄기'},
+   {k:'engBend',l:'굴곡 세기',min:-2,max:2,step:.05,fmt:v=>+v===0?'휘지 않음 (곧은 선)':(v<0?'반대로 ':'')+Math.abs(v).toFixed(2),re:'layout',show:()=>P.engMode!=='끄기'},
+   {k:'engSpacing',l:'선 간격',min:.3,max:4,step:.05,u:'mm',d:2,re:'layout',show:()=>P.engMode!=='끄기'},
+   {k:'engPen',l:'펜 굵기',min:.05,max:2,step:.01,u:'mm',d:2,re:'layout',show:()=>P.engMode!=='끄기'},
+   {k:'engMaxW',l:'가장 굵은 선',min:1,max:6,step:.1,fmt:v=>`펜 ×${(+v).toFixed(1)} (${(v*P.engPen).toFixed(2)} mm)`,re:'layout',show:()=>P.engMode!=='끄기'},
+   {k:'engCurve',l:'굵어지는 속도',min:.4,max:2.5,step:.05,fmt:v=>(v<.95?'일찍 굵어짐':v>1.05?'어두운 곳에서만 굵어짐':'고르게')+` (${(+v).toFixed(2)})`,re:'layout',show:()=>P.engMode!=='끄기'},
+   {k:'engCut',l:'밝은 곳 선 끊기',min:0,max:.5,step:.01,fmt:pct,re:'layout',show:()=>P.engMode!=='끄기'},
+   {k:'engCross',l:'가장 어두운 곳에 교차선 더하기',chk:1,re:'layout',show:()=>P.engMode!=='끄기'},
+   {k:'engCrossT',l:'교차선이 시작되는 진하기',min:.4,max:.95,step:.01,fmt:pct,re:'layout',show:()=>P.engMode!=='끄기'&&P.engCross},
+   {info:'engInfo'}]},
  {name:'선',hint:'망점 위에 선을 더합니다. 선은 따로 SVG 레이어로 나뉘고, 같은 펜으로 그려도 됩니다.',c:[
    {k:'lineOuter',l:'바깥 윤곽선',chk:1,re:'render'},
    {k:'lineInner',l:'안쪽 윤곽선 (앞쪽 형태가 뒤를 가리는 경계)',chk:1,re:'render'},
@@ -7018,6 +7030,8 @@ TABS.forEach((t,i)=>{
       node.innerHTML='<div class="bar"><input type="text" id="saveName" placeholder="저장 이름 (비워 두면 자동)" maxlength="60"><button class="primary" id="saveNow">지금 설정 저장</button></div><div id="saveList" class="savelist"></div><div class="bar"><button id="savesExport">저장 목록을 파일로 내보내기</button><label class="filebtn">파일에서 가져오기<input type="file" id="savesImport" accept=".json,application/json"></label></div><p class="hint">저장 목록은 이 브라우저에만 남습니다. 다른 컴퓨터에서 쓰려면 파일로 내보내 가져오세요.</p>'}
     else if(c.samples){node=document.createElement('div');node.className='bar';const lab=document.createElement('span');lab.className='hint';lab.textContent='샘플로 시험해 보기';node.appendChild(lab);
       [['두상','head'],['매듭','knot']].forEach(([n,k])=>{const bb=document.createElement('button');bb.className='chip';bb.textContent=n;bb.onclick=()=>loadSample(k);node.appendChild(bb)})}
+    else if(c.dirChips){node=document.createElement('div');node.className='bar';
+      [['가로',0],['세로',90],['사선 ／',135],['사선 ＼',45]].forEach(([n,a])=>{const bb=document.createElement('button');bb.className='chip';bb.textContent=n;bb.onclick=()=>{P.engAngle=a;syncInputs();changed('layout')};node.appendChild(bb)})}
     else if(c.planBox){node=document.createElement('div');node.className='lplan';node.id='layerPlan'}
     else if(c.chk){node=document.createElement('label');node.className='check';const cb=document.createElement('input');cb.type='checkbox';cb.id='i_'+c.k;cb.checked=!!P[c.k];
       cb.onchange=()=>{P[c.k]=cb.checked;changed(c.re)};node.append(cb,c.l);inputs[c.k]={c,el:cb}}
@@ -7177,7 +7191,12 @@ function compute(preview){
       if(P.lineOuter)marching(M,W,H,lines.outer);
       if(P.lineInner||P.lineCrease||P.lineSlice)geomLines(cam,lin,M,W,H,lines);
       lineCache={key,lines}}}
-  raw={W,H,SM,ST:sat(OUT,false),bx0,bx1,by0,by1,preview:!!preview&&+P.res>1024,box,SW,lines};
+  // engraving field: how far each pixel stands toward the viewer, in screen pixels (so a bend of 1 shifts a line by the form's own depth)
+  const ppu=H/(2*dist*Math.tan(THREE.MathUtils.degToRad(cam.fov)/2)),D0=new Float32Array(N);
+  for(let i=0;i<N;i++)if(M[i])D0[i]=(dist-lin[i])*ppu;
+  const SDP=sat(D0,false),rb=Math.max(1,Math.round(W/400)),DP=new Float32Array(N);
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x;if(!M[i])continue;const x0=Math.max(0,x-rb),x1=Math.min(W,x+rb+1),y0=Math.max(0,y-rb),y1=Math.min(H,y+rb+1),c=box(SM,x0,y0,x1,y1);DP[i]=c?box(SDP,x0,y0,x1,y1)/c:D0[i]}
+  raw={W,H,SM,ST:sat(OUT,false),bx0,bx1,by0,by1,preview:!!preview&&+P.res>1024,box,SW,lines,DP,MK:M};
   $('stale').hidden=!raw.preview;
 }
 
@@ -7287,6 +7306,52 @@ function clusterMatrix(c){const pts=[],m=(c-1)/2;for(let a=0;a<c;a++)for(let b=0
 function bayer(n){let M=[[0]];while(M.length<n){const s=M.length,N=[];for(let y=0;y<s*2;y++){N.push([]);for(let x=0;x<s*2;x++)N[y].push(4*M[y%s][x%s]+[0,2,3,1][(y<s?0:2)+(x<s?0:1)])}M=N}
   const out=new Float32Array(n*n);for(let y=0;y<n;y++)for(let x=0;x<n;x++)out[y*n+x]=(M[y][x]+.5)/(n*n);return out}
 const BAYER=bayer(8);
+// ---------- engraving lines: parallel lines bent by depth, swelled by tone ----------
+// The lines are the level sets of  base(x,y) + bend * depth : straight parallel lines, pushed sideways where the form
+// comes toward the viewer, so they wrap around it the way a banknote engraver's lines do. A single pen cannot change
+// width, so a dark stretch gets one or two extra strokes beside the line whose offset grows with the tone and shrinks
+// back to the line at both ends: the swell tapers like a burin cut.
+function engrave(toneAt,s,ox,oy){
+  const{W,H,DP,MK}=raw,L=P.engSpacing/s,g=Math.max(1,Math.min(4,Math.floor(L/3))),pen=P.engPen,out=[];
+  const maxHalf=Math.max(0,(P.engMaxW-1)*pen/2),step=pen*.75,J=Math.ceil(maxHalf/step-1e-6),cut=P.engCut,ds=Math.max(.1,Math.min(.5,P.engSpacing/3));
+  let nLines=0,len=0;
+  function trace(ang){const A=THREE.MathUtils.degToRad(ang),sA=Math.sin(A),cA=Math.cos(A),gw=Math.floor((W-1)/g)+1,gh=Math.floor((H-1)/g)+1,F=new Float32Array(gw*gh),ok=new Uint8Array(gw*gh);
+    for(let j=0;j<gh;j++)for(let i=0;i<gw;i++){const x=i*g,y=j*g,id=y*W+x;if(MK[id]){const q=j*gw+i;ok[q]=1;F[q]=(-(x+.5)*sA+(y+.5)*cA+P.engBend*DP[id])/L+1e-4}}
+    const lev=new Map(),E=[0,0,0,0,0,0,0,0];
+    for(let j=0;j<gh-1;j++)for(let i=0;i<gw-1;i++){const q=j*gw+i;if(!(ok[q]&&ok[q+1]&&ok[q+gw]&&ok[q+gw+1]))continue;
+      const a=F[q],b=F[q+1],c=F[q+gw+1],d=F[q+gw],lo=Math.min(a,b,c,d),hi=Math.max(a,b,c,d);
+      for(let k=Math.ceil(lo);k<=hi;k++){let n=0;
+        if((a-k)*(b-k)<0){E[n++]=i+(k-a)/(b-a);E[n++]=j}
+        if((b-k)*(c-k)<0){E[n++]=i+1;E[n++]=j+(k-b)/(c-b)}
+        if((d-k)*(c-k)<0){E[n++]=i+(k-d)/(c-d);E[n++]=j+1}
+        if((a-k)*(d-k)<0){E[n++]=i;E[n++]=j+(k-a)/(d-a)}
+        if(n<4)continue;let arr=lev.get(k);if(!arr)lev.set(k,arr=[]);
+        for(let e=0;e+3<n;e+=4)arr.push(E[e]*g+.5,E[e+1]*g+.5,E[e+2]*g+.5,E[e+3]*g+.5)}}
+    const polys=[];
+    for(const arr of lev.values())for(const l of chain(arr,g*.25)){if(l.length<6)continue;
+      const sm=chaikin(rdp(l,g*.35),2),mm=[];for(let q=0;q<sm.length;q+=2)mm.push(ox+sm[q]*s,oy+sm[q+1]*s);
+      // resample evenly in mm so tone and offsets are read at a steady pace along the line
+      const R=[mm[0],mm[1]];let carry=0;
+      for(let q=2;q<mm.length;q+=2){const x0=mm[q-2],y0=mm[q-1],x1=mm[q],y1=mm[q+1],sl=Math.hypot(x1-x0,y1-y0);let t=ds-carry;
+        while(t<=sl){R.push(x0+(x1-x0)*t/sl,y0+(y1-y0)*t/sl);t+=ds}carry=sl-(t-ds)}
+      if(R[R.length-2]!==mm[mm.length-2]||R[R.length-1]!==mm[mm.length-1])R.push(mm[mm.length-2],mm[mm.length-1]);
+      if(R.length>=4)polys.push(R)}
+    return polys}
+  const runs=(X,n,want,offset)=>{let st=-1;
+    const emit=(a,b)=>{if(b-a<1)return;const o=[];for(let i=a;i<=b;i++){const[dx,dy,d]=offset(i);o.push(X[2*i]+dx*d,X[2*i+1]+dy*d)}
+      let l=0;for(let q=2;q<o.length;q+=2)l+=Math.hypot(o[q]-o[q-2],o[q+1]-o[q-1]);if(l<Math.max(.25,pen)){return}out.push(rdp(o,.02));len+=l};   // .02 mm is far below the pen; it only drops points the plotter would not feel
+    for(let i=0;i<n;i++){if(want(i)){if(st<0)st=i}else if(st>=0){emit(st,i-1);st=-1}}if(st>=0)emit(st,n-1)};
+  const tones=(X,n)=>{const t=new Float32Array(n);for(let i=0;i<n;i++)t[i]=Math.max(0,toneAt(X[2*i],X[2*i+1],P.engSpacing/2));
+    const u=new Float32Array(n);for(let i=0;i<n;i++)u[i]=(t[Math.max(0,i-1)]+2*t[i]+t[Math.min(n-1,i+1)])/4;return u};
+  const normals=(X,n)=>{const N=new Float32Array(2*n);for(let i=0;i<n;i++){const a=Math.max(0,i-1),b=Math.min(n-1,i+1),dx=X[2*b]-X[2*a],dy=X[2*b+1]-X[2*a+1],l=Math.hypot(dx,dy)||1;N[2*i]=-dy/l;N[2*i+1]=dx/l}return N};
+  for(const X of trace(P.engAngle)){const n=X.length/2,t=tones(X,n),Nn=normals(X,n),h=new Float32Array(n);nLines++;
+    for(let i=0;i<n;i++){const tt=Math.min(1,Math.max(0,(t[i]-cut)/(1-cut||1)));h[i]=Math.pow(tt,P.engCurve)*maxHalf}
+    runs(X,n,i=>t[i]>cut,()=>[0,0,0]);
+    for(let jj=1;jj<=J;jj++)for(const sd of[1,-1]){const lo=(jj-1)*step+.02*pen;
+      runs(X,n,i=>h[i]>lo,i=>[Nn[2*i],Nn[2*i+1],sd*Math.min(jj*step,h[i])])}}
+  if(P.engCross)for(const X of trace(P.engAngle+90)){const n=X.length/2,t=tones(X,n);runs(X,n,i=>t[i]>P.engCrossT,()=>[0,0,0])}
+  const ie=$('engInfo');if(ie)ie.textContent=P.engMode==='끄기'?'':`선 ${nLines.toLocaleString()}줄 · 펜으로 긋는 획 ${out.length.toLocaleString()}개 · 길이 ${(len/1000).toFixed(1)} m · 선 사이 ${P.engSpacing.toFixed(2)} mm, 가장 굵은 곳 ${(P.engMaxW*pen).toFixed(2)} mm`;
+  return out}
 function layout(){
   if(!raw){pens=null;return}
   const{W,H,SM,ST,bx0,bx1,by0,by1,box}=raw;
@@ -7313,6 +7378,7 @@ function layout(){
   const ox0=ox+bx0*s,oy0=oy+by0*s,ox1=ox+(bx1+1)*s,oy1=oy+(by1+1)*s;
   pens=ws.map((w,pi)=>{
     const p=w*P.spacing,cmax=Math.min(1,Math.PI/4/(P.spacing*P.spacing));
+    if(P.engMode==='판화 선만')return{w,p,cmax,dots:new Float32Array(0),travel:0};
     const ang=THREE.MathUtils.degToRad(P.angle+[0,30,-30][pi]),ca=Math.cos(ang),sa=Math.sin(ang);
     let u0=1e9,u1=-1e9,v0=1e9,v1=-1e9;for(const[x,y]of[[ox0,oy0],[ox1,oy0],[ox0,oy1],[ox1,oy1]]){const u=x*ca+y*sa,v=-x*sa+y*ca;u0=Math.min(u0,u);u1=Math.max(u1,u);v0=Math.min(v0,v);v1=Math.max(v1,v)}
     const iu0=Math.floor(u0/p),iu1=Math.ceil(u1/p),iv0=Math.floor(v0/p),iv1=Math.ceil(v1/p),nu=iu1-iu0+1;
@@ -7337,6 +7403,7 @@ function layout(){
       const polys=chain(seg,k==='outer'?.01:2).map(l=>chaikin(rdp(l,tol),P.lineSmooth)).map(l=>l.map((v,i)=>i%2?v*s+oy:v*s+ox))
         .filter(l=>{let len=0;for(let i=2;i<l.length;i+=2)len+=Math.hypot(l[i]-l[i-2],l[i+1]-l[i-1]);return len>=P.lineMin});
       geo.lines.push(...polys)}}
+  geo.eng=P.engMode!=='끄기'&&raw.DP?engrave(toneAt,s,ox,oy):[];
   const pr=pens[0];$('pen1Info').textContent=`펜 1 굵기(${pr.w.toFixed(2)}mm)는 5번 망점 탭에서 바꿉니다.`;$('dotInfo').textContent=`펜 ${pr.w.toFixed(2)}mm · 점 간격 ${pr.p.toFixed(2)}mm · 가장 어둡게 찍을 수 있는 밀도 약 ${Math.round(pr.cmax*100)}%`+(P.spacing<1?' (점끼리 살짝 겹침)':'');
 }
 
@@ -7357,6 +7424,9 @@ function paintArt(g,k,tx,ty,Wc,Hc,colored){
     g.beginPath();for(let q=0;q<d.length;q+=2){const x=tx+d[q]*k,y=ty+d[q+1]*k;if(x<-2||y<-2||x>Wc+2||y>Hc+2)continue;g.moveTo(x+r,y);g.arc(x,y,r,0,6.2832)}g.fill()});
   if(geo&&geo.frame&&geo.frame.length){g.strokeStyle=colored?'#0E7C66':'#16181C';g.lineWidth=Math.max(.5,P.framePen*k);g.lineCap='round';g.lineJoin='miter';g.beginPath();
     for(const l of geo.frame){g.moveTo(tx+l[0]*k,ty+l[1]*k);for(let i=2;i<l.length;i+=2)g.lineTo(tx+l[i]*k,ty+l[i+1]*k);g.closePath()}g.stroke()}
+  const EG=geo&&geo.eng;
+  if(EG&&EG.length){g.strokeStyle='#16181C';g.lineWidth=Math.max(.45,P.engPen*k);g.lineCap='round';g.lineJoin='round';g.beginPath();
+    for(const l of EG){g.moveTo(tx+l[0]*k,ty+l[1]*k);for(let i=2;i<l.length;i+=2)g.lineTo(tx+l[i]*k,ty+l[i+1]*k)}g.stroke()}
   const L=geo?geo.lines:[];
   if(L.length){g.strokeStyle=colored?'#7A3FB0':'#16181C';g.lineWidth=Math.max(.5,P.linePen*k);g.lineCap='round';g.lineJoin='round';g.beginPath();
     for(const l of L){g.moveTo(tx+l[0]*k,ty+l[1]*k);for(let i=2;i<l.length;i+=2)g.lineTo(tx+l[i]*k,ty+l[i+1]*k)}g.stroke()}
@@ -7399,6 +7469,7 @@ function planLayers(){if(!pens||!geo)return[];
   const polys=(L,base,kind,w)=>{if(!L||!L.length)return;const n=L.length,sec=new Float64Array(n),cmd=new Float64Array(n);
     for(let i=0;i<n;i++){const l=L[i];let len=0;for(let q=2;q<l.length;q+=2)len+=Math.hypot(l[q]-l[q-2],l[q+1]-l[q-1]);sec[i]=len/P.travel+.3;cmd[i]=3+Math.max(1,l.length/2-1)}
     push(base,kind,-1,w,splitItems(sec,cmd,maxSec,maxCmd),sec,cmd,L)};
+  polys(geo.eng,`판화 선 · ${P.engPen.toFixed(2)}mm`,'line',P.engPen);
   polys(geo.lines,`선 · ${P.linePen.toFixed(2)}mm`,'line',P.linePen);
   polys(geo.frame,`테두리 · ${P.framePen.toFixed(2)}mm`,'frame',P.framePen);
   rows.forEach((r,i)=>{r.label=`${i+1} - ${r.base}${r.parts>1?` (${r.part}/${r.parts})`:''} · 약 ${fmtSec(r.sec)}`});
@@ -7423,8 +7494,11 @@ function renderPlan(){const box=$('layerPlan');if(!box)return;plan=planLayers();
 function renderStats(){
   const st=$('stats');if(!pens){st.innerHTML='';$('statNote').textContent='';return}
   let html='',tot=0,totDots=0;
-  pens.forEach((pn,i)=>{const n=pn.dots.length/2,sec=n*P.dotTime+pn.travel/P.travel;tot+=sec;totDots+=n;
+  pens.forEach((pn,i)=>{const n=pn.dots.length/2,sec=n*P.dotTime+pn.travel/P.travel;tot+=sec;totDots+=n;if(!n)return;
     html+=`<div class="stat"><b>${n.toLocaleString()}</b><span>펜 ${i+1} · ${pn.w.toFixed(2)}mm 점</span></div>`});
+  const EG=geo&&geo.eng||[];
+  if(EG.length){let len=0;for(const l of EG)for(let i=2;i<l.length;i+=2)len+=Math.hypot(l[i]-l[i-2],l[i+1]-l[i-1]);tot+=len/P.travel+EG.length*.3;
+    html+=`<div class="stat"><b>${(len/1000).toFixed(1)} m</b><span>판화 선 획 ${EG.length.toLocaleString()}개 · ${P.engPen.toFixed(2)}mm</span></div>`}
   const SL=geo?geo.lines.concat(geo.frame||[]):[];
   if(SL.length){let len=0;for(const l of SL)for(let i=2;i<l.length;i+=2)len+=Math.hypot(l[i]-l[i-2],l[i+1]-l[i-1]);const sec=len/P.travel+SL.length*.3;tot+=sec;
     html+=`<div class="stat"><b>${(len/1000).toFixed(1)} m</b><span>선 ${geo.lines.length.toLocaleString()}개${geo.frame&&geo.frame.length?' · 테두리 '+geo.frame.length+'줄':''} · ${P.linePen.toFixed(2)}mm</span></div>`}
