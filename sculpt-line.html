@@ -37,7 +37,7 @@ h1{font-family:var(--f-display);font-weight:800;font-size:clamp(28px,5vw,44px);l
 .view{position:relative;aspect-ratio:1/1;max-width:100%;background:var(--stage);border-radius:4px;overflow:hidden}
 .view canvas{display:block;width:100%;height:100%;touch-action:none}
 .paperwrap{position:relative;aspect-ratio:1/1;max-width:100%;background:var(--stage);border-radius:4px;overflow:hidden}
-.paperwrap canvas{display:block;width:100%;height:100%;cursor:zoom-in}
+.paperwrap canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
 .overlay{position:absolute;inset:0;display:grid;place-items:center;background:color-mix(in srgb,var(--stage) 75%,transparent);font-size:13px;color:var(--fg);text-align:center;padding:16px}
 .stale{color:var(--warn);font-size:12.5px}
 .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -70,6 +70,16 @@ select{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:4
 .status.err{color:#D2353B}
 .legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--mute)}
 .legend i{display:inline-block;width:14px;height:2px;vertical-align:middle;margin-right:5px}
+.notice{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;border:1px solid var(--accent);background:var(--panel);border-radius:4px;padding:10px 14px;font-size:13px}
+.notice span{min-width:0;flex:1 1 280px}
+.barmsg{font-size:13px;color:var(--accent)}.barmsg.err{color:#D2353B}
+.saves{display:flex;flex-direction:column;gap:12px}
+.saves input[type=text]{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--fg);flex:1 1 220px;min-width:0}
+.savelist{display:flex;flex-direction:column;gap:6px}
+.saverow{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:4px;padding:8px 10px;flex-wrap:wrap}
+.saveinfo{display:flex;flex-direction:column;gap:2px;flex:1 1 220px;min-width:0}
+.saveinfo b{font-weight:600;overflow-wrap:anywhere}.saveinfo span{font-size:12px;color:var(--mute);overflow-wrap:anywhere}
+button.ghost{background:transparent;color:var(--mute)}
 </style>
 </head>
 <body>
@@ -85,16 +95,19 @@ select{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:4
   <div class="bar">
     <label class="filebtn">3D 파일 올리기<input type="file" id="file" accept=".stl,.obj,.ply,.glb,.gltf"></label>
     <button class="primary" id="run">고화질로 다시 계산</button>
+    <button id="quickSave">설정 저장</button>
     <span class="stale" id="stale" hidden>미리보기 화질입니다. 저장할 때 자동으로 고화질로 다시 계산합니다.</span>
+    <span class="barmsg" id="barMsg" hidden></span>
   </div>
+  <div class="notice" id="notice" hidden><span id="noticeText"></span><button id="noticeClose">닫기</button></div>
 
   <div class="monitors">
     <section class="mon">
-      <h2><span>3D 모델 · 끌어서 돌리기</span><span class="tag" id="modelTag">샘플</span></h2>
+      <h2><span>3D 모델 · 끌어서 돌리기 · 휠로 확대</span><span class="tag" id="modelTag">샘플</span></h2>
       <div class="view" id="view"><canvas id="cv"></canvas><div class="overlay" id="loadOv" hidden><span id="loadMsg">불러오는 중…</span></div></div>
     </section>
     <section class="mon">
-      <h2><span>망점 미리보기 · 눌러서 확대</span><span class="tag" id="paperTag">A4 세로</span></h2>
+      <h2><span>망점 미리보기 · 휠로 확대 · 끌어서 이동 · 두 번 눌러 원래대로</span><span class="tag" id="paperTag">A4 세로</span></h2>
       <div class="paperwrap" id="paper"><canvas id="pv"></canvas><div class="overlay" id="runOv" hidden>계산 중…</div></div>
     </section>
   </div>
@@ -6825,16 +6838,18 @@ select{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:4
 (()=>{
 const $=id=>document.getElementById(id);
 const tick=()=>new Promise(r=>setTimeout(r,20));
-const PAPERS={'A5':[148,210],'A4':[210,297],'A3':[297,420],'30×40 cm':[300,400],'50×70 cm':[500,700]};
+const PAPERS={'A4':[210,297],'A3':[297,420],'A5':[148,210],'30×40 cm':[300,400],'50×70 cm':[500,700],'직접 입력':null};
 const DEF={upAxis:'Y',target:'600000',fov:20,
   lightAz:-45,lightEl:35,wrap:.4,fill:.3,midtone:0,dark:0,floor:.05,
   curv:.7,cavity:.5,local:.5,res:'2048',
   method:'스크린톤',cell:4,spacing:1.05,angle:45,
-  penCount:'1',pen1:.3,pen2:.6,pen3:1,cap1:.55,cap2:.8,penColors:true,dotTime:.15,travel:60,
-  paper:'A4',orient:'세로',margin:20};
+  penCount:'1',pen1:.3,pen2:.6,pen3:1,cap1:.55,cap2:.8,penColors:true,dotTime:.25,travel:60,
+  paper:'A4',paperW:210,paperH:297,orient:'세로',margin:20,drawScale:1,posX:0,posY:0,jpgDpi:'300',
+  lineOuter:false,lineInner:false,lineCrease:false,creaseAngle:40,lineSlice:false,sliceCount:30,sliceAxis:'높이',linePen:.3,lineMin:1,lineSmooth:2};
 let P;try{P={...DEF,...JSON.parse(localStorage.getItem('sculptDotP1')||'{}')}}catch(e){P={...DEF}}
-const save=()=>{try{localStorage.setItem('sculptDotP1',JSON.stringify(P))}catch(e){}};
+const save=()=>{try{localStorage.setItem('sculptDotP1',JSON.stringify(P))}catch(e){}try{saveLast()}catch(e){}};
 const pct=v=>Math.round(v*100)+'%';
+function paperSize(){let[w,h]=P.paper==='직접 입력'?[+P.paperW,+P.paperH]:PAPERS[P.paper];if(P.orient==='가로')[w,h]=[h,w];return[w,h]}
 const PEN_COLORS=['#16181C','#2F49F5','#C2410C'];
 
 // ---------- tabs ----------
@@ -6858,15 +6873,27 @@ const TABS=[
    {k:'cavity',l:'오목한 곳 어둡게',min:0,max:1,step:.05,fmt:pct,re:'render'},
    {k:'local',l:'국소 대비',min:0,max:1.5,step:.05,fmt:pct,re:'render'},
    {k:'res',l:'정밀도',sel:['1024','2048','3072'],fmt:v=>v+' px',re:'render'}]},
- {name:'망점',hint:'모든 점은 펜이 한 번 찍는 같은 크기입니다. 명암은 점을 찍는 밀도로만 냅니다.',c:[
+ {name:'망점',hint:'모든 점은 펜이 한 번 찍는 같은 크기입니다. 명암은 점을 찍는 밀도로만 냅니다. 펜 굵기를 바꾸면 점 간격과 개수가 바로 다시 계산됩니다.',c:[
+   {k:'pen1',l:'펜 굵기',min:.05,max:2,step:.01,u:'mm',d:2,re:'layout'},{penChips:1},
    {k:'method',l:'점 배치',sel:['스크린톤','오차 확산','점묘','규칙'],fmt:v=>({'스크린톤':'스크린톤 (점이 무리 지어 자람)','오차 확산':'오차 확산 (디테일 최대)','점묘':'점묘 (무작위로 흩뿌림)','규칙':'규칙 (고르게 퍼짐)'})[v],re:'layout'},
    {k:'cell',l:'망점 칸 크기',min:2,max:8,step:1,fmt:v=>`${v}×${v}점 · ${v*v+1}단계`,re:'layout',show:()=>P.method==='스크린톤'},
    {k:'spacing',l:'점 간격',min:.8,max:2.5,step:.05,fmt:v=>`펜 굵기 ×${(+v).toFixed(2)}`,re:'layout'},
    {k:'angle',l:'망점 각도',min:0,max:90,step:1,u:'°',re:'layout'},
    {info:'dotInfo'}]},
+ {name:'선',hint:'망점 위에 선을 더합니다. 선은 따로 SVG 레이어로 나뉘고, 같은 펜으로 그려도 됩니다.',c:[
+   {k:'lineOuter',l:'바깥 윤곽선',chk:1,re:'render'},
+   {k:'lineInner',l:'안쪽 윤곽선 (앞쪽 형태가 뒤를 가리는 경계)',chk:1,re:'render'},
+   {k:'lineCrease',l:'꺾인 선',chk:1,re:'render'},
+   {k:'creaseAngle',l:'꺾임 기준',min:10,max:90,step:1,u:'°',re:'render',show:()=>P.lineCrease},
+   {k:'lineSlice',l:'등고선',chk:1,re:'render'},
+   {k:'sliceCount',l:'등고선 개수',min:5,max:120,step:1,u:'줄',re:'render',show:()=>P.lineSlice},
+   {k:'sliceAxis',l:'등고선 방향',sel:['높이','옆','앞뒤'],re:'render',show:()=>P.lineSlice},
+   {k:'linePen',l:'선 펜 굵기',min:.05,max:2,step:.01,u:'mm',d:2,re:'layout'},
+   {k:'lineSmooth',l:'선 부드럽게',min:0,max:4,step:1,u:'번',re:'layout'},
+   {k:'lineMin',l:'짧은 선 지우기',min:0,max:10,step:.1,u:'mm',d:1,re:'layout'}]},
  {name:'펜',hint:'기본은 펜 한 자루입니다. 한 가지 굵기로 그리는 쪽이 가장 섬세합니다. 두세 자루를 고르면 어두운 곳에만 굵은 펜이 덧찍어 점 수와 시간을 줄입니다. 펜마다 SVG 레이어가 따로 나뉩니다.',c:[
    {k:'penCount',l:'펜 개수',sel:['1','2','3'],fmt:v=>v==='1'?'1자루 (추천)':v+'자루',re:'layout'},
-   {k:'pen1',l:'펜 1 굵기',min:.1,max:1.5,step:.05,u:'mm',d:2,re:'layout'},
+   {info:'pen1Info'},
    {k:'pen2',l:'펜 2 굵기',min:.1,max:2,step:.05,u:'mm',d:2,re:'layout',show:()=>+P.penCount>=2},
    {k:'cap1',l:'펜 1이 맡는 진하기',min:.2,max:.9,step:.05,fmt:pct,re:'layout',show:()=>+P.penCount>=2},
    {k:'pen3',l:'펜 3 굵기',min:.1,max:2.5,step:.05,u:'mm',d:2,re:'layout',show:()=>+P.penCount>=3},
@@ -6875,11 +6902,20 @@ const TABS=[
    {k:'dotTime',l:'점 하나 찍는 시간',min:.1,max:1,step:.01,u:'초',d:2,re:'stats'},
    {k:'travel',l:'펜 이동 속도',min:10,max:150,step:5,u:'mm/s',re:'stats'}]},
  {name:'종이',hint:'플로터에 올릴 종이 크기입니다. SVG가 실제 mm 크기로 저장됩니다.',c:[
+   {paperChips:1},
    {k:'paper',l:'종이',sel:Object.keys(PAPERS),re:'layout'},
+   {k:'paperW',l:'종이 가로',min:50,max:1200,step:1,u:'mm',re:'layout',show:()=>P.paper==='직접 입력'},
+   {k:'paperH',l:'종이 세로',min:50,max:1200,step:1,u:'mm',re:'layout',show:()=>P.paper==='직접 입력'},
    {k:'orient',l:'방향',sel:['세로','가로'],re:'layout'},
-   {k:'margin',l:'여백',min:0,max:80,step:1,u:'mm',re:'layout'}]},
- {name:'내보내기',out:true,c:[]}
+   {k:'margin',l:'여백',min:0,max:150,step:1,u:'mm',re:'layout'},
+   {k:'drawScale',l:'그림 크기',min:.1,max:1,step:.01,fmt:v=>`여백 안 최대의 ${Math.round(v*100)}%`,re:'layout'},
+   {k:'posX',l:'가로 위치',min:-1,max:1,step:.01,fmt:v=>v<0?`왼쪽 ${Math.round(-v*100)}`:v>0?`오른쪽 ${Math.round(v*100)}`:'가운데',re:'layout'},
+   {k:'posY',l:'세로 위치',min:-1,max:1,step:.01,fmt:v=>v<0?`위 ${Math.round(-v*100)}`:v>0?`아래 ${Math.round(v*100)}`:'가운데',re:'layout'},
+   {info:'drawInfo'}]},
+ {name:'내보내기',out:true,c:[{k:'jpgDpi',l:'JPG 해상도',sel:['150','300','600'],fmt:v=>v+' dpi',re:'none'}]},
+ {name:'설정 저장',hint:'지금의 모든 설정과 각도를 이 사이트에 저장합니다. 3D 파일은 용량이 커서 저장하지 않습니다. 불러올 때 원본 파일을 올려 달라고 알려 드리고, 올리면 각도까지 그대로 복원됩니다.',c:[{saves:1}]}
 ];
+const TAB_OUT=TABS.findIndex(t=>t.out),TAB_SAVE=TABS.length-1;
 const tabsEl=$('tabs'),panesEl=$('panes'),inputs={},shows=[];
 const fmtVal=(c,v)=>c.fmt?c.fmt(v):(c.d?(+v).toFixed(c.d):v)+(c.u?(c.u==='°'?c.u:' '+c.u):'');
 TABS.forEach((t,i)=>{
@@ -6892,6 +6928,12 @@ TABS.forEach((t,i)=>{
     else if(c.info){node=document.createElement('p');node.className='hint';node.id=c.info}
     else if(c.views){node=document.createElement('div');node.className='bar';
       [['정면',0,0],['오른쪽',90,0],['뒤',180,0],['왼쪽',270,0],['사선',30,6],['위에서',20,55]].forEach(([n,az,el])=>{const bb=document.createElement('button');bb.className='chip';bb.textContent=n;bb.onclick=()=>setView(az,el);node.appendChild(bb)})}
+    else if(c.penChips){node=document.createElement('div');node.className='bar';
+      [.1,.2,.3,.4,.5,.7,1].forEach(w=>{const bb=document.createElement('button');bb.className='chip';bb.textContent=w.toFixed(1)+' mm';bb.onclick=()=>{P.pen1=w;syncInputs();changed('layout')};node.appendChild(bb)})}
+    else if(c.paperChips){node=document.createElement('div');node.className='bar';
+      ['A4','A3'].forEach(n=>{const bb=document.createElement('button');bb.className='chip';bb.textContent=n;bb.onclick=()=>{P.paper=n;syncInputs();changed('layout')};node.appendChild(bb)})}
+    else if(c.saves){node=document.createElement('div');node.className='saves';
+      node.innerHTML='<div class="bar"><input type="text" id="saveName" placeholder="저장 이름 (비워 두면 자동)" maxlength="60"><button class="primary" id="saveNow">지금 설정 저장</button></div><div id="saveList" class="savelist"></div><div class="bar"><button id="savesExport">저장 목록을 파일로 내보내기</button><label class="filebtn">파일에서 가져오기<input type="file" id="savesImport" accept=".json,application/json"></label></div><p class="hint">저장 목록은 이 브라우저에만 남습니다. 다른 컴퓨터에서 쓰려면 파일로 내보내 가져오세요.</p>'}
     else if(c.samples){node=document.createElement('div');node.className='bar';const lab=document.createElement('span');lab.className='hint';lab.textContent='샘플로 시험해 보기';node.appendChild(lab);
       [['두상','head'],['매듭','knot']].forEach(([n,k])=>{const bb=document.createElement('button');bb.className='chip';bb.textContent=n;bb.onclick=()=>loadSample(k);node.appendChild(bb)})}
     else if(c.chk){node=document.createElement('label');node.className='check';const cb=document.createElement('input');cb.type='checkbox';cb.id='i_'+c.k;cb.checked=!!P[c.k];
@@ -6905,7 +6947,7 @@ TABS.forEach((t,i)=>{
     if(c.show)shows.push([node,c.show]);
     pane.appendChild(node);
   });
-  if(t.out){pane.insertAdjacentHTML('beforeend','<div class="stats" id="stats"></div><p class="hint" id="statNote"></p><div class="bar"><button class="primary" id="saveSvg">SVG 저장</button></div><div class="status" id="status"></div>')}
+  if(t.out){pane.insertAdjacentHTML('afterbegin','<div class="stats" id="stats"></div><p class="hint" id="statNote"></p>');pane.insertAdjacentHTML('beforeend','<div class="bar"><button class="primary" id="saveSvg">SVG 저장 (플로터용)</button><button id="saveJpg">JPG 저장 (보기용)</button></div><div class="status" id="status"></div>')}
   panesEl.appendChild(pane);
 });
 function updateShows(){for(const[n,f]of shows)n.hidden=!f()}
@@ -6923,6 +6965,7 @@ function changed(re){save();updateShows();
   if(re==='draw'){drawPreview();return}
   if(re==='stats')renderStats()}
 
+
 // ---------- three.js view ----------
 const cv=$('cv'),viewEl=$('view');
 const renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true});
@@ -6936,17 +6979,17 @@ let mesh=null;
 const controls=new THREE.OrbitControls(camera,cv);controls.enableDamping=false;
 let dragging=false;
 controls.addEventListener('change',()=>{draw();if(!dragging)autoRun()});
-controls.addEventListener('start',()=>{dragging=true});controls.addEventListener('end',()=>{dragging=false;autoRun()});
+controls.addEventListener('start',()=>{dragging=true});controls.addEventListener('end',()=>{dragging=false;autoRun();saveLast()});
 function size(){const w=viewEl.clientWidth,h=viewEl.clientHeight;if(!w)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();draw()}
 new ResizeObserver(size).observe(viewEl);
 const cssVar=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 function draw(){renderer.setClearColor(new THREE.Color(cssVar('--stage')||'#dcdfe4'),1);renderer.render(scene,camera)}
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{draw();drawPreview()});
 function fitDistance(){const d=1/Math.sin(THREE.MathUtils.degToRad(P.fov)/2)*1.12;const dir=camera.position.clone().sub(controls.target).normalize();camera.position.copy(dir.multiplyScalar(d));camera.near=d*.05;camera.far=d*4;camera.updateProjectionMatrix();controls.update();draw()}
-function setView(az,el){const a=THREE.MathUtils.degToRad(az),e=THREE.MathUtils.degToRad(el);camera.position.set(Math.sin(a)*Math.cos(e),Math.sin(e),Math.cos(a)*Math.cos(e));controls.target.set(0,0,0);camera.fov=P.fov;fitDistance();autoRun()}
+function setView(az,el){const a=THREE.MathUtils.degToRad(az),e=THREE.MathUtils.degToRad(el);camera.position.set(Math.sin(a)*Math.cos(e),Math.sin(e),Math.cos(a)*Math.cos(e));controls.target.set(0,0,0);camera.fov=P.fov;fitDistance();autoRun();saveLast()}
 
 // ---------- model prep: orient, normalise, weld or simplify by vertex clustering ----------
-let rawPos=null,yawTurns=0,modelName='sample';
+let rawPos=null,yawTurns=0,modelName='sample',modelFile='',currentSample='head',pendingRestore=null;
 function orient(src){
   const n=src.length/3,p=new Float32Array(src.length);
   for(let i=0;i<n;i++){let x=src[i*3],y=src[i*3+1],z=src[i*3+2];
@@ -7043,9 +7086,86 @@ function compute(preview){
     const x0=Math.max(0,x-R2),x1=Math.min(W,x+R2+1),y0=Math.max(0,y-R2),y1=Math.min(H,y+R2+1),c=box(SM,x0,y0,x1,y1),bl=c?box(ST,x0,y0,x1,y1)/c:T[i];
     let t=T[i]+P.local*(T[i]-bl);t=Math.min(1,Math.max(0,t));t=Math.pow(t,g);t=Math.min(1,Math.max(0,t+P.dark));
     OUT[i]=P.floor+(1-P.floor)*t}
-  raw={W,H,SM,ST:sat(OUT,false),bx0,bx1,by0,by1,preview:!!preview&&+P.res>1024,box,SW};
+  let lines=null;
+  if(P.lineOuter||P.lineInner||P.lineCrease||P.lineSlice){lines={outer:[],inner:[],crease:[],slice:[]};
+    if(P.lineOuter)marching(M,W,H,lines.outer);
+    if(P.lineInner||P.lineCrease||P.lineSlice)geomLines(cam,lin,M,W,H,lines)}
+  raw={W,H,SM,ST:sat(OUT,false),bx0,bx1,by0,by1,preview:!!preview&&+P.res>1024,box,SW,lines};
   $('stale').hidden=!raw.preview;
 }
+
+// ---------- lines: outer outline from the mask, inner contours / creases / slices from the mesh ----------
+function marching(M,W,H,out){
+  const at=(x,y)=>x>=0&&y>=0&&x<W&&y<H?M[y*W+x]:0;
+  const E=[[.5,0],[1,.5],[.5,1],[0,.5]],T={1:[[3,2]],2:[[2,1]],3:[[3,1]],4:[[0,1]],5:[[3,0],[2,1]],6:[[0,2]],7:[[3,0]],8:[[3,0]],9:[[0,2]],10:[[3,2],[0,1]],11:[[0,1]],12:[[3,1]],13:[[2,1]],14:[[3,2]]};
+  for(let y=-1;y<H;y++)for(let x=-1;x<W;x++){const c=at(x,y)*8+at(x+1,y)*4+at(x+1,y+1)*2+at(x,y+1);if(!c||c===15)continue;
+    for(const[a,b]of T[c])out.push(x+.5+E[a][0],y+.5+E[a][1],x+.5+E[b][0],y+.5+E[b][1])}}
+function getAdj(){
+  if(mesh.userData.adj)return mesh.userData.adj;
+  const pos=mesh.geometry.attributes.position.array,idx=mesh.geometry.index.array,F=idx.length/3,vc=pos.length/3;
+  const fN=new Float32Array(F*3),fC=new Float32Array(F*3);
+  for(let f=0;f<F;f++){const a=idx[f*3]*3,b=idx[f*3+1]*3,d=idx[f*3+2]*3;
+    const ux=pos[b]-pos[a],uy=pos[b+1]-pos[a+1],uz=pos[b+2]-pos[a+2],vx=pos[d]-pos[a],vy=pos[d+1]-pos[a+1],vz=pos[d+2]-pos[a+2];
+    let nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;const l=Math.hypot(nx,ny,nz)||1;fN[f*3]=nx/l;fN[f*3+1]=ny/l;fN[f*3+2]=nz/l;
+    fC[f*3]=(pos[a]+pos[b]+pos[d])/3;fC[f*3+1]=(pos[a+1]+pos[b+1]+pos[d+1])/3;fC[f*3+2]=(pos[a+2]+pos[b+2]+pos[d+2])/3}
+  let vol=0;for(let f=0;f<F;f++){const a=idx[f*3]*3,b=idx[f*3+1]*3,d=idx[f*3+2]*3;vol+=pos[a]*(pos[b+1]*pos[d+2]-pos[b+2]*pos[d+1])-pos[a+1]*(pos[b]*pos[d+2]-pos[b+2]*pos[d])+pos[a+2]*(pos[b]*pos[d+1]-pos[b+1]*pos[d])}
+  if(vol<0)for(let i=0;i<fN.length;i++)fN[i]=-fN[i];
+  const em=new Map(),eA=new Uint32Array(F*3),eB=new Uint32Array(F*3),eF1=new Int32Array(F*3),eF2=new Int32Array(F*3).fill(-1);let E=0;
+  for(let f=0;f<F;f++)for(let k=0;k<3;k++){let a=idx[f*3+k],b=idx[f*3+(k+1)%3];if(a===b)continue;if(a>b){const t=a;a=b;b=t}
+    const key=a*vc+b,e=em.get(key);if(e===undefined){em.set(key,E);eA[E]=a;eB[E]=b;eF1[E]=f;E++}else if(eF2[e]<0)eF2[e]=f}
+  const eCos=new Float32Array(E);for(let e=0;e<E;e++){const f1=eF1[e],f2=eF2[e];eCos[e]=f2<0?1:fN[f1*3]*fN[f2*3]+fN[f1*3+1]*fN[f2*3+1]+fN[f1*3+2]*fN[f2*3+2]}
+  return mesh.userData.adj={pos,idx,F,fN,fC,E,eA,eB,eF1,eF2,eCos}}
+function geomLines(cam,lin,M,W,H,out){
+  const{pos,idx,F,fN,fC,E,eA,eB,eF1,eF2,eCos}=getAdj();
+  const m=new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix,cam.matrixWorldInverse).elements,cp=cam.position,eps=.004;
+  // pixels near the background belong to the outer outline; inner contours skip them when that line is on
+  const Bd=new Uint8Array(W*H);if(P.lineOuter){const r=2;for(let y=0;y<H;y++)for(let x=0;x<W;x++){if(!M[y*W+x])continue;let edge=false;
+    for(let oy=-r;oy<=r&&!edge;oy++)for(let ox=-r;ox<=r;ox++){const qx=x+ox,qy=y+oy;if(qx<0||qy<0||qx>=W||qy>=H||!M[qy*W+qx]){edge=true;break}}Bd[y*W+x]=edge?1:0}}
+  const pr=(x,y,z,o)=>{const w=m[3]*x+m[7]*y+m[11]*z+m[15];o[0]=((m[0]*x+m[4]*y+m[8]*z+m[12])/w*.5+.5)*W;o[1]=(1-((m[1]*x+m[5]*y+m[9]*z+m[13])/w*.5+.5))*H;o[2]=w};
+  const A=[0,0,0],B=[0,0,0];
+  function visSeg(ax,ay,az,bx,by,bz,dst,skipEdge){
+    pr(ax,ay,az,A);pr(bx,by,bz,B);if(A[2]<=0||B[2]<=0)return;
+    const len=Math.hypot(B[0]-A[0],B[1]-A[1]),n=Math.max(1,Math.ceil(len/1.2));let run=-1,lx=0,ly=0;
+    for(let i=0;i<=n;i++){const t=i/n,sx=A[0]+(B[0]-A[0])*t,sy=A[1]+(B[1]-A[1])*t,sw=A[2]+(B[2]-A[2])*t,ix=Math.floor(sx),iy=Math.floor(sy);let vis=false;
+      if(ix>=0&&iy>=0&&ix<W&&iy<H){if(sw<=lin[iy*W+ix]+eps)vis=true;else{for(let oy=-1;oy<=1&&!vis;oy++)for(let ox=-1;ox<=1;ox++){const jx=ix+ox,jy=iy+oy;if(jx<0||jy<0||jx>=W||jy>=H)continue;if(sw<=lin[jy*W+jx]+eps){vis=true;break}}}
+        if(vis&&skipEdge&&Bd[iy*W+ix])vis=false}
+      if(vis){if(run<0){run=i;lx=sx;ly=sy}}
+      else if(run>=0){const pt=(i-1)/n;if(i-1>run)dst.push(lx,ly,A[0]+(B[0]-A[0])*pt,A[1]+(B[1]-A[1])*pt);run=-1}}
+    if(run>=0&&n>run)dst.push(lx,ly,B[0],B[1])}
+  const front=f=>fN[f*3]*(cp.x-fC[f*3])+fN[f*3+1]*(cp.y-fC[f*3+1])+fN[f*3+2]*(cp.z-fC[f*3+2])>0;
+  const cosT=Math.cos(THREE.MathUtils.degToRad(P.creaseAngle));
+  if(P.lineInner||P.lineCrease)for(let e=0;e<E;e++){const f1=eF1[e],f2=eF2[e];if(f2<0)continue;const a=front(f1),b=front(f2);let dst=null,skip=false;
+    if(a!==b){if(P.lineInner){dst=out.inner;skip=P.lineOuter}}else if(a&&P.lineCrease&&eCos[e]<cosT)dst=out.crease;
+    if(!dst)continue;const i=eA[e]*3,j=eB[e]*3;visSeg(pos[i],pos[i+1],pos[i+2],pos[j],pos[j+1],pos[j+2],dst,skip)}
+  if(P.lineSlice){const ax=P.sliceAxis==='높이'?1:P.sliceAxis==='옆'?0:2,N=P.sliceCount,step=2/(N+1);
+    for(let f=0;f<F;f++){const v=[idx[f*3]*3,idx[f*3+1]*3,idx[f*3+2]*3],h=v.map(o=>pos[o+ax]),lo=Math.min(h[0],h[1],h[2]),hi=Math.max(h[0],h[1],h[2]);
+      for(let k=Math.max(1,Math.ceil((lo+1)/step));k<=Math.min(N,Math.floor((hi+1)/step));k++){const c=-1+k*step,pts=[];
+        for(let s=0;s<3;s++){const a=v[s],b=v[(s+1)%3],ha=h[s],hb=h[(s+1)%3];if((ha-c)*(hb-c)<0){const t=(c-ha)/(hb-ha);pts.push(pos[a]+(pos[b]-pos[a])*t,pos[a+1]+(pos[b+1]-pos[a+1])*t,pos[a+2]+(pos[b+2]-pos[a+2])*t)}}
+        if(pts.length>=6)visSeg(pts[0],pts[1],pts[2],pts[3],pts[4],pts[5],out.slice,false)}}}}
+function chain(seg){
+  // join segment ends that meet within 2 px (tiny gaps come from the visibility sampling)
+  const n=seg.length/4,T=2,cell=(x,y)=>Math.floor(x/T)*100003+Math.floor(y/T),grid=new Map(),used=new Uint8Array(n),out=[];
+  for(let e=0;e<n*2;e++){const x=seg[e*2],y=seg[e*2+1],k=cell(x,y);let a=grid.get(k);if(!a)grid.set(k,a=[]);a.push(e)}
+  const next=(x,y)=>{const cx=Math.floor(x/T),cy=Math.floor(y/T);let best=-1,bd=T*T;
+    for(let ox=-1;ox<=1;ox++)for(let oy=-1;oy<=1;oy++){const a=grid.get((cx+ox)*100003+cy+oy);if(!a)continue;
+      for(const e of a){if(used[e>>1])continue;const dx=seg[e*2]-x,dy=seg[e*2+1]-y,d=dx*dx+dy*dy;if(d<=bd){bd=d;best=e}}}
+    return best};
+  for(let s=0;s<n;s++){if(used[s])continue;used[s]=1;const line=[seg[s*4],seg[s*4+1],seg[s*4+2],seg[s*4+3]];
+    for(let dir=0;dir<2;dir++){
+      for(;;){const L=line.length,x=dir?line[0]:line[L-2],y=dir?line[1]:line[L-1];const e=next(x,y);if(e<0)break;const i=e>>1;used[i]=1;
+        const o=(e&1)?0:1,fx=seg[i*4+o*2],fy=seg[i*4+o*2+1];
+        if(dir)line.unshift(fx,fy);else line.push(fx,fy)}}
+    out.push(line)}
+  return out;
+}
+function rdp(pts,tol){if(pts.length<=4||tol<=0)return pts;const n=pts.length/2,keep=new Uint8Array(n);keep[0]=keep[n-1]=1;const st=[[0,n-1]];
+  while(st.length){const[a,b]=st.pop();const ax=pts[a*2],ay=pts[a*2+1],bx=pts[b*2],by=pts[b*2+1],dx=bx-ax,dy=by-ay,l=Math.hypot(dx,dy);let md=0,mi=-1;
+    for(let i=a+1;i<b;i++){const d=l<1e-6?Math.hypot(pts[i*2]-ax,pts[i*2+1]-ay):Math.abs((pts[i*2]-ax)*dy-(pts[i*2+1]-ay)*dx)/l;if(d>md){md=d;mi=i}}
+    if(md>tol){keep[mi]=1;st.push([a,mi],[mi,b])}}
+  const o=[];for(let i=0;i<n;i++)if(keep[i])o.push(pts[i*2],pts[i*2+1]);return o}
+function chaikin(pts,it){for(let k=0;k<it;k++){if(pts.length<6)return pts;const o=[pts[0],pts[1]];
+  for(let i=0;i<pts.length/2-1;i++){const x0=pts[i*2],y0=pts[i*2+1],x1=pts[i*2+2],y1=pts[i*2+3];o.push(.75*x0+.25*x1,.75*y0+.25*y1,.25*x0+.75*x1,.25*y0+.75*y1)}
+  o.push(pts[pts.length-2],pts[pts.length-1]);pts=o}return pts}
 
 // ---------- screen: same-size pen dots, density only ----------
 let pens=null,geo=null;
@@ -7058,9 +7178,10 @@ const BAYER=bayer(8);
 function layout(){
   if(!raw){pens=null;return}
   const{W,H,SM,ST,bx0,bx1,by0,by1,box}=raw;
-  let[pw,ph]=PAPERS[P.paper];if(P.orient==='가로')[pw,ph]=[ph,pw];
-  const bw=bx1-bx0+1,bh=by1-by0+1,s=Math.min(Math.max(10,pw-2*P.margin)/bw,Math.max(10,ph-2*P.margin)/bh);
-  const ox=(pw-bw*s)/2-bx0*s,oy=(ph-bh*s)/2-by0*s;geo={pw,ph,s,ox,oy};
+  const[pw,ph]=paperSize();
+  const bw=bx1-bx0+1,bh=by1-by0+1,aw=Math.max(5,pw-2*P.margin),ah=Math.max(5,ph-2*P.margin),s=Math.min(aw/bw,ah/bh)*P.drawScale;
+  const fx=(aw-bw*s)/2,fy=(ah-bh*s)/2,ox=P.margin+fx*(1+P.posX)-bx0*s,oy=P.margin+fy*(1+P.posY)-by0*s;geo={pw,ph,s,ox,oy,lines:[]};
+  $('drawInfo').textContent=`그림 크기 ${(bw*s).toFixed(0)} × ${(bh*s).toFixed(0)} mm · 종이 ${pw} × ${ph} mm`;
   const toneAt=(x,y,rmm)=>{const px=(x-ox)/s,py=(y-oy)/s,rr=Math.max(.5,rmm/s);
     const x0=Math.max(0,Math.floor(px-rr)),x1=Math.min(W,Math.ceil(px+rr)),y0=Math.max(0,Math.floor(py-rr)),y1=Math.min(H,Math.ceil(py+rr));
     if(x1<=x0||y1<=y0)return -1;const c=box(SM,x0,y0,x1,y1);if(c<(x1-x0)*(y1-y0)*.4)return -1;return box(ST,x0,y0,x1,y1)/c};
@@ -7090,34 +7211,51 @@ function layout(){
       if(P.method==='오차 확산'){const tmp=errA;errA=errB;errB=tmp;errB.fill(0)}}
     let travel=0;for(let q=2;q<dots.length;q+=2)travel+=Math.hypot(dots[q]-dots[q-2],dots[q+1]-dots[q-1]);
     return{w,p,cmax,dots:new Float32Array(dots),travel}});
-  const pr=pens[0];$('dotInfo').textContent=`펜 ${pr.w.toFixed(2)}mm · 점 간격 ${pr.p.toFixed(2)}mm · 가장 어둡게 찍을 수 있는 밀도 약 ${Math.round(pr.cmax*100)}%`+(P.spacing<1?' (점끼리 살짝 겹침)':'');
+  if(raw.lines){const tol=.6;
+    for(const k of['outer','inner','crease','slice']){const seg=raw.lines[k];if(!seg||!seg.length)continue;
+      const polys=chain(seg).map(l=>chaikin(rdp(l,tol),P.lineSmooth)).map(l=>l.map((v,i)=>i%2?v*s+oy:v*s+ox))
+        .filter(l=>{let len=0;for(let i=2;i<l.length;i+=2)len+=Math.hypot(l[i]-l[i-2],l[i+1]-l[i-1]);return len>=P.lineMin});
+      geo.lines.push(...polys)}}
+  const pr=pens[0];$('pen1Info').textContent=`펜 1 굵기(${pr.w.toFixed(2)}mm)는 5번 망점 탭에서 바꿉니다.`;$('dotInfo').textContent=`펜 ${pr.w.toFixed(2)}mm · 점 간격 ${pr.p.toFixed(2)}mm · 가장 어둡게 찍을 수 있는 밀도 약 ${Math.round(pr.cmax*100)}%`+(P.spacing<1?' (점끼리 살짝 겹침)':'');
 }
 
 // ---------- preview ----------
-const pv=$('pv'),paperEl=$('paper');let zoom=null;
+const pv=$('pv'),paperEl=$('paper');let nav={x:0,y:0,z:1};
 function drawPreview(){
   const dpr=Math.min(2,devicePixelRatio||1),Wc=paperEl.clientWidth,Hc=paperEl.clientHeight;if(!Wc)return;
   pv.width=Math.round(Wc*dpr);pv.height=Math.round(Hc*dpr);const g=pv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
   g.fillStyle=cssVar('--stage')||'#dcdfe4';g.fillRect(0,0,Wc,Hc);
-  let[pw,ph]=PAPERS[P.paper];if(P.orient==='가로')[pw,ph]=[ph,pw];
-  $('paperTag').textContent=`${P.paper} ${P.orient} · ${pw}×${ph} mm`+(zoom?' · 6배 확대':'');
-  let k=Math.min(Wc*.92/pw,Hc*.92/ph),tx=(Wc-pw*k)/2,ty=(Hc-ph*k)/2;
-  if(zoom){k*=6;tx=Wc/2-zoom[0]*k;ty=Hc/2-zoom[1]*k}
+  const[pw,ph]=paperSize();
+  const k0=Math.min(Wc*.92/pw,Hc*.92/ph),k=k0*nav.z,tx=(Wc-pw*k0)/2+nav.x,ty=(Hc-ph*k0)/2+nav.y;
+  $('paperTag').textContent=`${P.paper==='직접 입력'?'직접 입력':P.paper} ${P.orient} · ${pw}×${ph} mm`+(nav.z>1.01?` · ${nav.z.toFixed(1)}배`:'');
   g.fillStyle=cssVar('--paper')||'#fff';g.shadowColor='rgba(0,0,0,.18)';g.shadowBlur=4;g.fillRect(tx,ty,pw*k,ph*k);g.shadowBlur=0;
-  if(!pens)return;
-  pens.forEach((pn,pi)=>{const r=Math.max(.35,pn.w/2*k),d=pn.dots;g.fillStyle=(+P.penCount>1&&P.penColors)?PEN_COLORS[pi]:'#16181C';
+  if(!pens)return;paintArt(g,k,tx,ty,Wc,Hc,+P.penCount>1&&P.penColors);
+}
+function paintArt(g,k,tx,ty,Wc,Hc,colored){
+  pens.forEach((pn,pi)=>{const r=Math.max(.35,pn.w/2*k),d=pn.dots;g.fillStyle=colored?PEN_COLORS[pi]:'#16181C';
     g.beginPath();for(let q=0;q<d.length;q+=2){const x=tx+d[q]*k,y=ty+d[q+1]*k;if(x<-2||y<-2||x>Wc+2||y>Hc+2)continue;g.moveTo(x+r,y);g.arc(x,y,r,0,6.2832)}g.fill()});
-  pv._map={k,tx,ty};
+  if(geo&&geo.lines.length){g.strokeStyle=colored?'#7A3FB0':'#16181C';g.lineWidth=Math.max(.5,P.linePen*k);g.lineCap='round';g.lineJoin='round';g.beginPath();
+    for(const l of geo.lines){g.moveTo(tx+l[0]*k,ty+l[1]*k);for(let i=2;i<l.length;i+=2)g.lineTo(tx+l[i]*k,ty+l[i+1]*k)}g.stroke()}
 }
 new ResizeObserver(drawPreview).observe(paperEl);
-pv.addEventListener('click',e=>{if(!pv._map)return;const b=pv.getBoundingClientRect(),{k,tx,ty}=pv._map;
-  zoom=zoom?null:[(e.clientX-b.left-tx)/k,(e.clientY-b.top-ty)/k];drawPreview()});
+// wheel zooms around the cursor, drag pans, double-click resets
+pv.addEventListener('wheel',e=>{e.preventDefault();const b=pv.getBoundingClientRect(),mx=e.clientX-b.left,my=e.clientY-b.top,Wc=b.width,Hc=b.height;
+  const[pw,ph]=paperSize(),k0=Math.min(Wc*.92/pw,Hc*.92/ph),tx=(Wc-pw*k0)/2+nav.x,ty=(Hc-ph*k0)/2+nav.y,k=k0*nav.z;
+  const px=(mx-tx)/k,py=(my-ty)/k,f=Math.exp(-e.deltaY*(e.deltaMode===1?.05:.0015)),z=Math.min(40,Math.max(.5,nav.z*f));
+  nav.z=z;nav.x=mx-px*k0*z-(Wc-pw*k0)/2;nav.y=my-py*k0*z-(Hc-ph*k0)/2;drawPreview()},{passive:false});
+let panning=null;
+pv.addEventListener('pointerdown',e=>{panning={x:e.clientX,y:e.clientY,nx:nav.x,ny:nav.y};pv.setPointerCapture(e.pointerId);pv.style.cursor='grabbing'});
+pv.addEventListener('pointermove',e=>{if(!panning)return;nav.x=panning.nx+e.clientX-panning.x;nav.y=panning.ny+e.clientY-panning.y;drawPreview()});
+const endPan=()=>{panning=null;pv.style.cursor=''};pv.addEventListener('pointerup',endPan);pv.addEventListener('pointercancel',endPan);
+pv.addEventListener('dblclick',()=>{nav={x:0,y:0,z:1};drawPreview()});
 
 function renderStats(){
   const st=$('stats');if(!pens){st.innerHTML='';$('statNote').textContent='';return}
   let html='',tot=0,totDots=0;
   pens.forEach((pn,i)=>{const n=pn.dots.length/2,sec=n*P.dotTime+pn.travel/P.travel;tot+=sec;totDots+=n;
     html+=`<div class="stat"><b>${n.toLocaleString()}</b><span>펜 ${i+1} · ${pn.w.toFixed(2)}mm 점</span></div>`});
+  if(geo&&geo.lines.length){let len=0;for(const l of geo.lines)for(let i=2;i<l.length;i+=2)len+=Math.hypot(l[i]-l[i-2],l[i+1]-l[i-1]);const sec=len/P.travel+geo.lines.length*.3;tot+=sec;
+    html+=`<div class="stat"><b>${(len/1000).toFixed(1)} m</b><span>선 ${geo.lines.length.toLocaleString()}개 · ${P.linePen.toFixed(2)}mm</span></div>`}
   const h=Math.floor(tot/3600),m=Math.round(tot%3600/60);
   html+=`<div class="stat"><b>${h?h+'시간 ':''}${m}분</b><span>예상 플로팅 시간${pens.length>1?' (펜 교체 '+(pens.length-1)+'번)':''}</span></div>`;
   st.innerHTML=html;
@@ -7156,9 +7294,12 @@ $('file').onchange=async e=>{const f=e.target.files[0];if(!f)return;const ext=f.
     else if(ext==='glb'||ext==='gltf'){const data=ext==='glb'?await f.arrayBuffer():await f.text();const gl=await new Promise((res,rej)=>new THREE.GLTFLoader().parse(data,'',res,rej));positions=collectPositions(gl.scene)}
     else throw new Error('지원하지 않는 형식입니다. STL·OBJ·PLY·GLB로 올려 주세요.');
     if(!positions||!positions.length)throw new Error('파일에서 면을 찾지 못했습니다.');
-    rawPos=positions;yawTurns=0;modelName=f.name.replace(/\.[^.]+$/,'');$('modelTag').textContent=f.name;zoom=null;
-    await prepare(`면 ${(positions.length/9).toLocaleString()}개를 준비하는 중…`);setView(0,0);
-  }catch(err){$('loadOv').hidden=true;setStatus('파일을 열지 못했습니다: '+(err.message||err),true);showTab(7)}
+    rawPos=positions;modelName=f.name.replace(/\.[^.]+$/,'');modelFile=f.name;currentSample=null;$('modelTag').textContent=f.name;nav={x:0,y:0,z:1};
+    const pr=pendingRestore;pendingRestore=null;yawTurns=pr?(pr.model.yaw||0):0;
+    await prepare(`면 ${(positions.length/9).toLocaleString()}개를 준비하는 중…`);
+    if(pr){applyView(pr.view);notice(null);autoRun();saveLast();flash(pr.model.name===modelName?`「${pr.name}」 설정을 각도까지 복원했습니다.`:`「${pr.name}」 설정을 적용했습니다. 저장할 때 파일(${pr.model.file||pr.model.name})과 이름이 다르니 확인해 주세요.`)}
+    else setView(0,0);
+  }catch(err){$('loadOv').hidden=true;setStatus('파일을 열지 못했습니다: '+(err.message||err),true);showTab(TAB_OUT)}
   e.target.value=''};
 
 // ---------- save ----------
@@ -7168,16 +7309,77 @@ function svgString(){
   pens.forEach((pn,i)=>{s+=`<g id="pen${i+1}" inkscape:groupmode="layer" inkscape:label="${i+1} 펜 ${pn.w.toFixed(2)}mm" fill="none" stroke="#000" stroke-width="${pn.w}" stroke-linecap="round">`;
     const d=pn.dots;for(let q=0;q<d.length;q+=4000){let path='';for(let r=q;r<Math.min(d.length,q+4000);r+=2)path+=`M${f(d[r])} ${f(d[r+1])}h.01`;s+=`<path d="${path}"/>`}
     s+='</g>'});
+  if(geo.lines.length){s+=`<g id="lines" inkscape:groupmode="layer" inkscape:label="${pens.length+1} 선 ${P.linePen.toFixed(2)}mm" fill="none" stroke="#000" stroke-width="${P.linePen}" stroke-linecap="round" stroke-linejoin="round">`;
+    for(const l of geo.lines){let d='M'+f(l[0])+' '+f(l[1]);for(let i=2;i<l.length;i+=2)d+='L'+f(l[i])+' '+f(l[i+1]);s+=`<path d="${d}"/>`}s+='</g>'}
   return s+'</svg>'}
 const downloadsP=(window.claude&&window.claude.use)?window.claude.use('downloads').catch(()=>null):Promise.resolve(null);
 $('saveSvg').onclick=async()=>{if(!pens){setStatus('먼저 모델을 불러와 주세요.',true);return}
   while(busy)await tick();
   if(raw&&raw.preview){setStatus('고화질로 다시 계산하는 중…');await run(false)}
   const name=`${modelName}-screentone-${P.paper.replace(/[^A-Za-z0-9]/g,'')}${pens.length>1?'-'+pens.length+'pens':''}.svg`,data=svgString();
-  const dl=await downloadsP;
-  if(!dl){try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'image/svg+xml'}));a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);setStatus('저장했습니다: '+name)}catch(e){setStatus('저장하지 못했습니다: '+e.message,true)}return}
-  try{await dl.save({filename:name,data});setStatus('저장했습니다: '+name)}
-  catch(e){setStatus(e&&e.code==='declined'?'저장을 취소했습니다.':'저장하지 못했습니다'+(e&&e.code?' ('+e.code+')':'')+'. 다시 눌러 주세요.',e&&e.code!=='declined')}};
+  saveFile(name,data,'image/svg+xml',setStatus)};
+async function saveFile(name,data,type,say){const dl=await downloadsP;
+  if(!dl){try{const a=document.createElement('a');a.href=URL.createObjectURL(data instanceof Blob?data:new Blob([data],{type}));a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);say('저장했습니다: '+name)}catch(e){say('저장하지 못했습니다: '+e.message,true)}return}
+  try{await dl.save({filename:name,data});say('저장했습니다: '+name)}
+  catch(e){say(e&&e.code==='declined'?'저장을 취소했습니다.':'저장하지 못했습니다'+(e&&e.code?' ('+e.code+')':'')+'. 다시 눌러 주세요.',e&&e.code!=='declined')}}
+$('saveJpg').onclick=async()=>{if(!pens){setStatus('먼저 모델을 불러와 주세요.',true);return}
+  while(busy)await tick();
+  if(raw&&raw.preview){setStatus('고화질로 다시 계산하는 중…');await run(false)}
+  const{pw,ph}=geo;let dpi=+P.jpgDpi;const maxPx=40e6;if(pw/25.4*dpi*ph/25.4*dpi>maxPx)dpi=Math.floor(Math.sqrt(maxPx/(pw*ph))*25.4);
+  const k=dpi/25.4,c=document.createElement('canvas');c.width=Math.round(pw*k);c.height=Math.round(ph*k);
+  const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);setStatus('JPG를 만드는 중…');await tick();
+  paintArt(g,k,0,0,c.width,c.height,false);
+  const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',.92));if(!blob){setStatus('JPG를 만들지 못했습니다. 해상도를 낮춰 보세요.',true);return}
+  saveFile(`${modelName}-screentone-${P.paper.replace(/[^A-Za-z0-9]/g,'')}-${dpi}dpi.jpg`,blob,'image/jpeg',setStatus)};
+
+// ---------- settings saves (kept in this site's storage; 3D files are never stored) ----------
+const SAVE_KEY='sculptDotSaves',LAST_KEY='sculptDotLast';
+// the working state (settings, angle, which model) is kept on every change so closing and reopening picks up where you left off
+function saveLast(){if(currentSample&&pendingRestore)return;try{localStorage.setItem(LAST_KEY,JSON.stringify(snapshot('지난 작업')))}catch(e){}}
+const loadSaves=()=>{try{const a=JSON.parse(localStorage.getItem(SAVE_KEY)||'[]');return Array.isArray(a)?a:[]}catch(e){return[]}};
+const storeSaves=a=>{try{localStorage.setItem(SAVE_KEY,JSON.stringify(a));return true}catch(e){return false}};
+let flashT=0;
+function flash(t,err){const el=$('barMsg');el.textContent=t;el.classList.toggle('err',!!err);el.hidden=false;clearTimeout(flashT);flashT=setTimeout(()=>{el.hidden=true},5000)}
+function notice(t){$('notice').hidden=!t;if(t)$('noticeText').textContent=t}
+$('noticeClose').onclick=()=>{pendingRestore=null;notice(null)};
+function applyView(v){if(!v)return;camera.position.fromArray(v.pos);controls.target.fromArray(v.target);camera.fov=P.fov;camera.updateProjectionMatrix();controls.update();draw()}
+const fmtDate=iso=>{const d=new Date(iso);return `${d.getFullYear()}.${d.getMonth()+1}.${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`};
+function snapshot(name){return{id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),name,date:new Date().toISOString(),P:{...P},
+  view:{pos:camera.position.toArray(),target:controls.target.toArray()},model:{name:modelName,file:modelFile,sample:currentSample,yaw:yawTurns}}}
+function saveSettings(name){
+  const nm=(name||'').trim()||`${currentSample?'샘플 '+(currentSample==='head'?'두상':'매듭'):modelFile||modelName} · ${fmtDate(new Date().toISOString())}`;
+  const a=loadSaves();a.unshift(snapshot(nm));
+  if(!storeSaves(a.slice(0,60))){flash('저장하지 못했습니다. 브라우저 저장 공간이 막혀 있습니다.',true);return}
+  renderSaves();flash(`설정을 저장했습니다: ${nm}`)}
+async function restore(e){
+  const needModel=P.target!==e.P.target||P.upAxis!==e.P.upAxis||yawTurns!==e.model.yaw;
+  P={...DEF,...e.P};save();syncInputs();camera.fov=P.fov;
+  if(e.model.sample){yawTurns=e.model.yaw||0;await loadSample(e.model.sample,true);applyView(e.view);notice(null);autoRun();flash(`「${e.name}」을 불러왔습니다.`);return}
+  if(rawPos&&!currentSample&&modelName===e.model.name){if(needModel){yawTurns=e.model.yaw||0;await prepare('모델을 다시 준비하는 중…')}applyView(e.view);notice(null);autoRun();saveLast();flash(`「${e.name}」을 각도까지 불러왔습니다.`);return}
+  pendingRestore=e;autoRun();
+  notice(`「${e.name}」은 3D 파일 「${e.model.file||e.model.name}」로 만든 설정입니다. 설정은 적용했습니다. 원본 3D 파일을 올려 주세요. 올리면 각도까지 그대로 복원됩니다.`)}
+function renderSaves(){
+  const box=$('saveList');if(!box)return;const a=loadSaves();
+  if(!a.length){box.innerHTML='<p class="hint">아직 저장한 설정이 없습니다. 위에서 이름을 적고 저장하거나, 맨 위의 설정 저장 버튼을 누르세요.</p>';return}
+  box.innerHTML='';
+  a.forEach(e=>{const row=document.createElement('div');row.className='saverow';
+    const info=document.createElement('div');info.className='saveinfo';
+    const t=document.createElement('b');t.textContent=e.name;const sub=document.createElement('span');
+    sub.textContent=`${fmtDate(e.date)} · ${e.model.sample?'샘플':(e.model.file||e.model.name)} · 펜 ${(+e.P.pen1).toFixed(2)}mm${+e.P.penCount>1?' 외 '+(e.P.penCount-1)+'자루':''} · ${e.P.paper==='직접 입력'?e.P.paperW+'×'+e.P.paperH+'mm':e.P.paper}`;
+    info.append(t,sub);
+    const load=document.createElement('button');load.textContent='불러오기';load.onclick=()=>restore(e);
+    const del=document.createElement('button');del.textContent='삭제';del.className='ghost';
+    del.onclick=()=>{if(del.dataset.armed){storeSaves(loadSaves().filter(x=>x.id!==e.id));renderSaves();flash('삭제했습니다.')}else{del.dataset.armed='1';del.textContent='한 번 더 누르면 삭제';setTimeout(()=>{delete del.dataset.armed;del.textContent='삭제'},3000)}};
+    row.append(info,load,del);box.appendChild(row)})}
+$('saveNow').onclick=()=>{saveSettings($('saveName').value);$('saveName').value=''};
+$('quickSave').onclick=()=>saveSettings('');
+$('savesExport').onclick=()=>{const a=loadSaves();if(!a.length){flash('내보낼 저장이 없습니다.',true);return}saveFile(`sculpt-line-settings-${new Date().toISOString().slice(0,10)}.json`,JSON.stringify(a,null,1),'application/json',flash)};
+$('savesImport').onchange=async ev=>{const f=ev.target.files[0];if(!f)return;
+  try{const inc=JSON.parse(await f.text());if(!Array.isArray(inc))throw new Error('형식이 맞지 않습니다');
+    const a=loadSaves(),ids=new Set(a.map(x=>x.id));let n=0;for(const e of inc){if(e&&e.P&&e.model&&!ids.has(e.id)){a.push(e);n++}}
+    a.sort((x,y)=>y.date<x.date?-1:1);storeSaves(a.slice(0,200));renderSaves();flash(`설정 ${n}개를 가져왔습니다.`)}
+  catch(err){flash('가져오지 못했습니다: '+err.message,true)}ev.target.value=''};
+renderSaves();
 
 // ---------- samples ----------
 function makeHead(){
@@ -7204,14 +7406,19 @@ function makeHead(){
   const neck=new THREE.CylinderGeometry(.42,.5,.85,96,1,true).toNonIndexed();neck.translate(0,-1.05,-.16);
   const out=new Float32Array(a.length+neck.attributes.position.array.length);out.set(a);out.set(neck.attributes.position.array,a.length);return out}
 
-async function loadSample(k){
+async function loadSample(k,keepView){
   rawPos=k==='head'?makeHead():new THREE.TorusKnotGeometry(1,.34,260,36,2,3).toNonIndexed().attributes.position.array;
-  yawTurns=0;modelName='sample-'+k;$('modelTag').textContent=k==='head'?'샘플 · 두상':'샘플 · 매듭';zoom=null;
+  if(!keepView)yawTurns=0;currentSample=k;modelFile='';modelName='sample-'+k;$('modelTag').textContent=k==='head'?'샘플 · 두상':'샘플 · 매듭';nav={x:0,y:0,z:1};
   const up=P.upAxis;P.upAxis='Y';await prepare();P.upAxis=up;
   $('modelInfo').textContent+=' · 샘플입니다. 토르소 파일을 올려 주세요.';
-  if(k==='head')setView(28,6);else setView(35,12);
+  if(keepView)return;if(k==='head')setView(28,6);else setView(35,12);
 }
-size();loadSample('head');
+size();
+(async()=>{let last=null;try{last=JSON.parse(localStorage.getItem(LAST_KEY)||'null')}catch(e){}
+  if(last&&last.model&&last.view&&!last.model.sample){pendingRestore=last;await loadSample('head');
+    notice(`지난번 설정을 그대로 복원했습니다. 작업하던 3D 파일 「${last.model.file||last.model.name}」을 다시 올리면 각도까지 이어집니다.`)}
+  else if(last&&last.model&&last.view&&last.model.sample){yawTurns=last.model.yaw||0;await loadSample(last.model.sample,true);applyView(last.view);autoRun()}
+  else await loadSample('head')})();
 window.__sl={get raw(){return raw},get pens(){return pens},run,P:()=>P};
 })();
 </script>
