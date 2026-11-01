@@ -91,6 +91,18 @@ details.corners{display:flex;flex-direction:column;gap:10px}details.corners summ
 .pieceview{position:relative;aspect-ratio:4/3;background:var(--stage);border-radius:4px;overflow:hidden}.pieceview canvas{display:block;width:100%;height:100%;touch-action:none}
 .saverow.sel{outline:2px solid var(--accent);outline-offset:-2px}.saverow.other{opacity:.7}
 .cutov .pnum{fill:#fff;font:600 15px/1 'JetBrains Mono',monospace;text-anchor:middle;dominant-baseline:middle;paint-order:stroke;stroke:var(--accent);stroke-width:3px}
+.mg{position:fixed;inset:0;z-index:50;background:var(--bg,#F4F5F7);display:flex;flex-direction:column}
+.mg[hidden]{display:none}
+.mgbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+.mgbar label{display:flex;gap:6px;align-items:center;font-size:13px}.mgbar .mgt{font-size:15px;margin-right:6px}
+.mgbar .seg{display:inline-flex}.mgbar .seg button{border-radius:0}.mgbar .seg button:first-child{border-radius:4px 0 0 4px}.mgbar .seg button:last-child{border-radius:0 4px 4px 0;margin-left:-1px}
+.mgbar .seg button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.mghint{margin:0;padding:6px 14px;font-size:12.5px;color:var(--mute)}
+.mgstage{position:relative;flex:1;min-height:0}.mgstage canvas,.mgstage svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.mgstage svg{touch-action:none}.mgmask{fill:#fff;pointer-events:none}
+.mgfr{fill:transparent;stroke:#111;stroke-width:2.2;cursor:pointer}.mgfr.sel{stroke:var(--accent);stroke-width:3}.mgfr.bad{stroke:var(--warn);stroke-dasharray:6 4}
+.mgnum{font:600 13px/1 'JetBrains Mono',monospace;fill:#111;pointer-events:none}
+.mghd{fill:#fff;stroke:var(--accent);stroke-width:2;cursor:grab}.mghd.mv{fill:var(--accent)}
 .ptitle.sect{margin-top:8px;padding-top:12px;border-top:1px solid var(--line)}.onpiece{color:var(--accent);font-weight:500}
 .view .empty{position:absolute;inset:0;display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--mute);font-size:13px;pointer-events:none}
 .view .empty b{font-size:16px;color:var(--fg);font-weight:600}
@@ -6844,7 +6856,7 @@ const DEF={upAxis:'Y',target:'600000',fov:20,
   curv:.7,cavity:.5,local:.5,res:'2048',
   method:'스크린톤',cell:4,spacing:1.05,angle:45,
   penCount:'1',pen1:.3,pen2:.6,pen3:1,cap1:.55,cap2:.8,penColors:true,dotTime:.25,travel:60,
-  paper:'A4',paperW:210,paperH:297,orient:'세로',margin:20,drawScale:1,posX:0,posY:0,frame:'없음',frameGap:5,frameLines:1,frameStep:1.5,jpgDpi:'300',
+  paper:'A4',paperW:210,paperH:297,orient:'세로',margin:20,drawScale:1,posX:0,posY:0,frame:'없음',frameGap:5,frameLines:1,frameStep:1.5,framePen:.3,jpgDpi:'300',
   lineOuter:false,lineInner:false,lineCrease:false,creaseAngle:40,lineSlice:false,sliceCount:30,sliceAxis:'높이',linePen:.3,lineMin:2,lineSmooth:2,innerJump:.05,
   cutW:.6,cutH:.8,cutX:0,cutY:0,cutRot:0,c0x:0,c0y:0,c1x:0,c1y:0,c2x:0,c2y:0,c3x:0,c3y:0,cutNear:0,cutFar:0,cutSrc:'원본 해상도',randMode:'칸 하나',randPanels:5,randSlant:8,randGutter:.02,randSnap:true,cutSeed:1,mergeRes:'384'};
 let P;try{P={...DEF,...JSON.parse(localStorage.getItem('sculptDotP1')||'{}')}}catch(e){P={...DEF}}
@@ -6864,6 +6876,7 @@ const TABS=[
  {name:'각도',hint:'왼쪽 화면을 끌어서 돌리고, 두 손가락이나 휠로 확대합니다. 손을 떼면 망점이 다시 계산됩니다.',c:[
    {views:1},{k:'fov',l:'원근감',min:5,max:60,step:1,u:'°',re:'cam'}]},
  {name:'컷',cut:true,hint:'3D 화면 위에 프레임을 얹고, 화면에 보이는 그대로 프레임 모양으로 깊이 방향 끝까지 잘라냅니다. 모서리를 끌거나 아래 값으로 조절하세요. 직사각형부터 만화 칸 같은 비정형 사각형까지 됩니다. 모델은 평소처럼 돌리고 확대해서 구도를 잡으면 됩니다.',c:[
+   {mangaBtn:1},
    {cutPresets:1},
    {k:'cutW',l:'가로',min:.05,max:2,step:.005,fmt:v=>(v*100).toFixed(1),num:1,re:'cut'},
    {k:'cutH',l:'세로',min:.05,max:1.2,step:.005,fmt:v=>(v*100).toFixed(1),num:1,re:'cut'},
@@ -6941,6 +6954,7 @@ const TABS=[
    {k:'frameGap',l:'테두리 간격',min:0,max:60,step:.5,u:'mm',re:'layout',show:()=>P.frame==='종이 가장자리'||P.frame==='그림 둘레',
      fmt:v=>P.frame==='그림 둘레'?`그림에서 ${v} mm 밖`:`종이 끝에서 ${v} mm 안`},
    {k:'frameLines',l:'테두리 겹선',min:1,max:3,step:1,fmt:v=>v>1?v+'줄':'한 줄',re:'layout',show:()=>P.frame!=='없음'},
+   {k:'framePen',l:'테두리 두께',min:.05,max:2,step:.01,u:'mm',d:2,re:'layout',show:()=>P.frame!=='없음'},
    {k:'frameStep',l:'겹선 사이',min:.5,max:10,step:.1,u:'mm',re:'layout',show:()=>P.frame!=='없음'&&P.frameLines>1},
    {info:'frameInfo'}]},
  {name:'내보내기',out:true,c:[{k:'jpgDpi',l:'JPG 해상도',sel:['150','300','600'],fmt:v=>v+' dpi',re:'none'}]},
@@ -6978,6 +6992,7 @@ TABS.forEach((t,i)=>{
       node.innerHTML='<p class="hint onpiece" id="cutOnPiece" hidden></p><div class="bar"><button class="primary" id="cutGo">프레임 모양으로 자르기</button><button class="primary" id="pageGo" hidden>페이지 칸 전부 자르기</button><button id="cutBack" hidden>원래 모델로 돌아가기</button></div>'+
         '<div id="pieceBox" hidden><h3 class="ptitle"><span>잘라낸 조각 · 끌어서 돌리기 · 휠로 확대</span><span class="tag" id="pieceTag"></span></h3><div class="pieceview"><canvas id="pieceCv"></canvas></div></div>'+
         '<h3 class="ptitle"><span>자른 기록 · 자동 저장 · 3D 파일이 아니라 자른 방법만 저장</span></h3><div id="pieceList" class="savelist"></div>'}
+    else if(c.mangaBtn){node=document.createElement('div');node.className='bar';node.innerHTML='<button class="primary" id="mgOpen">만화 페이지 꾸미기 (새 창)</button><span class="hint">만화책 한 쪽처럼 칸을 짜고, 칸마다 구도를 잡아 한 번에 잘라냅니다.</span>'}
     else if(c.randHead){node=document.createElement('h3');node.className='ptitle sect';node.innerHTML='<span>랜덤 컷 · 같은 번호면 언제나 같은 칸이 나옵니다</span>'}
     else if(c.randBtns){node=document.createElement('div');node.className='bar';node.innerHTML='<button id="randNew">새 번호로 랜덤</button><button class="ghost" id="randSame">이 번호로 다시</button>'}
     else if(c.mergePanel){node=document.createElement('div');node.className='cutpanel';
@@ -7269,7 +7284,7 @@ function layout(){
     const dir=P.frame==='그림 둘레'?1:-1;
     for(let i=0;i<P.frameLines;i++){const o=i*P.frameStep*dir,x0=Math.max(0,r[0]-o),y0=Math.max(0,r[1]-o),x1=Math.min(pw,r[2]+o),y1=Math.min(ph,r[3]+o);
       if(x1-x0>1&&y1-y0>1)geo.frame.push([x0,y0,x1,y0,x1,y1,x0,y1,x0,y0])}
-    const f0=geo.frame[0];$('frameInfo').textContent=f0?`테두리 ${(f0[2]-f0[0]).toFixed(1)} × ${(f0[5]-f0[1]).toFixed(1)} mm · 선 탭의 선 펜 굵기(${P.linePen.toFixed(2)}mm)로 그리고, SVG에서는 따로 된 층이라 펜을 바꿔 그릴 수도 있습니다.`+(P.frame==='그림 둘레'&&(f0[0]<=0||f0[1]<=0||f0[2]>=pw||f0[3]>=ph)?' 종이 밖으로 나가서 종이 끝에 맞췄습니다.':''):'테두리가 너무 작아서 그리지 않았습니다.'}
+    const f0=geo.frame[0];$('frameInfo').textContent=f0?`테두리 ${(f0[2]-f0[0]).toFixed(1)} × ${(f0[5]-f0[1]).toFixed(1)} mm · 두께 ${P.framePen.toFixed(2)}mm · SVG에서는 따로 된 층이라 그 굵기의 펜으로 바꿔 그리면 됩니다.`+(P.frame==='그림 둘레'&&(f0[0]<=0||f0[1]<=0||f0[2]>=pw||f0[3]>=ph)?' 종이 밖으로 나가서 종이 끝에 맞췄습니다.':''):'테두리가 너무 작아서 그리지 않았습니다.'}
   else $('frameInfo').textContent='';
   $('drawInfo').textContent=`그림 크기 ${(bw*s).toFixed(0)} × ${(bh*s).toFixed(0)} mm · 종이 ${pw} × ${ph} mm`;
   const toneAt=(x,y,rmm)=>{const px=(x-ox)/s,py=(y-oy)/s,rr=Math.max(.5,rmm/s);
@@ -7324,7 +7339,9 @@ function drawPreview(){
 function paintArt(g,k,tx,ty,Wc,Hc,colored){
   pens.forEach((pn,pi)=>{const r=Math.max(.35,pn.w/2*k),d=pn.dots;g.fillStyle=colored?PEN_COLORS[pi]:'#16181C';
     g.beginPath();for(let q=0;q<d.length;q+=2){const x=tx+d[q]*k,y=ty+d[q+1]*k;if(x<-2||y<-2||x>Wc+2||y>Hc+2)continue;g.moveTo(x+r,y);g.arc(x,y,r,0,6.2832)}g.fill()});
-  const L=geo?geo.lines.concat(geo.frame||[]):[];
+  if(geo&&geo.frame&&geo.frame.length){g.strokeStyle=colored?'#0E7C66':'#16181C';g.lineWidth=Math.max(.5,P.framePen*k);g.lineCap='round';g.lineJoin='miter';g.beginPath();
+    for(const l of geo.frame){g.moveTo(tx+l[0]*k,ty+l[1]*k);for(let i=2;i<l.length;i+=2)g.lineTo(tx+l[i]*k,ty+l[i+1]*k);g.closePath()}g.stroke()}
+  const L=geo?geo.lines:[];
   if(L.length){g.strokeStyle=colored?'#7A3FB0':'#16181C';g.lineWidth=Math.max(.5,P.linePen*k);g.lineCap='round';g.lineJoin='round';g.beginPath();
     for(const l of L){g.moveTo(tx+l[0]*k,ty+l[1]*k);for(let i=2;i<l.length;i+=2)g.lineTo(tx+l[i]*k,ty+l[i+1]*k)}g.stroke()}
 }
@@ -7418,7 +7435,7 @@ function svgString(){
     s+='</g>'});
   if(geo.lines.length){s+=`<g id="lines" inkscape:groupmode="layer" inkscape:label="${pens.length+1} 선 ${P.linePen.toFixed(2)}mm" fill="none" stroke="#000" stroke-width="${P.linePen}" stroke-linecap="round" stroke-linejoin="round">`;
     for(const l of geo.lines){let d='M'+f(l[0])+' '+f(l[1]);for(let i=2;i<l.length;i+=2)d+='L'+f(l[i])+' '+f(l[i+1]);s+=`<path d="${d}"/>`}s+='</g>'}
-  if(geo.frame&&geo.frame.length){s+=`<g id="frame" inkscape:groupmode="layer" inkscape:label="${pens.length+(geo.lines.length?2:1)} 테두리 ${P.linePen.toFixed(2)}mm" fill="none" stroke="#000" stroke-width="${P.linePen}" stroke-linecap="round" stroke-linejoin="round">`;
+  if(geo.frame&&geo.frame.length){s+=`<g id="frame" inkscape:groupmode="layer" inkscape:label="${pens.length+(geo.lines.length?2:1)} 테두리 ${P.framePen.toFixed(2)}mm" fill="none" stroke="#000" stroke-width="${P.framePen}" stroke-linecap="round" stroke-linejoin="round">`;
     for(const l of geo.frame)s+=`<path d="M${f(l[0])} ${f(l[1])}L${f(l[2])} ${f(l[3])}L${f(l[4])} ${f(l[5])}L${f(l[6])} ${f(l[7])}Z"/>`;s+='</g>'}
   return s+'</svg>'}
 const downloadsP=(window.claude&&window.claude.use)?window.claude.use('downloads').catch(()=>null):Promise.resolve(null);
@@ -7530,10 +7547,10 @@ let pagePanels=null;   // panels of a generated random page, shown instead of th
 // corners in view units: x right, y down, 1 = view height, origin = view centre
 function cutCorners(){const w=P.cutW/2,h=P.cutH/2,a=THREE.MathUtils.degToRad(P.cutRot),ca=Math.cos(a),sa=Math.sin(a);
   return[[-w,-h],[w,-h],[w,h],[-w,h]].map(([x,y],i)=>{x+=P['c'+i+'x'];y+=P['c'+i+'y'];return[x*ca-y*sa+P.cutX,x*sa+y*ca+P.cutY]})}
-function setFrameFromCorners(c){const cx=(c[0][0]+c[1][0]+c[2][0]+c[3][0])/4,cy=(c[0][1]+c[1][1]+c[2][1]+c[3][1])/4;
-  const xs=c.map(p=>p[0]),ys=c.map(p=>p[1]),w=Math.max(...xs)-Math.min(...xs),h=Math.max(...ys)-Math.min(...ys);
-  P.cutX=+cx.toFixed(4);P.cutY=+cy.toFixed(4);P.cutW=+w.toFixed(4);P.cutH=+h.toFixed(4);P.cutRot=0;
-  [[-w/2,-h/2],[w/2,-h/2],[w/2,h/2],[-w/2,h/2]].forEach(([bx,by],i)=>{P['c'+i+'x']=+(c[i][0]-cx-bx).toFixed(4);P['c'+i+'y']=+(c[i][1]-cy-by).toFixed(4)})}
+function cornersToFrame(c){const cx=(c[0][0]+c[1][0]+c[2][0]+c[3][0])/4,cy=(c[0][1]+c[1][1]+c[2][1]+c[3][1])/4;
+  const xs=c.map(p=>p[0]),ys=c.map(p=>p[1]),w=Math.max(...xs)-Math.min(...xs),h=Math.max(...ys)-Math.min(...ys),f={cutX:+cx.toFixed(4),cutY:+cy.toFixed(4),cutW:+w.toFixed(4),cutH:+h.toFixed(4),cutRot:0,cutNear:0,cutFar:0};
+  [[-w/2,-h/2],[w/2,-h/2],[w/2,h/2],[-w/2,h/2]].forEach(([bx,by],i)=>{f['c'+i+'x']=+(c[i][0]-cx-bx).toFixed(4);f['c'+i+'y']=+(c[i][1]-cy-by).toFixed(4)});return f}
+function setFrameFromCorners(c){const f=cornersToFrame(c);delete f.cutNear;delete f.cutFar;Object.assign(P,f)}
 function cutConvex(c){let sg=0;for(let i=0;i<4;i++){const a=c[i],b=c[(i+1)%4],d=c[(i+2)%4];const z=(b[0]-a[0])*(d[1]-b[1])-(b[1]-a[1])*(d[0]-b[0]);if(Math.abs(z)<1e-9)return false;const s=Math.sign(z);if(!sg)sg=s;else if(s!==sg)return false}return true}
 function cutActive(){return CUT_TAB>=0&&!$('pane'+CUT_TAB).hidden&&!!mesh}
 let cutDrag=null;
@@ -7636,12 +7653,12 @@ function clipMesh(pos0,idx0,planes){
   for(let i=0;i<T.length;i++){const v=T[i];if(remap[v]<0){remap[v]=pos.length/3;pos.push(V[v*3],V[v*3+1],V[v*3+2])}idx[i]=remap[v]}
   return{pos:new Float32Array(pos),idx,openLoops}}
 
-function planesFor(c,near,far){
-  camera.updateMatrixWorld();const asp=viewEl.clientWidth/viewEl.clientHeight,C=camera.position.clone();
-  const ray=([x,y])=>new THREE.Vector3(2*x/asp,-2*y,.5).unproject(camera);
+function planesFor(c,near,far,cam,asp){
+  cam=cam||camera;asp=asp||viewEl.clientWidth/viewEl.clientHeight;cam.updateMatrixWorld();const C=cam.position.clone();
+  const ray=([x,y])=>new THREE.Vector3(2*x/asp,-2*y,.5).unproject(cam);
   const R=c.map(ray),mid=ray([(c[0][0]+c[1][0]+c[2][0]+c[3][0])/4,(c[0][1]+c[1][1]+c[2][1]+c[3][1])/4]),planes=[];
   for(let i=0;i<4;i++){const a=R[i].clone().sub(C),b=R[(i+1)%4].clone().sub(C),n=a.cross(b).normalize();let d=-n.dot(C);if(n.dot(mid)+d<0){n.negate();d=-d}planes.push([n.x,n.y,n.z,d])}
-  const fw=new THREE.Vector3();camera.getWorldDirection(fw);const dist=-new THREE.Vector3().applyMatrix4(camera.matrixWorldInverse).z;
+  const fw=new THREE.Vector3();cam.getWorldDirection(fw);const dist=-new THREE.Vector3().applyMatrix4(cam.matrixWorldInverse).z;
   if(near>0){const z=dist-1+2*near;planes.push([fw.x,fw.y,fw.z,-(fw.dot(C)+z)])}
   if(far>0){const z=dist+1-2*far;planes.push([-fw.x,-fw.y,-fw.z,fw.dot(C)+z])}
   return planes}
@@ -7661,15 +7678,15 @@ async function computeRec(rec){
   if(vol<0)for(let i=0;i<x.length;i+=3){const t=x[i+1];x[i+1]=x[i+2];x[i+2]=t}
   const pc={pos:p,idx:x,norm:src.norm,open:r.openLoops};if(recCache.size>6)recCache.delete(recCache.keys().next().value);recCache.set(rec.id,pc);return pc}
 const recLabel=r=>`${r.root.name} · 컷 ${r.n}`;
-async function makeCut(corners,extra){
+async function makeCut(corners,extra,cam,asp,near,far,view,frame){
   if(!mesh||!base)return null;if(!cutConvex(corners)){flash('프레임이 오목해서 자를 수 없습니다.',true);return null}
   const parent=currentRec?loadRecs().find(r=>r.id===currentRec):null;
-  const own=planesFor(corners,P.cutNear,P.cutFar).map(p=>planeToOrig(p,normInfo));
+  const own=planesFor(corners,near===undefined?P.cutNear:near,far===undefined?P.cutFar:far,cam,asp).map(p=>planeToOrig(p,normInfo));
   const all=loadRecs(),n=all.reduce((m,r)=>sameRoot(r.root)?Math.max(m,r.n||0):m,0)+1;
   const rec={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),n,date:new Date().toISOString(),root:rootId(),
     parent:parent?parent.id:null,parentN:parent?parent.n:null,planes:(parent?parent.planes:[]).concat(own),
-    view:{pos:camera.position.toArray(),target:controls.target.toArray(),fov:P.fov},
-    frame:Object.fromEntries(['cutW','cutH','cutX','cutY','cutRot','c0x','c0y','c1x','c1y','c2x','c2y','c3x','c3y','cutNear','cutFar'].map(k=>[k,P[k]])),
+    view:view||{pos:camera.position.toArray(),target:controls.target.toArray(),fov:P.fov},
+    frame:frame||Object.fromEntries(['cutW','cutH','cutX','cutY','cutRot','c0x','c0y','c1x','c1y','c2x','c2y','c3x','c3y','cutNear','cutFar'].map(k=>[k,P[k]])),
     corners,mode:'직접',...extra};
   const t0=performance.now(),pc=await computeRec(rec);
   if(!pc){flash('프레임 안에 모델이 없습니다. 프레임이나 각도를 옮겨 주세요.',true);return null}
@@ -7743,6 +7760,7 @@ function renderRecs(){const box=$('pieceList');if(!box)return;$('cutBack').hidde
     const mk=(l,f,cls,tip)=>{const b=document.createElement('button');b.textContent=l;if(cls)b.className=cls;if(tip)b.title=tip;b.onclick=f;return b};
     const del=mk('지우기',null,'ghost');del.onclick=()=>{if(del.dataset.armed){storeRecs(loadRecs().filter(x=>x.id!==rec.id));recCache.delete(rec.id);if(selRec===rec.id)selRec=null;renderRecs();flash('기록을 지웠습니다.')}
       else{del.dataset.armed='1';del.textContent='한 번 더 누르면 지움';setTimeout(()=>{delete del.dataset.armed;del.textContent='지우기'},3000)}};
+    if(rec.mangaId){const snap=loadRecs().find(r=>r.mangaId===rec.mangaId&&r.manga);if(snap)row.append(mk('만화 페이지 다시 열기',()=>openManga(snap.manga),null,'이 칸이 들어 있던 만화 페이지를 편집 창에서 다시 엽니다'))}
     row.append(info,mk('보기',()=>{selRec=rec.id;renderRecs();showRec(rec)}),mk('구도 불러오기',()=>loadComposition(rec),null,'자를 때의 각도와 프레임을 3D 화면에 다시 얹습니다'),
       mk('이 조각 다시 자르기',()=>{workOn(rec).then(()=>flash('잘라낸 조각을 불러왔습니다. 프레임을 얹고 다시 자르세요.'))}),
       mk('망점 작업',()=>workOn(rec).then(()=>flash(`「${recLabel(rec)}」으로 망점 작업을 합니다.`)),'primary'),mk('STL 저장',()=>saveRecStl(rec)),del);
@@ -7876,6 +7894,128 @@ $('mergeGo').onclick=()=>{if(!base){flash('먼저 모델을 불러와 주세요.
 $('mergeUndo').onclick=unmerge;
 $('mergeStl').onclick=()=>{if(merged)saveFile(base.name+'-merged.stl',stlBlob(merged.raw,base.name+'-merged'),'model/stl',flash)};
 renderMerge();renderRecs();cutReady=true;drawFrame();
+// ---------- comic page editor: lay out panels like a manga page, compose a shot of the model in each, cut every panel ----------
+const MG_KEY='sculptMangaPage';
+const MG_PAPER={'만화 원고 B5':257/182,'A4':297/210,'정사각':1,'가로 펼침':257/364};
+const shotDef=()=>({az:0,el:0,dist:1/Math.sin(THREE.MathUtils.degToRad(P.fov)/2)*1.12,t:[0,0,0],fov:P.fov});
+let MG;try{MG=JSON.parse(localStorage.getItem(MG_KEY)||'null')}catch(e){MG=null}
+const mgSave=()=>{try{localStorage.setItem(MG_KEY,JSON.stringify(MG))}catch(e){}};
+const mgAR=()=>MG_PAPER[MG.paper]||MG_PAPER['만화 원고 B5'];
+// page units: x 0..1, y 0..ar
+function mgTemplate(name,seed){const ar=mgAR(),m=.06,g=MG.gutter,X0=m,X1=1-m,Y0=m*1.1,Y1=ar-m*1.4,cx=.5,T=d=>Math.tan(THREE.MathUtils.degToRad(d));
+  const R={'기본 3단':[[1,[1,1],0,0],[1.1,[1],0,0],[1,[1,1,1],0,0]],'4칸 세로':[[1,[1]],[1,[1]],[1,[1]],[1,[1]]],'큰 칸 + 작은 칸':[[2,[1]],[1,[1,1]]],
+    '사선 액션':[[1,[1.2,1],-5,9],[1.3,[1],6,0],[1,[1,1.3],0,-11]],'세로 둘':[[1,[1,1],0,4]],'한 칸':[[1,[1]]],'여섯 칸':[[1,[1,1]],[1,[1,1]],[1,[1,1]]]};
+  let rows=R[name];
+  if(name==='랜덤'){const rnd=mulberry(seed||1),n=2+Math.floor(rnd()*3);rows=[];for(let i=0;i<n;i++){const k=1+Math.floor(rnd()*3);rows.push([.7+rnd()*.9,Array.from({length:k},()=>.6+rnd()),(rnd()*2-1)*8,(rnd()*2-1)*12])}}
+  const tot=rows.reduce((a,r)=>a+r[0],0);let y=Y0;const H=[{c:Y0,t:0}];
+  rows.forEach((r,i)=>{y+=(Y1-Y0)*r[0]/tot;H.push(i===rows.length-1?{c:Y1,t:0}:{c:y,t:T(r[2]||0)})});
+  const out=[];const sh=(L,o,inner)=>inner?{c:L.c+o/Math.max(.5,Math.cos(Math.atan(L.t))),t:L.t}:L;
+  rows.forEach((r,k)=>{const top=H[k],bot=H[k+1],cy=(top.c+bot.c)/2,ws=r[1],wt=ws.reduce((a,b)=>a+b,0);let x=X0;const V=[{c:X0,t:0}];
+    ws.forEach((w,j)=>{x+=(X1-X0)*w/wt;V.push(j===ws.length-1?{c:X1,t:0}:{c:x,t:T((r[3]||0)*(j%2?-1:1))})});
+    for(let j=0;j<ws.length;j++)out.push(quadFromLines(sh(top,g/2,k>0),sh(bot,-g/2,k<rows.length-1),sh(V[j],g/2,j>0),sh(V[j+1],-g/2,j<ws.length-1),cx,cy))});
+  return out.filter(cutConvex).map(q=>({q,shot:shotDef()}))}
+if(!MG||!MG.panels){MG={paper:'만화 원고 B5',gutter:.025,panels:[]};MG.panels=mgTemplate('기본 3단')}
+let mgSel=0,mgMode='shot',mgR=null,mgScene,mgCam,mgLight,mgMesh=null,mgK=1,mgOX=0,mgOY=0;
+const mgEl=document.createElement('div');mgEl.className='mg';mgEl.hidden=true;
+mgEl.innerHTML=`<div class="mgbar">
+  <b class="mgt">만화 페이지 꾸미기</b>
+  <label>틀 <select id="mgTpl">${['기본 3단','4칸 세로','큰 칸 + 작은 칸','사선 액션','세로 둘','여섯 칸','한 칸','랜덤'].map(t=>`<option>${t}</option>`).join('')}</select></label><button id="mgApply">틀 적용</button>
+  <label>원고 <select id="mgPaper">${Object.keys(MG_PAPER).map(t=>`<option>${t}</option>`).join('')}</select></label>
+  <label>칸 사이 <input type="range" id="mgGut" min="0" max=".06" step=".005"></label>
+  <span class="seg"><button id="mgModeShot">구도 잡기</button><button id="mgModeEdit">칸 모양</button></span>
+  <button id="mgSplitH" title="고른 칸을 위아래로 나눕니다">위아래 나누기</button><button id="mgSplitV" title="고른 칸을 좌우로 나눕니다">좌우 나누기</button><button id="mgDel" class="ghost">칸 지우기</button>
+  <button id="mgFromMain" title="왼쪽 3D 화면의 각도를 고른 칸에 가져옵니다">메인 각도 가져오기</button><button id="mgAllSame" class="ghost">모든 칸에 같은 각도</button>
+  <button id="mgPng">페이지 그림 저장</button><button class="primary" id="mgCut">이 페이지로 자르기</button><button id="mgClose">닫기</button></div>
+  <p class="mghint" id="mgHint"></p>
+  <div class="mgstage" id="mgStage"><canvas id="mgCv"></canvas><svg id="mgSvg"></svg></div>`;
+document.body.appendChild(mgEl);
+const mgCv=$('mgCv'),mgSvg=$('mgSvg'),mgStage=$('mgStage');
+function mgInit(){if(mgR)return;mgR=new THREE.WebGLRenderer({canvas:document.createElement('canvas'),antialias:true,preserveDrawingBuffer:true});mgR.setPixelRatio(Math.min(2,devicePixelRatio||1));
+  mgScene=new THREE.Scene();mgScene.add(new THREE.HemisphereLight(0xf2f2f4,0x6a6d74,.75));mgLight=new THREE.DirectionalLight(0xffffff,.95);mgScene.add(mgLight);mgScene.add(mgLight.target);
+  mgCam=new THREE.PerspectiveCamera(20,1,.01,100);new ResizeObserver(mgDraw).observe(mgStage)}
+function shotCam(s,asp,cam){cam=cam||new THREE.PerspectiveCamera();const a=THREE.MathUtils.degToRad(s.az),e=THREE.MathUtils.degToRad(s.el);
+  cam.fov=s.fov;cam.aspect=asp;cam.position.set(s.t[0]+s.dist*Math.sin(a)*Math.cos(e),s.t[1]+s.dist*Math.sin(e),s.t[2]+s.dist*Math.cos(a)*Math.cos(e));
+  cam.up.set(0,1,0);cam.lookAt(s.t[0],s.t[1],s.t[2]);cam.near=Math.max(.01,s.dist-2.2);cam.far=s.dist+2.2;cam.updateProjectionMatrix();cam.updateMatrixWorld();return cam}
+const bboxOf=q=>{const xs=q.map(p=>p[0]),ys=q.map(p=>p[1]);const x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);return{x0,x1,y0,y1,w:x1-x0,h:y1-y0,cx:(x0+x1)/2,cy:(y0+y1)/2}};
+function mgDraw(){if(mgEl.hidden||!mgR)return;
+  const W=mgStage.clientWidth,H=mgStage.clientHeight,ar=mgAR(),dpr=Math.min(2,devicePixelRatio||1);mgK=Math.min((W-24)/1,(H-24)/ar);mgOX=(W-mgK)/2;mgOY=(H-ar*mgK)/2;
+  mgCv.width=Math.round(W*dpr);mgCv.height=Math.round(H*dpr);const g=mgCv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
+  g.fillStyle=cssVar('--stage')||'#dcdfe4';g.fillRect(0,0,W,H);g.fillStyle='#fff';g.fillRect(mgOX,mgOY,mgK,ar*mgK);
+  if(mesh){if(!mgMesh||mgMesh.geometry!==mesh.geometry){if(mgMesh)mgScene.remove(mgMesh);mgMesh=new THREE.Mesh(mesh.geometry,mat);mgScene.add(mgMesh)}
+    // every panel is rendered on its own and clipped to its quad, so slanted panels never paint over each other
+    const boxes=MG.panels.map(pn=>bboxOf(pn.q)),mw=Math.ceil(Math.max(...boxes.map(b=>b.w))*mgK)+2,mh=Math.ceil(Math.max(...boxes.map(b=>b.h))*mgK)+2;mgR.setSize(mw,mh,false);
+    MG.panels.forEach((pn,i)=>{const b=boxes[i],x=mgOX+b.x0*mgK,y=mgOY+b.y0*mgK,w=b.w*mgK,h=b.h*mgK;if(w<2||h<2)return;
+      shotCam(pn.shot,w/h,mgCam);mgLight.position.copy(mgCam.localToWorld(new THREE.Vector3(Math.sin(THREE.MathUtils.degToRad(P.lightAz)),Math.sin(THREE.MathUtils.degToRad(P.lightEl)),1)));mgLight.target.position.copy(mgCam.localToWorld(new THREE.Vector3(0,0,-1)));
+      mgR.setViewport(0,mh-h,w,h);mgR.setScissor(0,mh-h,w,h);mgR.setScissorTest(true);mgR.setClearColor(0xf4f4f2,1);mgR.clear();mgR.render(mgScene,mgCam);
+      g.save();g.beginPath();pn.q.forEach(([px,py],k)=>{const X=mgOX+px*mgK,Y=mgOY+py*mgK;k?g.lineTo(X,Y):g.moveTo(X,Y)});g.closePath();g.clip();
+      g.drawImage(mgR.domElement,0,0,w*dpr,h*dpr,x,y,w,h);g.restore()})}
+  // paper mask outside the panels, ink borders, handles
+  const P2=([x,y])=>[mgOX+x*mgK,mgOY+y*mgK],path=q=>'M'+q.map(P2).map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L')+'Z';
+  mgSvg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  let s='';
+  MG.panels.forEach((pn,i)=>{const ok=cutConvex(pn.q),c=P2([(pn.q[0][0]+pn.q[1][0]+pn.q[2][0]+pn.q[3][0])/4,(pn.q[0][1]+pn.q[1][1]+pn.q[2][1]+pn.q[3][1])/4]);
+    s+=`<path class="mgfr${i===mgSel?' sel':''}${ok?'':' bad'}" data-p="${i}" d="${path(pn.q)}"/><text class="mgnum" x="${P2(pn.q[0])[0]+8}" y="${P2(pn.q[0])[1]+16}">${i+1}</text>`;
+    if(i===mgSel&&mgMode==='edit'){pn.q.forEach((p,k)=>{const q=P2(p);s+=`<circle class="mghd" data-k="${k}" cx="${q[0]}" cy="${q[1]}" r="8"/>`});s+=`<rect class="mghd mv" data-k="m" x="${c[0]-8}" y="${c[1]-8}" width="16" height="16" rx="3"/>`}});
+  mgSvg.innerHTML=s;
+  $('mgHint').textContent=!mesh?'먼저 3D 파일을 불러와 주세요.':mgMode==='shot'?`구도 잡기: 칸 안을 끌면 돌리고, Shift를 누르고 끌면 옮기고, 휠로 확대합니다. 칸 ${MG.panels.length}개 · 고른 칸 ${mgSel+1}번.`:`칸 모양: 칸을 눌러 고르고, 모서리를 끌어 모양을, 가운데 네모를 끌어 위치를 바꿉니다. 오목해지면 빨간 점선이 됩니다.`;
+  $('mgModeShot').classList.toggle('on',mgMode==='shot');$('mgModeEdit').classList.toggle('on',mgMode==='edit')}
+const mgPage=e=>{const b=mgStage.getBoundingClientRect();return[(e.clientX-b.left-mgOX)/mgK,(e.clientY-b.top-mgOY)/mgK]};
+const inQuad=(pt,q)=>{let c=false;for(let i=0,j=3;i<4;j=i++){const a=q[i],b=q[j];if((a[1]>pt[1])!==(b[1]>pt[1])&&pt[0]<(b[0]-a[0])*(pt[1]-a[1])/(b[1]-a[1])+a[0])c=!c}return c};
+let mgDrag=null;
+mgSvg.addEventListener('pointerdown',e=>{const pt=mgPage(e),t=e.target;mgSvg.setPointerCapture(e.pointerId);
+  if(t.dataset&&t.dataset.k!==undefined){mgDrag={kind:'corner',k:t.dataset.k,start:pt,q:MG.panels[mgSel].q.map(p=>p.slice())};return}
+  const hit=MG.panels.findIndex(p=>inQuad(pt,p.q));if(hit>=0&&hit!==mgSel){mgSel=hit;mgDraw()}
+  if(hit<0)return;
+  if(mgMode==='shot')mgDrag={kind:e.shiftKey||e.button===2?'pan':'orbit',x:e.clientX,y:e.clientY,s:JSON.parse(JSON.stringify(MG.panels[hit].shot))}});
+mgSvg.addEventListener('contextmenu',e=>e.preventDefault());
+mgSvg.addEventListener('pointermove',e=>{if(!mgDrag)return;const pn=MG.panels[mgSel];
+  if(mgDrag.kind==='corner'){const pt=mgPage(e),dx=pt[0]-mgDrag.start[0],dy=pt[1]-mgDrag.start[1],ar=mgAR(),cl=(v,a,b)=>Math.min(b,Math.max(a,v));
+    pn.q=mgDrag.q.map((p,k)=>mgDrag.k==='m'||String(k)===mgDrag.k?[cl(p[0]+dx,0,1),cl(p[1]+dy,0,ar)]:p.slice())}
+  else if(mgDrag.kind==='orbit'){const s=mgDrag.s;pn.shot.az=s.az-(e.clientX-mgDrag.x)*.4;pn.shot.el=Math.max(-85,Math.min(85,s.el+(e.clientY-mgDrag.y)*.4))}
+  else{const s=mgDrag.s,c=shotCam(s,1),r=new THREE.Vector3().setFromMatrixColumn(c.matrixWorld,0),u=new THREE.Vector3().setFromMatrixColumn(c.matrixWorld,1),k=s.dist*.0016;
+    const t=new THREE.Vector3(...s.t).addScaledVector(r,-(e.clientX-mgDrag.x)*k).addScaledVector(u,(e.clientY-mgDrag.y)*k);pn.shot.t=t.toArray()}
+  mgDraw()});
+const mgEnd=()=>{if(mgDrag){mgDrag=null;mgSave()}};mgSvg.addEventListener('pointerup',mgEnd);mgSvg.addEventListener('pointercancel',mgEnd);
+mgSvg.addEventListener('wheel',e=>{if(mgMode!=='shot')return;const pt=mgPage(e),hit=MG.panels.findIndex(p=>inQuad(pt,p.q));if(hit<0)return;e.preventDefault();mgSel=hit;
+  const s=MG.panels[hit].shot;s.dist=Math.max(.3,Math.min(30,s.dist*Math.exp(e.deltaY*(e.deltaMode===1?.05:.0015))));mgDraw();clearTimeout(mgSvg._t);mgSvg._t=setTimeout(mgSave,300)},{passive:false});
+mgSvg.addEventListener('dblclick',e=>{if(mgMode!=='shot')return;const pt=mgPage(e),hit=MG.panels.findIndex(p=>inQuad(pt,p.q));if(hit<0)return;MG.panels[hit].shot=shotDef();mgSave();mgDraw()});
+function mgSplit(dir){const pn=MG.panels[mgSel];if(!pn)return;const[a,b,c,d]=pn.q,g=MG.gutter/2,L=(p,q,t)=>[p[0]+(q[0]-p[0])*t,p[1]+(q[1]-p[1])*t];
+  let A,B;if(dir==='h'){const lh=Math.hypot(d[0]-a[0],d[1]-a[1]),rh=Math.hypot(c[0]-b[0],c[1]-b[1]);
+    A=[a,b,L(b,c,.5-g/rh),L(a,d,.5-g/lh)];B=[L(a,d,.5+g/lh),L(b,c,.5+g/rh),c,d]}
+  else{const tw=Math.hypot(b[0]-a[0],b[1]-a[1]),bw=Math.hypot(c[0]-d[0],c[1]-d[1]);A=[a,L(a,b,.5-g/tw),L(d,c,.5-g/bw),d];B=[L(a,b,.5+g/tw),b,c,L(d,c,.5+g/bw)]}
+  MG.panels.splice(mgSel,1,{q:A,shot:{...pn.shot,t:pn.shot.t.slice()}},{q:B,shot:{...pn.shot,t:pn.shot.t.slice()}});mgSave();mgDraw()}
+$('mgSplitH').onclick=()=>mgSplit('h');$('mgSplitV').onclick=()=>mgSplit('v');
+$('mgDel').onclick=()=>{if(MG.panels.length<=1)return;MG.panels.splice(mgSel,1);mgSel=Math.max(0,mgSel-1);mgSave();mgDraw()};
+$('mgApply').onclick=()=>{const t=$('mgTpl').value;MG.panels=mgTemplate(t,1+Math.floor(Math.random()*99999));mgSel=0;mgSave();mgDraw()};
+$('mgPaper').onchange=()=>{const old=mgAR();MG.paper=$('mgPaper').value;const k=mgAR()/old;MG.panels.forEach(p=>p.q=p.q.map(([x,y])=>[x,y*k]));mgSave();mgDraw()};
+$('mgGut').oninput=()=>{MG.gutter=+$('mgGut').value;mgSave()};
+$('mgModeShot').onclick=()=>{mgMode='shot';mgDraw()};$('mgModeEdit').onclick=()=>{mgMode='edit';mgDraw()};
+$('mgFromMain').onclick=()=>{const pn=MG.panels[mgSel];if(!pn)return;const d=camera.position.clone().sub(controls.target),r=d.length();
+  pn.shot={az:THREE.MathUtils.radToDeg(Math.atan2(d.x,d.z)),el:THREE.MathUtils.radToDeg(Math.asin(d.y/r)),dist:r,t:controls.target.toArray(),fov:P.fov};mgSave();mgDraw()};
+$('mgAllSame').onclick=()=>{const s=MG.panels[mgSel].shot;MG.panels.forEach(p=>p.shot=JSON.parse(JSON.stringify(s)));mgSave();mgDraw()};
+$('mgClose').onclick=()=>{mgEl.hidden=true;document.body.style.overflow=''};
+function openManga(page){if(page){MG=JSON.parse(JSON.stringify(page));mgSave()}mgEl.hidden=false;document.body.style.overflow='hidden';mgInit();
+  $('mgPaper').value=MG.paper;$('mgGut').value=MG.gutter;mgSel=Math.min(mgSel,MG.panels.length-1);requestAnimationFrame(mgDraw)}
+// cut every panel: each panel's shot is a camera, its quad (relative to the panel's box, in box-height units) is the frame
+async function mgCutAll(){if(!mesh||!base){flash('먼저 모델을 불러와 주세요.',true);return}
+  const bad=MG.panels.findIndex(p=>!cutConvex(p.q));if(bad>=0){mgSel=bad;mgDraw();flash(`${bad+1}번 칸이 오목해서 자를 수 없습니다.`,true);return}
+  const pid=Date.now().toString(36),snap=JSON.parse(JSON.stringify(MG));let k=0,last=null;
+  for(let i=0;i<MG.panels.length;i++){const pn=MG.panels[i],b=bboxOf(pn.q),cam=shotCam(pn.shot,b.w/b.h);
+    const corners=pn.q.map(([x,y])=>[(x-b.cx)/b.h,(y-b.cy)/b.h]);$('loadMsg').textContent=`${i+1}/${MG.panels.length}번 칸 자르는 중…`;
+    const rec=await makeCut(corners,{mode:'만화 페이지',page:{id:pid,idx:i+1,n:MG.panels.length},manga:i===0?snap:undefined,mangaId:pid},cam,b.w/b.h,0,0,
+      {pos:cam.position.toArray(),target:pn.shot.t.slice(),fov:pn.shot.fov},cornersToFrame(corners));
+    if(rec){k++;last=rec}}
+  if(last){selRec=last.id;renderRecs();await showRec(last)}
+  flash(`만화 페이지 칸 ${k}개를 잘랐습니다. 컷 탭의 자른 기록에 있습니다.`);mgEl.hidden=true;document.body.style.overflow='';showTab(CUT_TAB)}
+$('mgCut').onclick=mgCutAll;
+// page picture for exhibition plans
+$('mgPng').onclick=()=>{mgDraw();const ar=mgAR(),dpr=mgCv.width/mgStage.clientWidth,c=document.createElement('canvas');
+  c.width=Math.round(mgK*dpr);c.height=Math.round(ar*mgK*dpr);const g=c.getContext('2d');g.drawImage(mgCv,mgOX*dpr,mgOY*dpr,mgK*dpr,ar*mgK*dpr,0,0,c.width,c.height);
+  g.scale(dpr,dpr);g.strokeStyle='#111';g.lineWidth=2.2;g.lineJoin='miter';MG.panels.forEach((p,i)=>{g.beginPath();p.q.forEach((q,k)=>k?g.lineTo(q[0]*mgK,q[1]*mgK):g.moveTo(q[0]*mgK,q[1]*mgK));g.closePath();g.stroke();
+    g.fillStyle='#111';g.font='600 13px sans-serif';g.fillText(String(i+1),p.q[0][0]*mgK+7,p.q[0][1]*mgK+17)});
+  c.toBlob(bl=>saveFile(`${modelName}-manga-page.png`,bl,'image/png',flash),'image/png')};
+
+$('mgOpen').onclick=()=>openManga();
 
 
 size();
