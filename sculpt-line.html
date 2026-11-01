@@ -68,6 +68,17 @@ select{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:4
 .stat span{font-size:12px;color:var(--mute)}
 .status{font-size:13px;min-height:1.5em}
 .status.err{color:#D2353B}
+.lplan{display:flex;flex-direction:column;gap:8px}
+.lplan .sum{font-size:12.5px;line-height:1.6}
+.lplan .sum b{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.lplan .wrapT{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:4px}
+.lplan table{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}
+.lplan col.c0{width:34px}.lplan col.c1{width:50px}.lplan col.c3{width:78px}.lplan col.c4{width:78px}.lplan col.c5{width:64px}
+.lplan th{position:sticky;top:0;background:var(--panel);text-align:left;font-weight:600;color:var(--mute);font-size:11px;padding:5px 6px;border-bottom:1px solid var(--line)}
+.lplan td{padding:4px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+.lplan .num{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.lplan .warn{color:var(--warn);font-weight:600}
+.lplan canvas{width:36px;height:48px;border:1px solid var(--line);border-radius:3px;background:#fff;display:block}
 .legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--mute)}
 .legend i{display:inline-block;width:14px;height:2px;vertical-align:middle;margin-right:5px}
 .notice{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;border:1px solid var(--accent);background:var(--panel);border-radius:4px;padding:10px 14px;font-size:13px}
@@ -6855,7 +6866,7 @@ const DEF={upAxis:'Y',target:'600000',fov:20,
   lightAz:-45,lightEl:35,wrap:.4,fill:.3,midtone:0,dark:0,floor:.05,
   curv:.7,cavity:.5,local:.5,res:'2048',
   method:'스크린톤',cell:4,spacing:1.05,angle:45,
-  penCount:'1',pen1:.3,pen2:.6,pen3:1,cap1:.55,cap2:.8,penColors:true,dotTime:.25,travel:60,
+  penCount:'1',pen1:.3,pen2:.6,pen3:1,cap1:.55,cap2:.8,penColors:true,dotTime:.25,travel:60,layerMin:20,cmdSafe:true,
   paper:'A4',paperW:210,paperH:297,orient:'세로',margin:20,drawScale:1,posX:0,posY:0,frame:'없음',frameGap:5,frameLines:1,frameStep:1.5,framePen:.3,jpgDpi:'300',
   lineOuter:false,lineInner:false,lineCrease:false,creaseAngle:40,lineSlice:false,sliceCount:30,sliceAxis:'높이',linePen:.3,lineMin:2,lineSmooth:2,innerJump:.05,
   cutW:.6,cutH:.8,cutX:0,cutY:0,cutRot:0,c0x:0,c0y:0,c1x:0,c1y:0,c2x:0,c2y:0,c3x:0,c3y:0,cutNear:0,cutFar:0,cutSrc:'원본 해상도',randMode:'칸 하나',randPanels:5,randSlant:8,randGutter:.02,randSnap:true,cutSeed:1,mergeRes:'384'};
@@ -6957,7 +6968,11 @@ const TABS=[
    {k:'framePen',l:'테두리 두께',min:.05,max:2,step:.01,u:'mm',d:2,re:'layout',show:()=>P.frame!=='없음'},
    {k:'frameStep',l:'겹선 사이',min:.5,max:10,step:.1,u:'mm',re:'layout',show:()=>P.frame!=='없음'&&P.frameLines>1},
    {info:'frameInfo'}]},
- {name:'내보내기',out:true,c:[{k:'jpgDpi',l:'JPG 해상도',sel:['150','300','600'],fmt:v=>v+' dpi',re:'none'}]},
+ {name:'내보내기',out:true,hint:'오래 걸리는 망점은 시간 단위로 나눕니다. SVG 파일은 하나이고, 그 안에서 레이어로 나뉩니다. 플로터 프로그램에서 위 레이어부터 하나씩 골라 그리세요. 점은 망점 각도를 따라 줄지어 찍히므로 한 레이어는 그림을 가로지르는 한 띠가 됩니다. 표의 작은 그림이 그 레이어가 맡는 자리입니다.',c:[
+   {k:'layerMin',l:'레이어 하나 최대 시간',min:5,max:120,step:5,u:'분',re:'stats'},
+   {k:'cmdSafe',l:'명령 수 안전선도 지키기 (레이어당 8,000개 · 톤 플롯과 같은 기준)',chk:1,re:'stats'},
+   {planBox:1},
+   {k:'jpgDpi',l:'JPG 해상도',sel:['150','300','600'],fmt:v=>v+' dpi',re:'none'}]},
  {name:'설정 저장',hint:'지금의 모든 설정과 각도를 이 사이트에 저장합니다. 3D 파일은 용량이 커서 저장하지 않습니다. 불러올 때 원본 파일을 올려 달라고 알려 드리고, 올리면 각도까지 그대로 복원됩니다.',c:[{saves:1}]}
 ];
 const TAB_OUT=TABS.findIndex(t=>t.out),TAB_SAVE=TABS.length-1;
@@ -7003,6 +7018,7 @@ TABS.forEach((t,i)=>{
       node.innerHTML='<div class="bar"><input type="text" id="saveName" placeholder="저장 이름 (비워 두면 자동)" maxlength="60"><button class="primary" id="saveNow">지금 설정 저장</button></div><div id="saveList" class="savelist"></div><div class="bar"><button id="savesExport">저장 목록을 파일로 내보내기</button><label class="filebtn">파일에서 가져오기<input type="file" id="savesImport" accept=".json,application/json"></label></div><p class="hint">저장 목록은 이 브라우저에만 남습니다. 다른 컴퓨터에서 쓰려면 파일로 내보내 가져오세요.</p>'}
     else if(c.samples){node=document.createElement('div');node.className='bar';const lab=document.createElement('span');lab.className='hint';lab.textContent='샘플로 시험해 보기';node.appendChild(lab);
       [['두상','head'],['매듭','knot']].forEach(([n,k])=>{const bb=document.createElement('button');bb.className='chip';bb.textContent=n;bb.onclick=()=>loadSample(k);node.appendChild(bb)})}
+    else if(c.planBox){node=document.createElement('div');node.className='lplan';node.id='layerPlan'}
     else if(c.chk){node=document.createElement('label');node.className='check';const cb=document.createElement('input');cb.type='checkbox';cb.id='i_'+c.k;cb.checked=!!P[c.k];
       cb.onchange=()=>{P[c.k]=cb.checked;changed(c.re)};node.append(cb,c.l);inputs[c.k]={c,el:cb}}
     else node=makeRow(c);
@@ -7357,6 +7373,53 @@ pv.addEventListener('pointermove',e=>{if(!panning)return;nav.x=panning.nx+e.clie
 const endPan=()=>{panning=null;pv.style.cursor=''};pv.addEventListener('pointerup',endPan);pv.addEventListener('pointercancel',endPan);
 pv.addEventListener('dblclick',()=>{nav={x:0,y:0,z:1};drawPreview()});
 
+// ---------- layer plan: split long plots into timed layers ----------
+// Every dot is one pen-down: move, down, tap, up -- four plotter commands, the same count TONE PLOT uses.
+// A layer is closed by time (the slider) and, if asked, by the 8,000-command line that kept TONE PLOT from stalling.
+// Items are never cut in half, and layers are made even, so the last one is not a tiny leftover.
+const SAFE_CMDS=8000,DOT_CMDS=4;
+function fmtSec(sec){if(sec<90)return Math.round(sec)+'초';const m=Math.round(sec/60);return m<60?m+'분':Math.floor(m/60)+'시간 '+(m%60?m%60+'분':'')}
+function splitItems(sec,cmd,maxSec,maxCmd){const n=sec.length;if(!n)return[];
+  let tS=0,tC=0;for(let i=0;i<n;i++){tS+=sec[i];tC+=cmd[i]}
+  let k=Math.max(1,Math.ceil(tS/maxSec),Math.ceil(tC/maxCmd));
+  for(;;){k=Math.min(k,n);const cut=[0];let acc=0,next=1;
+    for(let i=0;i<n&&next<k;i++){acc+=sec[i];if(acc>=tS*next/k&&i+1<n){cut.push(i+1);next++}}
+    cut.push(n);
+    let ok=true;for(let j=0;j+1<cut.length;j++){let a=0,b=0;for(let i=cut[j];i<cut[j+1];i++){a+=sec[i];b+=cmd[i]}
+      if((a>maxSec*1.001||b>maxCmd)&&cut[j+1]-cut[j]>1){ok=false;break}}
+    if(ok||k>=n)return cut;k++}}
+function planLayers(){if(!pens||!geo)return[];
+  const maxSec=Math.max(60,P.layerMin*60),maxCmd=P.cmdSafe?SAFE_CMDS:Infinity,rows=[];
+  const push=(base,kind,pi,w,cut,sec,cmd,items)=>{const n=cut.length-1;
+    for(let j=0;j<n;j++){let a=0,b=0;for(let i=cut[j];i<cut[j+1];i++){a+=sec[i];b+=cmd[i]}
+      rows.push({base,kind,pi,w,part:j+1,parts:n,a:cut[j],b:cut[j+1],count:cut[j+1]-cut[j],sec:a,cmds:b,items})}};
+  pens.forEach((pn,pi)=>{const d=pn.dots,n=d.length/2;if(!n)return;const sec=new Float64Array(n),cmd=new Float64Array(n).fill(DOT_CMDS);
+    for(let i=0;i<n;i++)sec[i]=P.dotTime+(i?Math.hypot(d[2*i]-d[2*i-2],d[2*i+1]-d[2*i-1])/P.travel:0);
+    push(`펜 ${pi+1} · ${pn.w.toFixed(2)}mm 점`,'dot',pi,pn.w,splitItems(sec,cmd,maxSec,maxCmd),sec,cmd,d)});
+  const polys=(L,base,kind,w)=>{if(!L||!L.length)return;const n=L.length,sec=new Float64Array(n),cmd=new Float64Array(n);
+    for(let i=0;i<n;i++){const l=L[i];let len=0;for(let q=2;q<l.length;q+=2)len+=Math.hypot(l[q]-l[q-2],l[q+1]-l[q-1]);sec[i]=len/P.travel+.3;cmd[i]=3+Math.max(1,l.length/2-1)}
+    push(base,kind,-1,w,splitItems(sec,cmd,maxSec,maxCmd),sec,cmd,L)};
+  polys(geo.lines,`선 · ${P.linePen.toFixed(2)}mm`,'line',P.linePen);
+  polys(geo.frame,`테두리 · ${P.framePen.toFixed(2)}mm`,'frame',P.framePen);
+  rows.forEach((r,i)=>{r.label=`${i+1} - ${r.base}${r.parts>1?` (${r.part}/${r.parts})`:''} · 약 ${fmtSec(r.sec)}`});
+  return rows}
+function drawPlanThumb(cv,r){const pw=geo.pw,ph=geo.ph,dpr=Math.min(2,devicePixelRatio||1),W=36,H=48;cv.width=W*dpr;cv.height=H*dpr;
+  const g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);g.fillStyle='#fff';g.fillRect(0,0,W,H);
+  const k=Math.min(W/pw,H/ph),tx=(W-pw*k)/2,ty=(H-ph*k)/2;g.strokeStyle='#E3E5E8';g.strokeRect(tx+.5,ty+.5,pw*k-1,ph*k-1);g.fillStyle=g.strokeStyle=r.kind==='dot'?'#16181C':'#7A3FB0';
+  if(r.kind==='dot'){const st=Math.max(1,Math.floor(r.count/1500));for(let i=r.a;i<r.b;i+=st)g.fillRect(tx+r.items[2*i]*k-.6,ty+r.items[2*i+1]*k-.6,1.2,1.2)}
+  else{g.lineWidth=.6;g.beginPath();for(let i=r.a;i<r.b;i++){const l=r.items[i];g.moveTo(tx+l[0]*k,ty+l[1]*k);for(let q=2;q<l.length;q+=2)g.lineTo(tx+l[q]*k,ty+l[q+1]*k)}g.stroke()}}
+let plan=[];
+function renderPlan(){const box=$('layerPlan');if(!box)return;plan=planLayers();
+  if(!plan.length){box.innerHTML='';return}
+  const max=Math.max(60,P.layerMin*60);let tot=0,longest=0,heavy=0;plan.forEach(r=>{tot+=r.sec;longest=Math.max(longest,r.sec);if(r.cmds>SAFE_CMDS)heavy++});
+  const swaps=new Set(plan.map(r=>r.w.toFixed(2))).size-1;
+  let h=`<div class="sum">SVG 파일 하나 · 레이어 <b>${plan.length}</b>개 · 모두 약 <b>${fmtSec(tot)}</b> · 가장 긴 레이어 약 <b>${fmtSec(longest)}</b>${swaps>0?` · 펜 교체 ${swaps}번`:''}`+
+    (heavy&&!P.cmdSafe?`<br><span class="warn">명령이 8,000개를 넘는 레이어가 ${heavy}개 있습니다. 한 번에 보내면 플로터가 도중에 멈출 수 있습니다 — 안전선을 켜 두기를 권합니다.</span>`:'')+
+    `</div><div class="wrapT"><table><colgroup><col class="c0"><col class="c1"><col><col class="c3"><col class="c4"><col class="c5"></colgroup><thead><tr><th class="num">#</th><th></th><th>레이어</th><th class="num">${plan.some(r=>r.kind==='dot')?'점·선':'선'}</th><th class="num">명령</th><th class="num">예상</th></tr></thead><tbody>`;
+  plan.forEach((r,i)=>{h+=`<tr><td class="num">${i+1}</td><td><canvas data-i="${i}"></canvas></td><td>${r.base}${r.parts>1?` <span style="color:var(--mute)">(${r.part}/${r.parts})</span>`:''}</td>`+
+    `<td class="num">${r.count.toLocaleString()}</td><td class="num${r.cmds>SAFE_CMDS?' warn':''}">${Math.round(r.cmds).toLocaleString()}</td><td class="num${r.sec>max*1.001?' warn':''}">${fmtSec(r.sec)}</td></tr>`});
+  box.innerHTML=h+'</tbody></table></div>';
+  box.querySelectorAll('canvas[data-i]').forEach(cv=>drawPlanThumb(cv,plan[+cv.dataset.i]))}
 function renderStats(){
   const st=$('stats');if(!pens){st.innerHTML='';$('statNote').textContent='';return}
   let html='',tot=0,totDots=0;
@@ -7367,7 +7430,7 @@ function renderStats(){
     html+=`<div class="stat"><b>${(len/1000).toFixed(1)} m</b><span>선 ${geo.lines.length.toLocaleString()}개${geo.frame&&geo.frame.length?' · 테두리 '+geo.frame.length+'줄':''} · ${P.linePen.toFixed(2)}mm</span></div>`}
   const h=Math.floor(tot/3600),m=Math.round(tot%3600/60);
   html+=`<div class="stat"><b>${h?h+'시간 ':''}${m}분</b><span>예상 플로팅 시간${pens.length>1?' (펜 교체 '+(pens.length-1)+'번)':''}</span></div>`;
-  st.innerHTML=html;
+  st.innerHTML=html;renderPlan();
   $('statNote').textContent=tot>6*3600?'시간이 아주 깁니다. 처음에는 A5로 시험하거나, 점 간격을 넓히거나, 펜 굵기를 키워 보세요.':pens.length>1?'SVG는 펜마다 레이어가 나뉩니다. 펜 1 레이어를 모두 그린 뒤 펜을 바꿔 다음 레이어를 그리세요.':'펜 한 자루로 그리는 기본 설정입니다.';
 }
 
@@ -7430,13 +7493,12 @@ async function openFile(f){const ext=f.name.split('.').pop().toLowerCase();
 function svgString(){
   const{pw,ph}=geo;const f=v=>v.toFixed(2);
   let s=`<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="${pw}mm" height="${ph}mm" viewBox="0 0 ${pw} ${ph}"><title>SCULPT LINE — ${modelName}</title>`;
-  pens.forEach((pn,i)=>{s+=`<g id="pen${i+1}" inkscape:groupmode="layer" inkscape:label="${i+1} 펜 ${pn.w.toFixed(2)}mm" fill="none" stroke="#000" stroke-width="${pn.w}" stroke-linecap="round">`;
-    const d=pn.dots;for(let q=0;q<d.length;q+=4000){let path='';for(let r=q;r<Math.min(d.length,q+4000);r+=2)path+=`M${f(d[r])} ${f(d[r+1])}h.01`;s+=`<path d="${path}"/>`}
+  // one layer per planned chunk, top to bottom = plotting order (inkscape lists them the same way)
+  const rows=planLayers(),esc=t=>t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  rows.forEach((r,i)=>{s+=`<g id="layer${i+1}" inkscape:groupmode="layer" inkscape:label="${esc(r.label)}" fill="none" stroke="#000" stroke-width="${r.w}" stroke-linecap="round" stroke-linejoin="round">`;
+    if(r.kind==='dot'){const d=r.items;for(let q=r.a;q<r.b;q+=2000){let path='';for(let k=q;k<Math.min(r.b,q+2000);k++)path+=`M${f(d[2*k])} ${f(d[2*k+1])}h.01`;s+=`<path d="${path}"/>`}}
+    else for(let k=r.a;k<r.b;k++){const l=r.items[k];let d='M'+f(l[0])+' '+f(l[1]);for(let q=2;q<l.length;q+=2)d+='L'+f(l[q])+' '+f(l[q+1]);s+=`<path d="${d}${r.kind==='frame'?'Z':''}"/>`}
     s+='</g>'});
-  if(geo.lines.length){s+=`<g id="lines" inkscape:groupmode="layer" inkscape:label="${pens.length+1} 선 ${P.linePen.toFixed(2)}mm" fill="none" stroke="#000" stroke-width="${P.linePen}" stroke-linecap="round" stroke-linejoin="round">`;
-    for(const l of geo.lines){let d='M'+f(l[0])+' '+f(l[1]);for(let i=2;i<l.length;i+=2)d+='L'+f(l[i])+' '+f(l[i+1]);s+=`<path d="${d}"/>`}s+='</g>'}
-  if(geo.frame&&geo.frame.length){s+=`<g id="frame" inkscape:groupmode="layer" inkscape:label="${pens.length+(geo.lines.length?2:1)} 테두리 ${P.framePen.toFixed(2)}mm" fill="none" stroke="#000" stroke-width="${P.framePen}" stroke-linecap="round" stroke-linejoin="round">`;
-    for(const l of geo.frame)s+=`<path d="M${f(l[0])} ${f(l[1])}L${f(l[2])} ${f(l[3])}L${f(l[4])} ${f(l[5])}L${f(l[6])} ${f(l[7])}Z"/>`;s+='</g>'}
   return s+'</svg>'}
 const downloadsP=(window.claude&&window.claude.use)?window.claude.use('downloads').catch(()=>null):Promise.resolve(null);
 $('saveSvg').onclick=async()=>{if(!pens){setStatus('먼저 모델을 불러와 주세요.',true);return}
