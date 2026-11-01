@@ -6866,7 +6866,7 @@ const DEF={upAxis:'Y',target:'600000',fov:20,
   lightAz:-45,lightEl:35,wrap:.4,fill:.3,midtone:0,dark:0,floor:.05,
   curv:.7,cavity:.5,local:.5,res:'2048',
   method:'스크린톤',cell:4,spacing:1.05,angle:45,
-  penCount:'1',pen1:.3,pen2:.6,pen3:1,cap1:.55,cap2:.8,penColors:true,dotTime:.25,travel:60,layerMin:20,cmdSafe:true,
+  penCount:'1',pen1:.3,pen2:.6,pen3:1,cap1:.55,cap2:.8,penColors:true,dotTime:.25,travel:60,layerMinute:3,cmdSafe:true,
   paper:'A4',paperW:210,paperH:297,orient:'세로',margin:20,drawScale:1,posX:0,posY:0,frame:'없음',frameGap:5,frameLines:1,frameStep:1.5,framePen:.3,jpgDpi:'300',
   lineOuter:false,lineInner:false,lineCrease:false,creaseAngle:40,lineSlice:false,sliceCount:30,sliceAxis:'높이',linePen:.3,lineMin:2,lineSmooth:2,innerJump:.05,
   cutW:.6,cutH:.8,cutX:0,cutY:0,cutRot:0,c0x:0,c0y:0,c1x:0,c1y:0,c2x:0,c2y:0,c3x:0,c3y:0,cutNear:0,cutFar:0,cutSrc:'원본 해상도',randMode:'칸 하나',randPanels:5,randSlant:8,randGutter:.02,randSnap:true,cutSeed:1,mergeRes:'384'};
@@ -6969,7 +6969,7 @@ const TABS=[
    {k:'frameStep',l:'겹선 사이',min:.5,max:10,step:.1,u:'mm',re:'layout',show:()=>P.frame!=='없음'&&P.frameLines>1},
    {info:'frameInfo'}]},
  {name:'내보내기',out:true,hint:'오래 걸리는 망점은 시간 단위로 나눕니다. SVG 파일은 하나이고, 그 안에서 레이어로 나뉩니다. 플로터 프로그램에서 위 레이어부터 하나씩 골라 그리세요. 점은 망점 각도를 따라 줄지어 찍히므로 한 레이어는 그림을 가로지르는 한 띠가 됩니다. 표의 작은 그림이 그 레이어가 맡는 자리입니다.',c:[
-   {k:'layerMin',l:'레이어 하나 최대 시간',min:5,max:120,step:5,u:'분',re:'stats'},
+   {k:'layerMinute',l:'레이어 하나 최대 시간',min:1,max:60,step:.5,fmt:v=>(+v)+' 분'+(+v===3?' (톤 플롯에서 검증된 값)':''),re:'stats'},
    {k:'cmdSafe',l:'명령 수 안전선도 지키기 (레이어당 8,000개 · 톤 플롯과 같은 기준)',chk:1,re:'stats'},
    {planBox:1},
    {k:'jpgDpi',l:'JPG 해상도',sel:['150','300','600'],fmt:v=>v+' dpi',re:'none'}]},
@@ -7389,7 +7389,7 @@ function splitItems(sec,cmd,maxSec,maxCmd){const n=sec.length;if(!n)return[];
       if((a>maxSec*1.001||b>maxCmd)&&cut[j+1]-cut[j]>1){ok=false;break}}
     if(ok||k>=n)return cut;k++}}
 function planLayers(){if(!pens||!geo)return[];
-  const maxSec=Math.max(60,P.layerMin*60),maxCmd=P.cmdSafe?SAFE_CMDS:Infinity,rows=[];
+  const maxSec=Math.max(30,P.layerMinute*60),maxCmd=P.cmdSafe?SAFE_CMDS:Infinity,rows=[];
   const push=(base,kind,pi,w,cut,sec,cmd,items)=>{const n=cut.length-1;
     for(let j=0;j<n;j++){let a=0,b=0;for(let i=cut[j];i<cut[j+1];i++){a+=sec[i];b+=cmd[i]}
       rows.push({base,kind,pi,w,part:j+1,parts:n,a:cut[j],b:cut[j+1],count:cut[j+1]-cut[j],sec:a,cmds:b,items})}};
@@ -7411,7 +7411,7 @@ function drawPlanThumb(cv,r){const pw=geo.pw,ph=geo.ph,dpr=Math.min(2,devicePixe
 let plan=[];
 function renderPlan(){const box=$('layerPlan');if(!box)return;plan=planLayers();
   if(!plan.length){box.innerHTML='';return}
-  const max=Math.max(60,P.layerMin*60);let tot=0,longest=0,heavy=0;plan.forEach(r=>{tot+=r.sec;longest=Math.max(longest,r.sec);if(r.cmds>SAFE_CMDS)heavy++});
+  const max=Math.max(30,P.layerMinute*60);let tot=0,longest=0,heavy=0;plan.forEach(r=>{tot+=r.sec;longest=Math.max(longest,r.sec);if(r.cmds>SAFE_CMDS)heavy++});
   const swaps=new Set(plan.map(r=>r.w.toFixed(2))).size-1;
   let h=`<div class="sum">SVG 파일 하나 · 레이어 <b>${plan.length}</b>개 · 모두 약 <b>${fmtSec(tot)}</b> · 가장 긴 레이어 약 <b>${fmtSec(longest)}</b>${swaps>0?` · 펜 교체 ${swaps}번`:''}`+
     (heavy&&!P.cmdSafe?`<br><span class="warn">명령이 8,000개를 넘는 레이어가 ${heavy}개 있습니다. 한 번에 보내면 플로터가 도중에 멈출 수 있습니다 — 안전선을 켜 두기를 권합니다.</span>`:'')+
