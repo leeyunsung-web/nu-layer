@@ -80,6 +80,16 @@ select{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:4
 .saveinfo{display:flex;flex-direction:column;gap:2px;flex:1 1 220px;min-width:0}
 .saveinfo b{font-weight:600;overflow-wrap:anywhere}.saveinfo span{font-size:12px;color:var(--mute);overflow-wrap:anywhere}
 button.ghost{background:transparent;color:var(--mute)}
+.cutov{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
+.cutov .shade{fill:rgba(15,17,20,.38);pointer-events:none}
+.cutov .fr{fill:none;stroke:var(--accent);stroke-width:2;pointer-events:none}.cutov .fr.bad{stroke:var(--warn);stroke-dasharray:6 4}
+.cutov .hd{fill:#fff;stroke:var(--accent);stroke-width:2;pointer-events:auto;cursor:grab;touch-action:none}.cutov .hd.mv{fill:var(--accent)}
+.num{width:100%;min-width:0;font:inherit;font-size:13px;padding:4px 6px;border:1px solid var(--line);border-radius:3px;background:var(--bg,transparent);color:inherit;text-align:right;box-sizing:border-box}
+details.corners{display:flex;flex-direction:column;gap:10px}details.corners summary{cursor:pointer;font-size:13px;font-weight:500;margin-bottom:8px}details.corners .row{margin-bottom:8px}
+.cutpanel{display:flex;flex-direction:column;gap:12px}
+.ptitle{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;font-weight:500;margin:0 0 6px;color:var(--mute);flex-wrap:wrap}
+.pieceview{position:relative;aspect-ratio:4/3;background:var(--stage);border-radius:4px;overflow:hidden}.pieceview canvas{display:block;width:100%;height:100%;touch-action:none}
+.saverow.sel{outline:2px solid var(--accent);outline-offset:-2px}
 .view .empty{position:absolute;inset:0;display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--mute);font-size:13px;pointer-events:none}
 .view .empty b{font-size:16px;color:var(--fg);font-weight:600}
 .view.drag{outline:2px dashed var(--accent);outline-offset:-8px}
@@ -6824,7 +6834,7 @@ button.ghost{background:transparent;color:var(--mute)}
 </script>
 <script>
 (()=>{
-const $=id=>document.getElementById(id);
+const $=id=>document.getElementById(id);var cutReady=false;
 const tick=()=>new Promise(r=>setTimeout(r,20));
 const PAPERS={'A4':[210,297],'A3':[297,420],'A5':[148,210],'30×40 cm':[300,400],'50×70 cm':[500,700],'직접 입력':null};
 const DEF={upAxis:'Y',target:'600000',fov:20,
@@ -6833,7 +6843,8 @@ const DEF={upAxis:'Y',target:'600000',fov:20,
   method:'스크린톤',cell:4,spacing:1.05,angle:45,
   penCount:'1',pen1:.3,pen2:.6,pen3:1,cap1:.55,cap2:.8,penColors:true,dotTime:.25,travel:60,
   paper:'A4',paperW:210,paperH:297,orient:'세로',margin:20,drawScale:1,posX:0,posY:0,frame:'없음',frameGap:5,frameLines:1,frameStep:1.5,jpgDpi:'300',
-  lineOuter:false,lineInner:false,lineCrease:false,creaseAngle:40,lineSlice:false,sliceCount:30,sliceAxis:'높이',linePen:.3,lineMin:2,lineSmooth:2,innerJump:.05};
+  lineOuter:false,lineInner:false,lineCrease:false,creaseAngle:40,lineSlice:false,sliceCount:30,sliceAxis:'높이',linePen:.3,lineMin:2,lineSmooth:2,innerJump:.05,
+  cutW:.6,cutH:.8,cutX:0,cutY:0,cutRot:0,c0x:0,c0y:0,c1x:0,c1y:0,c2x:0,c2y:0,c3x:0,c3y:0,cutNear:0,cutFar:0,cutSrc:'원본 해상도'};
 let P;try{P={...DEF,...JSON.parse(localStorage.getItem('sculptDotP1')||'{}')}}catch(e){P={...DEF}}
 const save=()=>{try{localStorage.setItem('sculptDotP1',JSON.stringify(P))}catch(e){}try{saveLast()}catch(e){}};
 const pct=v=>Math.round(v*100)+'%';
@@ -6848,6 +6859,19 @@ const TABS=[
    {btn:'yaw',l:'모델 90° 돌리기'},{info:'modelInfo'},{samples:1}]},
  {name:'각도',hint:'왼쪽 화면을 끌어서 돌리고, 두 손가락이나 휠로 확대합니다. 손을 떼면 망점이 다시 계산됩니다.',c:[
    {views:1},{k:'fov',l:'원근감',min:5,max:60,step:1,u:'°',re:'cam'}]},
+ {name:'컷',cut:true,hint:'3D 화면 위에 프레임을 얹고, 화면에 보이는 그대로 프레임 모양으로 깊이 방향 끝까지 잘라냅니다. 모서리를 끌거나 아래 값으로 조절하세요. 직사각형부터 만화 칸 같은 비정형 사각형까지 됩니다. 모델은 평소처럼 돌리고 확대해서 구도를 잡으면 됩니다.',c:[
+   {cutPresets:1},
+   {k:'cutW',l:'가로',min:.05,max:2,step:.005,fmt:v=>(v*100).toFixed(1),num:1,re:'cut'},
+   {k:'cutH',l:'세로',min:.05,max:1.2,step:.005,fmt:v=>(v*100).toFixed(1),num:1,re:'cut'},
+   {k:'cutX',l:'가로 위치',min:-1,max:1,step:.005,fmt:v=>(v*100).toFixed(1),num:1,re:'cut'},
+   {k:'cutY',l:'세로 위치',min:-.6,max:.6,step:.005,fmt:v=>(v*100).toFixed(1),num:1,re:'cut'},
+   {k:'cutRot',l:'기울기',min:-45,max:45,step:.5,fmt:v=>(+v).toFixed(1),num:1,re:'cut'},
+   {info:'cutInfo'},
+   {cutCorners:1},
+   {k:'cutNear',l:'앞에서 깎기',min:0,max:.95,step:.01,fmt:v=>v>0?pct(v):'안 깎음',re:'cut'},
+   {k:'cutFar',l:'뒤에서 깎기',min:0,max:.95,step:.01,fmt:v=>v>0?pct(v):'안 깎음',re:'cut'},
+   {k:'cutSrc',l:'자를 해상도',sel:['원본 해상도','작업용'],fmt:v=>v==='원본 해상도'?'원본 해상도 (디테일 그대로)':'작업용 (간소화본, 빠름)',re:'none'},
+   {cutPanel:1}]},
  {name:'빛·명암',hint:'빛 방향과 명암 곡선을 정합니다. 밝은 곳 최소 점을 올리면 빛을 받는 면도 점이 남아 형태가 날아가지 않습니다.',c:[
    {k:'lightAz',l:'빛 좌우',min:-90,max:90,step:1,fmt:v=>v<0?`왼쪽 ${-v}°`:v>0?`오른쪽 ${v}°`:'정면',re:'render'},
    {k:'lightEl',l:'빛 높이',min:-30,max:80,step:1,u:'°',re:'render'},
@@ -6913,6 +6937,14 @@ const TABS=[
 const TAB_OUT=TABS.findIndex(t=>t.out),TAB_SAVE=TABS.length-1;
 const tabsEl=$('tabs'),panesEl=$('panes'),inputs={},shows=[];
 const fmtVal=(c,v)=>c.fmt?c.fmt(v):(c.d?(+v).toFixed(c.d):v)+(c.u?(c.u==='°'?c.u:' '+c.u):'');
+function setOut(o,c,v){if(c.num)o.value=fmtVal(c,v);else o.textContent=fmtVal(c,v)}
+function makeRow(c){let node;node=document.createElement('div');node.className='row';const lab=document.createElement('label');lab.htmlFor='i_'+c.k;lab.textContent=c.l;
+      let el;const out=c.num?document.createElement('input'):document.createElement('output');if(c.num){out.type='number';out.className='num';out.step='any';out.onchange=()=>{const v=parseFloat(out.value);if(!isFinite(v)){out.value=fmtVal(c,P[c.k]);return}const raw=c.fmt&&c.fmt(1)==='100.0'?v/100:v;P[c.k]=raw;el.value=raw;changed(c.re);syncInputs()}}
+      if(c.sel){el=document.createElement('select');c.sel.forEach(o=>{const op=document.createElement('option');op.value=o;op.textContent=c.fmt?c.fmt(o):o;el.appendChild(op)});el.value=P[c.k]}
+      else{el=document.createElement('input');el.type='range';el.min=c.min;el.max=c.max;el.step=c.step;el.value=P[c.k];setOut(out,c,P[c.k])}
+      el.id='i_'+c.k;el.oninput=()=>{P[c.k]=c.sel?el.value:+el.value;if(!c.sel)setOut(out,c,P[c.k]);else for(const q in inputs){const o=inputs[q];if(o.out&&!o.c.sel&&!o.c.chk)setOut(o.out,o.c,P[q])}changed(c.re)};
+      node.append(lab,el,out);inputs[c.k]={c,el,out}
+  return node}
 TABS.forEach((t,i)=>{
   const b=document.createElement('button');b.role='tab';b.id='tab'+i;b.innerHTML=`<span class="n">${i+1}</span>${t.name}`;b.onclick=()=>showTab(i);tabsEl.appendChild(b);
   const pane=document.createElement('div');pane.className='pane';pane.id='pane'+i;pane.hidden=true;
@@ -6925,6 +6957,14 @@ TABS.forEach((t,i)=>{
       [['정면',0,0],['오른쪽',90,0],['뒤',180,0],['왼쪽',270,0],['사선',30,6],['위에서',20,55]].forEach(([n,az,el])=>{const bb=document.createElement('button');bb.className='chip';bb.textContent=n;bb.onclick=()=>setView(az,el);node.appendChild(bb)})}
     else if(c.penChips){node=document.createElement('div');node.className='bar';
       [.1,.2,.3,.4,.5,.7,1].forEach(w=>{const bb=document.createElement('button');bb.className='chip';bb.textContent=w.toFixed(1)+' mm';bb.onclick=()=>{P.pen1=w;syncInputs();changed('layout')};node.appendChild(bb)})}
+    else if(c.cutPresets){node=document.createElement('div');node.className='bar';
+      node.innerHTML='<button class="chip" data-cutpreset="rect">직사각형</button><button class="chip" data-cutpreset="square">정사각형</button><button class="chip" data-cutpreset="manga">만화 칸 기울이기</button><button class="chip ghost" data-cutpreset="reset">처음 크기로</button>'}
+    else if(c.cutCorners){node=document.createElement('details');node.className='corners';
+      node.innerHTML='<summary>모서리 하나씩 옮기기 (비정형 칸)</summary><p class="hint">숫자는 화면 높이를 100으로 본 값입니다. 프레임 기준으로 오른쪽·아래가 +입니다. 3D 화면의 동그란 손잡이를 끌어도 됩니다.</p>';
+      ['왼쪽 위','오른쪽 위','오른쪽 아래','왼쪽 아래'].forEach((nm,i)=>['x','y'].forEach(ax=>node.appendChild(makeRow({k:'c'+i+ax,l:nm+(ax==='x'?' ↔':' ↕'),min:-.5,max:.5,step:.005,fmt:v=>(v*100).toFixed(1),num:1,re:'cut'}))))}
+    else if(c.cutPanel){node=document.createElement('div');node.className='cutpanel';
+      node.innerHTML='<div class="bar"><button class="primary" id="cutGo">프레임 모양으로 자르기</button><button id="cutBack" hidden>원래 모델로 돌아가기</button></div>'+
+        '<div id="pieceBox" hidden><h3 class="ptitle"><span>잘라낸 조각 · 끌어서 돌리기 · 휠로 확대</span><span class="tag" id="pieceTag"></span></h3><div class="pieceview"><canvas id="pieceCv"></canvas></div></div><div id="pieceList" class="savelist"></div>'}
     else if(c.paperChips){node=document.createElement('div');node.className='bar';
       ['A4','A3'].forEach(n=>{const bb=document.createElement('button');bb.className='chip';bb.textContent=n;bb.onclick=()=>{P.paper=n;syncInputs();changed('layout')};node.appendChild(bb)})}
     else if(c.saves){node=document.createElement('div');node.className='saves';
@@ -6933,12 +6973,7 @@ TABS.forEach((t,i)=>{
       [['두상','head'],['매듭','knot']].forEach(([n,k])=>{const bb=document.createElement('button');bb.className='chip';bb.textContent=n;bb.onclick=()=>loadSample(k);node.appendChild(bb)})}
     else if(c.chk){node=document.createElement('label');node.className='check';const cb=document.createElement('input');cb.type='checkbox';cb.id='i_'+c.k;cb.checked=!!P[c.k];
       cb.onchange=()=>{P[c.k]=cb.checked;changed(c.re)};node.append(cb,c.l);inputs[c.k]={c,el:cb}}
-    else{node=document.createElement('div');node.className='row';const lab=document.createElement('label');lab.htmlFor='i_'+c.k;lab.textContent=c.l;
-      let el;const out=document.createElement('output');
-      if(c.sel){el=document.createElement('select');c.sel.forEach(o=>{const op=document.createElement('option');op.value=o;op.textContent=c.fmt?c.fmt(o):o;el.appendChild(op)});el.value=P[c.k]}
-      else{el=document.createElement('input');el.type='range';el.min=c.min;el.max=c.max;el.step=c.step;el.value=P[c.k];out.textContent=fmtVal(c,P[c.k])}
-      el.id='i_'+c.k;el.oninput=()=>{P[c.k]=c.sel?el.value:+el.value;if(!c.sel)out.textContent=fmtVal(c,P[c.k]);else for(const q in inputs){const o=inputs[q];if(o.out&&!o.c.sel&&!o.c.chk)o.out.textContent=fmtVal(o.c,P[q])}changed(c.re)};
-      node.append(lab,el,out);inputs[c.k]={c,el,out}}
+    else node=makeRow(c);
     if(c.show)shows.push([node,c.show]);
     pane.appendChild(node);
   });
@@ -6946,8 +6981,8 @@ TABS.forEach((t,i)=>{
   panesEl.appendChild(pane);
 });
 function updateShows(){for(const[n,f]of shows)n.hidden=!f()}
-function syncInputs(){for(const k in inputs){const{c,el,out}=inputs[k];if(c.chk)el.checked=!!P[k];else{el.value=P[k];if(out&&!c.sel)out.textContent=fmtVal(c,P[k])}}updateShows()}
-function showTab(i){TABS.forEach((t,j)=>{$('tab'+j).classList.toggle('on',i===j);$('tab'+j).setAttribute('aria-selected',i===j);$('pane'+j).hidden=i!==j});try{localStorage.setItem('sculptDotTab',i)}catch(e){}}
+function syncInputs(){for(const k in inputs){const{c,el,out}=inputs[k];if(c.chk)el.checked=!!P[k];else{el.value=P[k];if(out&&!c.sel)setOut(out,c,P[k])}}updateShows()}
+function showTab(i){TABS.forEach((t,j)=>{$('tab'+j).classList.toggle('on',i===j);$('tab'+j).setAttribute('aria-selected',i===j);$('pane'+j).hidden=i!==j});try{localStorage.setItem('sculptDotTab',i)}catch(e){}if(cutReady)drawFrame()}
 try{showTab(+(localStorage.getItem('sculptDotTab')||0))}catch(e){showTab(0)}
 updateShows();
 function setStatus(t,err){const s=$('status');s.textContent=t;s.classList.toggle('err',!!err)}
@@ -6958,6 +6993,7 @@ function changed(re){save();updateShows();
   if(re==='render'){updateLight();autoRun();return}
   if(re==='layout'){clearTimeout(layoutT);layoutT=setTimeout(()=>{layout();drawPreview();renderStats()},40);return}
   if(re==='draw'){drawPreview();return}
+  if(re==='cut'){drawFrame();return}
   if(re==='stats')renderStats()}
 
 
@@ -6981,13 +7017,13 @@ controls.addEventListener('start',()=>{dragging=true});controls.addEventListener
 function size(){const w=viewEl.clientWidth,h=viewEl.clientHeight;if(!w)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();draw()}
 new ResizeObserver(size).observe(viewEl);
 const cssVar=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-function draw(){renderer.setClearColor(new THREE.Color(cssVar('--stage')||'#dcdfe4'),1);renderer.render(scene,camera)}
+function draw(){renderer.setClearColor(new THREE.Color(cssVar('--stage')||'#dcdfe4'),1);renderer.render(scene,camera);if(cutReady)drawFrame()}
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{draw();drawPreview()});
 function fitDistance(){const d=1/Math.sin(THREE.MathUtils.degToRad(P.fov)/2)*1.12;const dir=camera.position.clone().sub(controls.target).normalize();camera.position.copy(dir.multiplyScalar(d));camera.near=d*.05;camera.far=d*4;camera.updateProjectionMatrix();controls.update();draw()}
 function setView(az,el){const a=THREE.MathUtils.degToRad(az),e=THREE.MathUtils.degToRad(el);camera.position.set(Math.sin(a)*Math.cos(e),Math.sin(e),Math.cos(a)*Math.cos(e));controls.target.set(0,0,0);camera.fov=P.fov;fitDistance();autoRun();saveLast()}
 
 // ---------- model prep: orient, normalise, weld or simplify by vertex clustering ----------
-let rawPos=null,yawTurns=0,modelName='sculpture',modelFile='',currentSample=null,pendingRestore=null;
+let normInfo={c:[0,0,0],r:1,up:'Y',yaw:0},rawPos=null,yawTurns=0,modelName='sculpture',modelFile='',currentSample=null,pendingRestore=null;
 function orient(src){
   const n=src.length/3,p=new Float32Array(src.length);
   for(let i=0;i<n;i++){let x=src[i*3],y=src[i*3+1],z=src[i*3+2];
@@ -6999,6 +7035,7 @@ function orient(src){
   const c=[0,1,2].map(k=>(mn[k]+mx[k])/2);let r=0;
   for(let i=0;i<n;i++){const dx=p[i*3]-c[0],dy=p[i*3+1]-c[1],dz=p[i*3+2]-c[2],d=dx*dx+dy*dy+dz*dz;if(d>r)r=d}r=Math.sqrt(r)||1;
   for(let i=0;i<n;i++)for(let k=0;k<3;k++)p[i*3+k]=(p[i*3+k]-c[k])/r;
+  normInfo={c,r,up:P.upAxis,yaw:((yawTurns%4)+4)%4};
   return p}
 function cluster(p,G,step,full){
   const n=p.length/9,K=G+1,map=new Map(),idx=[];let vc=0;const sums=full?[]:null;
@@ -7467,6 +7504,182 @@ async function loadSample(k,keepView){
   $('modelInfo').textContent+=' · 샘플입니다. 토르소 파일을 올려 주세요.';
   if(keepView)return;if(k==='head')setView(28,6);else setView(35,12);
 }
+// ---------- cut: lay a four-cornered frame over the 3D view and cut the model through its depth ----------
+const CUT_TAB=TABS.findIndex(t=>t.cut);
+const cutSvg=document.createElementNS('http://www.w3.org/2000/svg','svg');cutSvg.setAttribute('class','cutov');viewEl.appendChild(cutSvg);
+const CN=['왼쪽 위','오른쪽 위','오른쪽 아래','왼쪽 아래'];
+// corners in view units: x right, y down, 1 = view height, origin = view centre
+function cutCorners(){const w=P.cutW/2,h=P.cutH/2,a=THREE.MathUtils.degToRad(P.cutRot),ca=Math.cos(a),sa=Math.sin(a);
+  return[[-w,-h],[w,-h],[w,h],[-w,h]].map(([x,y],i)=>{x+=P['c'+i+'x'];y+=P['c'+i+'y'];return[x*ca-y*sa+P.cutX,x*sa+y*ca+P.cutY]})}
+function cutConvex(c){let sg=0;for(let i=0;i<4;i++){const a=c[i],b=c[(i+1)%4],d=c[(i+2)%4];const z=(b[0]-a[0])*(d[1]-b[1])-(b[1]-a[1])*(d[0]-b[0]);if(Math.abs(z)<1e-9)return false;const s=Math.sign(z);if(!sg)sg=s;else if(s!==sg)return false}return true}
+function cutActive(){return CUT_TAB>=0&&!$('pane'+CUT_TAB).hidden&&!!mesh}
+let cutDrag=null;
+function drawFrame(){
+  const on=cutActive();cutSvg.style.display=on?'':'none';if(!on)return;
+  const W=viewEl.clientWidth,H=viewEl.clientHeight;cutSvg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  const c=cutCorners(),px=c.map(([x,y])=>[W/2+x*H,H/2+y*H]),ok=cutConvex(c);
+  const poly=px.map(p=>p.map(v=>v.toFixed(1)).join(',')).join(' ');
+  const cx=(px[0][0]+px[1][0]+px[2][0]+px[3][0])/4,cy=(px[0][1]+px[1][1]+px[2][1]+px[3][1])/4;
+  cutSvg.innerHTML=`<path class="shade" fill-rule="evenodd" d="M0 0H${W}V${H}H0Z M${poly.split(' ').join(' L')}Z"/>`+
+    `<polygon class="fr${ok?'':' bad'}" points="${poly}"/>`+
+    px.map((p,i)=>`<circle class="hd" data-i="${i}" cx="${p[0]}" cy="${p[1]}" r="9"><title>${CN[i]} 모서리 · 끌어서 옮기기</title></circle>`).join('')+
+    `<rect class="hd mv" data-i="m" x="${cx-9}" y="${cy-9}" width="18" height="18" rx="3"><title>프레임 옮기기</title></rect>`;
+  const L=i=>Math.hypot(c[(i+1)%4][0]-c[i][0],c[(i+1)%4][1]-c[i][1])*100;
+  $('cutInfo').textContent=ok?`변 길이 (화면 높이 = 100) · 위 ${L(0).toFixed(1)} · 오른쪽 ${L(1).toFixed(1)} · 아래 ${L(2).toFixed(1)} · 왼쪽 ${L(3).toFixed(1)}`:'프레임이 오목하거나 꼬여 있어 자를 수 없습니다. 모서리를 바깥쪽으로 옮겨 주세요.';
+  $('cutGo').disabled=!ok;
+}
+cutSvg.addEventListener('pointerdown',e=>{const t=e.target;if(!t.classList||!t.classList.contains('hd'))return;e.preventDefault();e.stopPropagation();
+  cutSvg.setPointerCapture(e.pointerId);cutDrag={i:t.dataset.i,x:e.clientX,y:e.clientY,P:{...P}}});
+cutSvg.addEventListener('pointermove',e=>{if(!cutDrag)return;const H=viewEl.clientHeight,dx=(e.clientX-cutDrag.x)/H,dy=(e.clientY-cutDrag.y)/H,o=cutDrag.P;
+  if(cutDrag.i==='m'){P.cutX=+(o.cutX+dx).toFixed(4);P.cutY=+(o.cutY+dy).toFixed(4)}
+  else{const a=THREE.MathUtils.degToRad(P.cutRot),ca=Math.cos(a),sa=Math.sin(a),i=cutDrag.i;  // move in the frame's own (unrotated) axes
+    P['c'+i+'x']=+(o['c'+i+'x']+dx*ca+dy*sa).toFixed(4);P['c'+i+'y']=+(o['c'+i+'y']-dx*sa+dy*ca).toFixed(4)}
+  syncInputs();drawFrame()});
+const endCut=()=>{if(cutDrag){cutDrag=null;save()}};cutSvg.addEventListener('pointerup',endCut);cutSvg.addEventListener('pointercancel',endCut);
+new ResizeObserver(drawFrame).observe(viewEl);
+
+// keep the oriented, welded full-resolution mesh for cutting (the working mesh may be simplified)
+let cutSrcCache=null;
+async function cutSource(){
+  if(P.cutSrc!=='원본 해상도'||!rawPos||$('modelInfo').textContent.indexOf('간소화 없이')>=0){const g=mesh.geometry;return{pos:g.attributes.position.array,idx:g.index.array}}
+  const key=[rawPos.length,normInfo.up,normInfo.yaw,modelName].join('|');if(cutSrcCache&&cutSrcCache.key===key)return cutSrcCache;
+  $('loadMsg').textContent='원본 해상도로 준비하는 중…';$('loadOv').hidden=false;await tick();
+  const p=orient(rawPos),r=cluster(p,65536,1,true),pos=new Float32Array(r.vc*3);
+  for(let v=0;v<r.vc;v++){const c=r.sums[v*4+3];pos[v*3]=r.sums[v*4]/c;pos[v*3+1]=r.sums[v*4+1]/c;pos[v*3+2]=r.sums[v*4+2]/c}
+  cutSrcCache={key,pos,idx:new Uint32Array(r.idx)};return cutSrcCache}
+
+// clip an indexed mesh by planes (keep n·p + d >= 0) and close every cut with a flat cap
+function clipMesh(pos0,idx0,planes){
+  let V=Array.from(pos0),T=Array.from(idx0),openLoops=0;
+  for(const[nx,ny,nz,d]of planes){
+    const vc=V.length/3,dist=new Float64Array(vc);let any=false,all=true;
+    for(let v=0;v<vc;v++){let s=nx*V[v*3]+ny*V[v*3+1]+nz*V[v*3+2]+d;if(Math.abs(s)<1e-10)s=1e-10;dist[v]=s;if(s<0)any=true;else all=false}
+    if(!any)continue;if(all)return{pos:new Float32Array(0),idx:new Uint32Array(0),openLoops};
+    const emap=new Map(),NT=[],next=new Map();
+    const ev=(a,b)=>{const i=a<b?a:b,j=a<b?b:a,k=i*vc+j;let v=emap.get(k);if(v!==undefined)return v;
+      const t=dist[i]/(dist[i]-dist[j]);v=V.length/3;V.push(V[i*3]+(V[j*3]-V[i*3])*t,V[i*3+1]+(V[j*3+1]-V[i*3+1])*t,V[i*3+2]+(V[j*3+2]-V[i*3+2])*t);emap.set(k,v);return v};
+    const seg=(a,b)=>{let l=next.get(a);if(!l)next.set(a,l=[]);l.push(b)};
+    for(let f=0;f<T.length;f+=3){const t=[T[f],T[f+1],T[f+2]],ins=t.map(v=>dist[v]>0),n=ins[0]+ins[1]+ins[2];
+      if(n===3){NT.push(t[0],t[1],t[2]);continue}if(n===0)continue;
+      let r=0;if(n===1)r=ins.indexOf(true);else r=(ins.indexOf(false)+1)%3;
+      const p=t[r],q=t[(r+1)%3],s=t[(r+2)%3];
+      if(n===1){const pq=ev(p,q),sp=ev(s,p);NT.push(p,pq,sp);seg(pq,sp)}
+      else{const qs=ev(q,s),sp=ev(s,p);NT.push(p,q,qs,p,qs,sp);seg(qs,sp)}}
+    // walk the cut segments into loops
+    const loops=[];
+    for(const[st]of next){let l=next.get(st);while(l&&l.length){const loop=[st];let cur=l.pop(),guard=0;
+        while(cur!==st&&guard++<1e7){loop.push(cur);const m=next.get(cur);if(!m||!m.length){cur=-1;break}cur=m.pop()}
+        if(cur===st&&loop.length>=3)loops.push(loop);else openLoops++;l=next.get(st)}}
+    // project to the plane, sort outer loops and holes, triangulate
+    const n3=new THREE.Vector3(nx,ny,nz),u=new THREE.Vector3(),w=new THREE.Vector3();
+    u.set(Math.abs(nx)<.9?1:0,Math.abs(nx)<.9?0:1,0).cross(n3).normalize();w.crossVectors(n3,u);
+    const P2=loops.map(lp=>lp.map(v=>new THREE.Vector2(V[v*3]*u.x+V[v*3+1]*u.y+V[v*3+2]*u.z,V[v*3]*w.x+V[v*3+1]*w.y+V[v*3+2]*w.z)));
+    const area=P2.map(pl=>Math.abs(THREE.ShapeUtils.area(pl)));
+    const inside=(pt,pl)=>{let c=false;for(let i=0,j=pl.length-1;i<pl.length;j=i++){const a=pl[i],b=pl[j];if((a.y>pt.y)!==(b.y>pt.y)&&pt.x<(b.x-a.x)*(pt.y-a.y)/(b.y-a.y)+a.x)c=!c}return c};
+    const par=loops.map(()=>-1),depth=loops.map(()=>0);
+    loops.forEach((_,i)=>{let best=-1;loops.forEach((__,j)=>{if(i===j||area[j]<=area[i])return;if(inside(P2[i][0],P2[j])){depth[i]++;if(best<0||area[j]<area[best])best=j}});par[i]=best});
+    loops.forEach((lp,i)=>{if(depth[i]%2)return;const holes=loops.map((_,j)=>j).filter(j=>par[j]===i&&depth[j]%2);
+      const ids=lp.concat(...holes.map(j=>loops[j]));let tris;
+      try{tris=THREE.ShapeUtils.triangulateShape(P2[i].slice(),holes.map(j=>P2[j].slice()))}catch(e){tris=[]}
+      for(const[a,b,c]of tris){const A=ids[a],B=ids[b],C=ids[c];
+        const ux=V[B*3]-V[A*3],uy=V[B*3+1]-V[A*3+1],uz=V[B*3+2]-V[A*3+2],vx=V[C*3]-V[A*3],vy=V[C*3+1]-V[A*3+1],vz=V[C*3+2]-V[A*3+2];
+        const dot=(uy*vz-uz*vy)*nx+(uz*vx-ux*vz)*ny+(ux*vy-uy*vx)*nz;   // caps face away from the kept side
+        if(dot>0)NT.push(A,C,B);else NT.push(A,B,C)}});
+    T=NT}
+  // drop unused vertices
+  const remap=new Int32Array(V.length/3).fill(-1),pos=[],idx=new Uint32Array(T.length);
+  for(let i=0;i<T.length;i++){const v=T[i];if(remap[v]<0){remap[v]=pos.length/3;pos.push(V[v*3],V[v*3+1],V[v*3+2])}idx[i]=remap[v]}
+  return{pos:new Float32Array(pos),idx,openLoops}}
+
+function cutPlanes(){
+  camera.updateMatrixWorld();const W=viewEl.clientWidth,H=viewEl.clientHeight,asp=W/H,C=camera.position.clone();
+  const c=cutCorners(),ray=([x,y])=>new THREE.Vector3(2*x/asp,-2*y,.5).unproject(camera);
+  const R=c.map(ray),mid=ray([(c[0][0]+c[1][0]+c[2][0]+c[3][0])/4,(c[0][1]+c[1][1]+c[2][1]+c[3][1])/4]),planes=[];
+  for(let i=0;i<4;i++){const a=R[i].clone().sub(C),b=R[(i+1)%4].clone().sub(C),n=a.cross(b).normalize();let d=-n.dot(C);if(n.dot(mid)+d<0){n.negate();d=-d}planes.push([n.x,n.y,n.z,d])}
+  const fw=new THREE.Vector3();camera.getWorldDirection(fw);const dist=-new THREE.Vector3().applyMatrix4(camera.matrixWorldInverse).z;
+  if(P.cutNear>0){const z=dist-1+2*P.cutNear;planes.push([fw.x,fw.y,fw.z,-(fw.dot(C)+z)])}           // keep what is farther than z
+  if(P.cutFar>0){const z=dist+1-2*P.cutFar;planes.push([-fw.x,-fw.y,-fw.z,fw.dot(C)+z])}             // keep what is nearer than z
+  return planes}
+
+const pieces=[];let pieceSel=-1,pieceN=0,usingPiece=null;
+async function doCut(){
+  if(!mesh)return;const c=cutCorners();if(!cutConvex(c)){flash('프레임이 오목해서 자를 수 없습니다.',true);return}
+  const planes=cutPlanes();const src=await cutSource();
+  $('loadMsg').textContent='자르는 중…';$('loadOv').hidden=false;await tick();
+  const t0=performance.now();let r;
+  try{r=clipMesh(src.pos,src.idx,planes)}catch(e){$('loadOv').hidden=true;flash('자르지 못했습니다: '+e.message,true);return}
+  $('loadOv').hidden=true;
+  if(!r.idx.length){flash('프레임 안에 모델이 없습니다. 프레임이나 각도를 옮겨 주세요.',true);return}
+  // make sure the solid faces outward
+  let vol=0;const p=r.pos,x=r.idx;for(let i=0;i<x.length;i+=3){const a=x[i]*3,b=x[i+1]*3,d=x[i+2]*3;vol+=p[a]*(p[b+1]*p[d+2]-p[b+2]*p[d+1])-p[a+1]*(p[b]*p[d+2]-p[b+2]*p[d])+p[a+2]*(p[b]*p[d+1]-p[b+1]*p[d])}
+  if(vol<0)for(let i=0;i<x.length;i+=3){const t=x[i+1];x[i+1]=x[i+2];x[i+2]=t}
+  pieceN++;const pc={name:`${modelName}-cut${pieceN}`,pos:r.pos,idx:r.idx,norm:{...normInfo},open:r.openLoops,
+    frame:cutCorners(),time:((performance.now()-t0)/1000).toFixed(1)};
+  pieces.unshift(pc);pieceSel=0;renderPieces();showPiece(pc);
+  flash(`잘라냈습니다: ${pc.name} · 면 ${(x.length/3).toLocaleString()}개`+(r.openLoops?' · 원본에 구멍이 있어 일부 단면은 막지 못했습니다':''),!!r.openLoops)}
+
+// piece preview with its own renderer and orbit
+let pvR=null,pvS,pvC,pvO,pvM=null;
+function initPiecePreview(){if(pvR)return;const cvp=$('pieceCv');pvR=new THREE.WebGLRenderer({canvas:cvp,antialias:true});pvR.setPixelRatio(Math.min(2,devicePixelRatio||1));
+  pvS=new THREE.Scene();pvC=new THREE.PerspectiveCamera(25,1,.01,100);pvS.add(new THREE.HemisphereLight(0xf2f2f4,0x6a6d74,.75));
+  const k=new THREE.DirectionalLight(0xffffff,.9);k.position.set(-.6,.6,1);pvC.add(k);pvS.add(pvC);
+  pvO=new THREE.OrbitControls(pvC,cvp);pvO.addEventListener('change',drawPiece);
+  new ResizeObserver(()=>{const w=cvp.clientWidth,h=cvp.clientHeight;if(!w)return;pvR.setSize(w,h,false);pvC.aspect=w/h;pvC.updateProjectionMatrix();drawPiece()}).observe(cvp)}
+function drawPiece(){if(!pvR)return;pvR.setClearColor(new THREE.Color(cssVar('--stage')||'#dcdfe4'),1);pvR.render(pvS,pvC)}
+function showPiece(pc){initPiecePreview();$('pieceBox').hidden=false;
+  if(pvM){pvS.remove(pvM);pvM.geometry.dispose()}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pc.pos,3));g.setIndex(new THREE.BufferAttribute(pc.idx,1));
+  g.computeBoundingSphere();const s=g.boundingSphere;
+  pvM=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0x9a9a9c,roughness:.9,flatShading:true,side:THREE.DoubleSide}));pvS.add(pvM);
+  // start from the same direction the cut was made from
+  const dir=camera.position.clone().sub(controls.target).normalize();pvO.target.copy(s.center);
+  pvC.position.copy(s.center).add(dir.multiplyScalar(s.radius/Math.sin(THREE.MathUtils.degToRad(12.5))*1.1));pvC.near=s.radius*.05;pvC.far=s.radius*20;pvC.updateProjectionMatrix();pvO.update();
+  $('pieceTag').textContent=`${pc.name} · 면 ${(pc.idx.length/3).toLocaleString()}개`;drawPiece()}
+
+// back to the original file's coordinates and scale
+function toOriginal(pc){const{c,r,up,yaw}=pc.norm,p=pc.pos,o=new Float32Array(p.length);
+  for(let i=0;i<p.length;i+=3){let x=p[i]*r+c[0],y=p[i+1]*r+c[1],z=p[i+2]*r+c[2];
+    for(let k=0;k<yaw;k++){const t=x;x=-z;z=t}
+    if(up==='Z'){const t=y;y=-z;z=t}
+    o[i]=x;o[i+1]=y;o[i+2]=z}return o}
+function stlBlob(pc){const p=toOriginal(pc),x=pc.idx,n=x.length/3,buf=new ArrayBuffer(84+n*50),dv=new DataView(buf);
+  const head='SCULPT LINE cut '+pc.name;for(let i=0;i<Math.min(80,head.length);i++)dv.setUint8(i,head.charCodeAt(i)&127);dv.setUint32(80,n,true);
+  for(let f=0;f<n;f++){const o=84+f*50,a=x[f*3]*3,b=x[f*3+1]*3,d=x[f*3+2]*3;
+    const ux=p[b]-p[a],uy=p[b+1]-p[a+1],uz=p[b+2]-p[a+2],vx=p[d]-p[a],vy=p[d+1]-p[a+1],vz=p[d+2]-p[a+2];let nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;const l=Math.hypot(nx,ny,nz)||1;
+    dv.setFloat32(o,nx/l,true);dv.setFloat32(o+4,ny/l,true);dv.setFloat32(o+8,nz/l,true);
+    [a,b,d].forEach((q,k)=>{dv.setFloat32(o+12+k*12,p[q],true);dv.setFloat32(o+16+k*12,p[q+1],true);dv.setFloat32(o+20+k*12,p[q+2],true)})}
+  return new Blob([buf],{type:'model/stl'})}
+async function usePiece(pc){
+  if(!usingPiece)usingPiece={rawPos,modelName,modelFile,currentSample,up:P.upAxis,yaw:yawTurns};
+  const p=toOriginal(pc),x=pc.idx,soup=new Float32Array(x.length*3);for(let i=0;i<x.length;i++){soup[i*3]=p[x[i]*3];soup[i*3+1]=p[x[i]*3+1];soup[i*3+2]=p[x[i]*3+2]}
+  const dir=camera.position.clone().sub(controls.target).normalize();
+  rawPos=soup;modelName=pc.name;modelFile=pc.name+'.stl';currentSample=null;P.upAxis=pc.norm.up;yawTurns=pc.norm.yaw;syncInputs();save();
+  $('modelTag').textContent=pc.name+' (잘라낸 조각)';nav={x:0,y:0,z:1};
+  await prepare('잘라낸 조각을 준비하는 중…');
+  camera.position.copy(dir);controls.target.set(0,0,0);fitDistance();renderPieces();autoRun();saveLast();
+  flash(`「${pc.name}」으로 망점 작업을 합니다. 원래 모델로 돌아가려면 컷 탭의 버튼을 누르세요.`)}
+async function backToOriginal(){if(!usingPiece)return;const u=usingPiece;usingPiece=null;
+  rawPos=u.rawPos;modelName=u.modelName;modelFile=u.modelFile;currentSample=u.currentSample;P.upAxis=u.up;yawTurns=u.yaw;syncInputs();save();
+  $('modelTag').textContent=u.modelFile||(u.currentSample?'샘플':u.modelName);await prepare('원래 모델로 돌아가는 중…');renderPieces();autoRun();saveLast()}
+function renderPieces(){const box=$('pieceList');box.innerHTML='';$('cutBack').hidden=!usingPiece;
+  if(!pieces.length){box.innerHTML='<p class="hint">아직 잘라낸 조각이 없습니다. 3D 화면의 프레임을 맞추고 자르기를 누르세요. 조각은 이 창을 닫으면 사라지니 필요한 것은 STL로 저장하세요.</p>';$('pieceBox').hidden=true;return}
+  pieces.forEach((pc,i)=>{const row=document.createElement('div');row.className='saverow'+(i===pieceSel?' sel':'');
+    const info=document.createElement('div');info.className='saveinfo';const t=document.createElement('b');t.textContent=pc.name;const s=document.createElement('span');
+    s.textContent=`면 ${(pc.idx.length/3).toLocaleString()}개 · ${pc.time}초`+(pc.open?' · 일부 단면 열림':'');info.append(t,s);
+    const mk=(l,f,cls)=>{const b=document.createElement('button');b.textContent=l;if(cls)b.className=cls;b.onclick=f;return b};
+    row.append(info,mk('보기',()=>{pieceSel=i;renderPieces();showPiece(pc)}),mk('STL 저장',()=>saveFile(pc.name+'.stl',stlBlob(pc),'model/stl',flash)),
+      mk('망점 작업',()=>usePiece(pc),'primary'),mk('삭제',()=>{pieces.splice(i,1);if(pieceSel>=pieces.length)pieceSel=pieces.length-1;renderPieces();if(pieces[pieceSel])showPiece(pieces[pieceSel])},'ghost'));
+    box.appendChild(row)})}
+function cutPreset(k){for(let i=0;i<4;i++){P['c'+i+'x']=0;P['c'+i+'y']=0}
+  if(k==='square'){const s=Math.min(P.cutW,P.cutH);P.cutW=P.cutH=s;P.cutRot=0}
+  if(k==='rect'){P.cutRot=0}
+  if(k==='manga'){P.c0x=.03;P.c0y=.02;P.c1x=-.01;P.c1y=-.03;P.c2x=-.04;P.c2y=.01;P.c3x=.01;P.c3y=-.02}
+  if(k==='reset'){P.cutW=DEF.cutW;P.cutH=DEF.cutH;P.cutX=0;P.cutY=0;P.cutRot=0}
+  syncInputs();save();drawFrame()}
+$('cutGo').onclick=doCut;$('cutBack').onclick=backToOriginal;
+document.querySelectorAll('[data-cutpreset]').forEach(b=>b.onclick=()=>cutPreset(b.dataset.cutpreset));
+renderPieces();cutReady=true;drawFrame();
+
 size();
 (async()=>{let last=null;try{last=JSON.parse(localStorage.getItem(LAST_KEY)||'null')}catch(e){}
   currentSample=null;updateLight();drawPreview();
