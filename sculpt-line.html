@@ -7023,18 +7023,18 @@ async function prepare(msg){
   const t0=performance.now();
   if(msg){$('loadMsg').textContent=msg;$('loadOv').hidden=false;await tick()}
   const p=orient(rawPos),n=p.length/9,target=P.target==='원본 그대로'?Infinity:+P.target;
-  let G=65536;
+  let G=65536,simplified=false;
   if(n>target){
     $('loadMsg').textContent=`면 ${n.toLocaleString()}개를 ${target.toLocaleString()}개 이하로 줄이는 중…`;await tick();
     const step=Math.max(1,Math.floor(n/250000));let lo=8,hi=8192;
     for(let it=0;it<11;it++){const mid=Math.round(Math.sqrt(lo*hi));const est=cluster(p,mid,step,false).idx.length/3*step;if(est>target)hi=mid;else lo=mid}
-    G=lo}
+    G=lo;simplified=true}
   const r=cluster(p,G,1,true);
   const pos=new Float32Array(r.vc*3);for(let v=0;v<r.vc;v++){const c=r.sums[v*4+3];pos[v*3]=r.sums[v*4]/c;pos[v*3+1]=r.sums[v*4+1]/c;pos[v*3+2]=r.sums[v*4+2]/c}
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setIndex(new THREE.BufferAttribute(new Uint32Array(r.idx),1));g.computeVertexNormals();
   if(mesh){scene.remove(mesh);mesh.geometry.dispose()}mesh=new THREE.Mesh(g,mat);scene.add(mesh);$('emptyMsg').hidden=true;
   const F=r.idx.length/3;
-  $('modelInfo').textContent=F<n*.98?`원본 ${n.toLocaleString()}면 → 작업용 ${F.toLocaleString()}면으로 간소화 (${((performance.now()-t0)/1000).toFixed(1)}초)`:`면 ${F.toLocaleString()}개 · 간소화 없이 원본 그대로`;
+  $('modelInfo').textContent=simplified?`원본 ${n.toLocaleString()}면 → 작업용 ${F.toLocaleString()}면으로 간소화 (${((performance.now()-t0)/1000).toFixed(1)}초)`:`면 ${F.toLocaleString()}개 · 간소화 없이 원본 그대로`;
   $('loadOv').hidden=true;draw();
 }
 async function rebuild(){if(!rawPos)return;await prepare('모델을 다시 준비하는 중…');autoRun()}
@@ -7298,16 +7298,27 @@ $('run').onclick=()=>run(false);
 $('b_yaw').onclick=()=>{yawTurns++;rebuild()};
 
 // ---------- files ----------
-function parseSTL(buf){const dv=new DataView(buf);
-  if(buf.byteLength>=84){const n=dv.getUint32(80,true);if(84+n*50===buf.byteLength){const out=new Float32Array(n*9);let o=84;
-    for(let f=0;f<n;f++){o+=12;for(let k=0;k<9;k++){out[f*9+k]=dv.getFloat32(o,true);o+=4}o+=2}return out}}
-  const g=new THREE.STLLoader().parse(buf);return(g.index?g.toNonIndexed():g).attributes.position.array}
+// STL reader that copes with real-world exporters: binary files whose header starts with "solid",
+// binary files with a few padding bytes or a wrong face count, and plain-text (ASCII) files
+function parseSTL(buf){const dv=new DataView(buf),L=buf.byteLength;
+  const readBin=n=>{const out=new Float32Array(n*9);let o=84;for(let f=0;f<n;f++){o+=12;for(let k=0;k<9;k++){out[f*9+k]=dv.getFloat32(o,true);o+=4}o+=2}return out};
+  if(L>=134){const n=dv.getUint32(80,true),need=84+n*50;if(n>0&&need<=L&&L-need<65536)return readBin(n)}
+  const head=new TextDecoder().decode(new Uint8Array(buf,0,Math.min(L,4096)));
+  if(/^\s*solid/i.test(head)&&/facet|vertex/i.test(head)){
+    const txt=new TextDecoder().decode(new Uint8Array(buf)),re=/vertex\s+([-+\d.eE]+)\s+([-+\d.eE]+)\s+([-+\d.eE]+)/g,v=[];let m;
+    while((m=re.exec(txt)))v.push(+m[1],+m[2],+m[3]);
+    if(v.length>=9)return new Float32Array(v.slice(0,v.length-v.length%9))}
+  if(L>=134){const n=Math.floor((L-84)/50);if(n>0)return readBin(n)}   // face count in the header was wrong: read what is there
+  throw new Error('STL 형식을 읽지 못했습니다. 다른 프로그램에서 바이너리 STL로 다시 내보내 보세요.')}
 function collectPositions(obj){const parts=[];obj.updateMatrixWorld(true);
   obj.traverse(o=>{if(!o.isMesh||!o.geometry||!o.geometry.attributes.position)return;const g=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone();g.applyMatrix4(o.matrixWorld);parts.push(g.attributes.position.array)});
   let n=0;parts.forEach(a=>n+=a.length);const out=new Float32Array(n);let q=0;parts.forEach(a=>{out.set(a,q);q+=a.length});return out}
-viewEl.addEventListener('dragover',e=>{e.preventDefault();viewEl.classList.add('drag')});
-viewEl.addEventListener('dragleave',()=>viewEl.classList.remove('drag'));
-viewEl.addEventListener('drop',e=>{e.preventDefault();viewEl.classList.remove('drag');const f=e.dataTransfer.files&&e.dataTransfer.files[0];if(f)openFile(f)});
+// a file dropped anywhere on the page opens here (the browser would otherwise leave the page to show the file)
+let dragDepth=0;
+addEventListener('dragenter',e=>{if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files')){dragDepth++;viewEl.classList.add('drag')}});
+addEventListener('dragleave',()=>{dragDepth=Math.max(0,dragDepth-1);if(!dragDepth)viewEl.classList.remove('drag')});
+addEventListener('dragover',e=>{e.preventDefault()});
+addEventListener('drop',e=>{e.preventDefault();dragDepth=0;viewEl.classList.remove('drag');const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)openFile(f)});
 $('file').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(f)openFile(f)};
 async function openFile(f){const ext=f.name.split('.').pop().toLowerCase();
   $('loadMsg').textContent=`파일을 읽는 중… (${(f.size/1048576).toFixed(0)} MB)`;$('loadOv').hidden=false;await tick();
@@ -7319,7 +7330,7 @@ async function openFile(f){const ext=f.name.split('.').pop().toLowerCase();
     else throw new Error('지원하지 않는 형식입니다. STL·OBJ·PLY·GLB로 올려 주세요.');
     if(!positions||!positions.length)throw new Error('파일에서 면을 찾지 못했습니다.');
     rawPos=positions;modelName=f.name.replace(/\.[^.]+$/,'');modelFile=f.name;currentSample=null;$('modelTag').textContent=f.name;nav={x:0,y:0,z:1};
-    const pr=pendingRestore;pendingRestore=null;yawTurns=pr?(pr.model.yaw||0):0;
+    let pr=pendingRestore;pendingRestore=null;if(pr&&pr.model.name!==modelName){flash(`저장할 때와 다른 파일이라 설정만 적용하고 각도는 정면에서 시작합니다.`);pr=null;notice(null)}yawTurns=pr?(pr.model.yaw||0):0;
     await prepare(`면 ${(positions.length/9).toLocaleString()}개를 준비하는 중…`);
     if(pr){applyView(pr.view);notice(null);autoRun();saveLast();flash(pr.model.name===modelName?`「${pr.name}」 설정을 각도까지 복원했습니다.`:`「${pr.name}」 설정을 적용했습니다. 저장할 때 파일(${pr.model.file||pr.model.name})과 이름이 다르니 확인해 주세요.`)}
     else setView(0,0);
