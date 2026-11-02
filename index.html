@@ -971,7 +971,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b138</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b139</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -19112,10 +19112,10 @@ showLayerMenu(ev.clientX, ev.clientY, [
       for(const a of rec){
         if((a.li || 0) !== li) continue;
         try {
-          if(a.type === 'fill' && a.poly && a.poly.length >= 3){
-            // 레시피의 다각형은 이미 오브젝트 좌표다 (ox/oy 는 마스크 몫) -- 더하지 않는다
-            paintVectorFill(ctx2, { ...a, ox: 0, oy: 0 });
-          } else if(a.type === 'stroke' && a.tool !== 'eraser' && a.points && a.points.length){
+          // 채움은 덧그리지 않는다: 다각형은 '처음 채운 모양'이라, 지우개·올가미로 깎아 낸 뒤에는
+          // 마스크와 다르다 -- 덧그리면 지운 자리가 되살아나 '안 그린 곳'이 톤 창에 뜬다.
+          // 비트맵(마스크)이 곧 지금 모양이다. 확대 배치도 부드럽게 키워 문턱을 넘기니 테두리는 충분히 매끈하다.
+          if(a.type === 'stroke' && a.tool !== 'eraser' && a.points && a.points.length){
             const tx = a.tx || a.texture || 'smooth';
             if(tx !== 'smooth' && tx !== 'plotter') continue;    // 질감 붓은 비트맵 그대로
             strokeJoinNow = a.jn || null;
