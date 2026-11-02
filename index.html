@@ -971,7 +971,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b135</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b136</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -16823,6 +16823,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
   }
 
   function renderComposition() {
+    if(typeof scheduleCompAutosave === 'function') scheduleCompAutosave();
     paintCompBg();
     const fr = frameRect();
     cctx.save();
@@ -18448,7 +18449,8 @@ showLayerMenu(ev.clientX, ev.clientY, [
       objects: uniq,
       items: placedItems.map(it => ({
         o: idxOf.get(it.obj), x: it.x, y: it.y,
-        scale: it.scale, angle: it.angle || 0, r: it.r, u: placeUid(it)
+        scale: it.scale, angle: it.angle || 0, r: it.r, u: placeUid(it),
+        ...((it.sx && it.sx !== 1) || (it.sy && it.sy !== 1) ? { sx: it.sx || 1, sy: it.sy || 1 } : {})
       }))
     };
   }
@@ -18531,6 +18533,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
       const obj = objs[it.o];
       if(!obj) continue;
       const pl = { obj, x: it.x, y: it.y, scale: it.scale, angle: it.angle || 0, r: it.r };
+      if(it.sx) pl.sx = it.sx; if(it.sy) pl.sy = it.sy;
       if(it.u != null){ pl.uid = it.u; if(it.u > placeUidSeq) placeUidSeq = it.u; }
       placedItems.push(pl);
     }
@@ -18542,6 +18545,45 @@ showLayerMenu(ev.clientX, ev.clientY, [
     selectedItemIdx = null;
     $('compItemEditor').hidden = true;
     renderComposition();
+  }
+
+  // ---- 컴포지션 자동 저장: 새로고침해도 배치가 남는다 ----
+  // 드로잉의 자동 저장과 같은 생각이다. 매니페스트(저장 파일과 같은 꼴)를 브라우저 저장소에
+  // 두고, 열 때 비어 있으면 되살린다. 아카이브 주소나 레시피가 있는 오브젝트는 그걸로 다시
+  // 받아오고, 없는 것만 그림을 통째로 넣는다. 저장소가 모자라면 레시피를 빼고 한 번 더.
+  const COMP_AUTOSAVE_KEY = 'nu_layer_comp_autosave_v1';
+  let compAutosaveTimer = null, compRestoring = false;
+  function compAutosaveNow(){
+    if(compRestoring) return;
+    try {
+      if(!placedItems.length){ localStorage.removeItem(COMP_AUTOSAVE_KEY); return; }
+      const man = buildCompositionManifest();
+      man.savedAt = Date.now();
+      // 되받을 수 있는 오브젝트는 주소만 둔다 -- 드로잉 자동 저장과 같은 5MB 를 나눠 쓰므로 가볍게
+      for(const o of man.objects){ if(o.ghPath || o.downloadUrl){ o.recipe = null; o.png = null; } }
+      localStorage.setItem(COMP_AUTOSAVE_KEY, JSON.stringify(man));
+    } catch(e){
+      if(!compAutosaveNow._warned){ compAutosaveNow._warned = true; toast('컴포지션 자동 저장을 못 했습니다 — 브라우저 저장 공간이 모자랍니다.'); }
+    }
+  }
+  function scheduleCompAutosave(){
+    if(compAutosaveTimer || compRestoring) return;
+    compAutosaveTimer = setTimeout(()=>{ compAutosaveTimer = null; compAutosaveNow(); }, 800);
+  }
+  async function restoreCompAutosave(){
+    let raw = null;
+    try { raw = localStorage.getItem(COMP_AUTOSAVE_KEY); } catch(e){ return false; }
+    if(!raw || placedItems.length) return false;
+    let man = null;
+    try { man = JSON.parse(raw); } catch(e){ return false; }
+    if(!man || !man.nuComposition || !Array.isArray(man.items) || !man.items.length) return false;
+    compRestoring = true;
+    try {
+      await loadCompositionManifest(man);
+      if(placedItems.length) toast('컴포지션을 이어서 엽니다 (' + placedItems.length + '개 배치).');
+    } catch(e){ console.warn('composition autosave restore failed', e); }
+    finally { compRestoring = false; }
+    return true;
   }
 
   // ---- Gallery browser (master): list compositions/ and load one back ----
@@ -19938,6 +19980,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // Installed here (end of script) so `layers`, `actions`, and `renderAll`
   // are all initialized before first use.
   restoreAutosave();
+  setTimeout(() => { restoreCompAutosave(); }, 300);   // 오브젝트를 받아오므로 비동기 -- 화면이 뜬 뒤에
   updateDiscardBtn();
   renderLayersPanel();
   updateNavPreview();
