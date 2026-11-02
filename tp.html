@@ -298,7 +298,7 @@
 <body>
 
 <header>
-  <div class="brand"><b>TONE PLOT</b><span>펜 플로터 해칭·스크린톤 작업대</span><span class="mono" style="font-size:10px; color:var(--cy); border:1px solid var(--line-2); border-radius:4px; padding:2px 6px; margin-left:4px">v9 · G펜 감압</span></div>
+  <div class="brand"><b>TONE PLOT</b><span>펜 플로터 해칭·스크린톤 작업대</span><span class="mono" style="font-size:10px; color:var(--cy); border:1px solid var(--line-2); border-radius:4px; padding:2px 6px; margin-left:4px">v9 · G펜 감압 · b128</span></div>
   <div class="seg">
     <button id="mHatch" class="on">해칭</button>
     <button id="mCal">캘리브레이션</button>
@@ -1763,23 +1763,35 @@ function overlapMasks(penPx, gapPx, pxPerMm){
   const growOf = reg => Math.round(penPx/2 + (pxPerMm ? regGapMm(reg) * pxPerMm : (gapPx || 0)));
   // 위에서부터 내려오며 '파내는' 영역들의 합집합을 쌓는다. 투명·독립은
   // 합집합에 넣지 않고, 독립은 합집합에 파이지도 않는다.
-  const union = new Uint8Array(W*H);        // 파내는('위') 영역들
-  const unionAll = new Uint8Array(W*H);     // 독립이 아닌 위 영역 전부 -- 틈을 따로 정한 영역이 쓴다
+  // 세 가지 합집합을 위에서부터 쌓는다.
+  //  union      : '위'(파내는) 모드인 영역들 -- 전역 틈으로 아래를 파낸다
+  //  unionAll   : 독립이 아닌 위 영역 전부 -- 틈을 따로 정한 아래 영역이 쓴다
+  //  byGap      : 틈을 따로 정한 위 영역들을 틈 값별로 -- 겹침 모드와 무관하게 제 틈으로 아래를 파낸다
+  // 그래서 틈은 두 영역 중 어느 쪽에 걸어도 그 사이에 적용된다. 둘 다 정했으면 아래쪽 값.
+  const union = new Uint8Array(W*H), unionAll = new Uint8Array(W*H);
+  const byGap = new Map();
   let anyAbove = false, anyAll = false;
   const ownGap = reg => (reg.gap !== undefined && reg.gap !== null && reg.gap !== '' && isFinite(reg.gap));
+  const growMm = mm => Math.round(penPx/2 + (pxPerMm ? mm * pxPerMm : (gapPx || 0)));
+  const carve = (src, grow) => grow > 0 ? dilateMask(src, W, H, grow) : grow < 0 ? erodeMask(src, W, H, -grow) : src.slice();
   for(let i = S.regions.length - 1; i >= 0; i--){
     const reg = S.regions[i];
     const mode = regOverlap(reg);
     if(!reg.mask){ out.set(reg, { mask: reg.mask, blocked: null }); continue; }
-    // 틈을 따로 정한 영역은 겹침 모드가 '겹치게'(컴포지션 기본)여도 위 영역에서 그 틈만큼 파인다 --
-    // 틈을 정했다는 것이 곧 '위에 놓인 것과 이만큼 떨어지게' 라는 뜻이다.
-    const src = (ownGap(reg) && mode !== 'solo' && anyAll) ? unionAll : (anyAbove ? union : null);
-    if(!src || mode === 'solo'){ out.set(reg, { mask: reg.mask, blocked: null }); }
+    let blocked = null;
+    if(mode !== 'solo'){
+      if(ownGap(reg)){
+        if(anyAll) blocked = carve(unionAll, growOf(reg));
+      } else {
+        if(anyAbove) blocked = carve(union, growMm(S.overlapGap || 0));
+        for(const [g, m] of byGap){
+          const b2 = carve(m, growMm(g));
+          if(!blocked) blocked = b2; else for(let k=0; k<W*H; k++) if(b2[k]) blocked[k] = 1;
+        }
+      }
+    }
+    if(!blocked){ out.set(reg, { mask: reg.mask, blocked: null }); }
     else {
-      const grow = growOf(reg);
-      const blocked = grow > 0 ? dilateMask(src, W, H, grow)
-                    : grow < 0 ? erodeMask(src, W, H, -grow)
-                    : src.slice();
       const eff = new Uint8Array(W*H);
       for(let k=0; k<W*H; k++) if(reg.mask[k] && !blocked[k]) eff[k] = 1;
       out.set(reg, { mask: eff, blocked });
@@ -1787,6 +1799,11 @@ function overlapMasks(penPx, gapPx, pxPerMm){
     if(!reg.enabled || mode === 'solo') continue;
     for(let k=0; k<W*H; k++) if(reg.mask[k]) unionAll[k] = 1;
     anyAll = true;
+    if(ownGap(reg)){
+      const g = +reg.gap;
+      let m = byGap.get(g); if(!m){ m = new Uint8Array(W*H); byGap.set(g, m); }
+      for(let k=0; k<W*H; k++) if(reg.mask[k]) m[k] = 1;
+    }
     if(mode !== 'over') continue;   // 파내는 영역만 합집합에 쌓는다
     for(let k=0; k<W*H; k++) if(reg.mask[k]) union[k] = 1;
     anyAbove = true;
@@ -3598,8 +3615,8 @@ function syncTone(){
     $('regGapVal').textContent = (g >= 0 ? '+' : '') + g.toFixed(1) + 'mm' + (own ? '' : ' (전역)');
     $('regGapReset').style.visibility = own ? '' : 'hidden';
     $('regGap').title = (regOverlap(r) === 'thru' && !own)
-      ? '지금은 겹치게 그리는 중이라 전역 틈은 쓰이지 않습니다. 이 슬라이더로 틈을 정하면 이 영역만 위 영역에서 그 틈만큼 파입니다'
-      : '이 영역만의 틈(−2~5mm) — 위 영역이 이 영역을 파낼 때 펜 가장자리에서 그만큼 더 벌림(양수) 또는 파고듦(음수). 펜 메뉴의 틈을 움직이면 모든 영역이 그 값으로 다시 맞춰집니다';
+      ? '지금은 겹치게 그리는 중이라 전역 틈은 쓰이지 않습니다. 이 슬라이더로 틈을 정하면 이 영역과 맞닿은 영역 사이에 그 틈이 생깁니다 (이 영역이 아래면 파이고, 위면 아래 영역을 파냅니다)'
+      : '이 영역만의 틈(−2~5mm) — 이 영역과 이웃 영역이 맞닿는 자리에 펜 가장자리에서 그만큼 더 벌림(양수) 또는 파고듦(음수). 위·아래 어느 쪽에 걸어도 그 사이에 적용되고, 둘 다 정했으면 아래쪽 값. 펜 메뉴의 틈을 움직이면 모든 영역이 그 값으로 다시 맞춰집니다';
   }
   // 굵은 선 관련 줄은 실제로 굵은 획이 있을 때만 띄운다. 없는데 띄우면
   // 만져도 아무 일이 안 일어나는 컨트롤이 되고, 그건 고장과 구별되지 않는다.
