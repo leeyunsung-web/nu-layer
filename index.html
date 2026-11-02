@@ -971,7 +971,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b137</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b138</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -18552,16 +18552,30 @@ showLayerMenu(ev.clientX, ev.clientY, [
   // 두고, 열 때 비어 있으면 되살린다. 아카이브 주소나 레시피가 있는 오브젝트는 그걸로 다시
   // 받아오고, 없는 것만 그림을 통째로 넣는다. 저장소가 모자라면 레시피를 빼고 한 번 더.
   const COMP_AUTOSAVE_KEY = 'nu_layer_comp_autosave_v1';
-  let compAutosaveTimer = null, compRestoring = false;
+  let compAutosaveTimer = null, compRestoring = false, compRestoreDone = false;
   function compAutosaveNow(){
     if(compRestoring) return;
     try {
-      if(!placedItems.length){ localStorage.removeItem(COMP_AUTOSAVE_KEY); return; }
+      if(!placedItems.length){
+        // 시작 직후(아직 되살리기 전·되살리기 실패)에 빈 상태를 저장하면 남은 것을 지워 버린다.
+        if(compRestoreDone) localStorage.removeItem(COMP_AUTOSAVE_KEY);
+        return;
+      }
       const man = buildCompositionManifest();
       man.savedAt = Date.now();
-      // 되받을 수 있는 오브젝트는 주소만 둔다 -- 드로잉 자동 저장과 같은 5MB 를 나눠 쓰므로 가볍게
-      for(const o of man.objects){ if(o.ghPath || o.downloadUrl){ o.recipe = null; o.png = null; } }
-      localStorage.setItem(COMP_AUTOSAVE_KEY, JSON.stringify(man));
+      // 아카이브 주소가 있으면 받아올 주소도 함께 (ghPath 만 있는 오브젝트도 되살릴 수 있게)
+      for(const o of man.objects){
+        if(!o.downloadUrl && o.ghPath && ghConfig && ghConfig.owner && ghConfig.repo){
+          try { o.downloadUrl = rawUrlOf(o.ghPath); } catch(e){}
+        }
+      }
+      const put = m => localStorage.setItem(COMP_AUTOSAVE_KEY, JSON.stringify(m));
+      try { put(man); }
+      catch(e){
+        // 너무 크면: 되받을 수 있는 오브젝트의 레시피·그림을 빼고 다시 (드로잉 자동 저장과 5MB 를 나눠 쓴다)
+        for(const o of man.objects){ if(o.ghPath || o.downloadUrl){ o.recipe = null; o.png = null; } }
+        put(man);
+      }
     } catch(e){
       if(!compAutosaveNow._warned){ compAutosaveNow._warned = true; toast('컴포지션 자동 저장을 못 했습니다 — 브라우저 저장 공간이 모자랍니다.'); }
     }
@@ -18573,14 +18587,15 @@ showLayerMenu(ev.clientX, ev.clientY, [
   async function restoreCompAutosave(){
     let raw = null;
     try { raw = localStorage.getItem(COMP_AUTOSAVE_KEY); } catch(e){ return false; }
-    if(!raw || placedItems.length) return false;
+    if(!raw || placedItems.length){ compRestoreDone = true; return false; }
     let man = null;
-    try { man = JSON.parse(raw); } catch(e){ return false; }
-    if(!man || !man.nuComposition || !Array.isArray(man.items) || !man.items.length) return false;
+    try { man = JSON.parse(raw); } catch(e){ compRestoreDone = true; return false; }
+    if(!man || !man.nuComposition || !Array.isArray(man.items) || !man.items.length){ compRestoreDone = true; return false; }
     compRestoring = true;
     try {
       await loadCompositionManifest(man);
-      if(placedItems.length) toast('컴포지션을 이어서 엽니다 (' + placedItems.length + '개 배치).');
+      if(placedItems.length){ toast('컴포지션을 이어서 엽니다 (' + placedItems.length + '개 배치).'); compRestoreDone = true; }
+      else toast('컴포지션을 되살리지 못했습니다 — 오브젝트를 받아오지 못했습니다 (자동 저장은 남겨 둡니다).');
     } catch(e){ console.warn('composition autosave restore failed', e); }
     finally { compRestoring = false; }
     return true;
