@@ -298,7 +298,7 @@
 <body>
 
 <header>
-  <div class="brand"><b>TONE PLOT</b><span>펜 플로터 해칭·스크린톤 작업대</span><span class="mono" style="font-size:10px; color:var(--cy); border:1px solid var(--line-2); border-radius:4px; padding:2px 6px; margin-left:4px">v9 · G펜 감압 · b128</span></div>
+  <div class="brand"><b>TONE PLOT</b><span>펜 플로터 해칭·스크린톤 작업대</span><span class="mono" style="font-size:10px; color:var(--cy); border:1px solid var(--line-2); border-radius:4px; padding:2px 6px; margin-left:4px">v9 · G펜 감압 · b129</span></div>
   <div class="seg">
     <button id="mHatch" class="on">해칭</button>
     <button id="mCal">캘리브레이션</button>
@@ -375,9 +375,9 @@
       <span class="unit">mm</span>
     </div>
     <div class="row">
-      <label class="lb" for="overlapGap">틈</label>
+      <label class="lb" for="overlapGap">공통 틈</label>
       <input type="number" id="overlapGap" value="0" min="-2" max="5" step="0.1"
-        title="영역이 맞닿는 자리의 공통 틈. 0이면 펜의 가장자리가 딱 맞닿습니다. 양수는 그만큼 더 벌리고, 음수는 아래 영역이 위 영역 안으로 그만큼 파고듭니다 — 경계에 남는 실낱 같은 흰 줄을 덮을 때 씁니다. 톤 패널의 '틈'으로 영역마다 따로 정할 수 있고, 이 값을 움직이면 개별 틈은 모두 이 값으로 돌아갑니다">
+        title="모든 영역이 맞닿는 자리에 쓰는 공통 틈 (전체 조정). 겹치게 모드에서도 0이 아니면 영역 사이를 이만큼 벌립니다. 0이면 펜의 가장자리가 딱 맞닿습니다. 양수는 그만큼 더 벌리고, 음수는 아래 영역이 위 영역 안으로 그만큼 파고듭니다 — 경계에 남는 실낱 같은 흰 줄을 덮을 때 씁니다. 톤 패널의 '틈'으로 영역마다 따로 정할 수 있고, 이 값을 움직이면 개별 틈은 모두 이 값으로 돌아갑니다">
       <span class="unit">mm</span>
     </div>
     <div class="row">
@@ -431,11 +431,11 @@
       <span class="val" id="regPenWVal"></span>
     </div>
     <div class="row" id="regGapRow">
-      <label class="lb" for="regGap">틈</label>
+      <label class="lb" for="regGap">이 영역 틈</label>
       <input id="regGap" type="range" min="-20" max="50" step="1" data-num-scale="0.1" data-num-unit="mm"
         title="이 영역만의 틈(−2~5mm) — 위 영역이 이 영역을 파낼 때 펜 가장자리에서 그만큼 더 벌림(양수) 또는 파고듦(음수). 펜 메뉴의 틈을 움직이면 모든 영역이 그 값으로 다시 맞춰집니다">
       <span class="val" id="regGapVal"></span>
-      <button id="regGapReset" class="ghost" style="padding:2px 6px; font-size:11px" title="이 영역의 틈을 지우고 펜 메뉴의 공통 틈을 따릅니다">전역</button>
+      <button id="regGapReset" class="ghost" style="padding:2px 6px; font-size:11px" title="이 영역의 틈을 지우고 펜 패널의 공통 틈을 따릅니다">공통값</button>
     </div>
     <div class="row" id="reachRow">
       <label class="lb" for="burstReach">중심 도달</label>
@@ -1784,6 +1784,8 @@ function overlapMasks(penPx, gapPx, pxPerMm){
         if(anyAll) blocked = carve(unionAll, growOf(reg));
       } else {
         if(anyAbove) blocked = carve(union, growMm(S.overlapGap || 0));
+        // 겹치게 모드라도 공통 틈을 0 아닌 값으로 두었으면 '영역 사이를 이만큼 벌려라'는 뜻이다
+        else if(anyAll && S.overlap === 'over' && Math.abs(S.overlapGap || 0) > 1e-9) blocked = carve(unionAll, growMm(S.overlapGap));
         for(const [g, m] of byGap){
           const b2 = carve(m, growMm(g));
           if(!blocked) blocked = b2; else for(let k=0; k<W*H; k++) if(b2[k]) blocked[k] = 1;
@@ -3612,10 +3614,10 @@ function syncTone(){
     const own = (r.gap !== undefined && r.gap !== null && isFinite(r.gap));
     const g = own ? +r.gap : (S.overlapGap || 0);
     $('regGap').value = Math.round(g * 10);
-    $('regGapVal').textContent = (g >= 0 ? '+' : '') + g.toFixed(1) + 'mm' + (own ? '' : ' (전역)');
+    $('regGapVal').textContent = (g >= 0 ? '+' : '') + g.toFixed(1) + 'mm' + (own ? '' : ' (공통값 따름)');
     $('regGapReset').style.visibility = own ? '' : 'hidden';
     $('regGap').title = (regOverlap(r) === 'thru' && !own)
-      ? '지금은 겹치게 그리는 중이라 전역 틈은 쓰이지 않습니다. 이 슬라이더로 틈을 정하면 이 영역과 맞닿은 영역 사이에 그 틈이 생깁니다 (이 영역이 아래면 파이고, 위면 아래 영역을 파냅니다)'
+      ? '지금은 겹치게 그리는 중입니다. 이 슬라이더로 틈을 정하면 이 영역과 맞닿은 영역 사이에만 그 틈이 생깁니다 (전체는 펜 패널의 공통 틈)'
       : '이 영역만의 틈(−2~5mm) — 이 영역과 이웃 영역이 맞닿는 자리에 펜 가장자리에서 그만큼 더 벌림(양수) 또는 파고듦(음수). 위·아래 어느 쪽에 걸어도 그 사이에 적용되고, 둘 다 정했으면 아래쪽 값. 펜 메뉴의 틈을 움직이면 모든 영역이 그 값으로 다시 맞춰집니다';
   }
   // 굵은 선 관련 줄은 실제로 굵은 획이 있을 때만 띄운다. 없는데 띄우면
@@ -4431,7 +4433,7 @@ $('overlapGap').onchange = e => {
   // 공통 틈을 만지는 것은 '다시 균일하게'라는 뜻이다 (선 두께와 같은 규칙). 몇 개가 지워졌는지 알려 준다.
   const had = S.regions.filter(r => r.gap !== undefined && r.gap !== null).length;
   S.regions.forEach(r => { if(r.gap !== undefined){ delete r.gap; } });
-  if(had && $('penNote')) $('penNote').textContent = '개별 틈 ' + had + '개가 공통 틈(' + S.overlapGap.toFixed(1) + 'mm)으로 초기화되었습니다.';
+  if(had && $('penNote')) $('penNote').textContent = '영역별 틈 ' + had + '개가 공통 틈(' + S.overlapGap.toFixed(1) + 'mm)으로 초기화되었습니다.';
   if(typeof syncTone === 'function') syncTone();
   S.regions.forEach(r => { r._stamp = null; });
   refresh();
