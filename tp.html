@@ -1763,23 +1763,31 @@ function overlapMasks(penPx, gapPx, pxPerMm){
   const growOf = reg => Math.round(penPx/2 + (pxPerMm ? regGapMm(reg) * pxPerMm : (gapPx || 0)));
   // 위에서부터 내려오며 '파내는' 영역들의 합집합을 쌓는다. 투명·독립은
   // 합집합에 넣지 않고, 독립은 합집합에 파이지도 않는다.
-  const union = new Uint8Array(W*H);
-  let anyAbove = false;
+  const union = new Uint8Array(W*H);        // 파내는('위') 영역들
+  const unionAll = new Uint8Array(W*H);     // 독립이 아닌 위 영역 전부 -- 틈을 따로 정한 영역이 쓴다
+  let anyAbove = false, anyAll = false;
+  const ownGap = reg => (reg.gap !== undefined && reg.gap !== null && reg.gap !== '' && isFinite(reg.gap));
   for(let i = S.regions.length - 1; i >= 0; i--){
     const reg = S.regions[i];
     const mode = regOverlap(reg);
     if(!reg.mask){ out.set(reg, { mask: reg.mask, blocked: null }); continue; }
-    if(!anyAbove || mode === 'solo'){ out.set(reg, { mask: reg.mask, blocked: null }); }
+    // 틈을 따로 정한 영역은 겹침 모드가 '겹치게'(컴포지션 기본)여도 위 영역에서 그 틈만큼 파인다 --
+    // 틈을 정했다는 것이 곧 '위에 놓인 것과 이만큼 떨어지게' 라는 뜻이다.
+    const src = (ownGap(reg) && mode !== 'solo' && anyAll) ? unionAll : (anyAbove ? union : null);
+    if(!src || mode === 'solo'){ out.set(reg, { mask: reg.mask, blocked: null }); }
     else {
       const grow = growOf(reg);
-      const blocked = grow > 0 ? dilateMask(union, W, H, grow)
-                    : grow < 0 ? erodeMask(union, W, H, -grow)
-                    : union.slice();
+      const blocked = grow > 0 ? dilateMask(src, W, H, grow)
+                    : grow < 0 ? erodeMask(src, W, H, -grow)
+                    : src.slice();
       const eff = new Uint8Array(W*H);
       for(let k=0; k<W*H; k++) if(reg.mask[k] && !blocked[k]) eff[k] = 1;
       out.set(reg, { mask: eff, blocked });
     }
-    if(mode !== 'over' || !reg.enabled) continue;   // 파내는 영역만 합집합에 쌓는다
+    if(!reg.enabled || mode === 'solo') continue;
+    for(let k=0; k<W*H; k++) if(reg.mask[k]) unionAll[k] = 1;
+    anyAll = true;
+    if(mode !== 'over') continue;   // 파내는 영역만 합집합에 쌓는다
     for(let k=0; k<W*H; k++) if(reg.mask[k]) union[k] = 1;
     anyAbove = true;
   }
@@ -3589,6 +3597,9 @@ function syncTone(){
     $('regGap').value = Math.round(g * 10);
     $('regGapVal').textContent = (g >= 0 ? '+' : '') + g.toFixed(1) + 'mm' + (own ? '' : ' (전역)');
     $('regGapReset').style.visibility = own ? '' : 'hidden';
+    $('regGap').title = (regOverlap(r) === 'thru' && !own)
+      ? '지금은 겹치게 그리는 중이라 전역 틈은 쓰이지 않습니다. 이 슬라이더로 틈을 정하면 이 영역만 위 영역에서 그 틈만큼 파입니다'
+      : '이 영역만의 틈(−2~5mm) — 위 영역이 이 영역을 파낼 때 펜 가장자리에서 그만큼 더 벌림(양수) 또는 파고듦(음수). 펜 메뉴의 틈을 움직이면 모든 영역이 그 값으로 다시 맞춰집니다';
   }
   // 굵은 선 관련 줄은 실제로 굵은 획이 있을 때만 띄운다. 없는데 띄우면
   // 만져도 아무 일이 안 일어나는 컨트롤이 되고, 그건 고장과 구별되지 않는다.
