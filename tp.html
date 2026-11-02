@@ -298,7 +298,7 @@
 <body>
 
 <header>
-  <div class="brand"><b>TONE PLOT</b><span>펜 플로터 해칭·스크린톤 작업대</span><span class="mono" style="font-size:10px; color:var(--cy); border:1px solid var(--line-2); border-radius:4px; padding:2px 6px; margin-left:4px">v9 · G펜 감압 · b129</span></div>
+  <div class="brand"><b>TONE PLOT</b><span>펜 플로터 해칭·스크린톤 작업대</span><span class="mono" style="font-size:10px; color:var(--cy); border:1px solid var(--line-2); border-radius:4px; padding:2px 6px; margin-left:4px">v9 · G펜 감압 · b130</span></div>
   <div class="seg">
     <button id="mHatch" class="on">해칭</button>
     <button id="mCal">캘리브레이션</button>
@@ -1716,6 +1716,97 @@ function erodeMask(src, W, H, r){
   return out;
 }
 
+/* 유클리드 거리장. 마스크 밖 각 점에서 마스크까지의 거리(px). 안쪽은 0.
+   네모 팽창은 대각선 방향 틈이 1.4배가 되어 테두리를 따라 틈이 들쭉날쭉했다 --
+   거리장이면 어느 방향이든 같은 거리에서 떨어진다. */
+function edtOutside(mask, W, H){
+  const INF = 1e12;
+  const f = new Float64Array(Math.max(W, H)), d = new Float64Array(Math.max(W, H));
+  const v = new Int32Array(Math.max(W, H)), z = new Float64Array(Math.max(W, H) + 1);
+  const g = new Float64Array(W*H);
+  const dt1 = (n) => {            // f → d (제곱거리), Felzenszwalb & Huttenlocher
+    let k = 0; v[0] = 0; z[0] = -INF; z[1] = INF;
+    for(let q = 1; q < n; q++){
+      let sx;
+      while(true){
+        const p = v[k];
+        sx = ((f[q] + q*q) - (f[p] + p*p)) / (2*q - 2*p);
+        if(sx <= z[k] && k > 0){ k--; } else break;
+      }
+      k++; v[k] = q; z[k] = sx; z[k+1] = INF;
+    }
+    k = 0;
+    for(let q = 0; q < n; q++){ while(z[k+1] < q) k++; const p = v[k]; d[q] = (q-p)*(q-p) + f[p]; }
+  };
+  for(let x = 0; x < W; x++){                    // 세로 방향
+    for(let y = 0; y < H; y++) f[y] = mask[y*W + x] ? 0 : INF;
+    dt1(H);
+    for(let y = 0; y < H; y++) g[y*W + x] = d[y];
+  }
+  const out = new Float32Array(W*H);
+  for(let y = 0; y < H; y++){                    // 가로 방향
+    const o = y*W;
+    for(let x = 0; x < W; x++) f[x] = g[o + x];
+    dt1(W);
+    for(let x = 0; x < W; x++) out[o + x] = Math.sqrt(d[x]);
+  }
+  return out;
+}
+// 부호 있는 거리장: 마스크 밖은 +거리, 안은 -거리. 음수 틈(파고들기)에 쓴다.
+const sdfMemo = new WeakMap();
+// needInside 가 거짓이면 안쪽은 그냥 음수(-0.5)로 둔다 -- 파고들기(음수 틈)가 아니면 안쪽 거리는 쓸 일이 없고,
+// 거리장 하나가 통째로 절약된다.
+function sdfOf(mask, W, H, needInside){
+  const memo = sdfMemo.get(mask);
+  if(memo && (memo.inside || !needInside)) return memo.f;
+  const outD = edtOutside(mask, W, H);
+  const r = new Float32Array(W*H);
+  if(needInside){
+    const inv = new Uint8Array(W*H); for(let i = 0; i < W*H; i++) inv[i] = mask[i] ? 0 : 1;
+    const inD = edtOutside(inv, W, H);
+    for(let i = 0; i < W*H; i++) r[i] = mask[i] ? -inD[i] : outD[i];
+  } else {
+    for(let i = 0; i < W*H; i++) r[i] = mask[i] ? -0.5 : outD[i];
+  }
+  sdfMemo.set(mask, { f: r, inside: !!needInside });
+  return r;
+}
+// 거리장을 보간해 읽는다 (픽셀 사이도 부드럽게)
+function sampleField(fld, W, H, x, y){
+  const cx = Math.min(W - 1.001, Math.max(0, x)), cy = Math.min(H - 1.001, Math.max(0, y));
+  const x0 = Math.floor(cx), y0 = Math.floor(cy), fx = cx - x0, fy = cy - y0;
+  const i = y0*W + x0;
+  const a = fld[i], b = fld[i+1], c = fld[i+W], d = fld[i+W+1];
+  return (a*(1-fx) + b*fx)*(1-fy) + (c*(1-fx) + d*fx)*fy;
+}
+/* 여유장(margin)에서 선을 끊는다. margin < 0 인 자리가 가려진 자리. 두 표본 사이에서
+   부호가 바뀌면 보간으로 정확히 0 이 되는 자리까지 그린다 -- 끝이 계단이 아니라 그림을 따른다. */
+function trimPolysByField(polys, margin, W, H){
+  if(!margin) return polys;
+  const m = (p) => sampleField(margin, W, H, p[0], p[1]);
+  const out = [];
+  for(const poly of polys){
+    if(poly.length === 1){ if(m(poly[0]) >= 0) out.push(poly); continue; }
+    const pts = densify(poly, 2);
+    let seg = [], prev = null, pm = 0;
+    for(const p of pts){
+      const v = m(p);
+      if(prev){
+        if(pm >= 0 && v < 0){                       // 들어간다: 경계까지 그리고 끊는다
+          const t = pm / (pm - v); seg.push([prev[0] + (p[0]-prev[0])*t, prev[1] + (p[1]-prev[1])*t]);
+          if(seg.length > 1) out.push(seg); seg = [];
+        } else if(pm < 0 && v >= 0){                // 나온다: 경계에서 새로 시작
+          const t = pm / (pm - v); seg = [[prev[0] + (p[0]-prev[0])*t, prev[1] + (p[1]-prev[1])*t]];
+        }
+      }
+      if(v >= 0) seg.push(p);
+      prev = p; pm = v;
+    }
+    if(seg.length > 1) out.push(seg);
+  }
+  return out;
+}
+
 function dilateMask(src, W, H, r){
   if(r <= 0) return src;
   const a = new Uint8Array(W*H), b = new Uint8Array(W*H);
@@ -1755,7 +1846,22 @@ function regOverlap(reg){
 function regGapMm(reg){
   return (reg.gap !== undefined && reg.gap !== null && reg.gap !== '' && isFinite(reg.gap)) ? +reg.gap : (S.overlapGap || 0);
 }
+// 거리장은 비싸다(영역·소스마다 두 번). 입력이 같으면 지난 결과를 그대로 쓴다 --
+// 톤 슬라이더를 끄는 동안 generate() 가 매 프레임 불리므로.
+let _omCache = null;
+const _maskIds = new WeakMap(); let _maskSeq = 0;
 function overlapMasks(penPx, gapPx, pxPerMm){
+  const key = S.regions.map(r => {
+    let id = r.mask ? _maskIds.get(r.mask) : 0;
+    if(r.mask && !id){ id = ++_maskSeq; _maskIds.set(r.mask, id); }
+    return id + ':' + (r.enabled ? 1 : 0) + ':' + (r.ovl || '') + ':' + (r.gap ?? '') + ':' + (r.name || '') + ':' + (r.folder || '');
+  }).join('|') + '#' + penPx + '#' + gapPx + '#' + pxPerMm + '#' + S.overlap + '#' + (S.overlapGap || 0) + '#' + S.iw + 'x' + S.ih;
+  if(_omCache && _omCache.key === key) return _omCache.out;
+  const out = overlapMasks0(penPx, gapPx, pxPerMm);
+  _omCache = { key, out };
+  return out;
+}
+function overlapMasks0(penPx, gapPx, pxPerMm){
   const W = S.iw, H = S.ih;
   const out = new Map();
   // 음수면 파고든다. 펜 절반을 빼고도 남는 만큼 위 영역 안으로 들어간다.
@@ -1772,31 +1878,34 @@ function overlapMasks(penPx, gapPx, pxPerMm){
   const byGap = new Map();
   let anyAbove = false, anyAll = false;
   const ownGap = reg => (reg.gap !== undefined && reg.gap !== null && reg.gap !== '' && isFinite(reg.gap));
-  const growMm = mm => Math.round(penPx/2 + (pxPerMm ? mm * pxPerMm : (gapPx || 0)));
-  const carve = (src, grow) => grow > 0 ? dilateMask(src, W, H, grow) : grow < 0 ? erodeMask(src, W, H, -grow) : src.slice();
+  const growMmF = mm => penPx/2 + (pxPerMm ? mm * pxPerMm : (gapPx || 0));          // 반올림 없이
+  // 여유장: margin[k] = min_i (거리_i[k] - grow_i). 0 보다 작으면 가려진 자리.
+  const addMargin = (margin, src, grow) => {
+    const sd = sdfOf(src.slice(), W, H, grow < 0);   // 자라는 합집합이라 사본으로 (memo 가 새 배열마다)
+    if(!margin){ margin = new Float32Array(W*H); for(let k=0; k<W*H; k++) margin[k] = sd[k] - grow; return margin; }
+    for(let k=0; k<W*H; k++){ const v = sd[k] - grow; if(v < margin[k]) margin[k] = v; }
+    return margin;
+  };
   for(let i = S.regions.length - 1; i >= 0; i--){
     const reg = S.regions[i];
     const mode = regOverlap(reg);
-    if(!reg.mask){ out.set(reg, { mask: reg.mask, blocked: null }); continue; }
-    let blocked = null;
+    if(!reg.mask){ out.set(reg, { mask: reg.mask, blocked: null, margin: null }); continue; }
+    let margin = null;
     if(mode !== 'solo'){
       if(ownGap(reg)){
-        if(anyAll) blocked = carve(unionAll, growOf(reg));
+        if(anyAll) margin = addMargin(margin, unionAll, growMmF(regGapMm(reg)));
       } else {
-        if(anyAbove) blocked = carve(union, growMm(S.overlapGap || 0));
+        if(anyAbove) margin = addMargin(margin, union, growMmF(S.overlapGap || 0));
         // 겹치게 모드라도 공통 틈을 0 아닌 값으로 두었으면 '영역 사이를 이만큼 벌려라'는 뜻이다
-        else if(anyAll && S.overlap === 'over' && Math.abs(S.overlapGap || 0) > 1e-9) blocked = carve(unionAll, growMm(S.overlapGap));
-        for(const [g, m] of byGap){
-          const b2 = carve(m, growMm(g));
-          if(!blocked) blocked = b2; else for(let k=0; k<W*H; k++) if(b2[k]) blocked[k] = 1;
-        }
+        else if(anyAll && S.overlap === 'over' && Math.abs(S.overlapGap || 0) > 1e-9) margin = addMargin(margin, unionAll, growMmF(S.overlapGap));
+        for(const [g, m] of byGap) margin = addMargin(margin, m, growMmF(g));
       }
     }
-    if(!blocked){ out.set(reg, { mask: reg.mask, blocked: null }); }
+    if(!margin){ out.set(reg, { mask: reg.mask, blocked: null, margin: null }); }
     else {
-      const eff = new Uint8Array(W*H);
-      for(let k=0; k<W*H; k++) if(reg.mask[k] && !blocked[k]) eff[k] = 1;
-      out.set(reg, { mask: eff, blocked });
+      const eff = new Uint8Array(W*H), blocked = new Uint8Array(W*H);
+      for(let k=0; k<W*H; k++){ if(margin[k] < 0) blocked[k] = 1; else if(reg.mask[k]) eff[k] = 1; }
+      out.set(reg, { mask: eff, blocked, margin });
     }
     if(!reg.enabled || mode === 'solo') continue;
     for(let k=0; k<W*H; k++) if(reg.mask[k]) unionAll[k] = 1;
@@ -1941,7 +2050,9 @@ function tonePasses(tt, mask, reg, pen, M, opt, pitchPx, penPx, dens, budget){
    뒤쪽이 PENCIL/SPRAY를 플로터로 옮기는 길이다. 뉴레이어에서 굵게 그은 스프레이
    획 하나가 여기서는 '망점으로 채운 띠'가 되고, 연필 획은 성긴 해칭 띠가 된다.
    질감은 화면의 픽셀 그대로가 아니라 플로터가 실제로 낼 수 있는 표식으로 옮겨진다. */
-function linePasses(reg, pen, M, opt, pitchPx, penPx, dens, budget, blocked){
+function linePasses(reg, pen, M, opt, pitchPx, penPx, dens, budget, blocked, margin){
+  // 여유장이 있으면 그걸로 끊는다 (매끈). 없으면 예전 픽셀 마스크.
+  const cut = (paths) => margin ? trimPolysByField(paths, margin, S.iw, S.ih) : trimPolysByMask(paths, blocked, S.iw, S.ih);
   const out = [];
   const lines = reg.lines || [];
   if(!lines.length) return out;
@@ -1958,7 +2069,7 @@ function linePasses(reg, pen, M, opt, pitchPx, penPx, dens, budget, blocked){
 
   if(!(S.thickFill && S.thickMode === 'tone' && thick.length)){
     for(const L of thick) thin.push(...thickLinePaths(L.p, L.w, penPx));
-    const paths = trimPolysByMask(trimPolys(thin, er), blocked, S.iw, S.ih);
+    const paths = cut(trimPolys(thin, er));
     if(paths.length) out.push({ suffix:'라인', paths });
     return out;
   }
@@ -1967,15 +2078,16 @@ function linePasses(reg, pen, M, opt, pitchPx, penPx, dens, budget, blocked){
     const o = thickLineOutline(L.p, L.w, penPx);
     if(o) thin.push(o);
   }
-  const paths = trimPolysByMask(trimPolys(thin, er), blocked, S.iw, S.ih);
+  const paths = cut(trimPolys(thin, er));
   if(paths.length) out.push({ suffix:'라인', paths });
 
   const mask = new Uint8Array(S.iw * S.ih);
   stampCapsules(mask, S.iw, S.ih, thick, 1);
   if(er.length) stampCapsules(mask, S.iw, S.ih, er, 0);
   // 굵은 획의 띠도 가려진 자리를 판다. 면과 선이 따로 놀면 경계가 어긋난다.
-  if(blocked) for(let i=0; i<mask.length; i++) if(blocked[i]) mask[i] = 0;
+  if(blocked && !margin) for(let i=0; i<mask.length; i++) if(blocked[i]) mask[i] = 0;
   const ps = tonePasses(lineToneOf(reg), mask, reg, pen, M, opt, pitchPx, penPx, dens, budget);
+  if(ps && margin) for(const p of ps) p.paths = trimPolysByField(p.paths, margin, S.iw, S.ih);
   // 한도를 넘으면 톤은 포기하고 테두리만 남긴다. 굵은 선 하나 때문에 영역
   // 전체가 사라지는 것보다 낫다.
   if(ps) for(const p of ps)
@@ -2038,7 +2150,10 @@ function generate(){
     // 레이어의 알파가 곧 이 영역의 정확한 마스크다. 색 기반은 단독 PNG
     // 드롭용 폴백으로만 남는다.
     const em = effMasks.get(reg);
-    const mask = (em && em.mask) || reg.mask || buildMask(reg, 46);
+    // 톤은 파이지 않은 제 마스크로 만들고, 가려진 자리는 여유장으로 끊는다 --
+    // 픽셀 마스크로 자르면 틈 가장자리가 계단이 된다. 여유장이 없으면(가려질 것이 없음) 예전 그대로.
+    const margin = em ? em.margin : null;
+    const mask = margin ? (reg.mask || buildMask(reg, 46)) : ((em && em.mask) || reg.mask || buildMask(reg, 46));
     const blocked = em ? em.blocked : null;
     const dens = reg.dens/100;   // 100% 초과는 겹쳐 칠하기 -- 완전한 면
     // 간격은 종이에 남는 굵기로 잡는다. 닙 굵기로 잡으면 번진 만큼 겹쳐
@@ -2059,10 +2174,11 @@ function generate(){
     // 잡히고 선은 조용히 버려졌다 -- "라인이 안 뜬다"가 그것이다. 해칭 패스와
     // 별개의 패스로 함께 내보내면, 톤을 무엇으로 고르든 선은 남는다.
     if(S.keepLines || reg.type === 'keep')
-      passes.push(...linePasses(reg, pen, M, opt, pitchPx, penPx, dens, budget, blocked));
+      passes.push(...linePasses(reg, pen, M, opt, pitchPx, penPx, dens, budget, blocked, margin));
     if(reg.type !== 'keep'){
       const ps = tonePasses(reg.type, mask, reg, pen, M, opt, pitchPx, penPx, dens, budget);
       if(ps === null){ reg._stamp = null; continue; }
+      if(margin) for(const p of ps) p.paths = trimPolysByField(p.paths, margin, S.iw, S.ih);
       passes.push(...ps);
     }
 
