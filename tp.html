@@ -298,7 +298,7 @@
 <body>
 
 <header>
-  <div class="brand"><b>TONE PLOT</b><span>펜 플로터 해칭·스크린톤 작업대</span><span class="mono" style="font-size:10px; color:var(--cy); border:1px solid var(--line-2); border-radius:4px; padding:2px 6px; margin-left:4px">v9 · G펜 감압 · b132</span></div>
+  <div class="brand"><b>TONE PLOT</b><span>펜 플로터 해칭·스크린톤 작업대</span><span class="mono" style="font-size:10px; color:var(--cy); border:1px solid var(--line-2); border-radius:4px; padding:2px 6px; margin-left:4px">v9 · G펜 감압</span></div>
   <div class="seg">
     <button id="mHatch" class="on">해칭</button>
     <button id="mCal">캘리브레이션</button>
@@ -375,9 +375,9 @@
       <span class="unit">mm</span>
     </div>
     <div class="row">
-      <label class="lb" for="overlapGap">공통 틈</label>
+      <label class="lb" for="overlapGap">틈</label>
       <input type="number" id="overlapGap" value="0" min="-2" max="5" step="0.1"
-        title="모든 영역이 맞닿는 자리에 쓰는 공통 틈 (전체 조정). 겹치게 모드에서도 0이 아니면 영역 사이를 이만큼 벌립니다. 0이면 펜의 가장자리가 딱 맞닿습니다. 양수는 그만큼 더 벌리고, 음수는 아래 영역이 위 영역 안으로 그만큼 파고듭니다 — 경계에 남는 실낱 같은 흰 줄을 덮을 때 씁니다. 톤 패널의 '틈'으로 영역마다 따로 정할 수 있고, 이 값을 움직이면 개별 틈은 모두 이 값으로 돌아갑니다">
+        title="영역이 맞닿는 자리의 공통 틈. 0이면 펜의 가장자리가 딱 맞닿습니다. 양수는 그만큼 더 벌리고, 음수는 아래 영역이 위 영역 안으로 그만큼 파고듭니다 — 경계에 남는 실낱 같은 흰 줄을 덮을 때 씁니다. 톤 패널의 '틈'으로 영역마다 따로 정할 수 있고, 이 값을 움직이면 개별 틈은 모두 이 값으로 돌아갑니다">
       <span class="unit">mm</span>
     </div>
     <div class="row">
@@ -431,11 +431,11 @@
       <span class="val" id="regPenWVal"></span>
     </div>
     <div class="row" id="regGapRow">
-      <label class="lb" for="regGap">이 영역 틈</label>
+      <label class="lb" for="regGap">틈</label>
       <input id="regGap" type="range" min="-20" max="50" step="1" data-num-scale="0.1" data-num-unit="mm"
         title="이 영역만의 틈(−2~5mm) — 위 영역이 이 영역을 파낼 때 펜 가장자리에서 그만큼 더 벌림(양수) 또는 파고듦(음수). 펜 메뉴의 틈을 움직이면 모든 영역이 그 값으로 다시 맞춰집니다">
       <span class="val" id="regGapVal"></span>
-      <button id="regGapReset" class="ghost" style="padding:2px 6px; font-size:11px" title="이 영역의 틈을 지우고 펜 패널의 공통 틈을 따릅니다">공통값</button>
+      <button id="regGapReset" class="ghost" style="padding:2px 6px; font-size:11px" title="이 영역의 틈을 지우고 펜 메뉴의 공통 틈을 따릅니다">전역</button>
     </div>
     <div class="row" id="reachRow">
       <label class="lb" for="burstReach">중심 도달</label>
@@ -1716,150 +1716,6 @@ function erodeMask(src, W, H, r){
   return out;
 }
 
-/* 유클리드 거리장. 마스크 밖 각 점에서 마스크까지의 거리(px). 안쪽은 0.
-   네모 팽창은 대각선 방향 틈이 1.4배가 되어 테두리를 따라 틈이 들쭉날쭉했다 --
-   거리장이면 어느 방향이든 같은 거리에서 떨어진다. */
-function edtOutside(mask, W, H, cov){
-  // cov 가 있으면(덮임 - 0.5, 양수 = 덮임) 테두리 픽셀에 서브픽셀 씨앗을 준다:
-  // 반쯤 덮인 바깥 픽셀은 중심에서 (0.5 - 덮임) 만큼 떨어진 곳에 테두리가 있다.
-  // 그러면 등고선이 픽셀 격자가 아니라 원래 그림의 곡선을 따른다.
-  const INF = 1e12;
-  const f = new Float64Array(Math.max(W, H)), d = new Float64Array(Math.max(W, H));
-  const v = new Int32Array(Math.max(W, H)), z = new Float64Array(Math.max(W, H) + 1);
-  const g = new Float64Array(W*H);
-  const dt1 = (n) => {            // f → d (제곱거리), Felzenszwalb & Huttenlocher
-    let k = 0; v[0] = 0; z[0] = -INF; z[1] = INF;
-    for(let q = 1; q < n; q++){
-      let sx;
-      while(true){
-        const p = v[k];
-        sx = ((f[q] + q*q) - (f[p] + p*p)) / (2*q - 2*p);
-        if(sx <= z[k] && k > 0){ k--; } else break;
-      }
-      k++; v[k] = q; z[k] = sx; z[k+1] = INF;
-    }
-    k = 0;
-    for(let q = 0; q < n; q++){ while(z[k+1] < q) k++; const p = v[k]; d[q] = (q-p)*(q-p) + f[p]; }
-  };
-  for(let x = 0; x < W; x++){                    // 세로 방향
-    if(cov){
-      for(let y = 0; y < H; y++){
-        const a = cov[y*W + x] + 0.5;              // 0..1 덮임
-        f[y] = a >= 0.5 ? 0 : a <= 0.02 ? INF : (0.5 - a) * (0.5 - a);
-      }
-    } else {
-      for(let y = 0; y < H; y++) f[y] = mask[y*W + x] ? 0 : INF;
-    }
-    dt1(H);
-    for(let y = 0; y < H; y++) g[y*W + x] = d[y];
-  }
-  const out = new Float32Array(W*H);
-  for(let y = 0; y < H; y++){                    // 가로 방향
-    const o = y*W;
-    for(let x = 0; x < W; x++) f[x] = g[o + x];
-    dt1(W);
-    for(let x = 0; x < W; x++) out[o + x] = Math.sqrt(d[x]);
-  }
-  return out;
-}
-// 부호 있는 거리장: 마스크 밖은 +거리, 안은 -거리. 음수 틈(파고들기)에 쓴다.
-const sdfMemo = new WeakMap();
-// needInside 가 거짓이면 안쪽은 그냥 음수(-0.5)로 둔다 -- 파고들기(음수 틈)가 아니면 안쪽 거리는 쓸 일이 없고,
-// 거리장 하나가 통째로 절약된다.
-function sdfOf(mask, W, H, needInside, cov){
-  const memo = sdfMemo.get(mask);
-  if(memo && (memo.inside || !needInside)) return memo.f;
-  const outD = edtOutside(mask, W, H, cov);
-  const r = new Float32Array(W*H);
-  if(needInside){
-    const inv = new Uint8Array(W*H); for(let i = 0; i < W*H; i++) inv[i] = mask[i] ? 0 : 1;
-    const inD = edtOutside(inv, W, H);
-    for(let i = 0; i < W*H; i++) r[i] = mask[i] ? -inD[i] : outD[i];
-  } else {
-    for(let i = 0; i < W*H; i++) r[i] = mask[i] ? -0.5 : outD[i];
-  }
-  sdfMemo.set(mask, { f: r, inside: !!needInside });
-  return r;
-}
-/* 정밀 거리장: 테두리 주변(마스크 경계상자 + 틈)만 2배 해상도로 -- 덮임을 보간해 0.5 등고선을
-   2배 격자에 그리고 그 위에서 EDT 를 돈다. 양자화가 0.25px 로 줄어 틈 가장자리가 등거리에 가깝다.
-   상자 밖은 '멀다'(큰 양수). 음수 틈이면 안쪽 거리도 같이. */
-function maskBox(mask, W, H){
-  let x0 = W, y0 = H, x1 = -1, y1 = -1;
-  for(let y = 0; y < H; y++){ const o = y*W; for(let x = 0; x < W; x++) if(mask[o + x]){ if(x < x0) x0 = x; if(x > x1) x1 = x; if(y < y0) y0 = y; if(y > y1) y1 = y; } }
-  return x1 < 0 ? null : { x0, y0, x1, y1 };
-}
-function sdfFine(mask, cov, W, H, grow){
-  const out = new Float32Array(W*H).fill(1e6);
-  let x0 = W, y0 = H, x1 = -1, y1 = -1;
-  for(let y = 0; y < H; y++){ const o = y*W; for(let x = 0; x < W; x++) if(mask[o + x]){ if(x < x0) x0 = x; if(x > x1) x1 = x; if(y < y0) y0 = y; if(y > y1) y1 = y; } }
-  if(x1 < 0) return out;
-  // 상자 밖은 '멀다'로 두므로, 틈이 닿을 수 있는 만큼(펜 절반 + 5mm 쯤) 넉넉히 넓힌다
-  const pad = Math.ceil(Math.max(Math.abs(grow), (S.pen.widthMm/2 + 5.5) * (docMetrics().pxPerMm || 1))) + 3;
-  x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(W - 1, x1 + pad); y1 = Math.min(H - 1, y1 + pad);
-  const bw = x1 - x0 + 1, bh = y1 - y0 + 1, W2 = bw*2, H2 = bh*2;
-  const bin = new Uint8Array(W2*H2);
-  // 2배 격자 (i,j) 의 중심은 세계 좌표 (x0 + (i+0.5)/2, y0 + (j+0.5)/2)
-  for(let j = 0; j < H2; j++){
-    const sy = y0 + (j + 0.5)/2;
-    for(let i = 0; i < W2; i++){
-      const sx = x0 + (i + 0.5)/2;
-      if(sampleField(cov, W, H, sx, sy) >= 0) bin[j*W2 + i] = 1;
-    }
-  }
-  const outD = edtOutside(bin, W2, H2);
-  let inD = null;
-  if(grow < 0){ const inv = new Uint8Array(W2*H2); for(let i = 0; i < W2*H2; i++) inv[i] = bin[i] ? 0 : 1; inD = edtOutside(inv, W2, H2); }
-  const sd2 = new Float32Array(W2*H2);
-  for(let i = 0; i < W2*H2; i++) sd2[i] = bin[i] ? (inD ? -inD[i] : -0.5) : outD[i];
-  for(let y = y0; y <= y1; y++){
-    for(let x = x0; x <= x1; x++){
-      // 1배 픽셀 (x,y) 의 중심은 세계 (x+0.5, y+0.5) → 2배 격자 지수 i = (x+0.5-x0)*2 - 0.5 = 2(x-x0)+0.5
-      const v = bilinField(sd2, W2, H2, (x - x0)*2 + 0.5, (y - y0)*2 + 0.5) / 2;
-      out[y*W + x] = v;
-    }
-  }
-  return out;
-}
-// 거리장을 보간해 읽는다 (픽셀 사이도 부드럽게).
-// 픽셀 i 는 [i, i+1) 을 덮고 그 값은 중심 i+0.5 의 것이다 -- 선 좌표(캔버스 px)와 맞추려면 0.5 를 뺀다.
-// (이걸 안 맞추면 모든 끝이 대각선으로 0.7px 어긋난다)
-function sampleField(fld, W, H, x, y){ return bilinField(fld, W, H, x - 0.5, y - 0.5); }
-function bilinField(fld, W, H, x, y){
-  const cx = Math.min(W - 1.001, Math.max(0, x)), cy = Math.min(H - 1.001, Math.max(0, y));
-  const x0 = Math.floor(cx), y0 = Math.floor(cy), fx = cx - x0, fy = cy - y0;
-  const i = y0*W + x0;
-  const a = fld[i], b = fld[i+1], c = fld[i+W], d = fld[i+W+1];
-  return (a*(1-fx) + b*fx)*(1-fy) + (c*(1-fx) + d*fx)*fy;
-}
-/* 여유장(margin)에서 선을 끊는다. margin < 0 인 자리가 가려진 자리. 두 표본 사이에서
-   부호가 바뀌면 보간으로 정확히 0 이 되는 자리까지 그린다 -- 끝이 계단이 아니라 그림을 따른다. */
-function trimPolysByField(polys, margin, W, H){
-  if(!margin) return polys;
-  const m = (p) => sampleField(margin, W, H, p[0], p[1]);
-  const out = [];
-  for(const poly of polys){
-    if(poly.length === 1){ if(m(poly[0]) >= 0) out.push(poly); continue; }
-    const pts = densify(poly, 1);
-    let seg = [], prev = null, pm = 0;
-    for(const p of pts){
-      const v = m(p);
-      if(prev){
-        if(pm >= 0 && v < 0){                       // 들어간다: 경계까지 그리고 끊는다
-          const t = pm / (pm - v); seg.push([prev[0] + (p[0]-prev[0])*t, prev[1] + (p[1]-prev[1])*t]);
-          if(seg.length > 1) out.push(seg); seg = [];
-        } else if(pm < 0 && v >= 0){                // 나온다: 경계에서 새로 시작
-          const t = pm / (pm - v); seg = [[prev[0] + (p[0]-prev[0])*t, prev[1] + (p[1]-prev[1])*t]];
-        }
-      }
-      if(v >= 0) seg.push(p);
-      prev = p; pm = v;
-    }
-    if(seg.length > 1) out.push(seg);
-  }
-  return out;
-}
-
 function dilateMask(src, W, H, r){
   if(r <= 0) return src;
   const a = new Uint8Array(W*H), b = new Uint8Array(W*H);
@@ -1899,22 +1755,7 @@ function regOverlap(reg){
 function regGapMm(reg){
   return (reg.gap !== undefined && reg.gap !== null && reg.gap !== '' && isFinite(reg.gap)) ? +reg.gap : (S.overlapGap || 0);
 }
-// 거리장은 비싸다(영역·소스마다 두 번). 입력이 같으면 지난 결과를 그대로 쓴다 --
-// 톤 슬라이더를 끄는 동안 generate() 가 매 프레임 불리므로.
-let _omCache = null;
-const _maskIds = new WeakMap(); let _maskSeq = 0;
 function overlapMasks(penPx, gapPx, pxPerMm){
-  const key = S.regions.map(r => {
-    let id = r.mask ? _maskIds.get(r.mask) : 0;
-    if(r.mask && !id){ id = ++_maskSeq; _maskIds.set(r.mask, id); }
-    return id + ':' + (r.enabled ? 1 : 0) + ':' + (r.ovl || '') + ':' + (r.gap ?? '') + ':' + (r.name || '') + ':' + (r.folder || '');
-  }).join('|') + '#' + penPx + '#' + gapPx + '#' + pxPerMm + '#' + S.overlap + '#' + (S.overlapGap || 0) + '#' + S.iw + 'x' + S.ih;
-  if(_omCache && _omCache.key === key) return _omCache.out;
-  const out = overlapMasks0(penPx, gapPx, pxPerMm);
-  _omCache = { key, out };
-  return out;
-}
-function overlapMasks0(penPx, gapPx, pxPerMm){
   const W = S.iw, H = S.ih;
   const out = new Map();
   // 음수면 파고든다. 펜 절반을 빼고도 남는 만큼 위 영역 안으로 들어간다.
@@ -1922,60 +1763,25 @@ function overlapMasks0(penPx, gapPx, pxPerMm){
   const growOf = reg => Math.round(penPx/2 + (pxPerMm ? regGapMm(reg) * pxPerMm : (gapPx || 0)));
   // 위에서부터 내려오며 '파내는' 영역들의 합집합을 쌓는다. 투명·독립은
   // 합집합에 넣지 않고, 독립은 합집합에 파이지도 않는다.
-  // 세 가지 합집합을 위에서부터 쌓는다.
-  //  union      : '위'(파내는) 모드인 영역들 -- 전역 틈으로 아래를 파낸다
-  //  unionAll   : 독립이 아닌 위 영역 전부 -- 틈을 따로 정한 아래 영역이 쓴다
-  //  byGap      : 틈을 따로 정한 위 영역들을 틈 값별로 -- 겹침 모드와 무관하게 제 틈으로 아래를 파낸다
-  // 그래서 틈은 두 영역 중 어느 쪽에 걸어도 그 사이에 적용된다. 둘 다 정했으면 아래쪽 값.
-  // 영역마다 제 거리장을 한 번만 만들고(테두리 주변 2배 해상도), 아래 영역의 여유장은
-  // 위 영역들의 (거리 - 틈) 최솟값으로 쌓는다. 합집합을 키워 가며 거리장을 다시 도는 것보다
-  // 훨씬 싸다 -- 거리장은 작은 상자 안에서만 돌고, 합치기는 덧셈뿐이다.
-  const ownGap = reg => (reg.gap !== undefined && reg.gap !== null && reg.gap !== '' && isFinite(reg.gap));
-  const growMmF = mm => penPx/2 + (pxPerMm ? mm * pxPerMm : (gapPx || 0));          // 반올림 없이
-  const commonGrow = growMmF(S.overlapGap || 0);
-  const commonOn = S.overlap !== 'over' || Math.abs(S.overlapGap || 0) > 1e-9;       // 겹치게면 공통 틈이 0 아닐 때만
-  const needIn = (S.overlapGap || 0) < 0 || S.regions.some(r => ownGap(r) && +r.gap < 0);
-  const sdfR = reg => {
-    if(reg._sdf && reg._sdfFor === reg.mask && reg._sdfW === W && (reg._sdfIn || !needIn)) return reg._sdf;
-    const cov = reg.cov || null;
-    reg._sdf = cov ? sdfFine(reg.mask, cov, W, H, needIn ? -1 : 1) : sdfOf(reg.mask, W, H, needIn);
-    reg._sdfFor = reg.mask; reg._sdfW = W; reg._sdfIn = needIn;
-    reg._sdfBox = maskBox(reg.mask, W, H);
-    return reg._sdf;
-  };
-  const above = [];   // 위에서부터 내려오며 쌓은 { reg, mode }
+  const union = new Uint8Array(W*H);
+  let anyAbove = false;
   for(let i = S.regions.length - 1; i >= 0; i--){
     const reg = S.regions[i];
     const mode = regOverlap(reg);
-    if(!reg.mask){ out.set(reg, { mask: reg.mask, blocked: null, margin: null }); continue; }
-    let margin = null;
-    if(mode !== 'solo'){
-      for(const A of above){
-        // A 가 이 영역(B)을 얼마나 밀어내는가
-        let grow = null;
-        if(ownGap(reg)) grow = growMmF(regGapMm(reg));                       // B 의 틈이 먼저
-        else {
-          if(A.mode === 'over') grow = commonGrow;                                        // '위' 영역은 언제나 파낸다
-          else if(S.overlap === 'over' && commonOn) grow = commonGrow;                     // 겹치게 + 공통 틈 ≠ 0
-          if(ownGap(A.reg)){ const g = growMmF(+A.reg.gap); grow = (grow == null) ? g : Math.max(grow, g); }
-        }
-        if(grow == null) continue;
-        const sd = sdfR(A.reg), bx = A.reg._sdfBox;
-        if(!bx) continue;
-        const pad = Math.ceil(Math.abs(grow)) + 2;
-        const x0 = Math.max(0, bx.x0 - pad), x1 = Math.min(W - 1, bx.x1 + pad), y0 = Math.max(0, bx.y0 - pad), y1 = Math.min(H - 1, bx.y1 + pad);
-        if(!margin) margin = new Float32Array(W*H).fill(1e6);
-        for(let y = y0; y <= y1; y++){ const o = y*W; for(let x = x0; x <= x1; x++){ const v = sd[o + x] - grow; if(v < margin[o + x]) margin[o + x] = v; } }
-      }
-    }
-    if(!margin){ out.set(reg, { mask: reg.mask, blocked: null, margin: null }); }
+    if(!reg.mask){ out.set(reg, { mask: reg.mask, blocked: null }); continue; }
+    if(!anyAbove || mode === 'solo'){ out.set(reg, { mask: reg.mask, blocked: null }); }
     else {
-      const eff = new Uint8Array(W*H), blocked = new Uint8Array(W*H);
-      for(let k=0; k<W*H; k++){ if(margin[k] < 0) blocked[k] = 1; else if(reg.mask[k]) eff[k] = 1; }
-      out.set(reg, { mask: eff, blocked, margin });
+      const grow = growOf(reg);
+      const blocked = grow > 0 ? dilateMask(union, W, H, grow)
+                    : grow < 0 ? erodeMask(union, W, H, -grow)
+                    : union.slice();
+      const eff = new Uint8Array(W*H);
+      for(let k=0; k<W*H; k++) if(reg.mask[k] && !blocked[k]) eff[k] = 1;
+      out.set(reg, { mask: eff, blocked });
     }
-    if(!reg.enabled || mode === 'solo') continue;
-    above.push({ reg, mode });
+    if(mode !== 'over' || !reg.enabled) continue;   // 파내는 영역만 합집합에 쌓는다
+    for(let k=0; k<W*H; k++) if(reg.mask[k]) union[k] = 1;
+    anyAbove = true;
   }
   return out;
 }
@@ -2108,9 +1914,7 @@ function tonePasses(tt, mask, reg, pen, M, opt, pitchPx, penPx, dens, budget){
    뒤쪽이 PENCIL/SPRAY를 플로터로 옮기는 길이다. 뉴레이어에서 굵게 그은 스프레이
    획 하나가 여기서는 '망점으로 채운 띠'가 되고, 연필 획은 성긴 해칭 띠가 된다.
    질감은 화면의 픽셀 그대로가 아니라 플로터가 실제로 낼 수 있는 표식으로 옮겨진다. */
-function linePasses(reg, pen, M, opt, pitchPx, penPx, dens, budget, blocked, margin){
-  // 여유장이 있으면 그걸로 끊는다 (매끈). 없으면 예전 픽셀 마스크.
-  const cut = (paths) => margin ? trimPolysByField(paths, margin, S.iw, S.ih) : trimPolysByMask(paths, blocked, S.iw, S.ih);
+function linePasses(reg, pen, M, opt, pitchPx, penPx, dens, budget, blocked){
   const out = [];
   const lines = reg.lines || [];
   if(!lines.length) return out;
@@ -2127,7 +1931,7 @@ function linePasses(reg, pen, M, opt, pitchPx, penPx, dens, budget, blocked, mar
 
   if(!(S.thickFill && S.thickMode === 'tone' && thick.length)){
     for(const L of thick) thin.push(...thickLinePaths(L.p, L.w, penPx));
-    const paths = cut(trimPolys(thin, er));
+    const paths = trimPolysByMask(trimPolys(thin, er), blocked, S.iw, S.ih);
     if(paths.length) out.push({ suffix:'라인', paths });
     return out;
   }
@@ -2136,16 +1940,15 @@ function linePasses(reg, pen, M, opt, pitchPx, penPx, dens, budget, blocked, mar
     const o = thickLineOutline(L.p, L.w, penPx);
     if(o) thin.push(o);
   }
-  const paths = cut(trimPolys(thin, er));
+  const paths = trimPolysByMask(trimPolys(thin, er), blocked, S.iw, S.ih);
   if(paths.length) out.push({ suffix:'라인', paths });
 
   const mask = new Uint8Array(S.iw * S.ih);
   stampCapsules(mask, S.iw, S.ih, thick, 1);
   if(er.length) stampCapsules(mask, S.iw, S.ih, er, 0);
   // 굵은 획의 띠도 가려진 자리를 판다. 면과 선이 따로 놀면 경계가 어긋난다.
-  if(blocked && !margin) for(let i=0; i<mask.length; i++) if(blocked[i]) mask[i] = 0;
+  if(blocked) for(let i=0; i<mask.length; i++) if(blocked[i]) mask[i] = 0;
   const ps = tonePasses(lineToneOf(reg), mask, reg, pen, M, opt, pitchPx, penPx, dens, budget);
-  if(ps && margin) for(const p of ps) p.paths = trimPolysByField(p.paths, margin, S.iw, S.ih);
   // 한도를 넘으면 톤은 포기하고 테두리만 남긴다. 굵은 선 하나 때문에 영역
   // 전체가 사라지는 것보다 낫다.
   if(ps) for(const p of ps)
@@ -2208,18 +2011,8 @@ function generate(){
     // 레이어의 알파가 곧 이 영역의 정확한 마스크다. 색 기반은 단독 PNG
     // 드롭용 폴백으로만 남는다.
     const em = effMasks.get(reg);
-    // 톤은 파이지 않은 제 마스크로 만들고, 가려진 자리는 여유장으로 끊는다 --
-    // 픽셀 마스크로 자르면 틈 가장자리가 계단이 된다. 여유장이 없으면(가려질 것이 없음) 예전 그대로.
-    const margin = em ? em.margin : null;
-    let mask = margin ? (reg.mask || buildMask(reg, 46)) : ((em && em.mask) || reg.mask || buildMask(reg, 46));
+    const mask = (em && em.mask) || reg.mask || buildMask(reg, 46);
     const blocked = em ? em.blocked : null;
-    // 제 테두리도 매끈하게: 덮임 장이 있으면 마스크를 1px 넓혀 톤을 만들고, 0.5 등고선에서 정확히 끊는다.
-    // (마스크는 픽셀 칸이라 그 끝은 계단이다 -- 등고선은 원래 그림의 곡선을 따른다)
-    const own = (reg.cov && reg.mask) ? reg.cov : null;
-    if(own){
-      if(!reg._maskD1 || reg._maskD1For !== mask){ reg._maskD1 = dilateMask(mask, S.iw, S.ih, 1); reg._maskD1For = mask; }
-      mask = reg._maskD1;
-    }
     const dens = reg.dens/100;   // 100% 초과는 겹쳐 칠하기 -- 완전한 면
     // 간격은 종이에 남는 굵기로 잡는다. 닙 굵기로 잡으면 번진 만큼 겹쳐
     // 먹칠이 된다 -- 화면에서는 줄이 떨어져 보이는데도.
@@ -2239,12 +2032,10 @@ function generate(){
     // 잡히고 선은 조용히 버려졌다 -- "라인이 안 뜬다"가 그것이다. 해칭 패스와
     // 별개의 패스로 함께 내보내면, 톤을 무엇으로 고르든 선은 남는다.
     if(S.keepLines || reg.type === 'keep')
-      passes.push(...linePasses(reg, pen, M, opt, pitchPx, penPx, dens, budget, blocked, margin));
+      passes.push(...linePasses(reg, pen, M, opt, pitchPx, penPx, dens, budget, blocked));
     if(reg.type !== 'keep'){
       const ps = tonePasses(reg.type, mask, reg, pen, M, opt, pitchPx, penPx, dens, budget);
       if(ps === null){ reg._stamp = null; continue; }
-      if(own) for(const p of ps) p.paths = trimPolysByField(p.paths, own, S.iw, S.ih);
-      if(margin) for(const p of ps) p.paths = trimPolysByField(p.paths, margin, S.iw, S.ih);
       passes.push(...ps);
     }
 
@@ -2426,7 +2217,7 @@ function regionBBox(r){
 }
 // 처음 받은 자리. 옮기기는 언제나 여기서 다시 만든다.
 function regionOrig(r){
-  if(!r._orig) r._orig = { mask: r.mask, cov: r.cov, lines: r.lines, erasers: r.erasers, count: r.count };
+  if(!r._orig) r._orig = { mask: r.mask, lines: r.lines, erasers: r.erasers, count: r.count };
   return r._orig;
 }
 // 원본 기준 누적 오프셋으로 놓는다. (0,0) 이면 원본 그대로.
@@ -2437,10 +2228,9 @@ function setRegionShift(r, dx, dy){
   const o = regionOrig(r);
   const W = S.iw, H = S.ih;
   if(!dx && !dy){
-    r.mask = o.mask; r.cov = o.cov; r.lines = o.lines; r.erasers = o.erasers; r.count = o.count;
+    r.mask = o.mask; r.lines = o.lines; r.erasers = o.erasers; r.count = o.count;
   } else {
     const src = o.mask, dst = new Uint8Array(W*H);
-    const scov = o.cov, dcov = scov ? new Float32Array(W*H).fill(-0.5) : null;
     let n = 0;
     for(let y=0;y<H;y++){
       const sy = y - dy;
@@ -2449,10 +2239,9 @@ function setRegionShift(r, dx, dy){
         const sx = x - dx;
         if(sx < 0 || sx >= W) continue;
         if(src[sy*W+sx]){ dst[y*W+x] = 1; n++; }
-        if(dcov) dcov[y*W+x] = scov[sy*W+sx];
       }
     }
-    r.mask = dst; r.cov = dcov; r.count = n;
+    r.mask = dst; r.count = n;
     const shift = arr => arr.map(L => (L && L.p)
       ? { ...L, p: L.p.map(([x,y]) => [x+dx, y+dy]) }
       : L.map(([x,y]) => [x+dx, y+dy]));
@@ -3579,7 +3368,7 @@ function download(){
 /* ============================================================ IMAGE IN */
 
 function loadImage(img){
-  const MAXW = 1300;                       // working res (A4 세로 기준 한 칸 ≈ 0.16mm)
+  const MAXW = 900;                        // working res: plenty for a 0.1mm nib
   const sc = Math.min(1, MAXW / img.width);
   const w = Math.max(1, Math.round(img.width*sc)), h = Math.max(1, Math.round(img.height*sc));
   const c = document.createElement('canvas'); c.width = w; c.height = h;
@@ -3798,11 +3587,8 @@ function syncTone(){
     const own = (r.gap !== undefined && r.gap !== null && isFinite(r.gap));
     const g = own ? +r.gap : (S.overlapGap || 0);
     $('regGap').value = Math.round(g * 10);
-    $('regGapVal').textContent = (g >= 0 ? '+' : '') + g.toFixed(1) + 'mm' + (own ? '' : ' (공통값 따름)');
+    $('regGapVal').textContent = (g >= 0 ? '+' : '') + g.toFixed(1) + 'mm' + (own ? '' : ' (전역)');
     $('regGapReset').style.visibility = own ? '' : 'hidden';
-    $('regGap').title = (regOverlap(r) === 'thru' && !own)
-      ? '지금은 겹치게 그리는 중입니다. 이 슬라이더로 틈을 정하면 이 영역과 맞닿은 영역 사이에만 그 틈이 생깁니다 (전체는 펜 패널의 공통 틈)'
-      : '이 영역만의 틈(−2~5mm) — 이 영역과 이웃 영역이 맞닿는 자리에 펜 가장자리에서 그만큼 더 벌림(양수) 또는 파고듦(음수). 위·아래 어느 쪽에 걸어도 그 사이에 적용되고, 둘 다 정했으면 아래쪽 값. 펜 메뉴의 틈을 움직이면 모든 영역이 그 값으로 다시 맞춰집니다';
   }
   // 굵은 선 관련 줄은 실제로 굵은 획이 있을 때만 띄운다. 없는데 띄우면
   // 만져도 아무 일이 안 일어나는 컨트롤이 되고, 그건 고장과 구별되지 않는다.
@@ -4617,7 +4403,7 @@ $('overlapGap').onchange = e => {
   // 공통 틈을 만지는 것은 '다시 균일하게'라는 뜻이다 (선 두께와 같은 규칙). 몇 개가 지워졌는지 알려 준다.
   const had = S.regions.filter(r => r.gap !== undefined && r.gap !== null).length;
   S.regions.forEach(r => { if(r.gap !== undefined){ delete r.gap; } });
-  if(had && $('penNote')) $('penNote').textContent = '영역별 틈 ' + had + '개가 공통 틈(' + S.overlapGap.toFixed(1) + 'mm)으로 초기화되었습니다.';
+  if(had && $('penNote')) $('penNote').textContent = '개별 틈 ' + had + '개가 공통 틈(' + S.overlapGap.toFixed(1) + 'mm)으로 초기화되었습니다.';
   if(typeof syncTone === 'function') syncTone();
   S.regions.forEach(r => { r._stamp = null; });
   refresh();
@@ -4925,7 +4711,7 @@ function receiveLayers(d, done){
     const prev = S.regions.slice();
 
     // 작업 해상도로 축소 (loadImage와 동일한 규칙)
-    const MAXW = 1300;                     // 뉴레이어 1080 은 그대로, 큰 컴포지션은 1300 으로
+    const MAXW = 900;
     const sc = Math.min(1, MAXW / d.w);
     const w = Math.max(1, Math.round(d.w*sc)), h = Math.max(1, Math.round(d.h*sc));
     const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h;
@@ -4939,16 +4725,12 @@ function receiveLayers(d, done){
     const regs = [];
     for(let li = loaded.length-1; li >= 0; li--){
       tcx.clearRect(0,0,w,h);
-      // 부드럽게 줄인다 -- 알파가 곧 '얼마나 덮였나'가 되어, 톤 선 끝을 픽셀 칸이 아니라
-      // 0.5 등고선(진짜 테두리)에서 끊을 수 있다. 마스크 자체는 전처럼 0.5 문턱.
-      tcx.imageSmoothingEnabled = true; tcx.imageSmoothingQuality = 'high';
+      tcx.imageSmoothingEnabled = false;
       tcx.drawImage(loaded[li].im, 0, 0, w, h);
       const px = tcx.getImageData(0,0,w,h).data;
       const mask = new Uint8Array(w*h);
-      const cov = new Float32Array(w*h);
       let n = 0, ink = 0;
       for(let i=0, p=0; i<w*h; i++, p+=4){
-        cov[i] = px[p+3] / 255 - 0.5;            // 양수 = 덮임
         if(px[p+3] < 128) continue;
         ink++; mask[i] = 1; n++;
       }
@@ -4987,7 +4769,7 @@ function receiveLayers(d, done){
         rgb, hex:'#'+rgb.map(v=>v.toString(16).padStart(2,'0')).join(''),
         name: loaded[li].name,
         folder: loaded[li].folder,
-        mask, cov, lines, erasers, count:n, share:0,
+        mask, lines, erasers, count:n, share:0,
         dens: Math.max(8, Math.min(70, Math.round((1-lum)*80))),
         angle: 45,
         type: (lines.length && !loaded[li].hasFill) ? 'keep' : 'hatch',
