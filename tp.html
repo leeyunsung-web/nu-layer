@@ -298,7 +298,7 @@
 <body>
 
 <header>
-  <div class="brand"><b>TONE PLOT</b><span>펜 플로터 해칭·스크린톤 작업대</span><span class="mono" style="font-size:10px; color:var(--cy); border:1px solid var(--line-2); border-radius:4px; padding:2px 6px; margin-left:4px">v9 · G펜 감압 · b134</span></div>
+  <div class="brand"><b>TONE PLOT</b><span>펜 플로터 해칭·스크린톤 작업대</span><span class="mono" style="font-size:10px; color:var(--cy); border:1px solid var(--line-2); border-radius:4px; padding:2px 6px; margin-left:4px">v9 · G펜 감압 · b135</span></div>
   <div class="seg">
     <button id="mHatch" class="on">해칭</button>
     <button id="mCal">캘리브레이션</button>
@@ -1636,10 +1636,23 @@ function trimPolysByMask(polys, blocked, W, H){
       if(!hit(poly[0][0], poly[0][1])) out.push(poly);
       continue;
     }
-    let seg = [];
-    for(const p of densify(poly, 6)){
-      if(hit(p[0], p[1])){ if(seg.length > 1) out.push(seg); seg = []; }
-      else seg.push(p);
+    // 표본을 1px 마다 찍고, 가려진 자리로 들어가는 경계를 두 표본 사이에서 좁혀 끊는다 --
+    // 6px 간격으로 끊으면 끝이 6px 눈금에 떨어져 틈 가장자리가 들쭉날쭉(계단)했다.
+    // (선 레이어가 아래에 깔리는 컴포지션에서 바로 보였다)
+    const refine = (a, b) => {           // a 밖, b 안 → 경계 자리
+      let lo = a, hi = b;
+      for(let k = 0; k < 4; k++){ const m = [(lo[0]+hi[0])/2, (lo[1]+hi[1])/2]; if(hit(m[0], m[1])) hi = m; else lo = m; }
+      return lo;
+    };
+    let seg = [], prev = null, pin = false;
+    for(const p of densify(poly, 1)){
+      const h = hit(p[0], p[1]);
+      if(prev){
+        if(!pin && h){ seg.push(refine(prev, p)); if(seg.length > 1) out.push(seg); seg = []; }
+        else if(pin && !h){ seg = [refine(p, prev)]; }
+      }
+      if(!h) seg.push(p);
+      prev = p; pin = h;
     }
     if(seg.length > 1) out.push(seg);
   }
