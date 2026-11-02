@@ -971,7 +971,7 @@
     <div class="brand">
       <div>
         <h1>NU-LAYER</h1>
-        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b139</span></p>
+        <p>Drawing becomes specimen, specimens compose multiple layers <span id="buildTag" title="Build tag — tells you which file you are looking at">b140</span></p>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -15357,6 +15357,23 @@ showLayerMenu(ev.clientX, ev.clientY, [
     }
     // 잉크가 하나도 없는 레이어는 톤 창에서 빈 영역이 되므로 버린다.
     endAll();
+    // 마스크 레이어: 저장할 때 적어 둔 (meta.layers[].cl ↔ 획의 mk) 로 모양 밖을 잘라 낸다 --
+    // 안 자르면 마스크 밖에 그린 것이 톤 창·컴포지션에 '안 그린 것'으로 나타난다.
+    try {
+      const meta = recipe.find(x => x && x.type === 'meta');
+      if(meta && Array.isArray(meta.layers)){
+        for(const ml of meta.layers){
+          if(ml.cl == null || !doneL.has(ml.li || 0)) continue;
+          const mk = recipe.find(x => x && x.type === 'stroke' && x.mk === ml.cl && x.points && x.points.length >= 3);
+          if(!mk) continue;
+          const c = ensure(ml.li || 0);
+          c.save(); c.globalCompositeOperation = 'destination-in';
+          c.beginPath(); c.moveTo(mk.points[0].x, mk.points[0].y);
+          for(let i = 1; i < mk.points.length; i++) c.lineTo(mk.points[i].x, mk.points[i].y);
+          c.closePath(); c.fillStyle = '#000'; c.fill(); c.restore();
+        }
+      }
+    } catch(err){ console.warn('mask clip on recipe replay failed', err); }
     // 무엇이 그려졌는지는 이미 안다. getBBox 로 레이어마다 전체 픽셀을
     // 다시 읽을 이유가 없다 -- 804×862 를 다섯 번이면 350만 화소다.
     const out = [];
@@ -19109,6 +19126,13 @@ showLayerMenu(ev.clientX, ev.clientY, [
       ctx2.save();
       ctx2.beginPath(); ctx2.rect(fr.x, fr.y, fr.w, fr.h); ctx2.clip();
       ctx2.translate(it.x, it.y); ctx2.rotate(it.angle); ctx2.scale(kx, ky); ctx2.translate(-obj.w/2, -obj.h/2);
+      // 마스크 레이어면 그 모양 안에서만 (레시피 meta.cl ↔ 획 mk)
+      try {
+        const meta = rec.find(x => x && x.type === 'meta');
+        const ml = meta && Array.isArray(meta.layers) ? meta.layers.find(x => x && (x.li || 0) === li && x.cl != null) : null;
+        const mk = ml ? rec.find(x => x && x.type === 'stroke' && x.mk === ml.cl && x.points && x.points.length >= 3) : null;
+        if(mk){ ctx2.beginPath(); ctx2.moveTo(mk.points[0].x, mk.points[0].y); for(let i = 1; i < mk.points.length; i++) ctx2.lineTo(mk.points[i].x, mk.points[i].y); ctx2.closePath(); ctx2.clip(); }
+      } catch(err){}
       for(const a of rec){
         if((a.li || 0) !== li) continue;
         try {
@@ -19193,7 +19217,7 @@ showLayerMenu(ev.clientX, ev.clientY, [
           g.layers.set(sl.li, L);
         }
         place(L.ctx, sl.canvas, it);
-        if(recV) placeVectors(L.ctx, recV, sl.li, it, obj);
+        if(recV && !offLis.has(sl.li)) placeVectors(L.ctx, recV, sl.li, it, obj);
       }
       g.n++;
 
@@ -19372,7 +19396,13 @@ showLayerMenu(ev.clientX, ev.clientY, [
         if(!l.visible) continue;
         if(l.isTone) continue;                     // 톤 레이어를 다시 톤 뜨지 않는다
         if(!getBBox(l.canvas)) continue;           // 빈 레이어는 보내지 않는다
-        payload.push({ name: l.name, png: l.canvas.toDataURL('image/png'),
+        // 마스크 레이어는 모양 밖이 잘린 채로 보낸다 (레이어 비트맵 자체는 잘려 있지 않다)
+        let pngCanvas = l.canvas;
+        if(typeof layerClipStroke === 'function' && layerClipStroke(l)){
+          pngCanvas = document.createElement('canvas'); pngCanvas.width = l.canvas.width; pngCanvas.height = l.canvas.height;
+          drawLayerImage(pngCanvas.getContext('2d'), l);
+        }
+        payload.push({ name: l.name, png: pngCanvas.toDataURL('image/png'),
                        lines: l.asFill ? [] : (lineMap.get(l.id) || []),
                        hasFill: fillSet.has(l.id) || !!l.asFill });
       }
