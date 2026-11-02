@@ -298,7 +298,7 @@
 <body>
 
 <header>
-  <div class="brand"><b>TONE PLOT</b><span>펜 플로터 해칭·스크린톤 작업대</span><span class="mono" style="font-size:10px; color:var(--cy); border:1px solid var(--line-2); border-radius:4px; padding:2px 6px; margin-left:4px">v9 · G펜 감압 · b135</span></div>
+  <div class="brand"><b>TONE PLOT</b><span>펜 플로터 해칭·스크린톤 작업대</span><span class="mono" style="font-size:10px; color:var(--cy); border:1px solid var(--line-2); border-radius:4px; padding:2px 6px; margin-left:4px">v9 · G펜 감압 · b137</span></div>
   <div class="seg">
     <button id="mHatch" class="on">해칭</button>
     <button id="mCal">캘리브레이션</button>
@@ -4523,6 +4523,12 @@ function adoptToneSettings(prev){
       if(same.length === 1) best = same[0];
     }
     if(!best && mem[key]) best = mem[key];
+    // 컴포지션(폴더 / 이름) ↔ 드로잉(이름) 사이에서도 설정이 이어지게: 이름만으로 한 번 더
+    if(!best && r.folder && r.name && mem[r.name]) best = mem[r.name];
+    if(!best && !r.folder && r.name){
+      const k2 = Object.keys(mem).find(k => k.endsWith(' / ' + r.name));
+      if(k2) best = mem[k2];
+    }
     if(!best && !r.name){
       let bd = 40*40;
       for(const o of prev){
@@ -4762,7 +4768,9 @@ function receiveLayers(d, done){
     // 정해진다 -- 펜 굵기에 따라 파내는 폭이 달라지므로 여기서 굳히면 안 된다.
     // 기본값만 원본 종류로 정한다: 드로잉 레이어는 서로 가리는 관계라 겹치지
     // 않게, 컴포지션은 요소들이 얹힌 컷아웃이라 겹치게 두는 편이 자연스럽다.
-    if(S.overlapAuto) S.overlap = (d.source === 'composition') ? 'over' : 'none';
+    // 드로잉이든 컴포지션이든 같은 그림은 같게 나와야 한다 -- 둘 다 '겹치지 않게'.
+    // (컴포지션만 '겹치게'로 두던 규칙 때문에 같은 오브젝트가 다르게 보였다.)
+    if(S.overlapAuto) S.overlap = 'none';
     const regs = [];
     for(let li = loaded.length-1; li >= 0; li--){
       tcx.clearRect(0,0,w,h);
