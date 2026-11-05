@@ -3905,18 +3905,24 @@ const PRESETS=[
 {name:'띠 3컷 · 사선',W:240,H:80,skR:16,lines:[{c:0,off:-55,ang:68},{c:1,off:-30,ang:76}],parts:[['navel',-15],['eye',-10],['clav',8]]},
 {name:'큰 칸 + 쪼갠 2컷 (사선)',W:222,H:130,skR:10,lines:[{c:0,off:45,ang:78},{c:1,off:0,ang:-18}],parts:[['mouth',-15],['spine',10],['backhair',6]]},
 {name:'세로 기둥 3컷 · 계단',W:96,H:250,skR:12,lines:[{c:0,off:-35,ang:-14},{c:1,off:15,ang:16}],parts:[['topcut',-8],['breast',10],['basecut',14]]},
-{name:'정사각 · 4컷 엇갈림',W:170,H:170,skR:12,lines:[{c:0,off:6,ang:-9},{c:0,off:-8,ang:80},{c:1,off:10,ang:72}],parts:[['eye',-12],['nape',10],['waist',-10],['curl',14]]}];
+{name:'정사각 · 4컷 엇갈림',W:170,H:170,skR:12,lines:[{c:0,off:6,ang:-9},{c:0,off:-8,ang:80},{c:1,off:10,ang:72}],parts:[['eye',-12],['nape',10],['waist',-10],['curl',14]]},
+{name:'★ 최종 · 눈과 입 (머리 단면 사선)',W:222,H:80,skR:15.0588,lines:[{c:0,off:-27.4483,ang:-20.5185}],parts:[['mouth',-19],['eye',0]],
+  cams:{torso:[{pos:[0.180549,0.4079,0.496736],tgt:[-0.0548,0.4079,0.0891],roll:-19,wpu:0.000579721,pp:[39.7585,14.8811]},{pos:[0.613664,0.324685,1.85424],tgt:[0.045465,0.442742,0.076271],roll:0,wpu:0.001152356,pp:[131,42.5]}]}}];
+const FINAL_PRESET=PRESETS.length-1;
 
 function panelFor(model,key,roll){const P=MODELS[model].parts[key];return{part:key,t:null,az:P[2],el:P[3],d:P[4],roll,sx:0,sy:0}}
+function presetCam(model,pi,i){const p=PRESETS[pi];return p.cams&&p.cams[model]&&p.cams[model][i]?JSON.parse(JSON.stringify(p.cams[model][i])):null}
 function mkState(model,pi){const p=PRESETS[pi];const cyc=MODELS[model].cycle;
   return{W:p.W,H:p.H,skR:p.skR,gap:3.4,lines:p.lines.map(l=>({off:l.off,ang:l.ang})),
-    panels:p.parts.map(([k,roll],i)=>panelFor(model,cyc?cyc[i%cyc.length]:k,roll))}}
-const mkModelState=m=>({preset:0,st:PRESETS.map((_,i)=>mkState(m,i))});
+    panels:p.parts.map(([k,roll],i)=>{const c=presetCam(model,pi,i);const P=panelFor(model,c?k:(cyc?cyc[i%cyc.length]:k),roll);if(c)P.cam=c;return P})}}
+const mkModelState=m=>({preset:m==='torso'?FINAL_PRESET:0,st:PRESETS.map((_,i)=>mkState(m,i))});
 const DEF=()=>({model:'torso',tab:'model',view:'2d',style:'toon',lens:3,line:1,sel:0,pageCm:40,depthCm:0,spread:0,
-  models:{torso:mkModelState('torso'),medusa:mkModelState('medusa')},saved:[],align:{torso:null,medusa:null},rememberOrig:true});
+  models:{torso:mkModelState('torso'),medusa:mkModelState('medusa')},saved:[],align:{torso:null,medusa:null},rememberOrig:true,finalSeen:true});
 let G=DEF();
 try{const v=JSON.parse(localStorage.getItem('mangaCut1')||'null');
-  if(v&&v.models&&v.models.torso&&v.models.torso.st&&v.models.torso.st.length===PRESETS.length&&v.models.medusa&&v.models.medusa.st.length===PRESETS.length){G={...G,...v}}}catch(e){}
+  if(v&&v.models&&v.models.torso&&v.models.torso.st&&v.models.medusa&&v.models.medusa.st&&v.models.torso.st.length<=PRESETS.length&&v.models.medusa.st.length<=PRESETS.length){
+    ['torso','medusa'].forEach(m=>{while(v.models[m].st.length<PRESETS.length)v.models[m].st.push(mkState(m,v.models[m].st.length))});
+    if(!v.finalSeen){v.models.torso.preset=FINAL_PRESET;v.finalSeen=true}G={...G,...v}}}catch(e){}
 G.view='2d';
 const save=()=>{try{localStorage.setItem('mangaCut1',JSON.stringify(G))}catch(e){}};
 const MS=()=>G.models[G.model];
@@ -3965,15 +3971,19 @@ function setActiveGeo(){const a=ST.orig.raw?ST.orig:ST.ref;ST.active=a;
 function setStyle(){const t=G.style==='toon';if(mesh2)mesh2.material=t?toonM:shadeM;if(hull2)hull2.visible=t;hemi.intensity=t?1.2:0.8;key.intensity=t?2:2.8;
   const h=ST.ref.box?ST.ref.box.max.y-ST.ref.box.min.y:0.5;hullU.value=G.line*0.0032*h}
 const scaleD=d=>d*Math.tan(15*Math.PI/180)/Math.tan(G.lens*Math.PI/360);
-function setCam(Pn,q,x0,y0,w,h){const t=new THREE.Vector3(...targetOf(Pn));const ma=Pn.az*Math.PI/180,el=Pn.el*Math.PI/180;const D=scaleD(Pn.d);
+let curL={K:1,M:0};
+function setCam(Pn,q,x0,y0,w,h){if(Pn.cam){const C=Pn.cam;const t=new THREE.Vector3(...C.tgt);cam.clearViewOffset();cam.position.set(...C.pos);cam.up.set(0,1,0);cam.lookAt(t);if(C.roll)cam.rotateZ(C.roll*Math.PI/180);const D=cam.position.distanceTo(t);
+    const fov=2*Math.atan((h/curL.K)*C.wpu/2/D)*180/Math.PI;cam.fov=fov;cam.near=Math.max(0.001,D*0.05);cam.far=D*20+5;cam.aspect=w/h;const ppx=C.pp[0]*curL.K+curL.M,ppy=C.pp[1]*curL.K+curL.M;const offX=x0+w/2-ppx,offY=y0+h/2-ppy;
+    cam.setViewOffset(w,h,offX,offY,w,h);cam.updateProjectionMatrix();cam.updateMatrixWorld();const kl=new THREE.Vector3(-0.6,0.8,0.4).applyQuaternion(cam.quaternion);key.position.copy(t).add(kl);key.target.position.copy(t);return{D,offX,offY,t,fov}}
+  const t=new THREE.Vector3(...targetOf(Pn));const ma=Pn.az*Math.PI/180,el=Pn.el*Math.PI/180;const D=scaleD(Pn.d);
   cam.clearViewOffset();cam.position.set(t.x+Math.sin(ma)*Math.cos(el)*D,t.y+Math.sin(el)*D,t.z+Math.cos(ma)*Math.cos(el)*D);cam.up.set(0,1,0);cam.lookAt(t);cam.rotateZ(Pn.roll*Math.PI/180);
   cam.fov=G.lens;cam.near=Math.max(0.001,D*0.05);cam.far=D*20+5;cam.aspect=w/h;
   const c=cen(q);const offX=-((c[0]-x0)/w-0.5)*w+Pn.sx*w,offY=-((c[1]-y0)/h-0.5)*h+Pn.sy*h;cam.setViewOffset(w,h,offX,offY,w,h);cam.updateProjectionMatrix();cam.updateMatrixWorld();
-  const kl=new THREE.Vector3(-0.6,0.8,0.4).applyQuaternion(cam.quaternion);key.position.copy(t).add(kl);key.target.position.copy(t);return{D,offX,offY,t}}
+  const kl=new THREE.Vector3(-0.6,0.8,0.4).applyQuaternion(cam.quaternion);key.position.copy(t).add(kl);key.target.position.copy(t);return{D,offX,offY,t,fov:G.lens}}
 
 // ---------- 2D page ----------
 const cv2=$('cv2'),o2=cv2.getContext('2d');let lastQs=[],lastK=1;
-function renderPage(canvas,CW,labels){const S=cur();const L=layout(CW);const cs=cells();const ctx=canvas.getContext('2d');
+function renderPage(canvas,CW,labels){const S=cur();const L=layout(CW);curL=L;const cs=cells();const ctx=canvas.getContext('2d');
   canvas.width=CW;canvas.height=Math.round((S.H+16)*L.K);ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);const lw=1.5*L.K;const qs=[];
   cs.forEach((p,i)=>{const Pn=S.panels[i];const q=L.toPx(inset(p,S.gap));qs.push(q);if(!Pn||!mesh2)return;const [x0,y0,w,h]=bbox(q);setCam(Pn,q,x0,y0,w,h);r2.setSize(w,h,false);r2.render(sc2,cam);
     ctx.save();ctx.beginPath();q.forEach((v,j)=>j?ctx.lineTo(v[0],v[1]):ctx.moveTo(v[0],v[1]));ctx.closePath();ctx.clip();ctx.drawImage(r2.domElement,x0,y0);ctx.restore();
@@ -3981,7 +3991,7 @@ function renderPage(canvas,CW,labels){const S=cur();const L=layout(CW);const cs=
     if(labels){const c=cen(q);ctx.font='600 '+Math.round(4.2*L.K)+'px ui-monospace,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
       ctx.fillStyle=i===G.sel?'rgba(216,90,48,0.92)':'rgba(255,255,255,0.75)';ctx.beginPath();ctx.arc(c[0],c[1],3.6*L.K,0,Math.PI*2);ctx.fill();ctx.fillStyle=i===G.sel?'#fff':'#111';ctx.fillText(String(i+1),c[0],c[1]+0.3*L.K)}});
   return{qs,K:L.K,nCells:cs.length}}
-function draw2d(){const r=renderPage(cv2,Math.min(1600,Math.max(900,Math.round(cv2.clientWidth*(devicePixelRatio||1)))),true);lastQs=r.qs;lastK=r.K;
+let lastL={K:1,M:0};function draw2d(){const r=renderPage(cv2,Math.min(1600,Math.max(900,Math.round(cv2.clientWidth*(devicePixelRatio||1)))),true);lastQs=r.qs;lastK=r.K;lastL={...curL};
   const S=cur();if(S.panels.length!==r.nCells)status('칸 수가 바뀌었어요 — 선을 조금 되돌려 주세요.',true)}
 
 // ---------- 3D preview ----------
@@ -3991,10 +4001,10 @@ const sc3=new THREE.Scene();sc3.background=new THREE.Color('#e8e7e3');sc3.add(ne
 const vcam=new THREE.PerspectiveCamera(30,1,0.1,50000);const ctrl=new OrbitControls(vcam,cv3);ctrl.enableDamping=true;ctrl.autoRotate=true;ctrl.autoRotateSpeed=1.4;
 const root=new THREE.Group();sc3.add(root);let caps=[],fitted=false,box3=new THREE.Box3();
 const white=()=>new THREE.MeshStandardMaterial({color:0xf3f2ee,roughness:0.6,metalness:0});
-function pieceDefs(CW){const S=cur();const Ly=layout(CW);const cs=cells();const out=[];const center=[S.W/2,S.H/2];const a=ST.active;if(!a)return out;
+function pieceDefs(CW){const S=cur();const Ly=layout(CW);curL=Ly;const cs=cells();const out=[];const center=[S.W/2,S.H/2];const a=ST.active;if(!a)return out;
   cs.forEach((p,pi)=>{const Pn=S.panels[pi];if(!Pn)return;const q=Ly.toPx(inset(p,S.gap));const [x0,y0,w,h]=bbox(q);const R=setCam(Pn,q,x0,y0,w,h);const c=cam.clone();c.updateMatrixWorld();
     const ndc=pt=>new THREE.Vector3((pt[0]-x0)/w*2-1,1-(pt[1]-y0)/h*2,0.5).unproject(c);const C=ndc(cen(q));const O=c.position.clone();
-    const wpp=2*R.D*Math.tan(G.lens*Math.PI/360)/h;const s=1/(wpp*Ly.K);const pcx=x0+w/2-R.offX,pcy=y0+h/2-R.offY;
+    const wpp=2*R.D*Math.tan(R.fov*Math.PI/360)/h;const s=1/(wpp*Ly.K);const pcx=x0+w/2-R.offX,pcy=y0+h/2-R.offY;
     const pc=cen(p);const dv=[pc[0]-center[0],pc[1]-center[1]];const dl=Math.hypot(...dv)||1;
     const Lm=(sp)=>new THREE.Matrix4().makeTranslation((pcx-Ly.M)/Ly.K+dv[0]/dl*sp,-(pcy-Ly.M)/Ly.K-dv[1]/dl*sp,R.D*s).multiply(new THREE.Matrix4().makeScale(s,s,s)).multiply(c.matrixWorldInverse);
     const pw=[];for(let i=0;i<q.length;i++){const pl=new THREE.Plane().setFromCoplanarPoints(O,ndc(q[i]),ndc(q[(i+1)%q.length]));if(pl.distanceToPoint(C)<0)pl.negate();pw.push(pl)}
@@ -4181,10 +4191,13 @@ function buildUI(){ctl.innerHTML='';const S=cur(),P=preset();
   if(G.tab==='scene'){const sel=Math.min(G.sel,S.panels.length-1);G.sel=sel;const Pn=S.panels[sel];
     const s=sec(ctl,'칸 고르기','만화 컷 화면에서 칸을 눌러도 골라져요. 번호는 오른쪽 위부터 읽는 순서예요.');chips(s,S.panels.map((_,i)=>[i,(i+1)+'번 칸']),v=>v===sel,v=>{G.sel=v;save();buildUI();refresh()});
     const s2=sec(ctl,(sel+1)+'번 칸 장면');const opts=Object.entries(partsOf()).map(([k,v])=>[k,v[0]]);if(Pn.part==='custom')opts.unshift(['custom','직접 겨냥한 곳']);
+    if(Pn.cam){const h=document.createElement('p');h.className='hint';h.innerHTML='이 칸은 <b>저장된 최종 앵글</b>로 고정돼 있어요. 앵글을 바꾸려면 아래에서 고정을 풀어 주세요.';s2.appendChild(h);
+      btn(s2,'고정 풀고 일반 앵글로 바꾸기',()=>{const k=Pn.part;delete Pn.cam;Object.assign(Pn,panelFor(G.model,partsOf()[k]?k:'front',Pn.roll));buildUI();refresh()},'wide');
+      const r0=document.createElement('div');r0.className='chips';s2.appendChild(r0);btn(r0,'최종 앵글로 되돌리기',()=>{const c=presetCam(G.model,MS().preset,sel);if(c){Pn.cam=c;buildUI();refresh()}},'ghost');return}
     selectRow(s2,'부위',opts,Pn.part,v=>{if(v==='custom')return;Object.assign(Pn,panelFor(G.model,v,Pn.roll));buildUI();refresh()});
     const ab=btn(s2,aimMode?'겨냥 중 — 만화 컷에서 원하는 곳을 누르세요':'화면을 눌러 겨냥점 정하기',()=>{aimMode=!aimMode;buildUI();status(aimMode?'만화 컷 화면에서 이 칸 안의 원하는 곳을 누르면 그 지점을 중심으로 잡아요.':'겨냥을 취소했어요.')},aimMode?'on wide':'wide');
     slider(s2,'도는 각도',()=>Pn.az,v=>Pn.az=v,-180,360,1,'°');slider(s2,'위아래 각도',()=>Pn.el,v=>Pn.el=v,-85,85,1,'°');slider(s2,'거리(크기)',()=>Pn.d,v=>Pn.d=v,0.01,1,0.005);slider(s2,'기울기',()=>Pn.roll,v=>Pn.roll=v,-90,90,1,'°');slider(s2,'좌우 이동',()=>Pn.sx,v=>Pn.sx=v,-0.7,0.7,0.01);slider(s2,'위아래 이동',()=>Pn.sy,v=>Pn.sy=v,-0.7,0.7,0.01);
-    const r=document.createElement('div');r.className='chips';s2.appendChild(r);btn(r,'이 칸 장면 처음으로',()=>{const pk=PRESETS[MS().preset].parts[sel];const cyc=MODELS[G.model].cycle;Object.assign(Pn,panelFor(G.model,cyc?cyc[sel%cyc.length]:(pk?pk[0]:'front'),pk?pk[1]:0));buildUI();refresh()},'ghost')}
+    const r=document.createElement('div');r.className='chips';s2.appendChild(r);btn(r,'이 칸 장면 처음으로',()=>{const pk=PRESETS[MS().preset].parts[sel];const cyc=MODELS[G.model].cycle;const c=presetCam(G.model,MS().preset,sel);Object.assign(Pn,panelFor(G.model,c?pk[0]:(cyc?cyc[sel%cyc.length]:(pk?pk[0]:'front')),pk?pk[1]:0));if(c)Pn.cam=c;buildUI();refresh()},'ghost')}
   if(G.tab==='style'){const s=sec(ctl,'스타일');chips(s,[['toon','만화 펜선'],['shade','조각 음영']],v=>G.style===v,v=>{G.style=v;setStyle();save();buildUI();refresh()});
     slider(s,'펜선 굵기',()=>G.line,v=>{G.line=v;setStyle()},0,3,0.05);slider(s,'화각 (작을수록 정사법)',()=>G.lens,v=>G.lens=v,2,30,0.5,'°');
     const s2=sec(ctl,'페이지 그림 저장','지금 페이지를 큰 PNG로 저장해요.');const r=document.createElement('div');r.className='chips';s2.appendChild(r);[[3000,'3000px'],[5000,'5000px'],[8000,'8000px']].forEach(([w,l])=>btn(r,l,()=>exportPNG(w)))}
@@ -4217,8 +4230,8 @@ $('fitBtn').onclick=()=>{if(G.view==='3d'){ctrl.autoRotate=false;$('rotBtn').cla
 $('rotBtn').onclick=()=>{ctrl.autoRotate=!ctrl.autoRotate;$('rotBtn').classList.toggle('on',ctrl.autoRotate)};
 function exportPNG(w){const c=document.createElement('canvas');renderPage(c,w,false);c.toBlob(b=>download(b,`manga-cut_${G.model}_${w}px.png`),'image/png');refresh()}
 cv2.addEventListener('click',e=>{const r=cv2.getBoundingClientRect();const px=(e.clientX-r.left)*cv2.width/r.width,py=(e.clientY-r.top)*cv2.height/r.height;const i=lastQs.findIndex(q=>inPoly([px,py],q));if(i<0)return;
-  const S=cur();if(aimMode&&S.panels[i]&&mesh2){const q=lastQs[i];const [x0,y0,w,h]=bbox(q);setCam(S.panels[i],q,x0,y0,w,h);const rc=new THREE.Raycaster();rc.setFromCamera(new THREE.Vector2((px-x0)/w*2-1,1-(py-y0)/h*2),cam);const hit=rc.intersectObject(mesh2,false)[0];
-    if(hit){const Pn=S.panels[i];Pn.part='custom';Pn.t=hit.point.toArray().map(x=>+x.toFixed(5));Pn.sx=0;Pn.sy=0;aimMode=false;G.sel=i;save();buildUI();refresh();status('겨냥점을 정했어요. 이제 거리·각도로 다듬어 주세요.')}else status('조각 위를 눌러 주세요.',true);return}
+  const S=cur();if(aimMode&&S.panels[i]&&mesh2){curL=lastL;const q=lastQs[i];const [x0,y0,w,h]=bbox(q);setCam(S.panels[i],q,x0,y0,w,h);const rc=new THREE.Raycaster();rc.setFromCamera(new THREE.Vector2((px-x0)/w*2-1,1-(py-y0)/h*2),cam);const hit=rc.intersectObject(mesh2,false)[0];
+    if(hit){const Pn=S.panels[i];delete Pn.cam;Pn.part='custom';Pn.t=hit.point.toArray().map(x=>+x.toFixed(5));Pn.sx=0;Pn.sy=0;aimMode=false;G.sel=i;save();buildUI();refresh();status('겨냥점을 정했어요. 이제 거리·각도로 다듬어 주세요.')}else status('조각 위를 눌러 주세요.',true);return}
   G.sel=i;if(G.tab!=='scene'){G.tab='scene';buildTabs()}save();buildUI();refresh()});
 let pend=false;function refresh(){save();if(pend)return;pend=true;requestAnimationFrame(()=>{pend=false;if(!ST.active)return;if(G.view==='2d')draw2d();else build3d();updCutInfo()})}
 function refreshAll(){refresh()}
