@@ -992,6 +992,7 @@
       <button class="link-btn accent" id="nuVaryBtn" style="display:none; font-family:var(--font-mono); font-size:11px; padding:8px 12px; border-radius:8px; border:1px solid var(--ink); background:var(--ink); color:#fff; cursor:pointer; font-weight:600;" title="NU VARY 를 새 창으로 열고 고른 패스를 보냅니다 — 꼭지점과 선을 읽어 비슷하지만 다른 패턴을 계속 만듭니다. 고른 결과는 캔버스로 받거나 바로 아카이브에 등록할 수 있습니다">✦ NU VARY</button>
       <button class="link-btn accent" id="nuFlowBtn" style="display:none; font-family:var(--font-mono); font-size:11px; padding:8px 12px; border-radius:8px; border:1px solid var(--ink); background:var(--ink); color:#fff; cursor:pointer; font-weight:600;" title="NU FLOW 를 창 두 개로 엽니다 — 큰 이미지 화면과 조절 창 (nu-flow.html 이 같은 폴더에 있어야 합니다)">≋ NU FLOW</button>
       <button class="link-btn accent" id="sculptLineBtn" style="display:none; font-family:var(--font-mono); font-size:11px; padding:8px 12px; border-radius:8px; border:1px solid var(--ink); background:var(--ink); color:#fff; cursor:pointer; font-weight:600;" title="SCULPT LINE 을 새 창으로 엽니다 — 조각 3D 파일을 같은 굵기 펜의 망점 밀도로 명암을 낸 플로터용 SVG로 만듭니다 (sculpt-line.html 이 같은 폴더에 있어야 합니다)">◐ SCULPT LINE</button>
+      <button class="link-btn accent" id="mangaCutBtn" style="display:none; font-family:var(--font-mono); font-size:11px; padding:8px 12px; border-radius:8px; border:1px solid var(--ink); background:var(--ink); color:#fff; cursor:pointer; font-weight:600;" title="MANGA CUT 을 새 창으로 엽니다 — 만화 칸 구성으로 조각(토르소·메두사)을 잘라 만화 컷과 3D 조각으로 보고, 칸마다 STL 로 저장합니다 (manga-cut.html 과 models 폴더가 같은 곳에 있어야 합니다)">▦ MANGA CUT</button>
       <button class="link-btn accent" id="figureCreatorBtn" style="display:none; font-family:var(--font-mono); font-size:11px; padding:8px 12px; border-radius:8px; border:1px solid var(--ink); background:var(--ink); color:#fff; cursor:pointer; font-weight:600;" title="FIGURE CREATOR 를 새 창으로 엽니다 — 피규어 베이스 메쉬의 얼굴·머리·몸·팔다리 비율과 포즈를 슬라이더로 조절하고 STL 로 저장합니다 (figure-creator.html 이 같은 폴더에 있어야 합니다)">◍ FIGURE</button>
       <div class="role-chip" id="roleChip">
         <span class="role-badge" id="roleBadge">GUEST</span>
@@ -1712,7 +1713,7 @@
     if(sw) sw.textContent = isMaster ? '⇄ GUEST' : '⇄ MASTER';
     $('openMgrBtn').style.display = isMaster ? 'inline-flex' : 'none';
     // 창을 여는 도구들. 아카이브 매니저와 같은 성격이라 나란히 두고 함께 여닫는다.
-    for(const id of ['tonePlotBtn', 'sculptLineBtn', 'nuVaryBtn', 'nuFlowBtn', 'figureCreatorBtn']){
+    for(const id of ['tonePlotBtn', 'sculptLineBtn', 'nuVaryBtn', 'nuFlowBtn', 'figureCreatorBtn', 'mangaCutBtn']){
       const b = $(id);
       if(b) b.style.display = isMaster ? 'inline-flex' : 'none';
     }
@@ -5869,6 +5870,14 @@ showLayerMenu(ev.clientX, ev.clientY, [
     if(!fcWin) alert('팝업이 막혀 있습니다 — 이 사이트의 팝업을 허용해 주세요.');
   }
   $('figureCreatorBtn').addEventListener('click', openFigureCreator);
+
+  let mcWin = null;
+  function openMangaCut(){
+    if(mcWin && !mcWin.closed){ mcWin.focus(); return; }
+    mcWin = window.open('manga-cut.html', 'mangacut');
+    if(!mcWin) alert('팝업이 막혀 있습니다 — 이 사이트의 팝업을 허용해 주세요.');
+  }
+  $('mangaCutBtn').addEventListener('click', openMangaCut);
 
   let compSnapWired = false;
   function wireCompSnap(){
