@@ -3891,6 +3891,9 @@ const MODELS={
     parts:{eye:['눈 하나',[-0.035,0.19,0.0714],-10,0,0.06],eyes:['두 눈',[0,0.19,0.071],0,0,0.1],mouth:['입',[0,0.145,0.0748],0,0,0.06],cheek:['뺨·옆얼굴',[0.0436,0.16,0.0622],35,0,0.1],chinsnake:['턱 아래 뱀',[0.06,0.11,0.0505],20,0,0.1],forehead:['이마·앞머리',[0,0.23,0.0601],0,10,0.12],topspike:['머리 위 가시',[-0.04,0.285,-0.0461],0,20,0.12],wing:['날개',[0.11,0.17,-0.04],110,0,0.2],backhair:['뒷머리',[0,0.2,-0.0711],180,0,0.18],drips:['흘러내림',[0,0.05,0.03],20,0,0.14],base:['받침',[0,0.01,0.0564],15,15,0.2],face:['얼굴 전체',[0,0.17,0.075],0,0,0.2],front:['정면 전신',[0,0.15,0],0,0,0.45],side:['옆모습 전신',[0,0.15,0],90,0,0.45]},
     cycle:['eye','mouth','wing','chinsnake','backhair','topspike']}
 };
+const _md=MODELS.medusa;delete MODELS.medusa;
+MODELS.torsoJ={...MODELS.torso,ko:'토르소 조각 01 · 목과 몸을 붙인 버전',en:'Torso Sculpture 01 (neck and body joined)',file:'models/torso-sculpture-01-joined.glb',camsOf:'torso'};
+MODELS.medusa=_md;
 const PRESETS=[
 {name:'가로 직사각 · 2컷 세로로 나눔',W:220,H:90,skR:0,lines:[{c:0,off:-20,ang:90}],parts:[['mouth',0],['pelvis',0]]},
 {name:'가로 직사각 · 3컷 세로로 나눔',W:270,H:90,skR:0,lines:[{c:0,off:45,ang:90},{c:1,off:0,ang:90}],parts:[['eye',0],['clav',0],['navel',0]]},
@@ -3912,17 +3915,18 @@ const PRESETS=[
 const FINAL_PRESET=PRESETS.length-1;
 
 function panelFor(model,key,roll){const P=MODELS[model].parts[key];return{part:key,t:null,az:P[2],el:P[3],d:P[4],roll,sx:0,sy:0}}
-function presetCam(model,pi,i){const p=PRESETS[pi];return p.cams&&p.cams[model]&&p.cams[model][i]?JSON.parse(JSON.stringify(p.cams[model][i])):null}
+function presetCam(model,pi,i){const p=PRESETS[pi];const k=(MODELS[model]&&MODELS[model].camsOf)||model;return p.cams&&p.cams[k]&&p.cams[k][i]?JSON.parse(JSON.stringify(p.cams[k][i])):null}
 function mkState(model,pi){const p=PRESETS[pi];const cyc=MODELS[model].cycle;
   return{W:p.W,H:p.H,skR:p.skR,gap:3.4,lines:p.lines.map(l=>({off:l.off,ang:l.ang})),
     panels:p.parts.map(([k,roll],i)=>{const c=presetCam(model,pi,i);const P=panelFor(model,c?k:(cyc?cyc[i%cyc.length]:k),roll);if(c)P.cam=c;return P})}}
-const mkModelState=m=>({preset:m==='torso'?FINAL_PRESET:0,st:PRESETS.map((_,i)=>mkState(m,i))});
+const mkModelState=m=>({preset:(m==='torso'||m==='torsoJ')?FINAL_PRESET:0,st:PRESETS.map((_,i)=>mkState(m,i))});
 const DEF=()=>({model:'torso',tab:'model',view:'2d',style:'toon',lens:3,line:1,sel:0,pageCm:40,depthCm:0,spread:0,
-  models:{torso:mkModelState('torso'),medusa:mkModelState('medusa')},saved:[],align:{torso:null,medusa:null},rememberOrig:true,finalSeen:true});
+  models:{torso:mkModelState('torso'),torsoJ:mkModelState('torsoJ'),medusa:mkModelState('medusa')},saved:[],align:{torso:null,torsoJ:null,medusa:null},rememberOrig:true,finalSeen:true});
 let G=DEF();
 try{const v=JSON.parse(localStorage.getItem('mangaCut1')||'null');
   if(v&&v.models&&v.models.torso&&v.models.torso.st&&v.models.medusa&&v.models.medusa.st&&v.models.torso.st.length<=PRESETS.length&&v.models.medusa.st.length<=PRESETS.length){
-    ['torso','medusa'].forEach(m=>{while(v.models[m].st.length<PRESETS.length)v.models[m].st.push(mkState(m,v.models[m].st.length))});
+    if(!v.models.torsoJ||!v.models.torsoJ.st||v.models.torsoJ.st.length>PRESETS.length)v.models.torsoJ=mkModelState('torsoJ');v.align={torso:null,torsoJ:null,medusa:null,...(v.align||{})};
+    ['torso','torsoJ','medusa'].forEach(m=>{while(v.models[m].st.length<PRESETS.length)v.models[m].st.push(mkState(m,v.models[m].st.length))});
     if(!v.finalSeen){v.models.torso.preset=FINAL_PRESET;v.finalSeen=true}G={...G,...v}}}catch(e){}
 G.view='2d';
 const save=()=>{try{localStorage.setItem('mangaCut1',JSON.stringify(G))}catch(e){}};
@@ -4076,7 +4080,8 @@ function clipPlane(tris,pl,tol,gapMax){const nx=pl.normal.x,ny=pl.normal.y,nz=pl
   const grp=O.map((_,i)=>i);const find=i=>grp[i]===i?i:(grp[i]=find(grp[i]));
   for(let i=0;i<O.length;i++)for(let j=i+1;j<O.length;j++){if(find(i)===find(j))continue;if(cross(O[i].l,O[j].l,O[i].b,O[j].b))grp[find(i)]=find(j)}
   // assign each hole to the smallest outer containing it
-  const hOf=O.map(()=>[]);Hh.forEach(h=>{let best=-1;O.forEach((o,i)=>{if(o.a>h.a&&bov(o.b,h.b)&&pin(h.l[0],o.l)&&(best<0||o.a<O[best].a))best=i});if(best>=0)hOf[best].push(h)});
+  // a hole that lies inside two or more outers is covered by another overlapping solid (e.g. a filled joint), so it is not cut out
+  const hOf=O.map(()=>[]);Hh.forEach(h=>{let best=-1,cnt=0;O.forEach((o,i)=>{if(o.a>h.a&&bov(o.b,h.b)&&pin(h.l[0],o.l)){cnt++;if(best<0||o.a<O[best].a)best=i}});if(best>=0&&cnt<2)hOf[best].push(h)});
   const groups=new Map();O.forEach((o,i)=>{const r=find(i);(groups.get(r)||groups.set(r,[]).get(r)).push(i)});
   for(const idx of groups.values()){
     if(idx.length===1){const i=idx[0];emit(O[i].l,hOf[i].map(h=>h.l));continue}
