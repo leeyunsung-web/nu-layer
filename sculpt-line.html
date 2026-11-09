@@ -6868,7 +6868,7 @@ const DEF={upAxis:'Y',target:'600000',fov:20,
   lightAz:-45,lightEl:35,wrap:.4,fill:.3,midtone:0,dark:0,floor:.05,
   curv:.7,cavity:.5,local:.5,res:'2048',
   method:'스크린톤',cell:4,spacing:1.05,angle:45,
-  penCount:'1',pen1:.3,pen2:.6,pen3:1,cap1:.55,cap2:.8,penColors:true,dotTime:.25,travel:60,layerMinute:3,engMode:'끄기',engAngle:0,engBend:.5,engSpacing:1,engPen:.3,engMaxW:3,engCurve:1,engCut:.06,engCross:false,engCrossT:.72,engWidth:'한 줄만',engDense:'2',cmdSafe:true,
+  penCount:'1',pen1:.3,pen2:.6,pen3:1,cap1:.55,cap2:.8,penColors:true,dotTime:.25,travel:60,layerMinute:3,engMode:'끄기',engAngle:0,engBend:.5,engSpacing:1,engPen:.3,engMaxW:3,engCurve:1,engCut:.06,engCross:false,engCrossT:.72,engWidth:'한 줄만',engDense:'2',solidOn:false,solidT:.92,solidMin:4,solidGap:.4,solidPen:.3,cmdSafe:true,
   paper:'A4',paperW:210,paperH:297,orient:'세로',margin:20,drawScale:1,posX:0,posY:0,frame:'없음',frameGap:5,frameLines:1,frameStep:1.5,framePen:.3,jpgDpi:'300',
   lineOuter:false,lineInner:false,lineCrease:false,creaseAngle:40,lineSlice:false,sliceCount:30,sliceAxis:'높이',linePen:.3,lineMin:2,lineSmooth:2,innerJump:.05,
   cutW:.6,cutH:.8,cutX:0,cutY:0,cutRot:0,c0x:0,c0y:0,c1x:0,c1y:0,c2x:0,c2y:0,c3x:0,c3y:0,cutNear:0,cutFar:0,cutSrc:'원본 해상도',randMode:'칸 하나',randPanels:5,randSlant:8,randGutter:.02,randSnap:true,cutSeed:1,mergeRes:'384'};
@@ -6970,6 +6970,13 @@ const TABS=[
    {k:'lineSlice',l:'등고선',t:'모델을 일정 간격으로 저며 생기는 단면선. 지형도처럼 형태를 보여 줍니다. 개수가 많으면 선이 매우 많아집니다.',chk:1,re:'render'},
    {k:'sliceCount',l:'등고선 개수',t:'전체를 몇 줄로 저밀지.',min:5,max:120,step:1,u:'줄',re:'render',show:()=>P.lineSlice},
    {k:'sliceAxis',l:'등고선 방향',t:'어느 축으로 저밀지. 높이는 가로줄, 옆은 세로줄이 됩니다.',sel:['높이','옆','앞뒤'],re:'render',show:()=>P.lineSlice},
+   {head:'까만 면 (테두리만 그리고 비워 두기)'},
+   {k:'solidOn',l:'완전 까만 면은 테두리만 그리고 속은 비워 두기 (손으로 칠할 곳)',t:'아주 어두운 면은 점·선을 찍지 않고 테두리 선만 그립니다. 플로터가 끝나면 그 안을 붓이나 마커로 직접 칠하면 됩니다. 테두리는 따로 "까만 면 테두리" 레이어로 저장됩니다.',chk:1,re:'layout'},
+   {k:'solidT',l:'까맣다고 볼 진하기',t:'이 진하기보다 어두운 곳을 까만 면으로 봅니다. 낮추면 면이 넓어지고, 높이면 정말 새까만 곳만 남습니다.',min:.6,max:1,step:.01,fmt:pct,re:'layout',show:()=>P.solidOn},
+   {k:'solidMin',l:'작은 조각 무시',t:'이 넓이(mm²)보다 작은 까만 조각은 면으로 치지 않고 그냥 점·선으로 찍습니다. 손으로 칠하기 번거로운 자잘한 점을 거릅니다.',min:0,max:100,step:1,fmt:v=>v+' mm²',re:'layout',show:()=>P.solidOn},
+   {k:'solidGap',l:'테두리 안쪽 여유',t:'테두리 선에서 이만큼(mm) 안쪽까지는 점·선을 비웁니다. 점이 테두리에 붙어 지저분해지는 것을 막습니다.',min:0,max:2,step:.05,u:'mm',d:2,re:'layout',show:()=>P.solidOn},
+   {k:'solidPen',l:'테두리 펜 굵기',t:'까만 면 테두리를 그을 펜의 선 굵기(mm).',min:.05,max:2,step:.01,u:'mm',d:2,re:'layout',show:()=>P.solidOn},
+   {info:'solidInfo'},
    {head:'선 다듬기'},
    {k:'linePen',l:'선 펜 굵기',t:'윤곽선을 그을 펜의 선 굵기(mm). SVG에 이 굵기로 기록됩니다.',min:.05,max:2,step:.01,u:'mm',d:2,re:'layout'},
    {k:'lineSmooth',l:'선 부드럽게',t:'선의 잔떨림을 몇 번 둥글릴지. 많이 하면 매끈하지만 모서리가 무뎌집니다.',min:0,max:4,step:1,u:'번',re:'layout'},
@@ -7229,7 +7236,7 @@ function compute(preview){
   for(let i=0;i<N;i++)if(M[i])D0[i]=(dist-lin[i])*ppu;
   const SDP=sat(D0,false),rb=Math.max(1,Math.round(W/400)),DP=new Float32Array(N);
   for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x;if(!M[i])continue;const x0=Math.max(0,x-rb),x1=Math.min(W,x+rb+1),y0=Math.max(0,y-rb),y1=Math.min(H,y+rb+1),c=box(SM,x0,y0,x1,y1);DP[i]=c?box(SDP,x0,y0,x1,y1)/c:D0[i]}
-  raw={W,H,SM,ST:sat(OUT,false),bx0,bx1,by0,by1,preview:!!preview&&+P.res>1024,box,SW,lines,DP,MK:M};
+  raw={W,H,SM,ST:sat(OUT,false),TN:OUT,bx0,bx1,by0,by1,preview:!!preview&&+P.res>1024,box,SW,lines,DP,MK:M};
   $('stale').hidden=!raw.preview;
 }
 
@@ -7375,7 +7382,8 @@ function engrave(toneAt,s,ox,oy){
       if(R[R.length-2]!==mm[mm.length-2]||R[R.length-1]!==mm[mm.length-1])R.push(mm[mm.length-2],mm[mm.length-1]);
       if(R.length>=4)polys.push(R)}
     return polys}
-  const runs=(X,n,want,offset)=>{let st=-1;
+  const inSolid=geo&&geo.solidAt||(()=>false);
+  const runs=(X,n,want0,offset)=>{let st=-1;const want=i=>want0(i)&&!inSolid(X[2*i],X[2*i+1],pen/2);
     const emit=(a,b)=>{if(b-a<1)return;const o=[];for(let i=a;i<=b;i++){const[dx,dy,d]=offset(i);o.push(X[2*i]+dx*d,X[2*i+1]+dy*d)}
       let l=0;for(let q=2;q<o.length;q+=2)l+=Math.hypot(o[q]-o[q-2],o[q+1]-o[q-1]);if(l<Math.max(.25,pen)){return}out.push(rdp(o,.02));len+=l};   // .02 mm is far below the pen; it only drops points the plotter would not feel
     for(let i=0;i<n;i++){if(want(i)){if(st<0)st=i}else if(st>=0){emit(st,i-1);st=-1}}if(st>=0)emit(st,n-1)};
@@ -7414,6 +7422,27 @@ function layout(){
   const toneAt=(x,y,rmm)=>{const px=(x-ox)/s,py=(y-oy)/s,rr=Math.max(.5,rmm/s);
     const x0=Math.max(0,Math.floor(px-rr)),x1=Math.min(W,Math.ceil(px+rr)),y0=Math.max(0,Math.floor(py-rr)),y1=Math.min(H,Math.ceil(py+rr));
     if(x1<=x0||y1<=y0)return -1;const c=box(SM,x0,y0,x1,y1);if(c<(x1-x0)*(y1-y0)*.4)return -1;return box(ST,x0,y0,x1,y1)/c};
+  // ---- 까만 면: 아주 어두운 덩어리는 테두리만 남기고 속을 비운다 (손으로 칠할 자리) ----
+  geo.solid=[];let solidAt=()=>false;
+  if(P.solidOn&&raw.TN){const{TN,MK}=raw,N=W*H,S=new Uint8Array(N);
+    for(let i=0;i<N;i++)if(MK[i]&&TN[i]>=P.solidT)S[i]=1;
+    // 덩어리 찾기: 작은 조각은 버린다
+    const lab=new Int32Array(N),stack=new Int32Array(N);let nl=0,kept=0,areaPx=0;const minPx=P.solidMin/(s*s);
+    for(let i0=0;i0<N;i0++){if(!S[i0]||lab[i0])continue;nl++;let sp=0,cnt=0;stack[sp++]=i0;lab[i0]=nl;const members=[];
+      while(sp){const i=stack[--sp];cnt++;members.push(i);const x=i%W,y=(i-x)/W;
+        if(x>0&&S[i-1]&&!lab[i-1]){lab[i-1]=nl;stack[sp++]=i-1}if(x<W-1&&S[i+1]&&!lab[i+1]){lab[i+1]=nl;stack[sp++]=i+1}
+        if(y>0&&S[i-W]&&!lab[i-W]){lab[i-W]=nl;stack[sp++]=i-W}if(y<H-1&&S[i+W]&&!lab[i+W]){lab[i+W]=nl;stack[sp++]=i+W}}
+      if(cnt<minPx){for(const i of members)S[i]=0}else{kept++;areaPx+=cnt}}
+    if(kept){const SW=raw.SW,SS=new Float64Array(SW*(H+1));for(let y=0;y<H;y++){let rs=0;for(let x=0;x<W;x++){rs+=S[y*W+x];SS[(y+1)*SW+x+1]=SS[y*SW+x+1]+rs}}
+      const gapPx=P.solidGap/s;
+      solidAt=(x,y,rmm)=>{const px=(x-ox)/s,py=(y-oy)/s,rr=Math.max(.5,gapPx+(rmm||0)/s);
+        const x0=Math.max(0,Math.floor(px-rr)),x1=Math.min(W,Math.ceil(px+rr)),y0=Math.max(0,Math.floor(py-rr)),y1=Math.min(H,Math.ceil(py+rr));
+        return x1>x0&&y1>y0&&box(SS,x0,y0,x1,y1)>0};
+      const seg=[];marching(S,W,H,seg);
+      geo.solid=chain(seg,.01).map(l=>chaikin(rdp(l,.6),Math.max(1,P.lineSmooth))).map(l=>l.map((v,i)=>i%2?v*s+oy:v*s+ox)).filter(l=>l.length>=6)}
+    const si=$('solidInfo');if(si)si.textContent=kept?`까만 면 ${kept}개 · 넓이 약 ${(areaPx*s*s/100).toFixed(1)} cm² · 테두리 ${geo.solid.length}줄 — 이 안은 점·선 없이 비워 둡니다`:`지금 진하기 기준(${pct(P.solidT)})보다 어두운 면이 없습니다`}
+  else{const si=$('solidInfo');if(si)si.textContent=''}
+  geo.solidAt=solidAt;
   const NP=+P.penCount,ws=[P.pen1,P.pen2,P.pen3].slice(0,NP);
   const c1=NP>1?P.cap1:1,c2=NP>2?Math.max(P.cap2,c1+.05):1;
   const cum=(t,i)=>i===0?0:i===1?Math.min(t,c1):i===2?Math.min(t,c2):t;
@@ -7428,7 +7457,8 @@ function layout(){
     const dots=[];let errA=new Float32Array(nu+2),errB=new Float32Array(nu+2);
     for(let iv=iv0;iv<=iv1;iv++){const rev=(iv-iv0)&1,row=[];
       for(let k=0;k<nu;k++){const j=rev?nu-1-k:k,iu=iu0+j,u=iu*p,v=iv*p,x=u*ca-v*sa,y=u*sa+v*ca;
-        const t=toneAt(x,y,p/2);let f=0;
+        let t=toneAt(x,y,p/2);let f=0;
+        if(t>=0&&solidAt(x,y,w/2))t=P.method==='오차 확산'?-1:0;   // 까만 면 안: 점을 찍지 않는다 (오차 확산은 오차도 넘기지 않게 바깥 취급)
         if(t>=0){const a=cum(t,pi),b=cum(t,pi+1);f=Math.min(1,Math.max(0,(1-(1-b)/(1-a+1e-6))/cmax))}
         let on=false;
         if(P.method==='오차 확산'){if(t<0){errB[j+1]=0;continue}const val=f+errA[j+1];on=val>=.5;const e=val-(on?1:0);
@@ -7470,6 +7500,9 @@ function paintArt(g,k,tx,ty,Wc,Hc,colored){
   const EG=geo&&geo.eng;
   if(EG&&EG.length){g.strokeStyle='#16181C';g.lineWidth=Math.max(.45,P.engPen*k);g.lineCap='round';g.lineJoin='round';g.beginPath();
     for(const l of EG){g.moveTo(tx+l[0]*k,ty+l[1]*k);for(let i=2;i<l.length;i+=2)g.lineTo(tx+l[i]*k,ty+l[i+1]*k)}g.stroke()}
+  const SO=geo&&geo.solid||[];
+  if(SO.length){g.save();g.beginPath();for(const l of SO){g.moveTo(tx+l[0]*k,ty+l[1]*k);for(let i=2;i<l.length;i+=2)g.lineTo(tx+l[i]*k,ty+l[i+1]*k);g.closePath()}
+    g.fillStyle='rgba(22,24,28,.14)';g.fill('evenodd');g.strokeStyle='#16181C';g.lineWidth=Math.max(.5,P.solidPen*k);g.lineJoin='round';g.stroke();g.restore()}
   const L=geo?geo.lines:[];
   if(L.length){g.strokeStyle=colored?'#7A3FB0':'#16181C';g.lineWidth=Math.max(.5,P.linePen*k);g.lineCap='round';g.lineJoin='round';g.beginPath();
     for(const l of L){g.moveTo(tx+l[0]*k,ty+l[1]*k);for(let i=2;i<l.length;i+=2)g.lineTo(tx+l[i]*k,ty+l[i+1]*k)}g.stroke()}
@@ -7514,6 +7547,7 @@ function planLayers(){if(!pens||!geo)return[];
     push(base,kind,-1,w,splitItems(sec,cmd,maxSec,maxCmd),sec,cmd,L)};
   polys(geo.eng,`판화 선 · ${P.engPen.toFixed(2)}mm`,'line',P.engPen);
   polys(geo.lines,`선 · ${P.linePen.toFixed(2)}mm`,'line',P.linePen);
+  polys(geo.solid,`까만 면 테두리 (속은 손으로 칠하기) · ${P.solidPen.toFixed(2)}mm`,'line',P.solidPen);
   polys(geo.frame,`테두리 · ${P.framePen.toFixed(2)}mm`,'frame',P.framePen);
   rows.forEach((r,i)=>{r.label=`${i+1} - ${r.base}${r.parts>1?` (${r.part}/${r.parts})`:''} · 약 ${fmtSec(r.sec)}`});
   return rows}
@@ -7542,7 +7576,7 @@ function renderStats(){
   const EG=geo&&geo.eng||[];
   if(EG.length){let len=0;for(const l of EG)for(let i=2;i<l.length;i+=2)len+=Math.hypot(l[i]-l[i-2],l[i+1]-l[i-1]);tot+=len/P.travel+EG.length*.3;
     html+=`<div class="stat"><b>${(len/1000).toFixed(1)} m</b><span>판화 선 획 ${EG.length.toLocaleString()}개 · ${P.engPen.toFixed(2)}mm</span></div>`}
-  const SL=geo?geo.lines.concat(geo.frame||[]):[];
+  const SL=geo?geo.lines.concat(geo.frame||[],geo.solid||[]):[];
   if(SL.length){let len=0;for(const l of SL)for(let i=2;i<l.length;i+=2)len+=Math.hypot(l[i]-l[i-2],l[i+1]-l[i-1]);const sec=len/P.travel+SL.length*.3;tot+=sec;
     html+=`<div class="stat"><b>${(len/1000).toFixed(1)} m</b><span>선 ${geo.lines.length.toLocaleString()}개${geo.frame&&geo.frame.length?' · 테두리 '+geo.frame.length+'줄':''} · ${P.linePen.toFixed(2)}mm</span></div>`}
   const h=Math.floor(tot/3600),m=Math.round(tot%3600/60);
