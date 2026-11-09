@@ -58,6 +58,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .hint{font-size:12.5px;color:var(--mute);margin:0}
 .row{display:grid;grid-template-columns:8.5em minmax(0,1fr) 4.8em;align-items:center;gap:10px}
 .row label{font-size:13px}
+.hastip{border-radius:6px}.hastip:hover{background:rgba(127,127,127,.07)}
+.tipbox{position:fixed;z-index:9000;pointer-events:none;background:var(--ink,#16181C);color:#fff;font-size:12.5px;line-height:1.5;padding:8px 10px;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.25);word-break:keep-all}
 .row output{font-family:var(--f-mono);font-size:12px;text-align:right;font-variant-numeric:tabular-nums;color:var(--mute)}
 input[type=range]{width:100%;accent-color:var(--accent)}
 select{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--fg);width:100%}
@@ -6866,7 +6868,7 @@ const DEF={upAxis:'Y',target:'600000',fov:20,
   lightAz:-45,lightEl:35,wrap:.4,fill:.3,midtone:0,dark:0,floor:.05,
   curv:.7,cavity:.5,local:.5,res:'2048',
   method:'스크린톤',cell:4,spacing:1.05,angle:45,
-  penCount:'1',pen1:.3,pen2:.6,pen3:1,cap1:.55,cap2:.8,penColors:true,dotTime:.25,travel:60,layerMinute:3,engMode:'끄기',engAngle:0,engBend:.5,engSpacing:1,engPen:.3,engMaxW:3,engCurve:1,engCut:.06,engCross:false,engCrossT:.72,cmdSafe:true,
+  penCount:'1',pen1:.3,pen2:.6,pen3:1,cap1:.55,cap2:.8,penColors:true,dotTime:.25,travel:60,layerMinute:3,engMode:'끄기',engAngle:0,engBend:.5,engSpacing:1,engPen:.3,engMaxW:3,engCurve:1,engCut:.06,engCross:false,engCrossT:.72,engWidth:'한 줄만',engDense:'2',cmdSafe:true,
   paper:'A4',paperW:210,paperH:297,orient:'세로',margin:20,drawScale:1,posX:0,posY:0,frame:'없음',frameGap:5,frameLines:1,frameStep:1.5,framePen:.3,jpgDpi:'300',
   lineOuter:false,lineInner:false,lineCrease:false,creaseAngle:40,lineSlice:false,sliceCount:30,sliceAxis:'높이',linePen:.3,lineMin:2,lineSmooth:2,innerJump:.05,
   cutW:.6,cutH:.8,cutX:0,cutY:0,cutRot:0,c0x:0,c0y:0,c1x:0,c1y:0,c2x:0,c2y:0,c3x:0,c3y:0,cutNear:0,cutFar:0,cutSrc:'원본 해상도',randMode:'칸 하나',randPanels:5,randSlant:8,randGutter:.02,randSnap:true,cutSeed:1,mergeRes:'384'};
@@ -6879,114 +6881,131 @@ const PEN_COLORS=['#16181C','#2F49F5','#C2410C'];
 // ---------- tabs ----------
 const TABS=[
  {name:'파일',hint:'STL·OBJ·PLY·GLB 파일을 올리세요. 면이 아주 많은 파일은 간소화 목표에 맞춰 자동으로 줄여 빠르게 작업합니다. 모델이 누워 있으면 위쪽 축을 바꾸세요.',c:[
-   {k:'target',l:'간소화 목표',sel:['원본 그대로','1000000','600000','300000','150000'],fmt:v=>v==='원본 그대로'?v:(+v).toLocaleString()+' 면 이하',re:'model'},
-   {k:'upAxis',l:'위쪽 축',sel:['Y','Z'],fmt:v=>v==='Y'?'Y (대부분의 OBJ·GLB)':'Z (대부분의 STL)',re:'model'},
-   {btn:'yaw',l:'모델 90° 돌리기'},{info:'modelInfo'},{samples:1},
-   {k:'mergeRes',l:'속 채우기 정밀도',sel:['256','384','512'],fmt:v=>({'256':'256 (빠름)','384':'384 (보통)','512':'512 (디테일 최대, 느림)'})[v],re:'none'},
+   {k:'target',l:'간소화 목표',t:'작업용 모델의 면 개수 상한입니다. 적을수록 빠르고, 많을수록 작은 굴곡이 살아납니다. 자르기는 원본으로 하므로 결과 디테일과는 별개입니다.',sel:['원본 그대로','1000000','600000','300000','150000'],fmt:v=>v==='원본 그대로'?v:(+v).toLocaleString()+' 면 이하',re:'model'},
+   {k:'upAxis',l:'위쪽 축',t:'모델이 옆으로 누워 보이면 바꾸세요. OBJ·GLB는 대개 Y, STL은 대개 Z가 위입니다.',sel:['Y','Z'],fmt:v=>v==='Y'?'Y (대부분의 OBJ·GLB)':'Z (대부분의 STL)',re:'model'},
+   {btn:'yaw',l:'모델 90° 돌리기',t:'모델을 제자리에서 90°씩 돌립니다. 정면이 엉뚱한 쪽을 볼 때 쓰세요.'},{info:'modelInfo'},{samples:1},
+   {head:'속 채우기 (여러 조각으로 된 파일)'},
+   {k:'mergeRes',l:'속 채우기 정밀도',t:'여러 조각이 겹쳐 있는 모델을 하나의 덩어리로 합칠 때의 정밀도입니다. 높을수록 느립니다.',sel:['256','384','512'],fmt:v=>({'256':'256 (빠름)','384':'384 (보통)','512':'512 (디테일 최대, 느림)'})[v],re:'none'},
    {mergePanel:1}]},
  {name:'각도',hint:'왼쪽 화면을 끌어서 돌리고, 두 손가락이나 휠로 확대합니다. 손을 떼면 망점이 다시 계산됩니다.',c:[
-   {views:1},{k:'fov',l:'원근감',min:5,max:60,step:1,u:'°',re:'cam'}]},
+   {views:1},{k:'fov',l:'원근감',t:'카메라 화각입니다. 작을수록 도면처럼 납작하고, 클수록 가까운 쪽이 커 보입니다.',min:5,max:60,step:1,u:'°',re:'cam'}]},
  {name:'컷',cut:true,hint:'3D 화면 위에 프레임을 얹고, 화면에 보이는 그대로 프레임 모양으로 깊이 방향 끝까지 잘라냅니다. 모서리를 끌거나 아래 값으로 조절하세요. 직사각형부터 만화 칸 같은 비정형 사각형까지 됩니다. 모델은 평소처럼 돌리고 확대해서 구도를 잡으면 됩니다.',c:[
    {mangaBtn:1},
+   {head:'프레임 크기·위치'},
    {cutPresets:1},
-   {k:'cutW',l:'가로',min:.05,max:2,step:.005,fmt:v=>(v*100).toFixed(1),num:1,re:'cut'},
-   {k:'cutH',l:'세로',min:.05,max:1.2,step:.005,fmt:v=>(v*100).toFixed(1),num:1,re:'cut'},
-   {k:'cutX',l:'가로 위치',min:-1,max:1,step:.005,fmt:v=>(v*100).toFixed(1),num:1,re:'cut'},
-   {k:'cutY',l:'세로 위치',min:-.6,max:.6,step:.005,fmt:v=>(v*100).toFixed(1),num:1,re:'cut'},
-   {k:'cutRot',l:'기울기',min:-45,max:45,step:.5,fmt:v=>(+v).toFixed(1),num:1,re:'cut'},
+   {k:'cutW',l:'가로',t:'프레임 가로 크기. 화면 높이를 100으로 본 값입니다.',min:.05,max:2,step:.005,fmt:v=>(v*100).toFixed(1),num:1,re:'cut'},
+   {k:'cutH',l:'세로',t:'프레임 세로 크기. 화면 높이를 100으로 본 값입니다.',min:.05,max:1.2,step:.005,fmt:v=>(v*100).toFixed(1),num:1,re:'cut'},
+   {k:'cutX',l:'가로 위치',t:'프레임을 좌우로 옮깁니다. 오른쪽이 +.',min:-1,max:1,step:.005,fmt:v=>(v*100).toFixed(1),num:1,re:'cut'},
+   {k:'cutY',l:'세로 위치',t:'프레임을 위아래로 옮깁니다. 아래가 +.',min:-.6,max:.6,step:.005,fmt:v=>(v*100).toFixed(1),num:1,re:'cut'},
+   {k:'cutRot',l:'기울기',t:'프레임을 통째로 기울입니다. 만화 칸처럼 비스듬한 컷을 만들 때.',min:-45,max:45,step:.5,fmt:v=>(+v).toFixed(1),num:1,re:'cut'},
    {info:'cutInfo'},
    {cutCorners:1},
-   {k:'cutNear',l:'앞에서 깎기',min:0,max:.95,step:.01,fmt:v=>v>0?pct(v):'안 깎음',re:'cut'},
-   {k:'cutFar',l:'뒤에서 깎기',min:0,max:.95,step:.01,fmt:v=>v>0?pct(v):'안 깎음',re:'cut'},
-   {k:'cutSrc',l:'자를 해상도',sel:['원본 해상도','작업용'],fmt:v=>v==='원본 해상도'?'원본 해상도 (디테일 그대로)':'작업용 (간소화본, 빠름)',re:'none'},
+   {head:'깊이 방향 깎기'},
+   {k:'cutNear',l:'앞에서 깎기',t:'카메라 쪽(앞)에서부터 이만큼을 잘라 버립니다. 앞에 튀어나온 부분을 없앨 때.',min:0,max:.95,step:.01,fmt:v=>v>0?pct(v):'안 깎음',re:'cut'},
+   {k:'cutFar',l:'뒤에서 깎기',t:'뒤쪽에서부터 이만큼을 잘라 버립니다. 뒤에 겹쳐 보이는 부분을 없앨 때.',min:0,max:.95,step:.01,fmt:v=>v>0?pct(v):'안 깎음',re:'cut'},
+   {k:'cutSrc',l:'자를 해상도',t:'원본 해상도로 자르면 디테일이 그대로지만 느립니다. 구도를 잡는 동안은 작업용이 빠릅니다.',sel:['원본 해상도','작업용'],fmt:v=>v==='원본 해상도'?'원본 해상도 (디테일 그대로)':'작업용 (간소화본, 빠름)',re:'none'},
    {randHead:1},
-   {k:'randMode',l:'랜덤 방식',sel:['칸 하나','한 페이지'],fmt:v=>v==='칸 하나'?'칸 하나 (프레임만 얹기)':'한 페이지 (몸 전체를 칸으로 나누기)',re:'cut'},
-   {k:'randPanels',l:'페이지 칸 수',min:2,max:9,step:1,fmt:v=>v+'칸',re:'none',show:()=>P.randMode==='한 페이지'},
-   {k:'randSlant',l:'최대 기울기',min:0,max:20,step:.5,u:'°',re:'none'},
-   {k:'randGutter',l:'칸 사이 간격',min:0,max:.08,step:.005,fmt:v=>(v*100).toFixed(1),re:'none',show:()=>P.randMode==='한 페이지'},
-   {k:'randSnap',l:'파손선 규칙: 칸의 가로 변을 몸이 가는 곳(목·허리·허벅지)에 맞추기',chk:1,re:'none'},
-   {k:'cutSeed',l:'번호',min:1,max:99999,step:1,fmt:v=>String(Math.round(v)),num:1,re:'none'},
+   {k:'randMode',l:'랜덤 방식',t:'칸 하나: 지금 화면에 프레임 하나를 무작위로 얹습니다. 한 페이지: 몸 전체를 만화 한 쪽처럼 여러 칸으로 나눕니다.',sel:['칸 하나','한 페이지'],fmt:v=>v==='칸 하나'?'칸 하나 (프레임만 얹기)':'한 페이지 (몸 전체를 칸으로 나누기)',re:'cut'},
+   {k:'randPanels',l:'페이지 칸 수',t:'한 페이지를 몇 칸으로 나눌지.',min:2,max:9,step:1,fmt:v=>v+'칸',re:'none',show:()=>P.randMode==='한 페이지'},
+   {k:'randSlant',l:'최대 기울기',t:'랜덤 칸이 기울 수 있는 최대 각도. 0이면 늘 반듯한 칸.',min:0,max:20,step:.5,u:'°',re:'none'},
+   {k:'randGutter',l:'칸 사이 간격',t:'칸과 칸 사이의 빈 틈 너비.',min:0,max:.08,step:.005,fmt:v=>(v*100).toFixed(1),re:'none',show:()=>P.randMode==='한 페이지'},
+   {k:'randSnap',l:'파손선 규칙: 칸의 가로 변을 몸이 가는 곳(목·허리·허벅지)에 맞추기',t:'켜면 칸을 나누는 가로 경계가 몸이 가늘어지는 자리에 오도록 맞춥니다. 조각 파편처럼 보이게 하는 규칙입니다.',chk:1,re:'none'},
+   {k:'cutSeed',l:'번호',t:'랜덤의 씨앗 번호. 같은 번호면 언제나 같은 칸이 나오므로, 마음에 든 번호를 적어 두면 다시 만들 수 있습니다.',min:1,max:99999,step:1,fmt:v=>String(Math.round(v)),num:1,re:'none'},
    {randBtns:1},
    {cutPanel:1}]},
- {name:'빛·명암',hint:'빛 방향과 명암 곡선을 정합니다. 밝은 곳 최소 점을 올리면 빛을 받는 면도 점이 남아 형태가 날아가지 않습니다.',c:[
-   {k:'lightAz',l:'빛 좌우',min:-90,max:90,step:1,fmt:v=>v<0?`왼쪽 ${-v}°`:v>0?`오른쪽 ${v}°`:'정면',re:'render'},
-   {k:'lightEl',l:'빛 높이',min:-30,max:80,step:1,u:'°',re:'render'},
-   {k:'wrap',l:'그림자 부드럽게',min:0,max:1,step:.05,fmt:pct,re:'render'},
-   {k:'fill',l:'반사광',min:0,max:1,step:.05,fmt:pct,re:'render'},
-   {k:'midtone',l:'중간톤',min:-1,max:1,step:.05,fmt:v=>v>0?`진하게 ${Math.round(v*100)}`:v<0?`밝게 ${Math.round(-v*100)}`:'기본',re:'render'},
-   {k:'dark',l:'전체 진하기',min:-.3,max:.3,step:.01,fmt:v=>(v>0?'+':'')+Math.round(v*100),re:'render'},
-   {k:'floor',l:'밝은 곳 최소 점',min:0,max:.25,step:.01,fmt:pct,re:'render'}]},
- {name:'디테일',hint:'조각의 작은 굴곡을 살립니다. 곡률 강조는 튀어나온 곳을 밝게, 파인 곳을 어둡게 해서 빛 방향과 상관없이 형태를 드러냅니다.',c:[
-   {k:'curv',l:'곡률 강조',min:0,max:1.5,step:.05,fmt:pct,re:'render'},
-   {k:'cavity',l:'오목한 곳 어둡게',min:0,max:1,step:.05,fmt:pct,re:'render'},
-   {k:'local',l:'국소 대비',min:0,max:1.5,step:.05,fmt:pct,re:'render'},
-   {k:'res',l:'정밀도',sel:['1024','2048','3072'],fmt:v=>v+' px',re:'render'}]},
+ {name:'명암',hint:'빛 방향과 명암 곡선, 그리고 작은 굴곡을 드러내는 정도를 정합니다. 망점·판화 선 모두 여기서 만든 명암을 따릅니다.',c:[
+   {head:'빛'},
+   {k:'lightAz',l:'빛 좌우',t:'빛이 오는 좌우 방향. 왼쪽 빛이면 왼쪽 면이 밝아집니다.',min:-90,max:90,step:1,fmt:v=>v<0?`왼쪽 ${-v}°`:v>0?`오른쪽 ${v}°`:'정면',re:'render'},
+   {k:'lightEl',l:'빛 높이',t:'빛이 오는 높이. 높을수록 위에서 내리쬐어 아래쪽에 그늘이 집니다.',min:-30,max:80,step:1,u:'°',re:'render'},
+   {k:'wrap',l:'그림자 부드럽게',t:'빛과 그늘의 경계를 얼마나 부드럽게 넘길지. 높이면 그늘이 옅고 넓게 퍼집니다.',min:0,max:1,step:.05,fmt:pct,re:'render'},
+   {k:'fill',l:'반사광',t:'그늘진 면에도 어느 정도 빛이 돌게 합니다. 높이면 그늘이 새까매지지 않습니다.',min:0,max:1,step:.05,fmt:pct,re:'render'},
+   {head:'명암 곡선'},
+   {k:'midtone',l:'중간톤',t:'중간 밝기만 진하게 또는 밝게 밉니다. 가장 밝은 곳과 가장 어두운 곳은 그대로입니다.',min:-1,max:1,step:.05,fmt:v=>v>0?`진하게 ${Math.round(v*100)}`:v<0?`밝게 ${Math.round(-v*100)}`:'기본',re:'render'},
+   {k:'dark',l:'전체 진하기',t:'그림 전체를 한꺼번에 진하게(+) 또는 밝게(−) 합니다.',min:-.3,max:.3,step:.01,fmt:v=>(v>0?'+':'')+Math.round(v*100),re:'render'},
+   {k:'floor',l:'밝은 곳 최소 점',t:'가장 밝은 면에도 이만큼은 점이 남게 합니다. 0이면 빛 받는 면이 종이색으로 날아갑니다.',min:0,max:.25,step:.01,fmt:pct,re:'render'},
+   {head:'디테일 (작은 굴곡 살리기)'},
+   {k:'curv',l:'곡률 강조',t:'튀어나온 곳은 밝게, 파인 곳은 어둡게 해서 빛 방향과 상관없이 형태를 드러냅니다. 근육·주름 표현에 좋습니다.',min:0,max:1.5,step:.05,fmt:pct,re:'render'},
+   {k:'cavity',l:'오목한 곳 어둡게',t:'깊게 파인 곳(겨드랑이·목 밑·주름 안쪽)을 더 어둡게 합니다.',min:0,max:1,step:.05,fmt:pct,re:'render'},
+   {k:'local',l:'국소 대비',t:'주변과의 밝기 차이를 키워 작은 디테일을 또렷하게 합니다. 너무 높이면 거칠어집니다.',min:0,max:1.5,step:.05,fmt:pct,re:'render'},
+   {k:'res',l:'정밀도',t:'명암을 계산하는 그림의 해상도. 높을수록 작은 디테일이 살지만 느립니다.',sel:['1024','2048','3072'],fmt:v=>v+' px',re:'render'}]},
  {name:'망점',hint:'모든 점은 펜이 한 번 찍는 같은 크기입니다. 명암은 점을 찍는 밀도로만 냅니다. 펜 굵기를 바꾸면 점 간격과 개수가 바로 다시 계산됩니다.',c:[
-   {k:'pen1',l:'펜 굵기',min:.05,max:2,step:.01,u:'mm',d:2,re:'layout'},{penChips:1},
-   {k:'method',l:'점 배치',sel:['스크린톤','오차 확산','점묘','규칙'],fmt:v=>({'스크린톤':'스크린톤 (점이 무리 지어 자람)','오차 확산':'오차 확산 (디테일 최대)','점묘':'점묘 (무작위로 흩뿌림)','규칙':'규칙 (고르게 퍼짐)'})[v],re:'layout'},
-   {k:'cell',l:'망점 칸 크기',min:2,max:8,step:1,fmt:v=>`${v}×${v}점 · ${v*v+1}단계`,re:'layout',show:()=>P.method==='스크린톤'},
-   {k:'spacing',l:'점 간격',min:.8,max:2.5,step:.05,fmt:v=>`펜 굵기 ×${(+v).toFixed(2)}`,re:'layout'},
-   {k:'angle',l:'망점 각도',min:0,max:90,step:1,u:'°',re:'layout'},
-   {info:'dotInfo'}]},
- {name:'판화 선',hint:'지폐 초상처럼 나란한 선이 형태를 따라 휘어 지나가며, 어두운 곳에서는 선이 굵어지고 밝은 곳에서는 가늘어지다 끊깁니다. 펜 한 자루로 굵기를 내기 위해 어두운 곳은 선 옆에 한두 줄을 겹쳐 그어 부풀립니다.',c:[
-   {k:'engMode',l:'쓰기',sel:['끄기','판화 선만','망점과 함께'],fmt:v=>({'끄기':'끄기 (망점만)','판화 선만':'판화 선만','망점과 함께':'망점과 함께'})[v],re:'layout'},
-   {k:'engAngle',l:'선 방향',min:0,max:180,step:1,fmt:v=>(+v===0||+v===180)?'가로':+v===90?'세로':v+'°',re:'layout',show:()=>P.engMode!=='끄기'},{dirChips:1,show:()=>P.engMode!=='끄기'},
-   {k:'engBend',l:'굴곡 세기',min:-2,max:2,step:.05,fmt:v=>+v===0?'휘지 않음 (곧은 선)':(v<0?'반대로 ':'')+Math.abs(v).toFixed(2),re:'layout',show:()=>P.engMode!=='끄기'},
-   {k:'engSpacing',l:'선 간격',min:.3,max:4,step:.05,u:'mm',d:2,re:'layout',show:()=>P.engMode!=='끄기'},
-   {k:'engPen',l:'펜 굵기',min:.05,max:2,step:.01,u:'mm',d:2,re:'layout',show:()=>P.engMode!=='끄기'},
-   {k:'engMaxW',l:'가장 굵은 선',min:1,max:6,step:.1,fmt:v=>`펜 ×${(+v).toFixed(1)} (${(v*P.engPen).toFixed(2)} mm)`,re:'layout',show:()=>P.engMode!=='끄기'},
-   {k:'engCurve',l:'굵어지는 속도',min:.4,max:2.5,step:.05,fmt:v=>(v<.95?'일찍 굵어짐':v>1.05?'어두운 곳에서만 굵어짐':'고르게')+` (${(+v).toFixed(2)})`,re:'layout',show:()=>P.engMode!=='끄기'},
-   {k:'engCut',l:'밝은 곳 선 끊기',min:0,max:.5,step:.01,fmt:pct,re:'layout',show:()=>P.engMode!=='끄기'},
-   {k:'engCross',l:'가장 어두운 곳에 교차선 더하기',chk:1,re:'layout',show:()=>P.engMode!=='끄기'},
-   {k:'engCrossT',l:'교차선이 시작되는 진하기',min:.4,max:.95,step:.01,fmt:pct,re:'layout',show:()=>P.engMode!=='끄기'&&P.engCross},
-   {info:'engInfo'}]},
- {name:'선',hint:'망점 위에 선을 더합니다. 선은 따로 SVG 레이어로 나뉘고, 같은 펜으로 그려도 됩니다.',c:[
-   {k:'lineOuter',l:'바깥 윤곽선',chk:1,re:'render'},
-   {k:'lineInner',l:'안쪽 윤곽선 (앞쪽 형태가 뒤를 가리는 경계)',chk:1,re:'render'},
-   {k:'innerJump',l:'안쪽 윤곽선 기준',min:.005,max:.15,step:.005,fmt:v=>(v<.02?'작은 굴곡까지':v<.06?'보통':'큰 경계만')+` (${Math.round(v*1000)/10})`,re:'render',show:()=>P.lineInner},
-   {k:'lineCrease',l:'꺾인 선',chk:1,re:'render'},
-   {k:'creaseAngle',l:'꺾임 기준',min:10,max:90,step:1,u:'°',re:'render',show:()=>P.lineCrease},
-   {k:'lineSlice',l:'등고선',chk:1,re:'render'},
-   {k:'sliceCount',l:'등고선 개수',min:5,max:120,step:1,u:'줄',re:'render',show:()=>P.lineSlice},
-   {k:'sliceAxis',l:'등고선 방향',sel:['높이','옆','앞뒤'],re:'render',show:()=>P.lineSlice},
-   {k:'linePen',l:'선 펜 굵기',min:.05,max:2,step:.01,u:'mm',d:2,re:'layout'},
-   {k:'lineSmooth',l:'선 부드럽게',min:0,max:4,step:1,u:'번',re:'layout'},
-   {k:'lineMin',l:'짧은 선 지우기',min:0,max:10,step:.1,u:'mm',d:1,re:'layout'}]},
- {name:'펜',hint:'기본은 펜 한 자루입니다. 한 가지 굵기로 그리는 쪽이 가장 섬세합니다. 두세 자루를 고르면 어두운 곳에만 굵은 펜이 덧찍어 점 수와 시간을 줄입니다. 펜마다 SVG 레이어가 따로 나뉩니다.',c:[
-   {k:'penCount',l:'펜 개수',sel:['1','2','3'],fmt:v=>v==='1'?'1자루 (추천)':v+'자루',re:'layout'},
+   {head:'점'},
+   {k:'pen1',l:'펜 굵기',t:'실제로 쓸 펜의 선 굵기(mm). 점 하나의 크기이자 점 간격의 기준입니다.',min:.05,max:2,step:.01,u:'mm',d:2,re:'layout'},{penChips:1},
+   {k:'method',l:'점 배치',t:'스크린톤: 만화책 망점처럼 점이 무리 지어 자랍니다. 오차 확산: 디테일이 가장 살지만 점이 흩어집니다. 점묘: 무작위로 흩뿌립니다. 규칙: 고른 격자.',sel:['스크린톤','오차 확산','점묘','규칙'],fmt:v=>({'스크린톤':'스크린톤 (점이 무리 지어 자람)','오차 확산':'오차 확산 (디테일 최대)','점묘':'점묘 (무작위로 흩뿌림)','규칙':'규칙 (고르게 퍼짐)'})[v],re:'layout'},
+   {k:'cell',l:'망점 칸 크기',t:'스크린톤 한 무리가 몇 점까지 자라는지. 클수록 명암 단계는 많아지고 망점은 굵어 보입니다.',min:2,max:8,step:1,fmt:v=>`${v}×${v}점 · ${v*v+1}단계`,re:'layout',show:()=>P.method==='스크린톤'},
+   {k:'spacing',l:'점 간격',t:'점과 점 사이 거리를 펜 굵기의 몇 배로 할지. 1.0이면 가장 어두운 곳에서 점이 맞닿습니다. 넓히면 점 수와 시간이 줄어듭니다.',min:.8,max:2.5,step:.05,fmt:v=>`펜 굵기 ×${(+v).toFixed(2)}`,re:'layout'},
+   {k:'angle',l:'망점 각도',t:'점이 줄지어 늘어서는 각도. 만화 망점은 보통 45°입니다.',min:0,max:90,step:1,u:'°',re:'layout'},
+   {info:'dotInfo'},
+   {head:'펜 여러 자루 (선택)'},
+   {k:'penCount',l:'펜 개수',t:'기본은 한 자루입니다. 두세 자루를 고르면 어두운 곳에만 굵은 펜으로 덧찍어 점 수와 시간을 줄입니다. 펜마다 SVG 레이어가 나뉩니다.',sel:['1','2','3'],fmt:v=>v==='1'?'1자루 (추천)':v+'자루',re:'layout'},
    {info:'pen1Info'},
-   {k:'pen2',l:'펜 2 굵기',min:.1,max:2,step:.05,u:'mm',d:2,re:'layout',show:()=>+P.penCount>=2},
-   {k:'cap1',l:'펜 1이 맡는 진하기',min:.2,max:.9,step:.05,fmt:pct,re:'layout',show:()=>+P.penCount>=2},
-   {k:'pen3',l:'펜 3 굵기',min:.1,max:2.5,step:.05,u:'mm',d:2,re:'layout',show:()=>+P.penCount>=3},
-   {k:'cap2',l:'펜 2까지 맡는 진하기',min:.4,max:.95,step:.05,fmt:pct,re:'layout',show:()=>+P.penCount>=3},
-   {k:'penColors',l:'펜마다 다른 색으로 보기',chk:1,re:'draw',show:()=>+P.penCount>=2},
-   {k:'dotTime',l:'점 하나 찍는 시간',min:.1,max:1,step:.01,u:'초',d:2,re:'stats'},
-   {k:'travel',l:'펜 이동 속도',min:10,max:150,step:5,u:'mm/s',re:'stats'}]},
- {name:'종이',hint:'플로터에 올릴 종이 크기입니다. SVG가 실제 mm 크기로 저장됩니다.',c:[
+   {k:'pen2',l:'펜 2 굵기',t:'두 번째(굵은) 펜의 선 굵기.',min:.1,max:2,step:.05,u:'mm',d:2,re:'layout',show:()=>+P.penCount>=2},
+   {k:'cap1',l:'펜 1이 맡는 진하기',t:'이 진하기까지는 펜 1만 찍고, 더 어두운 곳은 펜 2가 맡습니다.',min:.2,max:.9,step:.05,fmt:pct,re:'layout',show:()=>+P.penCount>=2},
+   {k:'pen3',l:'펜 3 굵기',t:'세 번째(가장 굵은) 펜의 선 굵기.',min:.1,max:2.5,step:.05,u:'mm',d:2,re:'layout',show:()=>+P.penCount>=3},
+   {k:'cap2',l:'펜 2까지 맡는 진하기',t:'이 진하기까지는 펜 1·2가 찍고, 더 어두운 곳은 펜 3이 맡습니다.',min:.4,max:.95,step:.05,fmt:pct,re:'layout',show:()=>+P.penCount>=3},
+   {k:'penColors',l:'펜마다 다른 색으로 보기',t:'미리보기에서만 펜별로 색을 다르게 보여 줍니다. 저장되는 SVG는 검정입니다.',chk:1,re:'draw',show:()=>+P.penCount>=2}]},
+ {name:'판화 선',hint:'지폐 초상처럼 나란한 선이 형태를 따라 휘어 지나가며, 어두운 곳은 진하게 밝은 곳은 가늘어지다 끊깁니다. 펜 플로터는 선 굵기를 못 바꾸므로, 어두운 곳을 어떻게 진하게 낼지 "진하게 내는 방식"에서 고릅니다.',c:[
+   {k:'engMode',l:'쓰기',t:'끄기: 망점만. 판화 선만: 점 없이 선으로만 명암. 망점과 함께: 망점 위에 선을 얹습니다.',sel:['끄기','판화 선만','망점과 함께'],fmt:v=>({'끄기':'끄기 (망점만)','판화 선만':'판화 선만','망점과 함께':'망점과 함께'})[v],re:'layout'},
+   {head:'선 모양',show:()=>P.engMode!=='끄기'},
+   {k:'engAngle',l:'선 방향',t:'선이 지나가는 기본 방향. 0°는 가로, 90°는 세로.',min:0,max:180,step:1,fmt:v=>(+v===0||+v===180)?'가로':+v===90?'세로':v+'°',re:'layout',show:()=>P.engMode!=='끄기'},{dirChips:1,show:()=>P.engMode!=='끄기'},
+   {k:'engBend',l:'굴곡 세기',t:'형태가 앞으로 나온 곳에서 선이 옆으로 밀려 휘는 정도. 0이면 곧은 평행선, 높이면 지폐 초상처럼 몸을 감쌉니다. 음수는 반대로 휩니다.',min:-2,max:2,step:.05,fmt:v=>+v===0?'휘지 않음 (곧은 선)':(v<0?'반대로 ':'')+Math.abs(v).toFixed(2),re:'layout',show:()=>P.engMode!=='끄기'},
+   {k:'engSpacing',l:'선 간격',t:'나란한 선과 선 사이 거리(mm). 좁힐수록 전체가 진해지고 선 수가 늘어납니다.',min:.3,max:4,step:.05,u:'mm',d:2,re:'layout',show:()=>P.engMode!=='끄기'},
+   {k:'engPen',l:'펜 굵기',t:'판화 선을 그을 펜의 선 굵기(mm).',min:.05,max:2,step:.01,u:'mm',d:2,re:'layout',show:()=>P.engMode!=='끄기'},
+   {k:'engCut',l:'밝은 곳 선 끊기',t:'이 밝기보다 밝은 곳에서는 선을 끊어 종이를 비웁니다. 높이면 밝은 면이 더 넓게 비고 선이 짧아집니다.',min:0,max:.5,step:.01,fmt:pct,re:'layout',show:()=>P.engMode!=='끄기'},
+   {head:'어두운 곳 진하게 내는 방식',show:()=>P.engMode!=='끄기'},
+   {k:'engWidth',l:'방식',t:'한 줄만: 선마다 한 번만 긋고, 어두운 곳은 선 사이에 선을 더 끼워 촘촘하게 합니다 (플로터에 가장 깔끔, 추천). 겹선: 선 옆에 줄을 덧그어 굵어 보이게 합니다 — 같은 자리를 여러 번 지나갑니다. 한쪽 겹선: 한쪽으로만 덧그어 반만 지나갑니다.',sel:['한 줄만','겹선','한쪽 겹선'],fmt:v=>({'한 줄만':'한 줄만 — 어두운 곳은 선을 촘촘히 (추천)','겹선':'겹선 — 선 옆에 양쪽으로 덧긋기','한쪽 겹선':'한쪽 겹선 — 한쪽으로만 덧긋기'})[v],re:'layout',show:()=>P.engMode!=='끄기'},
+   {k:'engMaxW',l:'가장 굵은 선',t:'가장 어두운 곳에서 선이 펜 굵기의 몇 배까지 굵어 보이게 할지. ×1이면 덧긋기 없음. 값이 클수록 같은 자리를 더 여러 번 지나갑니다.',min:1,max:6,step:.1,fmt:v=>`펜 ×${(+v).toFixed(1)} (${(v*P.engPen).toFixed(2)} mm)`,re:'layout',show:()=>P.engMode!=='끄기'&&P.engWidth!=='한 줄만'},
+   {k:'engDense',l:'가장 촘촘한 간격',t:'가장 어두운 곳에서 선 사이가 기본 간격의 몇 분의 1까지 좁아질지. 1/2이면 사이에 한 줄, 1/4이면 세 줄이 끼어듭니다. 펜 굵기보다 좁아지지는 않습니다.',sel:['2','4'],fmt:v=>v==='2'?'기본 간격의 1/2 (사이에 한 줄)':'기본 간격의 1/4 (사이에 세 줄)',re:'layout',show:()=>P.engMode!=='끄기'&&P.engWidth==='한 줄만'},
+   {k:'engCurve',l:'굵어지는 속도',t:'얼마나 어두워야 진해지기 시작하는지. 낮으면 중간 밝기부터 진해지고, 높으면 아주 어두운 곳에서만 진해집니다.',min:.4,max:2.5,step:.05,fmt:v=>(v<.95?'일찍 진해짐':v>1.05?'어두운 곳에서만 진해짐':'고르게')+` (${(+v).toFixed(2)})`,re:'layout',show:()=>P.engMode!=='끄기'},
+   {k:'engCross',l:'가장 어두운 곳에 교차선 더하기',t:'아주 어두운 곳에 90° 방향 선을 한 겹 더 지나가게 합니다. 켜면 그 자리를 두 번 지나갑니다.',chk:1,re:'layout',show:()=>P.engMode!=='끄기'},
+   {k:'engCrossT',l:'교차선이 시작되는 진하기',t:'이 진하기보다 어두운 곳에만 교차선이 들어갑니다.',min:.4,max:.95,step:.01,fmt:pct,re:'layout',show:()=>P.engMode!=='끄기'&&P.engCross},
+   {info:'engInfo'}]},
+ {name:'윤곽선',hint:'망점·판화 선 위에 형태의 경계선을 더합니다. 선은 따로 SVG 레이어로 나뉘고, 같은 펜으로 그려도 됩니다. 모두 꺼 두면 선 레이어가 만들어지지 않습니다.',c:[
+   {head:'어떤 선을 그릴지'},
+   {k:'lineOuter',l:'바깥 윤곽선',t:'조각과 배경의 경계, 즉 실루엣 한 바퀴.',chk:1,re:'render'},
+   {k:'lineInner',l:'안쪽 윤곽선 (앞쪽 형태가 뒤를 가리는 경계)',t:'팔이 몸을 가리는 곳처럼 앞 형태가 뒤 형태를 덮는 경계선.',chk:1,re:'render'},
+   {k:'innerJump',l:'안쪽 윤곽선 기준',t:'앞뒤 깊이 차이가 이만큼 이상 나는 곳만 안쪽 윤곽선으로 봅니다. 작게 하면 작은 굴곡 경계까지 선이 생깁니다.',min:.005,max:.15,step:.005,fmt:v=>(v<.02?'작은 굴곡까지':v<.06?'보통':'큰 경계만')+` (${Math.round(v*1000)/10})`,re:'render',show:()=>P.lineInner},
+   {k:'lineCrease',l:'꺾인 선',t:'면이 급하게 꺾이는 모서리를 따라 선을 긋습니다. 조각의 깎인 자국을 살릴 때.',chk:1,re:'render'},
+   {k:'creaseAngle',l:'꺾임 기준',t:'두 면이 이 각도 이상 꺾이는 곳만 선으로 봅니다. 낮추면 선이 많아집니다.',min:10,max:90,step:1,u:'°',re:'render',show:()=>P.lineCrease},
+   {k:'lineSlice',l:'등고선',t:'모델을 일정 간격으로 저며 생기는 단면선. 지형도처럼 형태를 보여 줍니다. 개수가 많으면 선이 매우 많아집니다.',chk:1,re:'render'},
+   {k:'sliceCount',l:'등고선 개수',t:'전체를 몇 줄로 저밀지.',min:5,max:120,step:1,u:'줄',re:'render',show:()=>P.lineSlice},
+   {k:'sliceAxis',l:'등고선 방향',t:'어느 축으로 저밀지. 높이는 가로줄, 옆은 세로줄이 됩니다.',sel:['높이','옆','앞뒤'],re:'render',show:()=>P.lineSlice},
+   {head:'선 다듬기'},
+   {k:'linePen',l:'선 펜 굵기',t:'윤곽선을 그을 펜의 선 굵기(mm). SVG에 이 굵기로 기록됩니다.',min:.05,max:2,step:.01,u:'mm',d:2,re:'layout'},
+   {k:'lineSmooth',l:'선 부드럽게',t:'선의 잔떨림을 몇 번 둥글릴지. 많이 하면 매끈하지만 모서리가 무뎌집니다.',min:0,max:4,step:1,u:'번',re:'layout'},
+   {k:'lineMin',l:'짧은 선 지우기',t:'이 길이(mm)보다 짧은 토막 선은 버립니다. 자잘한 부스러기를 없앨 때.',min:0,max:10,step:.1,u:'mm',d:1,re:'layout'}]},
+ {name:'종이',hint:'플로터에 올릴 종이 크기와 그림의 위치입니다. SVG가 실제 mm 크기로 저장됩니다.',c:[
+   {head:'종이 크기'},
    {paperChips:1},
-   {k:'paper',l:'종이',sel:Object.keys(PAPERS),re:'layout'},
-   {k:'paperW',l:'종이 가로',min:50,max:1200,step:1,u:'mm',re:'layout',show:()=>P.paper==='직접 입력'},
-   {k:'paperH',l:'종이 세로',min:50,max:1200,step:1,u:'mm',re:'layout',show:()=>P.paper==='직접 입력'},
-   {k:'orient',l:'방향',sel:['세로','가로'],re:'layout'},
-   {k:'margin',l:'여백',min:0,max:150,step:1,u:'mm',re:'layout'},
-   {k:'drawScale',l:'그림 크기',min:.1,max:1,step:.01,fmt:v=>`여백 안 최대의 ${Math.round(v*100)}%`,re:'layout'},
-   {k:'posX',l:'가로 위치',min:-1,max:1,step:.01,fmt:v=>v<0?`왼쪽 ${Math.round(-v*100)}`:v>0?`오른쪽 ${Math.round(v*100)}`:'가운데',re:'layout'},
-   {k:'posY',l:'세로 위치',min:-1,max:1,step:.01,fmt:v=>v<0?`위 ${Math.round(-v*100)}`:v>0?`아래 ${Math.round(v*100)}`:'가운데',re:'layout'},
+   {k:'paper',l:'종이',t:'종이 규격. 직접 입력을 고르면 가로·세로를 mm로 넣을 수 있습니다.',sel:Object.keys(PAPERS),re:'layout'},
+   {k:'paperW',l:'종이 가로',t:'종이 가로 길이(mm).',min:50,max:1200,step:1,u:'mm',re:'layout',show:()=>P.paper==='직접 입력'},
+   {k:'paperH',l:'종이 세로',t:'종이 세로 길이(mm).',min:50,max:1200,step:1,u:'mm',re:'layout',show:()=>P.paper==='직접 입력'},
+   {k:'orient',l:'방향',t:'종이를 세로로 둘지 가로로 둘지.',sel:['세로','가로'],re:'layout'},
+   {head:'그림 위치'},
+   {k:'margin',l:'여백',t:'종이 가장자리에서 그림까지의 빈 폭(mm). 플로터가 못 가는 가장자리를 피하는 용도로도 씁니다.',min:0,max:150,step:1,u:'mm',re:'layout'},
+   {k:'drawScale',l:'그림 크기',t:'여백 안에 들어갈 수 있는 최대 크기를 100%로 본 비율.',min:.1,max:1,step:.01,fmt:v=>`여백 안 최대의 ${Math.round(v*100)}%`,re:'layout'},
+   {k:'posX',l:'가로 위치',t:'그림을 여백 안에서 좌우로 옮깁니다.',min:-1,max:1,step:.01,fmt:v=>v<0?`왼쪽 ${Math.round(-v*100)}`:v>0?`오른쪽 ${Math.round(v*100)}`:'가운데',re:'layout'},
+   {k:'posY',l:'세로 위치',t:'그림을 여백 안에서 위아래로 옮깁니다.',min:-1,max:1,step:.01,fmt:v=>v<0?`위 ${Math.round(-v*100)}`:v>0?`아래 ${Math.round(v*100)}`:'가운데',re:'layout'},
    {info:'drawInfo'},
-   {k:'frame',l:'화면 테두리',sel:['없음','종이 가장자리','여백 선','그림 둘레'],re:'layout'},
-   {k:'frameGap',l:'테두리 간격',min:0,max:60,step:.5,u:'mm',re:'layout',show:()=>P.frame==='종이 가장자리'||P.frame==='그림 둘레',
+   {head:'테두리'},
+   {k:'frame',l:'화면 테두리',t:'그림 둘레에 선 테두리를 넣습니다. 없음이면 안 그립니다.',sel:['없음','종이 가장자리','여백 선','그림 둘레'],re:'layout'},
+   {k:'frameGap',l:'테두리 간격',t:'테두리를 기준선에서 얼마나 띄울지(mm).',min:0,max:60,step:.5,u:'mm',re:'layout',show:()=>P.frame==='종이 가장자리'||P.frame==='그림 둘레',
      fmt:v=>P.frame==='그림 둘레'?`그림에서 ${v} mm 밖`:`종이 끝에서 ${v} mm 안`},
-   {k:'frameLines',l:'테두리 겹선',min:1,max:3,step:1,fmt:v=>v>1?v+'줄':'한 줄',re:'layout',show:()=>P.frame!=='없음'},
-   {k:'framePen',l:'테두리 두께',min:.05,max:2,step:.01,u:'mm',d:2,re:'layout',show:()=>P.frame!=='없음'},
-   {k:'frameStep',l:'겹선 사이',min:.5,max:10,step:.1,u:'mm',re:'layout',show:()=>P.frame!=='없음'&&P.frameLines>1},
+   {k:'frameLines',l:'테두리 겹선',t:'테두리를 몇 줄로 그릴지.',min:1,max:3,step:1,fmt:v=>v>1?v+'줄':'한 줄',re:'layout',show:()=>P.frame!=='없음'},
+   {k:'framePen',l:'테두리 두께',t:'테두리를 그을 펜의 선 굵기(mm).',min:.05,max:2,step:.01,u:'mm',d:2,re:'layout',show:()=>P.frame!=='없음'},
+   {k:'frameStep',l:'겹선 사이',t:'테두리 줄과 줄 사이 거리(mm).',min:.5,max:10,step:.1,u:'mm',re:'layout',show:()=>P.frame!=='없음'&&P.frameLines>1},
    {info:'frameInfo'}]},
  {name:'내보내기',out:true,hint:'오래 걸리는 망점은 시간 단위로 나눕니다. SVG 파일은 하나이고, 그 안에서 레이어로 나뉩니다. 플로터 프로그램에서 위 레이어부터 하나씩 골라 그리세요. 점은 망점 각도를 따라 줄지어 찍히므로 한 레이어는 그림을 가로지르는 한 띠가 됩니다. 표의 작은 그림이 그 레이어가 맡는 자리입니다.',c:[
-   {k:'layerMinute',l:'레이어 하나 최대 시간',min:1,max:60,step:.5,fmt:v=>(+v)+' 분'+(+v===3?' (톤 플롯에서 검증된 값)':''),re:'stats'},
-   {k:'cmdSafe',l:'명령 수 안전선도 지키기 (레이어당 8,000개 · 톤 플롯과 같은 기준)',chk:1,re:'stats'},
+   {head:'플로터 속도 (예상 시간 계산용)'},
+   {k:'dotTime',l:'점 하나 찍는 시간',t:'플로터가 펜을 내렸다 올리는 데 걸리는 시간(초). 예상 시간 계산에만 쓰입니다.',min:.1,max:1,step:.01,u:'초',d:2,re:'stats'},
+   {k:'travel',l:'펜 이동 속도',t:'플로터가 펜을 옮기는 속도(mm/s). 예상 시간 계산에만 쓰입니다.',min:10,max:150,step:5,u:'mm/s',re:'stats'},
+   {head:'레이어 나누기'},
+   {k:'layerMinute',l:'레이어 하나 최대 시간',t:'한 레이어가 이 시간을 넘지 않게 나눕니다. 톤 플롯에서는 3분이 실제 플로터에서 안정적이었습니다.',min:1,max:60,step:.5,fmt:v=>(+v)+' 분'+(+v===3?' (톤 플롯에서 검증된 값)':''),re:'stats'},
+   {k:'cmdSafe',l:'명령 수 안전선도 지키기 (레이어당 8,000개 · 톤 플롯과 같은 기준)',t:'한 레이어의 플로터 명령이 8,000개를 넘지 않게도 나눕니다. 넘으면 플로터가 도중에 멈출 수 있습니다.',chk:1,re:'stats'},
    {planBox:1},
-   {k:'jpgDpi',l:'JPG 해상도',sel:['150','300','600'],fmt:v=>v+' dpi',re:'none'}]},
- {name:'설정 저장',hint:'지금의 모든 설정과 각도를 이 사이트에 저장합니다. 3D 파일은 용량이 커서 저장하지 않습니다. 불러올 때 원본 파일을 올려 달라고 알려 드리고, 올리면 각도까지 그대로 복원됩니다.',c:[{saves:1}]}
-];
+   {head:'보기용 그림'},
+   {k:'jpgDpi',l:'JPG 해상도',t:'보기용 JPG의 해상도. 플로터용 SVG와는 상관없습니다.',sel:['150','300','600'],fmt:v=>v+' dpi',re:'none'}]},
+ {name:'설정 저장',hint:'지금의 모든 설정과 각도를 이 사이트에 저장합니다. 3D 파일은 용량이 커서 저장하지 않습니다. 불러올 때 원본 파일을 올려 달라고 알려 드리고, 올리면 각도까지 그대로 복원됩니다.',c:[{saves:1}]}];
 const TAB_OUT=TABS.findIndex(t=>t.out),TAB_SAVE=TABS.length-1;
 const tabsEl=$('tabs'),panesEl=$('panes'),inputs={},shows=[];
 const fmtVal=(c,v)=>c.fmt?c.fmt(v):(c.d?(+v).toFixed(c.d):v)+(c.u?(c.u==='°'?c.u:' '+c.u):'');
@@ -7004,7 +7023,8 @@ TABS.forEach((t,i)=>{
   if(t.hint){const h=document.createElement('p');h.className='hint';h.textContent=t.hint;pane.appendChild(h)}
   t.c.forEach(c=>{
     let node;
-    if(c.btn){node=document.createElement('button');node.id='b_'+c.btn;node.textContent=c.l;node.style.alignSelf='flex-start'}
+    if(c.head){node=document.createElement('h3');node.className='ptitle sect';node.innerHTML='<span>'+c.head+'</span>'}
+    else if(c.btn){node=document.createElement('button');node.id='b_'+c.btn;node.textContent=c.l;node.style.alignSelf='flex-start'}
     else if(c.info){node=document.createElement('p');node.className='hint';node.id=c.info}
     else if(c.views){node=document.createElement('div');node.className='bar';
       [['정면',0,0],['오른쪽',90,0],['뒤',180,0],['왼쪽',270,0],['사선',30,6],['위에서',20,55]].forEach(([n,az,el])=>{const bb=document.createElement('button');bb.className='chip';bb.textContent=n;bb.onclick=()=>setView(az,el);node.appendChild(bb)})}
@@ -7037,12 +7057,25 @@ TABS.forEach((t,i)=>{
       cb.onchange=()=>{P[c.k]=cb.checked;changed(c.re)};node.append(cb,c.l);inputs[c.k]={c,el:cb}}
     else node=makeRow(c);
     if(c.show)shows.push([node,c.show]);
+    if(c.t)tipOn(node,c.t);
     pane.appendChild(node);
   });
   if(t.out){pane.insertAdjacentHTML('afterbegin','<div class="stats" id="stats"></div><p class="hint" id="statNote"></p>');pane.insertAdjacentHTML('beforeend','<div class="bar"><button class="primary" id="saveSvg">SVG 저장 (플로터용)</button><button id="saveJpg">JPG 저장 (보기용)</button></div><div class="status" id="status"></div>')}
   panesEl.appendChild(pane);
 });
 function updateShows(){for(const[n,f]of shows)n.hidden=!f()}
+// ---------- hover tips: one floating box, shown right away on hover or keyboard focus ----------
+const tipBox=document.createElement('div');tipBox.className='tipbox';tipBox.hidden=true;document.body.appendChild(tipBox);
+let tipT=0;
+function tipOn(node,text){node.classList.add('hastip');
+  const show=()=>{clearTimeout(tipT);tipBox.textContent=text;tipBox.hidden=false;const r=node.getBoundingClientRect(),bw=Math.min(340,innerWidth-16);tipBox.style.maxWidth=bw+'px';
+    tipBox.style.left='0px';tipBox.style.top='0px';const tb=tipBox.getBoundingClientRect();let x,y;
+    if(r.right+12+tb.width<=innerWidth-8){x=r.right+12;y=Math.min(Math.max(8,r.top+r.height/2-tb.height/2),innerHeight-8-tb.height)}   // 오른쪽에 자리가 있으면 옆에 -- 아래 항목을 가리지 않게
+    else{x=r.left;y=r.bottom+6;if(x+tb.width>innerWidth-8)x=Math.max(8,innerWidth-8-tb.width);if(y+tb.height>innerHeight-8)y=Math.max(8,r.top-6-tb.height)}
+    tipBox.style.left=x+'px';tipBox.style.top=y+'px'};
+  const hide=()=>{clearTimeout(tipT);tipT=setTimeout(()=>{tipBox.hidden=true},60)};
+  node.addEventListener('pointerenter',show);node.addEventListener('pointerleave',hide);
+  node.addEventListener('focusin',show);node.addEventListener('focusout',hide)}
 function syncInputs(){for(const k in inputs){const{c,el,out}=inputs[k];if(c.chk)el.checked=!!P[k];else{el.value=P[k];if(out&&!c.sel)setOut(out,c,P[k])}}updateShows()}
 function showTab(i){TABS.forEach((t,j)=>{$('tab'+j).classList.toggle('on',i===j);$('tab'+j).setAttribute('aria-selected',i===j);$('pane'+j).hidden=i!==j});try{localStorage.setItem('sculptDotTab',i)}catch(e){}if(cutReady)drawFrame()}
 try{showTab(+(localStorage.getItem('sculptDotTab')||0))}catch(e){showTab(0)}
@@ -7313,10 +7346,15 @@ const BAYER=bayer(8);
 // back to the line at both ends: the swell tapers like a burin cut.
 function engrave(toneAt,s,ox,oy){
   const{W,H,DP,MK}=raw,L=P.engSpacing/s,g=Math.max(1,Math.min(4,Math.floor(L/3))),pen=P.engPen,out=[];
-  const maxHalf=Math.max(0,(P.engMaxW-1)*pen/2),step=pen*.75,J=Math.ceil(maxHalf/step-1e-6),cut=P.engCut,ds=Math.max(.1,Math.min(.5,P.engSpacing/3));
+  const mode=P.engWidth||'겹선',single=mode==='한 줄만';
+  // 겹선: 덧긋는 줄 사이는 펜 굵기 하나 -- 번진 잉크가 겹치지 않고 나란히 붙게. 한 줄만: 덧긋기 없이 사이에 선을 끼운다.
+  const maxHalf=single?0:Math.max(0,(P.engMaxW-1)*pen/2),step=pen,J=Math.ceil(maxHalf/step-1e-6),cut=P.engCut,ds=Math.max(.1,Math.min(.5,P.engSpacing/3));
+  const sides=mode==='한쪽 겹선'?[1]:[1,-1];
+  // 끼워 넣는 선: 기본 간격의 1/2 (한 줄), 1/4 (세 줄). 선 사이가 펜 굵기보다 좁아지면 그 단계는 넣지 않는다.
+  let dense=single?+(P.engDense||2):1;while(dense>1&&P.engSpacing/dense<pen*.9)dense/=2;
   let nLines=0,len=0;
-  function trace(ang){const A=THREE.MathUtils.degToRad(ang),sA=Math.sin(A),cA=Math.cos(A),gw=Math.floor((W-1)/g)+1,gh=Math.floor((H-1)/g)+1,F=new Float32Array(gw*gh),ok=new Uint8Array(gw*gh);
-    for(let j=0;j<gh;j++)for(let i=0;i<gw;i++){const x=i*g,y=j*g,id=y*W+x;if(MK[id]){const q=j*gw+i;ok[q]=1;F[q]=(-(x+.5)*sA+(y+.5)*cA+P.engBend*DP[id])/L+1e-4}}
+  function trace(ang,shift=0){const A=THREE.MathUtils.degToRad(ang),sA=Math.sin(A),cA=Math.cos(A),gw=Math.floor((W-1)/g)+1,gh=Math.floor((H-1)/g)+1,F=new Float32Array(gw*gh),ok=new Uint8Array(gw*gh);
+    for(let j=0;j<gh;j++)for(let i=0;i<gw;i++){const x=i*g,y=j*g,id=y*W+x;if(MK[id]){const q=j*gw+i;ok[q]=1;F[q]=(-(x+.5)*sA+(y+.5)*cA+P.engBend*DP[id])/L+shift+1e-4}}
     const lev=new Map(),E=[0,0,0,0,0,0,0,0];
     for(let j=0;j<gh-1;j++)for(let i=0;i<gw-1;i++){const q=j*gw+i;if(!(ok[q]&&ok[q+1]&&ok[q+gw]&&ok[q+gw+1]))continue;
       const a=F[q],b=F[q+1],c=F[q+gw+1],d=F[q+gw],lo=Math.min(a,b,c,d),hi=Math.max(a,b,c,d);
@@ -7347,10 +7385,15 @@ function engrave(toneAt,s,ox,oy){
   for(const X of trace(P.engAngle)){const n=X.length/2,t=tones(X,n),Nn=normals(X,n),h=new Float32Array(n);nLines++;
     for(let i=0;i<n;i++){const tt=Math.min(1,Math.max(0,(t[i]-cut)/(1-cut||1)));h[i]=Math.pow(tt,P.engCurve)*maxHalf}
     runs(X,n,i=>t[i]>cut,()=>[0,0,0]);
-    for(let jj=1;jj<=J;jj++)for(const sd of[1,-1]){const lo=(jj-1)*step+.02*pen;
+    for(let jj=1;jj<=J;jj++)for(const sd of sides){const lo=(jj-1)*step+.02*pen;
       runs(X,n,i=>h[i]>lo,i=>[Nn[2*i],Nn[2*i+1],sd*Math.min(jj*step,h[i])])}}
+  // 한 줄만: 어두운 곳에 중간 선을 끼운다. 1/2 선은 진하기가 절반을 넘는 곳, 1/4·3/4 선은 더 어두운 곳에만.
+  if(single&&dense>1){const lv=dense===4?[[.5,.45],[.25,.8],[.75,.8]]:[[.5,.5]];
+    for(const[sh,th]of lv)for(const X of trace(P.engAngle,sh)){const n=X.length/2,t=tones(X,n);
+      runs(X,n,i=>Math.pow(Math.min(1,Math.max(0,(t[i]-cut)/(1-cut||1))),P.engCurve)>th,()=>[0,0,0])}}
   if(P.engCross)for(const X of trace(P.engAngle+90)){const n=X.length/2,t=tones(X,n);runs(X,n,i=>t[i]>P.engCrossT,()=>[0,0,0])}
-  const ie=$('engInfo');if(ie)ie.textContent=P.engMode==='끄기'?'':`선 ${nLines.toLocaleString()}줄 · 펜으로 긋는 획 ${out.length.toLocaleString()}개 · 길이 ${(len/1000).toFixed(1)} m · 선 사이 ${P.engSpacing.toFixed(2)} mm, 가장 굵은 곳 ${(P.engMaxW*pen).toFixed(2)} mm`;
+  const ie=$('engInfo');if(ie)ie.textContent=P.engMode==='끄기'?'':`선 ${nLines.toLocaleString()}줄 · 펜으로 긋는 획 ${out.length.toLocaleString()}개 · 길이 ${(len/1000).toFixed(1)} m · 선 사이 ${P.engSpacing.toFixed(2)} mm · `+
+    (single?`한 줄만 (어두운 곳 최소 간격 ${(P.engSpacing/dense).toFixed(2)} mm, 덧긋기 없음)`:`${mode} · 가장 굵은 곳 ${(P.engMaxW*pen).toFixed(2)} mm (최대 ${J*sides.length}번 덧긋기)`);
   return out}
 function layout(){
   if(!raw){pens=null;return}
@@ -7404,7 +7447,7 @@ function layout(){
         .filter(l=>{let len=0;for(let i=2;i<l.length;i+=2)len+=Math.hypot(l[i]-l[i-2],l[i+1]-l[i-1]);return len>=P.lineMin});
       geo.lines.push(...polys)}}
   geo.eng=P.engMode!=='끄기'&&raw.DP?engrave(toneAt,s,ox,oy):[];
-  const pr=pens[0];$('pen1Info').textContent=`펜 1 굵기(${pr.w.toFixed(2)}mm)는 5번 망점 탭에서 바꿉니다.`;$('dotInfo').textContent=`펜 ${pr.w.toFixed(2)}mm · 점 간격 ${pr.p.toFixed(2)}mm · 가장 어둡게 찍을 수 있는 밀도 약 ${Math.round(pr.cmax*100)}%`+(P.spacing<1?' (점끼리 살짝 겹침)':'');
+  const pr=pens[0];$('pen1Info').textContent=`펜 1 굵기(${pr.w.toFixed(2)}mm)는 위 "점" 항목의 펜 굵기입니다.`;$('dotInfo').textContent=`펜 ${pr.w.toFixed(2)}mm · 점 간격 ${pr.p.toFixed(2)}mm · 가장 어둡게 찍을 수 있는 밀도 약 ${Math.round(pr.cmax*100)}%`+(P.spacing<1?' (점끼리 살짝 겹침)':'');
 }
 
 // ---------- preview ----------
