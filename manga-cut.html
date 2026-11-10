@@ -3880,7 +3880,7 @@ void main() {
 'use strict';try{
 const {polygonClipping,THREE,GLTFLoader,STLLoader,OBJLoader,PLYLoader,OrbitControls,mergeVertices}=window.MC;
 const $=id=>document.getElementById(id);
-const VERSION='mc2';
+const VERSION='mc3';
 
 // ---------- models & parts ----------
 const MODELS={
@@ -3959,7 +3959,23 @@ function rawFromObject(obj){obj.updateMatrixWorld(true);const parts=[];let n=0;
   const out=new Float32Array(n);let k=0;parts.forEach(a=>{out.set(a,k);k+=a.length});return out}
 function rawFromGeometry(g){g=g.index?g.toNonIndexed():g;return new Float32Array(g.attributes.position.array)}
 function bboxRaw(raw){const b=new THREE.Box3();const v=new THREE.Vector3();for(let i=0;i<raw.length;i+=3){v.set(raw[i],raw[i+1],raw[i+2]);b.expandByPoint(v)}return b}
-function renderGeoFrom(raw){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(raw,3));let m;try{m=mergeVertices(g,1e-6)}catch(e){m=g}m.computeVertexNormals();m.computeBoundingBox();m.computeBoundingSphere();return m}
+// 각진 곳은 각지게(평평한 잘린 면·바닥이 울퉁불퉁하게 보이지 않게), 곡면은 부드럽게: 30° 넘게 꺾인 이웃 면과는 법선을 섞지 않는다
+function renderGeoFrom(raw,creaseDeg){const nT=raw.length/9,cosT=Math.cos((creaseDeg||30)*Math.PI/180);
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(raw,3));
+  let idx=null;try{const m=mergeVertices(g.clone(),1e-6);idx=m.index&&m.index.array}catch(e){}
+  if(!idx||idx.length!==nT*3){g.computeVertexNormals();g.computeBoundingBox();g.computeBoundingSphere();return g}
+  const fn=new Float32Array(nT*3);   // area-weighted face normals
+  for(let f=0;f<nT;f++){const o=f*9,ax=raw[o+3]-raw[o],ay=raw[o+4]-raw[o+1],az=raw[o+5]-raw[o+2],bx=raw[o+6]-raw[o],by=raw[o+7]-raw[o+1],bz=raw[o+8]-raw[o+2];
+    fn[f*3]=ay*bz-az*by;fn[f*3+1]=az*bx-ax*bz;fn[f*3+2]=ax*by-ay*bx}
+  let nV=0;for(let i=0;i<idx.length;i++)if(idx[i]>=nV)nV=idx[i]+1;
+  const cnt=new Uint32Array(nV+1);for(let i=0;i<idx.length;i++)cnt[idx[i]+1]++;for(let v=0;v<nV;v++)cnt[v+1]+=cnt[v];
+  const fill=cnt.slice(0,nV),lst=new Uint32Array(idx.length);for(let c=0;c<idx.length;c++)lst[fill[idx[c]]++]=(c/3)|0;
+  const nrm=new Float32Array(nT*9);
+  for(let c=0;c<idx.length;c++){const f=(c/3)|0,v=idx[c];let fx=fn[f*3],fy=fn[f*3+1],fz=fn[f*3+2];const fl=Math.hypot(fx,fy,fz)||1;
+    let sx=0,sy=0,sz=0;for(let k=cnt[v];k<cnt[v+1];k++){const h=lst[k],hx=fn[h*3],hy=fn[h*3+1],hz=fn[h*3+2],hl=Math.hypot(hx,hy,hz)||1;
+      if((fx*hx+fy*hy+fz*hz)/(fl*hl)>=cosT){sx+=hx;sy+=hy;sz+=hz}}
+    const l=Math.hypot(sx,sy,sz)||1;nrm[c*3]=sx/l;nrm[c*3+1]=sy/l;nrm[c*3+2]=sz/l}
+  g.setAttribute('normal',new THREE.BufferAttribute(nrm,3));g.computeBoundingBox();g.computeBoundingSphere();return g}
 
 // ---------- renderers ----------
 {const tc=document.createElement('canvas');if(!tc.getContext('webgl2')){$('st').textContent='이 브라우저는 WebGL2를 지원하지 않아 MANGA CUT을 열 수 없어요. 최신 크롬·사파리(iOS 15 이상)나 컴퓨터에서 열어 주세요.';$('st').classList.add('warn');return}}
@@ -4251,10 +4267,9 @@ window.addEventListener('resize',()=>{if(G.view==='2d')refresh()});
 // ---------- loading ----------
 async function loadModel(m){status(`${MODELS[m].ko} 불러오는 중…`);ST.orig={};
   const g=await new Promise((res,rej)=>new GLTFLoader().load(MODELS[m].file,res,ev=>{if(ev.total)status(`${MODELS[m].ko} 불러오는 중… ${Math.round(ev.loaded/ev.total*100)}%`)},rej));
-  const raw=rawFromObject(g.scene);let dgeo=null;const ms=[];g.scene.traverse(o=>{if(o.isMesh)ms.push(o)});
-  if(ms.length===1&&ms[0].geometry.attributes.normal){dgeo=ms[0].geometry.clone();dgeo.applyMatrix4(ms[0].matrixWorld);dgeo.computeBoundingBox();dgeo.computeBoundingSphere()}
+  const raw=rawFromObject(g.scene);
   status(`${MODELS[m].ko} 준비 중…`);await tick();
-  ST.ref={raw,box:bboxRaw(raw),geo:dgeo||renderGeoFrom(raw),name:MODELS[m].en};fitted=false;setActiveGeo();buildTabs();buildUI();
+  ST.ref={raw,box:bboxRaw(raw),geo:renderGeoFrom(raw),name:MODELS[m].en};fitted=false;setActiveGeo();buildTabs();buildUI();
   status(`${MODELS[m].ko} — 홈페이지용 3D를 썼어요. 원본은 "모델" 탭에서 올릴 수 있어요.`);
   try{const v=await DB.get(m);if(v)status(`${MODELS[m].ko} — 이 기기에 기억된 원본(${v.name})이 있어요. "모델" 탭에서 불러올 수 있어요.`)}catch(e){}}
 buildTabs();buildUI();setView('3d');loop();
