@@ -3881,20 +3881,20 @@ void main() {
 'use strict';try{
 const {polygonClipping,THREE,GLTFLoader,STLLoader,OBJLoader,PLYLoader,OrbitControls,mergeVertices}=window.MC;
 const $=id=>document.getElementById(id);
-const VERSION='mc3';
+const VERSION='mc4';
 
-// ---------- models & parts ----------
-const MODELS={
-  torso:{ko:'토르소 조각 01',en:'Torso Sculpture 01',file:'models/torso-sculpture-01.glb',
-    parts:{eye:['눈',[0,0.432,0.09],14,-4,0.06],mouth:['입',[-0.0548,0.4079,0.0891],30,0,0.05],ear:['귀',[0.0756,0.41,0.0437],65,5,0.1],clav:['쇄골',[-0.005,0.33,0.06],-5,12,0.2],breast:['가슴',[-0.07,0.24,0.15],-40,0,0.22],navel:['배꼽·복부',[0,0.11,0.1],5,0,0.16],pelvis:['골반선',[0.03,0.08,0.07],35,-5,0.32],waist:['허리 옆선',[-0.0912,0.12,0.008],-95,0,0.32],spine:['기립근',[0,0.08,0],180,12,0.28],nape:['목덜미',[0.0058,0.37,-0.0101],-25,-8,0.16],shoulder:['어깨 끝',[-0.1463,0.3,0.0258],-80,15,0.22],curl:['머리카락 컬',[0.1153,0.3,-0.0665],120,10,0.11],backhair:['뒷머리 물결',[0,0.27,-0.08],200,0,0.36],topcut:['정수리 단면',[-0.036,0.468,0.028],200,25,0.22],basecut:['바닥 단면',[0.02,0.04,0.06],20,-2,0.36],front:['정면 전신',[0,0.25,0],0,0,0.6],sidebody:['옆모습 전신',[0,0.25,0],95,0,0.6],backbody:['뒷모습 전신',[0,0.25,0],225,4,0.6]},
-    cycle:null},
-  medusa:{ko:'메두사 (실버)',en:'Head of Medusa (Silver Edition)',file:'models/head-of-medusa-silver.glb',
-    parts:{eye:['눈 하나',[-0.035,0.19,0.0714],-10,0,0.06],eyes:['두 눈',[0,0.19,0.071],0,0,0.1],mouth:['입',[0,0.145,0.0748],0,0,0.06],cheek:['뺨·옆얼굴',[0.0436,0.16,0.0622],35,0,0.1],chinsnake:['턱 아래 뱀',[0.06,0.11,0.0505],20,0,0.1],forehead:['이마·앞머리',[0,0.23,0.0601],0,10,0.12],topspike:['머리 위 가시',[-0.04,0.285,-0.0461],0,20,0.12],wing:['날개',[0.11,0.17,-0.04],110,0,0.2],backhair:['뒷머리',[0,0.2,-0.0711],180,0,0.18],drips:['흘러내림',[0,0.05,0.03],20,0,0.14],base:['받침',[0,0.01,0.0564],15,15,0.2],face:['얼굴 전체',[0,0.17,0.075],0,0,0.2],front:['정면 전신',[0,0.15,0],0,0,0.45],side:['옆모습 전신',[0,0.15,0],90,0,0.45]},
-    cycle:['eye','mouth','wing','chinsnake','backhair','topspike']}
-};
-const _md=MODELS.medusa;delete MODELS.medusa;
-MODELS.torsoJ={...MODELS.torso,ko:'토르소 조각 01 · 목과 몸을 붙인 버전',en:'Torso Sculpture 01 (neck and body joined)',file:'models/torso-sculpture-01-joined.glb',camsOf:'torso'};
-MODELS.medusa=_md;
+// ---------- files & parts ----------
+// 올린 파일은 모두 높이 0.5 · 가운데(x·z) · 바닥 y=0 으로 맞춰 쓴다 → 예전 토르소 앵글 좌표가 같은 기준으로 그대로 맞는다
+const REF_BOX=new THREE.Box3(new THREE.Vector3(-0.21398,0,-0.18899),new THREE.Vector3(0.21398,0.5,0.18899));
+const TORSO_PARTS={eye:['눈',[0,0.432,0.09],14,-4,0.06],mouth:['입',[-0.0548,0.4079,0.0891],30,0,0.05],ear:['귀',[0.0756,0.41,0.0437],65,5,0.1],clav:['쇄골',[-0.005,0.33,0.06],-5,12,0.2],breast:['가슴',[-0.07,0.24,0.15],-40,0,0.22],navel:['배꼽·복부',[0,0.11,0.1],5,0,0.16],pelvis:['골반선',[0.03,0.08,0.07],35,-5,0.32],waist:['허리 옆선',[-0.0912,0.12,0.008],-95,0,0.32],spine:['기립근',[0,0.08,0],180,12,0.28],nape:['목덜미',[0.0058,0.37,-0.0101],-25,-8,0.16],shoulder:['어깨 끝',[-0.1463,0.3,0.0258],-80,15,0.22],curl:['머리카락 컬',[0.1153,0.3,-0.0665],120,10,0.11],backhair:['뒷머리 물결',[0,0.27,-0.08],200,0,0.36],topcut:['정수리 단면',[-0.036,0.468,0.028],200,25,0.22],basecut:['바닥 단면',[0.02,0.04,0.06],20,-2,0.36],front:['정면 전신',[0,0.25,0],0,0,0.6],sidebody:['옆모습 전신',[0,0.25,0],95,0,0.6],backbody:['뒷모습 전신',[0,0.25,0],225,4,0.6]};
+const GEN_CYCLE=['upper','middle','lower','upperside','backupper','front'];
+function genericParts(b){const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()),H=s.y,y0=b.min.y,F=1.2*Math.max(s.x,s.y,s.z),C=0.6*H,at=f=>[+c.x.toFixed(5),+(y0+H*f).toFixed(5),+c.z.toFixed(5)];
+  return{front:['정면 전신',at(.5),0,0,F],q34:['3/4 전신',at(.5),35,5,F],sidebody:['옆모습 전신',at(.5),90,0,F],backbody:['뒷모습 전신',at(.5),180,0,F],topdown:['위에서 본 모습',at(.5),20,55,F],
+    upper:['위쪽',at(.82),0,0,C],middle:['가운데',at(.5),0,0,C],lower:['아래쪽',at(.18),0,0,C],upperside:['위쪽 옆모습',at(.8),90,0,C],backupper:['뒤쪽 위',at(.78),180,5,C]}}
+const MODELS={};
+function defModel(key){const f=G.files[key];if(!f)return null;const torso=f.kind==='torso';
+  const b=f.box?new THREE.Box3(new THREE.Vector3(...f.box[0]),new THREE.Vector3(...f.box[1])):REF_BOX;
+  return MODELS[key]={ko:f.name,en:f.name,parts:torso?TORSO_PARTS:genericParts(b),cycle:torso?null:GEN_CYCLE,camsOf:torso?'torso':key}}
 const PRESETS=[
 {name:'가로 직사각 · 2컷 세로로 나눔',W:220,H:90,skR:0,lines:[{c:0,off:-20,ang:90}],parts:[['mouth',0],['pelvis',0]]},
 {name:'가로 직사각 · 3컷 세로로 나눔',W:270,H:90,skR:0,lines:[{c:0,off:45,ang:90},{c:1,off:0,ang:90}],parts:[['eye',0],['clav',0],['navel',0]]},
@@ -3915,27 +3915,37 @@ const PRESETS=[
   cams:{torso:[{pos:[0.180549,0.4079,0.496736],tgt:[-0.0548,0.4079,0.0891],roll:-19,wpu:0.000579721,pp:[39.7585,14.8811]},{pos:[0.613664,0.324685,1.85424],tgt:[0.045465,0.442742,0.076271],roll:0,wpu:0.001152356,pp:[131,42.5]}]}}];
 const FINAL_PRESET=PRESETS.length-1;
 
-function panelFor(model,key,roll){const P=MODELS[model].parts[key];return{part:key,t:null,az:P[2],el:P[3],d:P[4],roll,sx:0,sy:0}}
+function panelFor(model,key,roll){const PT=MODELS[model].parts;const k=PT[key]?key:'front';const P=PT[k];return{part:k,t:null,az:P[2],el:P[3],d:P[4],roll,sx:0,sy:0}}
 function presetCam(model,pi,i){const p=PRESETS[pi];const k=(MODELS[model]&&MODELS[model].camsOf)||model;return p.cams&&p.cams[k]&&p.cams[k][i]?JSON.parse(JSON.stringify(p.cams[k][i])):null}
 function mkState(model,pi){const p=PRESETS[pi];const cyc=MODELS[model].cycle;
   return{W:p.W,H:p.H,skR:p.skR,gap:3.4,lines:p.lines.map(l=>({off:l.off,ang:l.ang})),
     panels:p.parts.map(([k,roll],i)=>{const c=presetCam(model,pi,i);const P=panelFor(model,c?k:(cyc?cyc[i%cyc.length]:k),roll);if(c)P.cam=c;return P})}}
-const mkModelState=m=>({preset:(m==='torso'||m==='torsoJ')?FINAL_PRESET:0,st:PRESETS.map((_,i)=>mkState(m,i))});
-const DEF=()=>({model:'torso',tab:'model',view:'3d',style:'toon',lens:3,line:1,sel:0,pageCm:40,depthCm:0,spread:0,
-  models:{torso:mkModelState('torso'),torsoJ:mkModelState('torsoJ'),medusa:mkModelState('medusa')},saved:[],align:{torso:null,torsoJ:null,medusa:null},rememberOrig:true,finalSeen:true});
+const mkModelState=m=>({preset:MODELS[m]&&MODELS[m].camsOf==='torso'?FINAL_PRESET:0,st:PRESETS.map((_,i)=>mkState(m,i))});
+// 칸 구성·장면은 파일 이름별로 G.files 에 (설정 동기화로 모든 컴퓨터에 같게). 3D 파일 자체는 컴퓨터마다 IndexedDB 에.
+const DEF=()=>({file:null,tab:'model',view:'3d',style:'toon',lens:3,line:1,sel:0,pageCm:40,depthCm:0,spread:0,files:{},legacy:null,saved:[],rememberOrig:true,lightFaces:300000,showOrig:false,v:2});
+function migrate(v){if(!v||typeof v!=='object')return DEF();const g={...DEF(),...v};
+  if(v.models&&!v.files){// 예전 버전: 토르소 구성(최종 눈·입 앵글 포함)을 '예전 구성'으로 옮겨 두고, 토르소 파일을 올리면 그대로 이어 쓴다
+    const pick=(v.model==='torso'||v.model==='torsoJ')&&v.models[v.model]?v.model:(v.models.torsoJ?'torsoJ':'torso');const L=v.models[pick];
+    g.legacy=L&&Array.isArray(L.st)?{preset:L.preset|0,st:L.st}:null;g.files={};g.file=null;g.tab='model'}
+  delete g.models;delete g.align;delete g.model;delete g.finalSeen;
+  if(!g.files||typeof g.files!=='object')g.files={};
+  for(const k in g.files){const f=g.files[k];if(!f||!Array.isArray(f.st)||!f.name)delete g.files[k]}
+  if(g.file&&!g.files[g.file])g.file=null;g.showOrig=false;return g}
 let G=DEF();
-try{const v=JSON.parse(localStorage.getItem('mangaCut1')||'null');
-  if(v&&v.models&&v.models.torso&&v.models.torso.st&&v.models.medusa&&v.models.medusa.st&&v.models.torso.st.length<=PRESETS.length&&v.models.medusa.st.length<=PRESETS.length){
-    if(!v.models.torsoJ||!v.models.torsoJ.st||v.models.torsoJ.st.length>PRESETS.length)v.models.torsoJ=mkModelState('torsoJ');v.align={torso:null,torsoJ:null,medusa:null,...(v.align||{})};
-    ['torso','torsoJ','medusa'].forEach(m=>{while(v.models[m].st.length<PRESETS.length)v.models[m].st.push(mkState(m,v.models[m].st.length))});
-    if(!v.finalSeen){v.models.torso.preset=FINAL_PRESET;v.finalSeen=true}G={...G,...v}}}catch(e){}
+try{G=migrate(JSON.parse(localStorage.getItem('mangaCut1')||'null'))}catch(e){}
 G.view='3d';
 const save=()=>{try{localStorage.setItem('mangaCut1',JSON.stringify(G))}catch(e){}};
-const MS=()=>G.models[G.model];
+const MS=()=>G.file?G.files[G.file]:null;
 const cur=()=>MS().st[MS().preset];
 const preset=()=>PRESETS[MS().preset];
-const partsOf=()=>MODELS[G.model].parts;
+const partsOf=()=>MODELS[G.file].parts;
 const targetOf=Pn=>Pn.part==='custom'&&Pn.t?Pn.t:(partsOf()[Pn.part]||partsOf().front)[1];
+const isTorsoName=n=>/torso|토르소/i.test(n||'');
+function newFileEntry(name,ext){return{name,ext,kind:isTorsoName(name)?'torso':'generic',align:{base:-1,yaw:0,pitch:0,mirror:false},box:null,preset:0,st:null}}
+function ensureLayouts(key){const f=G.files[key];defModel(key);
+  if(!f.st){if(f.kind==='torso'&&G.legacy){f.preset=G.legacy.preset;f.st=JSON.parse(JSON.stringify(G.legacy.st))}else{const m=mkModelState(key);f.preset=m.preset;f.st=m.st}}
+  while(f.st.length<PRESETS.length)f.st.push(mkState(key,f.st.length));if(!(f.preset>=0&&f.preset<PRESETS.length))f.preset=0}
+const fileBase=()=>(MS()?MS().name:'page').replace(/\.[^.]+$/,'').replace(/[^\w가-힣-]+/g,'_').slice(0,40);
 
 // ---------- geometry helpers ----------
 function inset(p,g){const n=p.length,ls=[];for(let i=0;i<n;i++){const a=p[i],b=p[(i+1)%n];let dx=b[0]-a[0],dy=b[1]-a[1],l=Math.hypot(dx,dy)||1;dx/=l;dy/=l;ls.push([a[0]-dy*g,a[1]+dx*g,dx,dy])}
@@ -3953,7 +3963,7 @@ const bbox=q=>{const xs=q.map(v=>v[0]),ys=q.map(v=>v[1]);const x0=Math.floor(Mat
 function layout(CW){const S=cur();const mU=8;const K=CW/(S.W+mU*2);return{K,M:mU*K,toPx:q=>q.map(v=>[v[0]*K+mU*K,v[1]*K+mU*K])}}
 
 // ---------- model data ----------
-const ST={ref:{},orig:{},active:null};
+const ST={ref:{},orig:{},active:null,T:null,key:null,srcBox:null,origState:'none',origPromise:null};
 function rawFromObject(obj){obj.updateMatrixWorld(true);const parts=[];let n=0;
   obj.traverse(o=>{if(o.isMesh&&o.geometry){let g=o.geometry.index?o.geometry.toNonIndexed():o.geometry;const p=g.attributes.position;const a=new Float32Array(p.count*3);const v=new THREE.Vector3();
     for(let i=0;i<p.count;i++){v.fromBufferAttribute(p,i).applyMatrix4(o.matrixWorld);a[i*3]=v.x;a[i*3+1]=v.y;a[i*3+2]=v.z}parts.push(a);n+=a.length}});
@@ -3988,9 +3998,9 @@ const toonM=new THREE.MeshToonMaterial({color:0xf2f2f2,gradientMap:gm});const sh
 const hullU={value:0.0016};const hullM=new THREE.MeshBasicMaterial({color:0x111111,side:THREE.BackSide});
 hullM.onBeforeCompile=s=>{s.uniforms.uLine=hullU;s.vertexShader='uniform float uLine;\n'+s.vertexShader.replace('#include <begin_vertex>','vec3 transformed=position+normal*uLine;')};
 let mesh2=null,hull2=null;
-function setActiveGeo(){const a=ST.orig.raw?ST.orig:ST.ref;ST.active=a;
+function setActiveGeo(){const useO=G.showOrig&&ST.orig.raw&&ST.orig.geo;if(!useO)G.showOrig=false;const a=useO?ST.orig:ST.ref;ST.active=a.geo?a:null;if(!ST.active)return;
   if(mesh2){sc2.remove(mesh2);sc2.remove(hull2)}
-  mesh2=new THREE.Mesh(a.geo,toonM);hull2=new THREE.Mesh(a.geo,hullM);sc2.add(mesh2,hull2);setStyle();refreshAll()}
+  mesh2=new THREE.Mesh(a.geo,toonM);hull2=new THREE.Mesh(a.hullGeo||a.geo,hullM);sc2.add(mesh2,hull2);setStyle();refreshAll()}
 function setStyle(){const t=G.style==='toon';if(mesh2)mesh2.material=t?toonM:shadeM;if(hull2)hull2.visible=t;hemi.intensity=t?1.2:0.8;key.intensity=t?2:2.8;
   const h=ST.ref.box?ST.ref.box.max.y-ST.ref.box.min.y:0.5;hullU.value=G.line*0.0032*h}
 const scaleD=d=>d*Math.tan(15*Math.PI/180)/Math.tan(G.lens*Math.PI/360);
@@ -4121,7 +4131,10 @@ function download(blob,name){const a=document.createElement('a');a.href=URL.crea
 const tick=()=>new Promise(r=>setTimeout(r,0));
 let cutting=false;
 async function cutSTL(mode){if(cutting||!ST.active)return;cutting=true;const one=mode==='one';const btns=[...document.querySelectorAll('.stlbtn')];btns.forEach(b=>b.disabled=true);
-  try{const a=ST.active;const defs=pieceDefs(900);const mpu=mmPerUnit();const files=[];const report=[];const all=[];
+  try{// STL은 언제나 원본으로 자른다 (불러오는 중이면 끝날 때까지 기다림)
+    if(!ST.orig.raw&&ST.origState==='loading'&&ST.origPromise){status('원본을 불러오는 중이에요 — 다 불러오면 바로 원본으로 잘라요…');await ST.origPromise}
+    if(!ST.orig.raw){status('STL은 원본으로만 잘라요. 이 컴퓨터에 원본이 없어요 — "모델" 탭에서 원본 3D를 다시 올려 주세요.',true);return}
+    const a=ST.orig;const defs=pieceDefs(900);const mpu=mmPerUnit();const files=[];const report=[];const all=[];
     const bb=a.box;const tol=(bb.max.distanceTo(bb.min))*2e-6;
     for(const D of defs){status(`${D.idx+1}번 칸 자르는 중… (${defs.length}칸 중)`);await tick();
       const Lm=D.Lm(0);const nm=new THREE.Matrix3().getNormalMatrix(Lm);const planes=D.pw.map(pl=>pl.clone().applyMatrix4(Lm,nm));
@@ -4137,49 +4150,187 @@ async function cutSTL(mode){if(cutting||!ST.active)return;cutting=true;const one
       const nmF=`panel-${String(D.idx+1).padStart(2,'0')}.stl`;files.push({name:nmF,data:stlBinary(outT,nmF)});all.push(outT);
       report.push({panel:D.idx+1,triangles:outT.length/9,size_mm:[mx[0]-mn[0],mx[1]-mn[1],mx[2]-mn[2]].map(x=>+x.toFixed(1)),open_edges:open})}
     const tot=all.reduce((s,a)=>s+a.length,0);const merged=new Float32Array(tot);let k=0;all.forEach(a=>{merged.set(a,k);k+=a.length});files.push({name:'page-all-panels.stl',data:stlBinary(merged,'page')});
-    const info={tool:'MANGA CUT',version:VERSION,date:new Date().toISOString(),model:MODELS[G.model].en,source:ST.orig.raw?('original: '+ST.orig.name):'homepage model (light)',preset:preset().name,page_width_cm:G.pageCm,depth_limit_cm:G.depthCm,lens_deg:G.lens,units:'mm, Z up, front faces -Y',layout:cur(),pieces:report};
+    const info={tool:'MANGA CUT',version:VERSION,date:new Date().toISOString(),model:MS().name,source:'original: '+ST.orig.name+' ('+ST.orig.tris+' triangles)',preset:preset().name,page_width_cm:G.pageCm,depth_limit_cm:G.depthCm,lens_deg:G.lens,units:'mm, Z up, front faces -Y',layout:cur(),pieces:report};
     files.push({name:'cut-info.json',data:new TextEncoder().encode(JSON.stringify(info,null,2))});
     const stamp=new Date().toISOString().slice(0,16).replace(/[-:T]/g,'');
-    if(one)download(new Blob([files.find(f=>f.name==='page-all-panels.stl').data],{type:'model/stl'}),`manga-cut_${G.model}_${stamp}.stl`);else download(zip(files),`manga-cut_${G.model}_${stamp}.zip`);
+    if(one)download(new Blob([files.find(f=>f.name==='page-all-panels.stl').data],{type:'model/stl'}),`manga-cut_${fileBase()}_${stamp}.stl`);else download(zip(files),`manga-cut_${fileBase()}_${stamp}.zip`);
     const openTot=report.reduce((s,r)=>s+r.open_edges,0);
-    $('cutReport').innerHTML=report.map(r=>`<div class="rep"><b>${r.panel}번 칸</b> ${r.size_mm.map(v=>(v/10).toFixed(1)).join(' × ')} cm · 삼각형 ${r.triangles.toLocaleString()}${r.open_edges?` · <span class="warn">단면이 덜 닫힌 곳 ${r.open_edges}</span>`:''}</div>`).join('');
+    if($('cutReport'))$('cutReport').innerHTML=report.map(r=>`<div class="rep"><b>${r.panel}번 칸</b> ${r.size_mm.map(v=>(v/10).toFixed(1)).join(' × ')} cm · 삼각형 ${r.triangles.toLocaleString()}${r.open_edges?` · <span class="warn">단면이 덜 닫힌 곳 ${r.open_edges}</span>`:''}</div>`).join('');
     status(openTot?'STL 저장 완료 — 일부 단면이 덜 닫혔어요(원본 3D가 완전히 닫힌 메쉬가 아닐 때 생겨요). 출력 전에 슬라이서에서 확인해 주세요.':(one?'STL 저장 완료 — 페이지 전체를 STL 한 파일로 받았어요 (칸 조각이 제자리에 놓인 상태, mm 단위).':'STL 저장 완료 — 칸별 파일과 페이지 전체 파일을 ZIP으로 받았어요.'),!!openTot)}
   catch(e){console.error(e);status('자르는 중 오류: '+(e.message||e),true)}finally{cutting=false;btns.forEach(b=>b.disabled=false)}}
 
-// ---------- original model: IndexedDB + alignment ----------
-const DB={open(){return new Promise((res,rej)=>{const r=indexedDB.open('mangaCutDB',1);r.onupgradeneeded=()=>r.result.createObjectStore('orig');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})},
-  async put(k,v){const d=await this.open();return new Promise((res,rej)=>{const t=d.transaction('orig','readwrite');t.objectStore('orig').put(v,k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error)})},
-  async get(k){const d=await this.open();return new Promise((res,rej)=>{const t=d.transaction('orig','readonly');const q=t.objectStore('orig').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})},
-  async del(k){const d=await this.open();return new Promise((res)=>{const t=d.transaction('orig','readwrite');t.objectStore('orig').delete(k);t.oncomplete=()=>res()})}};
+// ---------- 3D files: 이 컴퓨터에만 (IndexedDB) — 원본 파일 + 가벼운 버전 ----------
+const DB={_d:null,open(){if(this._d)return Promise.resolve(this._d);return new Promise((res,rej)=>{const r=indexedDB.open('mangaCutDB',2);
+    r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains('orig'))d.createObjectStore('orig');if(!d.objectStoreNames.contains('light'))d.createObjectStore('light')};
+    r.onsuccess=()=>{this._d=r.result;res(r.result)};r.onerror=()=>rej(r.error)})},
+  // put() 은 부르는 순간 값을 복사한다 → 미리 open 해 두면 바로 뒤에 버퍼를 워커로 넘겨도 안전
+  putNow(d,st,k,v){return new Promise((res,rej)=>{const t=d.transaction(st,'readwrite');t.objectStore(st).put(v,k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error)})},
+  async put(st,k,v){return this.putNow(await this.open(),st,k,v)},
+  async get(st,k){const d=await this.open();return new Promise((res,rej)=>{const q=d.transaction(st,'readonly').objectStore(st).get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})},
+  async del(st,k){const d=await this.open();return new Promise(res=>{const t=d.transaction(st,'readwrite');t.objectStore(st).delete(k);t.oncomplete=()=>res();t.onerror=()=>res()})},
+  async keys(st){const d=await this.open();return new Promise((res,rej)=>{const q=d.transaction(st,'readonly').objectStore(st).getAllKeys();q.onsuccess=()=>res(q.result||[]);q.onerror=()=>rej(q.error)})}};
 async function parseFile(name,buf){const ext=name.split('.').pop().toLowerCase();
   if(ext==='stl')return rawFromGeometry(new STLLoader().parse(buf));
   if(ext==='ply')return rawFromGeometry(new PLYLoader().parse(buf));
   if(ext==='obj')return rawFromObject(new OBJLoader().parse(new TextDecoder().decode(buf)));
   if(ext==='glb'||ext==='gltf'){const g=await new Promise((res,rej)=>new GLTFLoader().parse(buf,'',res,rej));return rawFromObject(g.scene)}
   throw new Error('STL · OBJ · PLY · GLB 파일만 됩니다')}
-const ROTS={auto:null};
-function alignRaw(src,refBox,al){const rot=new THREE.Matrix4();const cand=[new THREE.Matrix4(),new THREE.Matrix4().makeRotationX(-Math.PI/2),new THREE.Matrix4().makeRotationX(Math.PI/2),new THREE.Matrix4().makeRotationZ(Math.PI/2),new THREE.Matrix4().makeRotationZ(-Math.PI/2)];
-  const rs=refBox.getSize(new THREE.Vector3());const rn=rs.clone().divideScalar(Math.max(rs.x,rs.y,rs.z));const sb=bboxRaw(src);const corners=[];for(let i=0;i<8;i++)corners.push(new THREE.Vector3(i&1?sb.max.x:sb.min.x,i&2?sb.max.y:sb.min.y,i&4?sb.max.z:sb.min.z));
-  let base=al&&al.base!=null?al.base:-1;if(base<0){let best=1e9;cand.forEach((m,i)=>{const b=new THREE.Box3();corners.forEach(c=>b.expandByPoint(c.clone().applyMatrix4(m)));const s=b.getSize(new THREE.Vector3());const n=s.clone().divideScalar(Math.max(s.x,s.y,s.z));const err=Math.abs(n.x-rn.x)+Math.abs(n.y-rn.y)*2+Math.abs(n.z-rn.z);if(err<best){best=err;base=i}})}
-  rot.copy(cand[base]);const extra=new THREE.Matrix4().makeRotationY((al&&al.yaw||0)*Math.PI/180);const ex2=new THREE.Matrix4().makeRotationX((al&&al.pitch||0)*Math.PI/180);const flip=new THREE.Matrix4().makeScale(al&&al.mirror?-1:1,1,1);
-  const R=new THREE.Matrix4().multiplyMatrices(flip,new THREE.Matrix4().multiplyMatrices(extra,new THREE.Matrix4().multiplyMatrices(ex2,rot)));
-  const b=new THREE.Box3();corners.forEach(c=>b.expandByPoint(c.clone().applyMatrix4(R)));const s=b.getSize(new THREE.Vector3());const sc=rs.y/(s.y||1);
-  const rc=refBox.getCenter(new THREE.Vector3()),bc=b.getCenter(new THREE.Vector3());
-  const T=new THREE.Matrix4().makeTranslation(rc.x-bc.x*sc,refBox.min.y-b.min.y*sc,rc.z-bc.z*sc).multiply(new THREE.Matrix4().makeScale(sc,sc,sc)).multiply(R);
-  const out=new Float32Array(src.length);const e=T.elements;for(let i=0;i<src.length;i+=3){const x=src[i],y=src[i+1],z=src[i+2];out[i]=e[0]*x+e[4]*y+e[8]*z+e[12];out[i+1]=e[1]*x+e[5]*y+e[9]*z+e[13];out[i+2]=e[2]*x+e[6]*y+e[10]*z+e[14]}
-  return{raw:out,base,scale:sc,mirror:out&&al&&al.mirror}}
-async function loadOriginal(name,buf,fromDB){status(`원본 불러오는 중… ${name}`);await tick();
-  const src=await parseFile(name,buf);const al=G.align[G.model]||{base:-1,yaw:0,pitch:0,mirror:false};const r=alignRaw(src,ST.ref.box,al);al.base=r.base;G.align[G.model]=al;
-  ST.orig={src,raw:r.raw,name,tris:src.length/9,box:bboxRaw(r.raw)};ST.orig.geo=renderGeoFrom(r.raw);
-  if(!fromDB&&G.rememberOrig){try{await DB.put(G.model,{name,buf});}catch(e){status('이 기기에 원본을 기억하지 못했어요(저장 공간 부족일 수 있어요).',true)}}
-  save();fitted=false;setActiveGeo();buildUI();drawCompare();status(`원본을 썼어요 — ${name} · 삼각형 ${ST.orig.tris.toLocaleString()} · 기준 크기에 자동으로 맞췄어요. 아래 비교 그림으로 방향을 확인해 주세요.`)}
-function realign(){if(!ST.orig.src)return;const al=G.align[G.model];const r=alignRaw(ST.orig.src,ST.ref.box,al);ST.orig.raw=r.raw;ST.orig.box=bboxRaw(r.raw);ST.orig.geo=renderGeoFrom(r.raw);save();fitted=false;setActiveGeo();drawCompare()}
-function useHomepage(){ST.orig={};fitted=false;setActiveGeo();buildUI();status('홈페이지용 가벼운 3D로 돌아왔어요.')}
-// compare thumbnails
-function drawCompare(){const box=$('cmp');if(!box)return;const cs=box.querySelectorAll('canvas');if(cs.length<2)return;const pairs=[[ST.ref,cs[0]],[ST.orig.raw?ST.orig:ST.ref,cs[1]]];
-  const bk=[mesh2&&mesh2.geometry];pairs.forEach(([m,c])=>{if(!m||!m.geo)return;const tmp=new THREE.Mesh(m.geo,shadeM);const sc=new THREE.Scene();sc.add(new THREE.HemisphereLight(0xffffff,0x555555,1.4));const d=new THREE.DirectionalLight(0xffffff,2);d.position.set(-1,1,2);sc.add(d);sc.add(tmp);
-    const b=ST.ref.box;const ctr=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3());const cmr=new THREE.PerspectiveCamera(20,1,0.01,100);const D=Math.max(s.y,s.x)*1.6/Math.tan(10*Math.PI/180)/2;cmr.position.set(ctr.x+D*0.5,ctr.y,ctr.z+D*0.87);cmr.lookAt(ctr);
-    r2.setSize(240,240,false);r2.render(sc,cmr);const x=c.getContext('2d');c.width=240;c.height=240;x.fillStyle='#fff';x.fillRect(0,0,240,240);x.drawImage(r2.domElement,0,0)})}
+
+// 워커: STL 읽기 + 가벼운 버전 만들기 (화면이 멈추지 않게 뒤에서)
+function workerMain(){
+  const bboxOf=r=>{const a=[Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity];for(let i=0;i<r.length;i+=3){const x=r[i],y=r[i+1],z=r[i+2];if(x<a[0])a[0]=x;if(x>a[3])a[3]=x;if(y<a[1])a[1]=y;if(y>a[4])a[4]=y;if(z<a[2])a[2]=z;if(z>a[5])a[5]=z}return a};
+  function parseSTL(buf){const dv=new DataView(buf);
+    if(buf.byteLength>=84){const n=dv.getUint32(80,true);if(84+n*50===buf.byteLength){const out=new Float32Array(n*9);let o=84;for(let i=0;i<n;i++){o+=12;for(let k=0;k<9;k++){out[i*9+k]=dv.getFloat32(o,true);o+=4}o+=2}return out}}
+    const tk=new TextDecoder().decode(new Uint8Array(buf)).split(/\s+/),a=[];for(let i=0;i<tk.length-3;i++)if(tk[i]==='vertex'){a.push(+tk[i+1],+tk[i+2],+tk[i+3]);i+=3}
+    if(!a.length)throw new Error('STL 파일을 읽지 못했어요');return new Float32Array(a)}
+  // 격자 묶기 + 오차 최소점(QEM): 칸마다 한 점으로 모으되, 평평한 면·각진 모서리는 그대로 서도록 면의 평면들에 가장 가까운 점을 고른다
+  function cluster(r,h,b){const nV=r.length/3,nT=nV/3,gx=Math.floor((b[3]-b[0])/h)+2,gy=Math.floor((b[4]-b[1])/h)+2;
+    const map=new Map(),vid=new Uint32Array(nV);let V=0;
+    for(let j=0;j<nV;j++){const i=j*3,k=Math.floor((r[i]-b[0])/h)+gx*(Math.floor((r[i+1]-b[1])/h)+gy*Math.floor((r[i+2]-b[2])/h));let c=map.get(k);if(c===undefined){c=V++;map.set(k,c)}vid[j]=c}
+    map.clear();
+    // 얇은 곳(머리카락 가닥 등)은 앞면·뒷면이 한 칸에 들어가 서로 붙어 버린다 → 칸 안에서도 면 방향이 반대인 쪽은 따로 묶는다
+    {const CN=new Float64Array(V*3);
+      for(let t=0;t<nT;t++){const o=t*9,ax=r[o+3]-r[o],ay=r[o+4]-r[o+1],az=r[o+5]-r[o+2],bx=r[o+6]-r[o],by=r[o+7]-r[o+1],bz=r[o+8]-r[o+2],x=ay*bz-az*by,y=az*bx-ax*bz,z=ax*by-ay*bx;
+        for(let k=0;k<3;k++){const c=vid[t*3+k]*3;CN[c]+=x;CN[c+1]+=y;CN[c+2]+=z}}
+      for(let t=0;t<nT;t++){const o=t*9,ax=r[o+3]-r[o],ay=r[o+4]-r[o+1],az=r[o+5]-r[o+2],bx=r[o+6]-r[o],by=r[o+7]-r[o+1],bz=r[o+8]-r[o+2],x=ay*bz-az*by,y=az*bx-ax*bz,z=ax*by-ay*bx;
+        for(let k=0;k<3;k++){const j=t*3+k,c=vid[j];vid[j]=c*2+((x*CN[c*3]+y*CN[c*3+1]+z*CN[c*3+2])<0?1:0)}}
+      V*=2}const S=new Float64Array(V*4),Q=new Float64Array(V*9),NS=new Float64Array(V*3);
+    for(let j=0;j<nV;j++){const c=vid[j]*4,i=j*3;S[c]+=r[i];S[c+1]+=r[i+1];S[c+2]+=r[i+2];S[c+3]++}
+    for(let t=0;t<nT;t++){const o=t*9,ax=r[o+3]-r[o],ay=r[o+4]-r[o+1],az=r[o+5]-r[o+2],bx=r[o+6]-r[o],by=r[o+7]-r[o+1],bz=r[o+8]-r[o+2];
+      let x=ay*bz-az*by,y=az*bx-ax*bz,z=ax*by-ay*bx;const l=Math.hypot(x,y,z);if(!(l>0))continue;const w=l*.5;x/=l;y/=l;z/=l;const d=-(x*r[o]+y*r[o+1]+z*r[o+2]);
+      for(let k=0;k<3;k++){const q=vid[t*3+k]*9,nq=vid[t*3+k]*3;NS[nq]+=w*x;NS[nq+1]+=w*y;NS[nq+2]+=w*z;Q[q]+=w*x*x;Q[q+1]+=w*x*y;Q[q+2]+=w*x*z;Q[q+3]+=w*y*y;Q[q+4]+=w*y*z;Q[q+5]+=w*z*z;Q[q+6]-=w*x*d;Q[q+7]-=w*y*d;Q[q+8]-=w*z*d}}
+    const P=new Float64Array(V*3);
+    for(let c=0;c<V;c++){const n=S[c*4+3];if(!n)continue;const mx=S[c*4]/n,my=S[c*4+1]/n,mz=S[c*4+2]/n,q=c*9;const tr=Q[q]+Q[q+3]+Q[q+5],e=tr*.02+1e-30;
+      const a11=Q[q]+e,a12=Q[q+1],a13=Q[q+2],a22=Q[q+3]+e,a23=Q[q+4],a33=Q[q+5]+e,b1=Q[q+6]+e*mx,b2=Q[q+7]+e*my,b3=Q[q+8]+e*mz;
+      const det=a11*(a22*a33-a23*a23)-a12*(a12*a33-a23*a13)+a13*(a12*a23-a22*a13);let px=mx,py=my,pz=mz;
+      if(Math.abs(det)>1e-30){px=(b1*(a22*a33-a23*a23)-a12*(b2*a33-a23*b3)+a13*(b2*a23-a22*b3))/det;py=(a11*(b2*a33-a23*b3)-b1*(a12*a33-a23*a13)+a13*(a12*b3-b2*a13))/det;pz=(a11*(a22*b3-b2*a23)-a12*(a12*b3-b2*a13)+b1*(a12*a23-a22*a13))/det;
+        if(!isFinite(px+py+pz)||Math.hypot(px-mx,py-my,pz-mz)>h){px=mx;py=my;pz=mz}}
+      P[c*3]=px;P[c*3+1]=py;P[c*3+2]=pz}
+    // 겹친 삼각형은 하나만
+    let cap=1<<16;while(cap<nT/4)cap<<=1;cap=Math.min(cap,1<<24);let H=new Int32Array(cap*3).fill(-1),used=0;
+    const out=[];let cnt=0,buf=new Float32Array(1<<20);
+    const ins=(a,b,c)=>{let s0=a,s1=b,s2=c,t;if(s0>s1){t=s0;s0=s1;s1=t}if(s1>s2){t=s1;s1=s2;s2=t}if(s0>s1){t=s0;s0=s1;s1=t}
+      if(used*2>cap){const old=H,oc=cap;cap*=2;H=new Int32Array(cap*3).fill(-1);used=0;for(let i=0;i<oc;i++)if(old[i*3]>=0)put(old[i*3],old[i*3+1],old[i*3+2])}
+      return put(s0,s1,s2)};
+    const put=(a,b,c)=>{let h2=(Math.imul(a,73856093)^Math.imul(b,19349663)^Math.imul(c,83492791))&(cap-1);
+      for(;;){const o=h2*3;if(H[o]<0){H[o]=a;H[o+1]=b;H[o+2]=c;used++;return true}if(H[o]===a&&H[o+1]===b&&H[o+2]===c)return false;h2=(h2+1)&(cap-1)}};
+    for(let t=0;t<nT;t++){let a=vid[t*3],b=vid[t*3+1],c=vid[t*3+2];if(a===b||b===c||a===c||!ins(a,b,c))continue;
+      // 접혀 뒤집힌 삼각형은 주변 원래 면 방향에 맞게 돌려 놓는다 (음영 얼룩·외곽선 끊김 방지)
+      {const ux=P[b*3]-P[a*3],uy=P[b*3+1]-P[a*3+1],uz=P[b*3+2]-P[a*3+2],vx=P[c*3]-P[a*3],vy=P[c*3+1]-P[a*3+1],vz=P[c*3+2]-P[a*3+2];
+        const fx=uy*vz-uz*vy,fy=uz*vx-ux*vz,fz=ux*vy-uy*vx;if(fx*(NS[a*3]+NS[b*3]+NS[c*3])+fy*(NS[a*3+1]+NS[b*3+1]+NS[c*3+1])+fz*(NS[a*3+2]+NS[b*3+2]+NS[c*3+2])<0){const tt=b;b=c;c=tt}}
+      if((cnt+1)*9>buf.length){const nb=new Float32Array(buf.length*2);nb.set(buf);buf=nb}
+      const o=cnt*9;buf[o]=P[a*3];buf[o+1]=P[a*3+1];buf[o+2]=P[a*3+2];buf[o+3]=P[b*3];buf[o+4]=P[b*3+1];buf[o+5]=P[b*3+2];buf[o+6]=P[c*3];buf[o+7]=P[c*3+1];buf[o+8]=P[c*3+2];cnt++}
+    return buf.slice(0,cnt*9)}
+  // 같은 좌표의 점을 하나로 (삼각형 목록 → 점 + 번호)
+  function weld(r){const nV=r.length/3,U=new Uint32Array(r.buffer,r.byteOffset,r.length);let cap=1<<16;while(cap<nV/3)cap<<=1;let T=new Int32Array(cap).fill(-1);const rep=new Uint32Array(nV),idx=new Uint32Array(nV);let V=0,used=0;
+    const find=(j,T,cap)=>{const i=j*3,a=U[i],b=U[i+1],c=U[i+2];let h=(Math.imul(a,73856093)^Math.imul(b,19349663)^Math.imul(c,83492791))&(cap-1);for(;;){const s=T[h];if(s<0)return-1-h;const q=rep[s]*3;if(U[q]===a&&U[q+1]===b&&U[q+2]===c)return s;h=(h+1)&(cap-1)}};
+    for(let j=0;j<nV;j++){let s=find(j,T,cap);if(s<0){if(used*2>cap){cap*=2;const T2=new Int32Array(cap).fill(-1);for(let v=0;v<V;v++){const x=find(rep[v],T2,cap);T2[-1-x]=v}T=T2;s=find(j,T,cap)}T[-1-s]=V;rep[V]=j;s=V++;used++}idx[j]=s}
+    T=null;const pos=new Float32Array(V*3);for(let v=0;v<V;v++){const q=rep[v]*3;pos[v*3]=r[q];pos[v*3+1]=r[q+1];pos[v*3+2]=r[q+2]}return{pos,idx,V}}
+  // 가벼운 버전: meshoptimizer 의 모서리 줄이기(형태 오차가 가장 작은 곳부터) — 얇은 머리카락·각진 단면도 형태 그대로. 안 되면 격자 묶기로
+  async function simplifyTo(r,target,prog){prog('가벼운 버전 만드는 중');
+    try{await MeshoptSimplifier.ready;const w=weld(r);const res=MeshoptSimplifier.simplify(w.idx,w.pos,3,target*3,0.5,[]);const ix=res[0],n=ix.length/3;if(!n)throw new Error('empty');
+      const out=new Float32Array(n*9);for(let t=0;t<n*3;t++){const v=ix[t]*3;out[t*3]=w.pos[v];out[t*3+1]=w.pos[v+1];out[t*3+2]=w.pos[v+2]}return out}
+    catch(err){prog('가벼운 버전 만드는 중 (간단한 방법으로)');return decimate(r,target,prog)}}
+  function decimate(r,target,prog){const b=bboxOf(r);let A=0;
+    for(let o=0;o<r.length;o+=9){const ax=r[o+3]-r[o],ay=r[o+4]-r[o+1],az=r[o+5]-r[o+2],bx=r[o+6]-r[o],by=r[o+7]-r[o+1],bz=r[o+8]-r[o+2];A+=Math.hypot(ay*bz-az*by,az*bx-ax*bz,ax*by-ay*bx)*.5}
+    let h=Math.sqrt(3*A/target),best=null;
+    for(let it=0;it<3;it++){prog('가벼운 버전 만드는 중'+(it?' (크기 다시 맞추는 중)':''));const L=cluster(r,h,b),f=L.length/9;
+      if(!best||Math.abs(f-target)<Math.abs(best.length/9-target))best=L;if(f<=target*1.2&&f>=target*.75)break;h*=Math.sqrt(f/target)}
+    return best}
+  // 원본 보기용 법선: 같은 점끼리 묶고, 30° 넘게 꺾인 면과는 섞지 않는다 (각진 곳은 각지게, 곡면은 부드럽게)
+  function creaseNormals(r,deg){const nV=r.length/3,nT=nV/3,cosT=Math.cos(deg*Math.PI/180);const w=weld(r),vid=w.idx,V=w.V;
+    const fn=new Float32Array(nT*3);for(let t=0;t<nT;t++){const o=t*9,ax=r[o+3]-r[o],ay=r[o+4]-r[o+1],az=r[o+5]-r[o+2],bx=r[o+6]-r[o],by=r[o+7]-r[o+1],bz=r[o+8]-r[o+2];fn[t*3]=ay*bz-az*by;fn[t*3+1]=az*bx-ax*bz;fn[t*3+2]=ax*by-ay*bx}
+    const cnt=new Uint32Array(V+1);for(let j=0;j<nV;j++)cnt[vid[j]+1]++;for(let v=0;v<V;v++)cnt[v+1]+=cnt[v];const fill=cnt.slice(0,V),lst=new Uint32Array(nV);for(let j=0;j<nV;j++)lst[fill[vid[j]]++]=(j/3)|0;
+    const out=new Float32Array(nV*3);
+    for(let j=0;j<nV;j++){const f=(j/3)|0,v=vid[j],fx=fn[f*3],fy=fn[f*3+1],fz=fn[f*3+2],fl=Math.hypot(fx,fy,fz)||1;let sx=0,sy=0,sz=0;
+      for(let k=cnt[v];k<cnt[v+1];k++){const h=lst[k],hx=fn[h*3],hy=fn[h*3+1],hz=fn[h*3+2],hl=Math.hypot(hx,hy,hz)||1;if((fx*hx+fy*hy+fz*hz)/(fl*hl)>=cosT){sx+=hx;sy+=hy;sz+=hz}}
+      const l=Math.hypot(sx,sy,sz)||1;out[j*3]=sx/l;out[j*3+1]=sy/l;out[j*3+2]=sz/l}
+    return out}
+  onmessage=async e=>{const d=e.data,id=d.id,prog=m=>postMessage({op:'progress',id,msg:m});
+    if(d.op==='normals'){try{const n=creaseNormals(d.raw,30);postMessage({op:'done',id,normals:n,raw:d.raw},[n.buffer,d.raw.buffer])}catch(err){postMessage({op:'error',id,msg:String(err&&err.message||err)})}return}
+    try{let raw=d.raw;if(!raw){prog('파일 읽는 중');raw=parseSTL(d.buf)}
+      const box=bboxOf(raw),tris=raw.length/9;let light=null;if(d.target>0)light=tris<=d.target?raw.slice():await simplifyTo(raw,d.target,prog);
+      const out={op:'done',id,box,tris},tr=[];if(light){out.light=light;tr.push(light.buffer)}if(d.wantRaw){out.raw=raw;tr.push(raw.buffer)}postMessage(out,tr)}
+    catch(err){postMessage({op:'error',id,msg:String(err&&err.message||err)})}}}
+// meshoptimizer 0.21 simplifier (MIT License, (C) 2016-2024 Arseny Kapoulkine) — 워커 안에서만 씀
+const MESHOPT_SRC="// This file is part of meshoptimizer library and is distributed under the terms of MIT License.\n// Copyright (C) 2016-2024, by Arseny Kapoulkine (arseny.kapoulkine@gmail.com)\nvar MeshoptSimplifier = (function() {\n\t\"use strict\";\n\t// Built with clang version 18.1.2\n\t// Built from meshoptimizer 0.21\n\tvar wasm = \"b9H79Tebbbe9Hk9Geueu9Geub9Gbb9Gsuuuuuuuuuuuu99uueu9Gvuuuuub9Gvuuuuue999Gquuuuuuu99uueu9Gwuuuuuu99ueu9Giuuue999Gluuuueu9GiuuueuizsdilvoirwDbqqbeqlve9Weiiviebeoweuecj;jekr:Tewo9TW9T9VV95dbH9F9F939H79T9F9J9H229F9Jt9VV7bbz9TW79O9V9Wt9F79P9T9W29P9M95bl8E9TW79O9V9Wt9F79P9T9W29P9M959x9Pt9OcttV9P9I91tW7bvQ9TW79O9V9Wt9F79P9T9W29P9M959q9V9P9Ut7boX9TW79O9V9Wt9F79P9T9W29P9M959t9J9H2Wbra9TW79O9V9Wt9F9V9Wt9P9T9P96W9wWVtW94SWt9J9O9sW9T9H9Wbwl79IV9RbDDwebcekdmxq:f97sdbk:39si8Au8A99zu8Jjjjjbc;W;ab9Rgs8Kjjjjbcbhzascxfcbc;Kbz:ljjjb8AdnabaeSmbabaeadcdtz:kjjjb8AkdndnamcdGmbcbhHxekasalcrfci4gecbyd;S1jjbHjjjjbbgOBdxasceBd2aOcbaez:ljjjbhAcbhlcbhednadTmbcbhlabheadhOinaAaeydbgCci4fgXaXRbbgXceaCcrGgCtV86bbaXcu7aC4ceGalfhlaeclfheaOcufgOmbkcualcdtalcFFFFi0Ehekasaecbyd;S1jjbHjjjjbbgHBdzascdBd2alcd4alfhCcehOinaOgecethOaeaC6mbkcdhzcbhQascuaecdtgOaecFFFFi0Ecbyd;S1jjbHjjjjbbgCBdCasciBd2aCcFeaOz:ljjjbhLdnadTmbaecufhXcbhKinabaQcdtfgYydbgAc:v;t;h;Ev2hCcbhedndninaLaCaXGgCcdtfg8AydbgOcuSmeaHaOcdtfydbaASmdaecefgeaCfhCaeaX9nmbxdkkaHaKcdtfaABdba8AaKBdbaKhOaKcefhKkaYaOBdbaQcefgQad9hmbkkaLcbyd;O1jjbH:bjjjbbascdBd2kascxfazcdtfcualcefgecdtaecFFFFi0Ecbyd;S1jjbHjjjjbbgEBdbasaEBdlasazceVgeBd2ascxfaecdtfcuadcitadcFFFFe0Ecbyd;S1jjbHjjjjbbg3Bdbasa3BdwasazcdfgeBd2asclfabadalcbz:cjjjbascxfaecdtfcualcdtg5alcFFFFi0Eg8Ecbyd;S1jjbHjjjjbbgOBdbasazcifgeBd2ascxfaecdtfa8Ecbyd;S1jjbHjjjjbbg8FBdbasazclVgaBd2alcd4alfhXcehCinaCgecethCaeaX6mbkcbhKascxfaacdtfghcuaecdtgCaecFFFFi0Ecbyd;S1jjbHjjjjbbgXBdbasazcvVggBd2aXcFeaCz:ljjjbhQdnalTmbavcd4hAaecufhCinaKhednaHTmbaHaKcdtfydbhekaiaeaA2cdtfgeydlgXcH4aX7c:F:b:DD2aeydbgXcH4aX7c;D;O:B8J27aeydwgecH4ae7c:3F;N8N27aCGheaKcdth8JdndndndndnaHTmbaHa8JfhYcbhXinaQaecdtfgLydbg8AcuSmlaiaHa8AcdtfydbaA2cdtfaiaYydbaA2cdtfcxz:ojjjbTmiaXcefgXaefaCGheaXaC9nmbxdkkaiaKaA2cdtfhYcbhXinaQaecdtfgLydbg8AcuSmiaia8AaA2cdtfaYcxz:ojjjbTmdaXcefgXaefaCGheaXaC9nmbkkcbhLkaLydbgecu9hmekaLaKBdbaKhekaOa8JfaeBdbaKcefgKal9hmbkcbhea8FhCinaCaeBdbaCclfhCalaecefge9hmbkcbheaOhCa8FhXindnaeaCydbgASmbaXa8FaAcdtfgAydbBdbaAaeBdbkaCclfhCaXclfhXalaecefge9hmbkkcbh8KaQcbyd;O1jjbH:bjjjbbasaaBd2ahalcbyd;S1jjbHjjjjbbgABdbasagBd2ascxfagcdtfa8Ecbyd;S1jjbHjjjjbbgeBdbasazcofgCBd2ascxfaCcdtfa8Ecbyd;S1jjbHjjjjbbgCBdbasazcrfg8LBd2aecFea5z:ljjjbh8MaCcFea5z:ljjjbh8NdnalTmba3cwfhyindnaEa8KgXcefg8Kcdtfydbg8AaEaXcdtgefydbgCSmba8AaC9Rh8Ja3aCcitfh5a8Naefhga8MaefhKcbhLindndna5aLcitfydbgQaX9hmbaKaXBdbagaXBdbxekdnaEaQcdtgafgeclfydbgCaeydbgeSmba3aecitg8AfydbaXSmeaCae9Rhhaecu7aCfhYaya8AfhCcbheinaYaeSmeaecefheaCydbh8AaCcwfhCa8AaX9hmbkaeah6meka8NaafgeaXaQaeydbcuSEBdbaKaQaXaKydbcuSEBdbkaLcefgLa8J9hmbkka8Kal9hmbkaOhCaHhLa8FhXa8Nh8Aa8MhQcbheindndnaeaCydbgY9hmbdnaqTmbaehYdnaHTmbaLydbhYkaqaYfRbbTmbaAaefcl86bbxdkdnaeaXydbgY9hmbaQydbhYdna8AydbgKcu9hmbaYcu9hmbaAaefcb86bbxikaAaefh8JdnaeaKSmbaeaYSmba8Jce86bbxika8Jcl86bbxdkdnaea8FaYcdtgKfydb9hmbdna8Aydbg8JcuSmbaea8JSmbaQydbg5cuSmbaea5Smba8NaKfydbgacuSmbaaaYSmba8MaKfydbgKcuSmbaKaYSmbdnaOa8JcdtfydbaOaKcdtfydb9hmbaOa5cdtfydbaOaacdtfydb9hmbaAaefcd86bbxlkaAaefcl86bbxikaAaefcl86bbxdkaAaefcl86bbxekaAaefaAaYfRbb86bbkaCclfhCaLclfhLaXclfhXa8Aclfh8AaQclfhQalaecefge9hmbkamceGTmbaAhealhCindnaeRbbce9hmbaecl86bbkaecefheaCcufgCmbkkascxfa8Lcdtfcualcx2alc;v:Q;v:Qe0Ecbyd;S1jjbHjjjjbbggBdbasazcwVg8JBd2agaialavaHz:djjjbh8PdndnaDmbcbhvxekascxfa8JcdtfcualaD2gecdtaecFFFFi0Ecbyd;S1jjbHjjjjbbgvBdbasazcDVg8JBd2alTmbarcd4hYdnaHTmbaDcdthKcbhLavhQinaoaHaLcdtfydbaY2cdtfheawhCaQhXaDh8AinaXaeIdbaCIdbNUdbaeclfheaCclfhCaXclfhXa8Acufg8AmbkaQaKfhQaLcefgLal9hmbxdkkaYcdthYaDcdthKcbhQavhLinaoheawhCaLhXaDh8AinaXaeIdbaCIdbNUdbaeclfheaCclfhCaXclfhXa8Acufg8AmbkaoaYfhoaLaKfhLaQcefgQal9hmbkkascxfa8Jcdtfcualc8S2gealc;D;O;f8U0EgXcbyd;S1jjbHjjjjbbgCBdbasa8Jcefg8ABd2aCcbaez:ljjjbh8KdndndnaDTmbascxfa8AcdtfaXcbyd;S1jjbHjjjjbbgqBdbasa8JcdfgCBd2aqcbaez:ljjjb8AascxfaCcdtfcualaD2gecltgCaecFFFFb0Ecbyd;S1jjbHjjjjbbgwBdbasa8JcifBd2awcbaCz:ljjjb8AadmexdkcbhqcbhwadTmekcbhLabhCindnagaCclfydbgQcx2fgeIdbagaCydbgYcx2fgXIdbgI:tg8RagaCcwfydbgKcx2fg8AIdlaXIdlg8S:tgRNa8AIdbaI:tg8UaeIdla8S:tg8VN:tg8Wa8WNa8Va8AIdwaXIdwg8X:tg8YNaRaeIdwa8X:tg8VN:tgRaRNa8Va8UNa8Ya8RN:tg8Ra8RNMM:rg8UJbbbb9ETmba8Wa8U:vh8Wa8Ra8U:vh8RaRa8U:vhRka8KaOaYcdtfydbc8S2fgeaRa8U:rg8UaRNNg8VaeIdbMUdbaea8Ra8Ua8RNg8ZNg8YaeIdlMUdlaea8Wa8Ua8WNg80Ng81aeIdwMUdwaea8ZaRNg8ZaeIdxMUdxaea80aRNgBaeIdzMUdzaea80a8RNg80aeIdCMUdCaeaRa8Ua8Wa8XNaRaINa8Sa8RNMM:mg8SNgINgRaeIdKMUdKaea8RaINg8RaeId3MUd3aea8WaINg8WaeIdaMUdaaeaIa8SNgIaeId8KMUd8Kaea8UaeIdyMUdya8KaOaQcdtfydbc8S2fgea8VaeIdbMUdbaea8YaeIdlMUdlaea81aeIdwMUdwaea8ZaeIdxMUdxaeaBaeIdzMUdzaea80aeIdCMUdCaeaRaeIdKMUdKaea8RaeId3MUd3aea8WaeIdaMUdaaeaIaeId8KMUd8Kaea8UaeIdyMUdya8KaOaKcdtfydbc8S2fgea8VaeIdbMUdbaea8YaeIdlMUdlaea81aeIdwMUdwaea8ZaeIdxMUdxaeaBaeIdzMUdzaea80aeIdCMUdCaeaRaeIdKMUdKaea8RaeId3MUd3aea8WaeIdaMUdaaeaIaeId8KMUd8Kaea8UaeIdyMUdyaCcxfhCaLcifgLad6mbkcbh8JabhYinaba8JcdtfhQcbhCinaAaQaCcj1jjbfydbcdtfydbgXfRbbhedndnaAaYaCfydbg8AfRbbgLc99fcFeGcpe0mbaeceSmbaecd9hmekdnaLcufcFeGce0mba8Ma8AcdtfydbaX9hmekdnaecufcFeGce0mba8NaXcdtfydba8A9hmekdnaLcv2aefc:q1jjbfRbbTmbaOaXcdtfydbaOa8Acdtfydb0mekdnagaXcx2fgKIdwaga8Acx2fgiIdwg8S:tgRaRNaKIdbaiIdbg8X:tg8Ra8RNaKIdlaiIdlg8V:tg8Ua8UNMM:rgIJbbbb9ETmbaRaI:vhRa8UaI:vh8Ua8RaI:vh8RkJbbacJbbacJbbjZaeceSEaLceSEh80dnagaQaCc:e1jjbfydbcdtfydbcx2fgeIdwa8S:tg8WaRa8WaRNaeIdba8X:tg81a8RNa8UaeIdla8V:tg8ZNMMg8YN:tg8Wa8WNa81a8Ra8YN:tgRaRNa8Za8Ua8YN:tg8Ra8RNMM:rg8UJbbbb9ETmba8Wa8U:vh8Wa8Ra8U:vh8RaRa8U:vhRka8KaOa8Acdtfydbc8S2fgeaRa80aINg8UaRNNg8YaeIdbMUdbaea8Ra8Ua8RNg80Ng81aeIdlMUdlaea8Wa8Ua8WNgINg8ZaeIdwMUdwaea80aRNg80aeIdxMUdxaeaIaRNgBaeIdzMUdzaeaIa8RNg83aeIdCMUdCaeaRa8Ua8Wa8SNaRa8XNa8Va8RNMM:mg8SNgINgRaeIdKMUdKaea8RaINg8RaeId3MUd3aea8WaINg8WaeIdaMUdaaeaIa8SNgIaeId8KMUd8Kaea8UaeIdyMUdya8KaOaXcdtfydbc8S2fgea8YaeIdbMUdbaea81aeIdlMUdlaea8ZaeIdwMUdwaea80aeIdxMUdxaeaBaeIdzMUdzaea83aeIdCMUdCaeaRaeIdKMUdKaea8RaeId3MUd3aea8WaeIdaMUdaaeaIaeId8KMUd8Kaea8UaeIdyMUdykaCclfgCcx9hmbkaYcxfhYa8Jcifg8Jad6mbkaDTmbcbhYinJbbbbh8XagabaYcdtfgeclfydbgKcx2fgCIdwagaeydbgicx2fgXIdwg8Z:tg8Ra8RNaCIdbaXIdbgB:tg8Wa8WNaCIdlaXIdlg83:tg8Ua8UNMMg80agaecwfydbg8Jcx2fgeIdwa8Z:tgINa8Ra8RaINa8WaeIdbaB:tg8SNa8UaeIdla83:tg8VNMMgRN:tJbbbbJbbjZa80aIaINa8Sa8SNa8Va8VNMMg81NaRaRN:tg8Y:va8YJbbbb9BEg8YNhUa81a8RNaIaRN:ta8YNh85a80a8VNa8UaRN:ta8YNh86a81a8UNa8VaRN:ta8YNh87a80a8SNa8WaRN:ta8YNh88a81a8WNa8SaRN:ta8YNh89a8Wa8VNa8Sa8UN:tgRaRNa8UaINa8Va8RN:tgRaRNa8Ra8SNaIa8WN:tgRaRNMM:r:rhRavaiaD2cdtfhCava8JaD2cdtfhXavaKaD2cdtfh8Aa8Z:mh8:a83:mhZaB:mhncbhLaDhQJbbbbh8VJbbbbh8YJbbbbh80Jbbbbh81Jbbbbh8ZJbbbbhBJbbbbh83JbbbbhcJbbbbh9cinasc;WbfaLfgecwfaRa85a8AIdbaCIdbgI:tg8UNaUaXIdbaI:tg8SNMg8RNUdbaeclfaRa87a8UNa86a8SNMg8WNUdbaeaRa89a8UNa88a8SNMg8UNUdbaecxfaRa8:a8RNaZa8WNaIana8UNMMMgINUdbaRa8Ra8WNNa81Mh81aRa8Ra8UNNa8ZMh8ZaRa8Wa8UNNaBMhBaRaIaINNa8XMh8XaRa8RaINNa8VMh8VaRa8WaINNa8YMh8YaRa8UaINNa80Mh80aRa8Ra8RNNa83Mh83aRa8Wa8WNNacMhcaRa8Ua8UNNa9cMh9caCclfhCa8Aclfh8AaXclfhXaLczfhLaQcufgQmbkaqaOaicdtfydbgCc8S2fgea9caeIdbMUdbaeacaeIdlMUdlaea83aeIdwMUdwaeaBaeIdxMUdxaea8ZaeIdzMUdzaea81aeIdCMUdCaea80aeIdKMUdKaea8YaeId3MUd3aea8VaeIdaMUdaaea8XaeId8KMUd8KaeaRaeIdyMUdyaqaOaKcdtfydbgKc8S2fgea9caeIdbMUdbaeacaeIdlMUdlaea83aeIdwMUdwaeaBaeIdxMUdxaea8ZaeIdzMUdzaea81aeIdCMUdCaea80aeIdKMUdKaea8YaeId3MUd3aea8VaeIdaMUdaaea8XaeId8KMUd8KaeaRaeIdyMUdyaqaOa8Jcdtfydbgic8S2fgea9caeIdbMUdbaeacaeIdlMUdlaea83aeIdwMUdwaeaBaeIdxMUdxaea8ZaeIdzMUdzaea81aeIdCMUdCaea80aeIdKMUdKaea8YaeId3MUd3aea8VaeIdaMUdaaea8XaeId8KMUd8KaeaRaeIdyMUdyawaCaD2cltfhQcbhCaDh8AinaQaCfgeasc;WbfaCfgXIdbaeIdbMUdbaeclfgLaXclfIdbaLIdbMUdbaecwfgLaXcwfIdbaLIdbMUdbaecxfgeaXcxfIdbaeIdbMUdbaCczfhCa8Acufg8AmbkawaKaD2cltfhQcbhCaDh8AinaQaCfgeasc;WbfaCfgXIdbaeIdbMUdbaeclfgLaXclfIdbaLIdbMUdbaecwfgLaXcwfIdbaLIdbMUdbaecxfgeaXcxfIdbaeIdbMUdbaCczfhCa8Acufg8AmbkawaiaD2cltfhQcbhCaDh8AinaQaCfgeasc;WbfaCfgXIdbaeIdbMUdbaeclfgLaXclfIdbaLIdbMUdbaecwfgLaXcwfIdbaLIdbMUdbaecxfgeaXcxfIdbaeIdbMUdbaCczfhCa8Acufg8AmbkaYcifgYad6mbkkasydlhJcbhednalTmbaJclfheaJydbh8AaAhCalhLcbhXincbaeydbgQa8A9RaCRbbcpeGEaXfhXaCcefhCaeclfheaQh8AaLcufgLmbkaXce4hekcuadae9Rcifg8Lcx2a8Lc;v:Q;v:Qe0Ecbyd;S1jjbHjjjjbbhhascxfasyd2gecdtfahBdbasaecefgCBd2ascxfaCcdtfcua8Lcdta8LcFFFFi0Ecbyd;S1jjbHjjjjbbgzBdbasaecdfgCBd2ascxfaCcdtfa8Ecbyd;S1jjbHjjjjbbg3BdbasaecifgCBd2ascxfaCcdtfalcbyd;S1jjbHjjjjbbg9eBdbasaeclfBd2a8PJbbjZamclGEhcJbbbbh83dnadak9nmbdna8Lci6mbaxaxNacacN:vhBaDclthTahcwfhSJbbbbh83inasclfabadgoalaOz:cjjjbabhicbhEcbhyinabaycdtfh8JcbheindnaOaiaefydbgXcdtgKfydbg8AaOa8Jaec:S1jjbfydbcdtfydbgCcdtfydbgLSmbaAaCfRbbgYcv2aAaXfRbbgQfc;a1jjbfRbbgaaQcv2aYfg5c;a1jjbfRbbgdVcFeGTmbdnaLa8A9nmba5c:q1jjbfRbbcFeGmekdnaQaY9hmbaQcufcFeGce0mba8MaKfydbaC9hmekahaEcx2fg8AaCaXadcFeGgLEBdla8AaXaCaLEBdba8AaLaaGcb9hBdwaEcefhEkaeclfgecx9hmbkdnaycifgyao9pmbaicxfhiaEcifa8L9nmekkdnaEmbaohdxikcbhYinJbbbbJbbjZa8KaOahaYcx2fg8AydlgLa8AydbgQa8AydwgCEgicdtfydbgac8S2gdfgeIdygR:vaRJbbbb9BEaeIdwagaQaLaCEgKcx2fgCIdwg8UNaeIdzaCIdbgINaeIdaMgRaRMMa8UNaeIdlaCIdlg8SNaeIdCa8UNaeId3MgRaRMMa8SNaeIdbaINaeIdxa8SNaeIdKMgRaRMMaINaeId8KMMM:lNh80JbbbbJbbjZa8KaOaQcdtfydbgyc8S2gXfgeIdygR:vaRJbbbb9BEaeIdwagaLcx2fgCIdwg8WNaeIdzaCIdbg8XNaeIdaMgRaRMMa8WNaeIdlaCIdlg8VNaeIdCa8WNaeId3MgRaRMMa8VNaeIdba8XNaeIdxa8VNaeIdKMgRaRMMa8XNaeId8KMMM:lNh81a8Acwfh8Ja8Aclfh5dnaDTmbaqaXfgXIdwa8WNaXIdza8XNaXIdaMgRaRMMa8WNaXIdla8VNaXIdCa8WNaXId3MgRaRMMa8VNaXIdba8XNaXIdxa8VNaXIdKMgRaRMMa8XNaXId8KMMMh8RavaLaD2cdtfhCawayaD2cltfheaXIdyh8YaDhXinaCIdbgRJbbb;aNaecxfIdba8WaecwfIdbNa8XaeIdbNa8VaeclfIdbNMMMNaRaRNa8YNa8RMMh8RaCclfhCaeczfheaXcufgXmbkaqadfgXIdwa8UNaXIdzaINaXIdaMgRaRMMa8UNaXIdla8SNaXIdCa8UNaXId3MgRaRMMa8SNaXIdbaINaXIdxa8SNaXIdKMgRaRMMaINaXId8KMMMh8WavaKaD2cdtfhCawaaaD2cltfheaXIdyh8XaDhXinaCIdbgRJbbb;aNaecxfIdba8UaecwfIdbNaIaeIdbNa8SaeclfIdbNMMMNaRaRNa8XNa8WMMh8WaCclfhCaeczfheaXcufgXmbka80a8W:lMh80a81a8R:lMh81ka5aLaKa81a809FgeEBdba8AaQaiaeEBdba8Ja81a80aeEUdbaYcefgYaE9hmbkasc;Wbfcbcj;abz:ljjjb8AaSheaEhCinasc;WbfaeydbcO4c;8ZGfgXaXydbcefBdbaecxfheaCcufgCmbkcbhecbhCinasc;WbfaefgXydbh8AaXaCBdba8AaCfhCaeclfgecj;ab9hmbkcbheaShCinasc;WbfaCydbcO4c;8ZGfgXaXydbgXcefBdbazaXcdtfaeBdbaCcxfhCaEaecefge9hmbkaoak9RgXci9Uh9hdnalTmbcbhea3hCinaCaeBdbaCclfhCalaecefge9hmbkkcbh9ia9ecbalz:ljjjbh6aXcO9Uh9ka9hce4h0asydwh9mcbhdcbh5dninahaza5cdtfydbcx2fg8JIdwg8RaB9Emeada9h9pmeJFFuuhRdna0aE9pmbahaza0cdtfydbcx2fIdwJbb;aZNhRkdna8RaR9ETmbada9k0mdkdna6aOa8Jydlg9ncdtg9ofydbg8Afg9pRbba6aOa8Jydbgicdtg9qfydbg9rfg9sRbbVmbdnaJa9rcdtfgeclfydbgCaeydbgeSmbaCae9RhQa9maecitfheaga8Acx2fgKcwfhyaKclfh8Eaga9rcx2fgacwfhmaaclfhrcbhCcehYdnindna3aeydbcdtfydbgXa8ASmba3aeclfydbcdtfydbgLa8ASmbaXaLSmbagaLcx2fgLIdbagaXcx2fgXIdbg8W:tgRarIdbaXIdlg8U:tg8XNaaIdba8W:tg8VaLIdla8U:tg8RN:tgIaRa8EIdba8U:tg8YNaKIdba8W:tg80a8RN:tg8UNa8RamIdbaXIdwg8S:tg81Na8XaLIdwa8S:tg8WN:tg8Xa8RayIdba8S:tg8ZNa8Ya8WN:tg8RNa8Wa8VNa81aRN:tg8Sa8Wa80Na8ZaRN:tgRNMMaIaINa8Xa8XNa8Sa8SNMMa8Ua8UNa8Ra8RNaRaRNMMN:rJbbj8:N9FmdkaecwfheaCcefgCaQ6hYaQaC9hmbkkaYceGTmba0cefh0xeka8Ka8Ac8S2gXfgea8Ka9rc8S2gLfgCIdbaeIdbMUdbaeaCIdlaeIdlMUdlaeaCIdwaeIdwMUdwaeaCIdxaeIdxMUdxaeaCIdzaeIdzMUdzaeaCIdCaeIdCMUdCaeaCIdKaeIdKMUdKaeaCId3aeId3MUd3aeaCIdaaeIdaMUdaaeaCId8KaeId8KMUd8KaeaCIdyaeIdyMUdydnaDTmbaqaXfgeaqaLfgCIdbaeIdbMUdbaeaCIdlaeIdlMUdlaeaCIdwaeIdwMUdwaeaCIdxaeIdxMUdxaeaCIdzaeIdzMUdzaeaCIdCaeIdCMUdCaeaCIdKaeIdKMUdKaeaCId3aeId3MUd3aeaCIdaaeIdaMUdaaeaCId8KaeId8KMUd8KaeaCIdyaeIdyMUdyaTa9r2hYaTa8A2hKawhCaDhLinaCaKfgeaCaYfgXIdbaeIdbMUdbaeclfgQaXclfIdbaQIdbMUdbaecwfgQaXcwfIdbaQIdbMUdbaecxfgeaXcxfIdbaeIdbMUdbaCczfhCaLcufgLmbkka8JcwfhCdndndndnaAaifgXRbbc9:fPdebdkaiheina3aecdtgefa8ABdba8Faefydbgeai9hmbxikka8Fa9ofydbhea8Fa9qfydbhia3a9qfa9nBdbaeh9nka3aicdtfa9nBdbka9sce86bba9pce86bbaCIdbgRa83a83aR9DEh83a9icefh9icecdaXRbbceSEadfhdka5cefg5aE9hmbkkdna9imbaohdxikdnalTmbcbhCa8MheindnaeydbgXcuSmbdnaCa3aXcdtg8AfydbgX9hmba8Ma8AfydbhXkaeaXBdbkaeclfhealaCcefgC9hmbkcbhCa8NheindnaeydbgXcuSmbdnaCa3aXcdtg8AfydbgX9hmba8Na8AfydbhXkaeaXBdbkaeclfhealaCcefgC9hmbkkcbhdabhecbhLindna3aeydbcdtfydbgCa3aeclfydbcdtfydbgXSmbaCa3aecwfydbcdtfydbg8ASmbaXa8ASmbabadcdtfgQaCBdbaQcwfa8ABdbaQclfaXBdbadcifhdkaecxfheaLcifgLao6mbkadak9nmdxbkkasclfabadalaOz:cjjjbkdnaHTmbadTmbadheinabaHabydbcdtfydbBdbabclfhbaecufgembkkdnaPTmbaPaca83:rNUdbkasyd2gecdtascxffc98fhOdninaeTmeaOydbcbyd;O1jjbH:bjjjbbaOc98fhOaecufhexbkkasc;W;abf8Kjjjjbadk;Yieouabydlhvabydbclfcbaicdtz:ljjjbhoadci9UhrdnadTmbdnalTmbaehwadhDinaoalawydbcdtfydbcdtfgqaqydbcefBdbawclfhwaDcufgDmbxdkkaehwadhDinaoawydbcdtfgqaqydbcefBdbawclfhwaDcufgDmbkkdnaiTmbcbhDaohwinawydbhqawaDBdbawclfhwaqaDfhDaicufgimbkkdnadci6mbinaecwfydbhwaeclfydbhDaeydbhidnalTmbalawcdtfydbhwalaDcdtfydbhDalaicdtfydbhikavaoaicdtfgqydbcitfaDBdbavaqydbcitfawBdlaqaqydbcefBdbavaoaDcdtfgqydbcitfawBdbavaqydbcitfaiBdlaqaqydbcefBdbavaoawcdtfgwydbcitfaiBdbavawydbcitfaDBdlawawydbcefBdbaecxfhearcufgrmbkkabydbcbBdbk;Podvuv998Jjjjjbca9RgvcFFF;7rBd3av9cFFF;7;3FF:;Fb83dCavcFFF97Bdzav9cFFF;7FFF:;u83dwdnadTmbaicd4hodnabmbdnalTmbcbhrinaealarcdtfydbao2cdtfhwcbhiinavcCfaifgDawaifIdbgqaDIdbgkakaq9EEUdbavcwfaifgDaqaDIdbgkakaq9DEUdbaiclfgicx9hmbkarcefgrad9hmbxikkaocdthrcbhwincbhiinavcCfaifgDaeaifIdbgqaDIdbgkakaq9EEUdbavcwfaifgDaqaDIdbgkakaq9DEUdbaiclfgicx9hmbkaearfheawcefgwad9hmbxdkkdnalTmbcbhrinabarcx2fgiaealarcdtfydbao2cdtfgwIdbUdbaiawIdlUdlaiawIdwUdwcbhiinavcCfaifgDawaifIdbgqaDIdbgkakaq9EEUdbavcwfaifgDaqaDIdbgkakaq9DEUdbaiclfgicx9hmbkarcefgrad9hmbxdkkaocdthlcbhraehwinabarcx2fgiaearao2cdtfgDIdbUdbaiaDIdlUdlaiaDIdwUdwcbhiinavcCfaifgDawaifIdbgqaDIdbgkakaq9EEUdbavcwfaifgDaqaDIdbgkakaq9DEUdbaiclfgicx9hmbkawalfhwarcefgrad9hmbkkJbbbbavIdwavIdCgk:tgqaqJbbbb9DEgqavIdxavIdKgx:tgmamaq9DEgqavIdzavId3gm:tgPaPaq9DEhPdnabTmbadTmbJbbbbJbbjZaP:vaPJbbbb9BEhqinabaqabIdbak:tNUdbabclfgvaqavIdbax:tNUdbabcwfgvaqavIdbam:tNUdbabcxfhbadcufgdmbkkaPk8MbabaeadaialavcbcbcbcbcbaoarawaDz:bjjjbk8MbabaeadaialavaoarawaDaqakaxamaPz:bjjjbk;3Aowud99wue99iul998Jjjjjbc;Wb9Rgw8KjjjjbdndnarmbcbhDxekawcxfcbc;Kbz:ljjjb8Aawcuadcx2adc;v:Q;v:Qe0Ecbyd;S1jjbHjjjjbbgqBdxawceBd2aqaeadaicbz:djjjb8AawcuadcdtadcFFFFi0Egkcbyd;S1jjbHjjjjbbgxBdzawcdBd2adcd4adfhmceheinaegicetheaiam6mbkcbhmawcuaicdtgPaicFFFFi0Ecbyd;S1jjbHjjjjbbgsBdCawciBd2dndnar:Zgz:rJbbbZMgH:lJbbb9p9DTmbaH:Ohexekcjjjj94hekaicufhOc:bwhAcbhCcbhXadhQinaChLaeaAgKcufaeaK9iEamgDcefaeaD9kEhYdndnadTmbaYcuf:YhHaqhiaxheadhmindndnaiIdbaHNJbbbZMg8A:lJbbb9p9DTmba8A:OhAxekcjjjj94hAkaAcCthAdndnaiclfIdbaHNJbbbZMg8A:lJbbb9p9DTmba8A:OhCxekcjjjj94hCkaCcqtaAVhAdndnaicwfIdbaHNJbbbZMg8A:lJbbb9p9DTmba8A:OhCxekcjjjj94hCkaeaAaCVBdbaicxfhiaeclfheamcufgmmbkascFeaPz:ljjjbhEcbh3cbh5indnaEaxa5cdtfydbgAcm4aA7c:v;t;h;Ev2gics4ai7aOGgmcdtfgCydbgecuSmbaeaASmbcehiinaEamaifaOGgmcdtfgCydbgecuSmeaicefhiaeaA9hmbkkaCaABdba3aecuSfh3a5cefg5ad9hmbxdkkascFeaPz:ljjjb8Acbh3kaDaYa3ar0giEhmaLa3aiEhCdna3arSmbaYaKaiEgAam9Rcd9imbdndnaXcl0mbdnaQ:ZgHaL:Zg8A:taY:Yg8EaD:Y:tg8Fa8EaK:Y:tgaa3:Zghaz:tNNNaHaz:taaNa8Aah:tNa8Aaz:ta8FNahaH:tNM:va8EMJbbbZMgH:lJbbb9p9DTmbaH:Ohexdkcjjjj94hexekamaAfcd9Theka3aQaiEhQaXcefgXcs9hmekkdndnaCmbcihicbhDxekcbhiawakcbyd;S1jjbHjjjjbbg5BdKawclBd2dndnadTmbamcuf:YhHaqhiaxheadhmindndnaiIdbaHNJbbbZMg8A:lJbbb9p9DTmba8A:OhAxekcjjjj94hAkaAcCthAdndnaiclfIdbaHNJbbbZMg8A:lJbbb9p9DTmba8A:OhCxekcjjjj94hCkaCcqtaAVhAdndnaicwfIdbaHNJbbbZMg8A:lJbbb9p9DTmba8A:OhCxekcjjjj94hCkaeaAaCVBdbaicxfhiaeclfheamcufgmmbkascFeaPz:ljjjbhEcbhDcbh3inaxa3cdtgYfydbgAcm4aA7c:v;t;h;Ev2gics4ai7hecbhidndninaEaeaOGgmcdtfgCydbgecuSmednaxaecdtgCfydbaASmbaicefgiamfheaiaO9nmekka5aCfydbhixekaCa3BdbaDhiaDcefhDka5aYfaiBdba3cefg3ad9hmbkcuaDc32giaDc;j:KM;jb0EhexekascFeaPz:ljjjb8AcbhDcbhekawaecbyd;S1jjbHjjjjbbgeBd3awcvBd2aecbaiz:ljjjbhCavcd4hxdnadTmbdnalTmbaxcdthEa5hAalheaqhmadhOinaCaAydbc32fgiamIdbaiIdbMUdbaiamclfIdbaiIdlMUdlaiamcwfIdbaiIdwMUdwaiaeIdbaiIdxMUdxaiaeclfIdbaiIdzMUdzaiaecwfIdbaiIdCMUdCaiaiIdKJbbjZMUdKaAclfhAaeaEfheamcxfhmaOcufgOmbxdkka5hmaqheadhAinaCamydbc32fgiaeIdbaiIdbMUdbaiaeclfIdbaiIdlMUdlaiaecwfIdbaiIdwMUdwaiaiIdxJbbbbMUdxaiaiIdzJbbbbMUdzaiaiIdCJbbbbMUdCaiaiIdKJbbjZMUdKamclfhmaecxfheaAcufgAmbkkdnaDTmbaChiaDheinaiaiIdbJbbbbJbbjZaicKfIdbgH:vaHJbbbb9BEgHNUdbaiclfgmaHamIdbNUdbaicwfgmaHamIdbNUdbaicxfgmaHamIdbNUdbaiczfgmaHamIdbNUdbaicCfgmaHamIdbNUdbaic3fhiaecufgembkkcbhAawcuaDcdtgYaDcFFFFi0Egicbyd;S1jjbHjjjjbbgeBdaawcoBd2awaicbyd;S1jjbHjjjjbbgEBd8KaecFeaYz:ljjjbh3dnadTmbaoaoNh8Aaxcdthxalheina8Aaec;C1jjbalEgmIdwaCa5ydbgOc32fgiIdC:tgHaHNamIdbaiIdx:tgHaHNamIdlaiIdz:tgHaHNMMNaqcwfIdbaiIdw:tgHaHNaqIdbaiIdb:tgHaHNaqclfIdbaiIdl:tgHaHNMMMhHdndna3aOcdtgifgmydbcuSmbaEaifIdbaH9ETmekamaABdbaEaifaHUdbka5clfh5aeaxfheaqcxfhqadaAcefgA9hmbkkaba3aYz:kjjjb8AcrhikaicdthiinaiTmeaic98fgiawcxffydbcbyd;O1jjbH:bjjjbbxbkkawc;Wbf8KjjjjbaDk:Odieui99iu8Jjjjjbca9RgicFFF;7rBd3ai9cFFF;7;3FF:;Fb83dCaicFFF97Bdzai9cFFF;7FFF:;u83dwdndnaembJbbjFhlJbbjFhvJbbjFhoxekadcd4cdthrcbhwincbhdinaicCfadfgDabadfIdbglaDIdbgvaval9EEUdbaicwfadfgDalaDIdbgvaval9DEUdbadclfgdcx9hmbkabarfhbawcefgwae9hmbkaiIdzaiId3:thoaiIdxaiIdK:thvaiIdwaiIdC:thlkJbbbbalalJbbbb9DEglavaval9DEglaoaoal9DEk9DeeuabcFeaicdtz:ljjjbhlcbhbdnadTmbindnalaeydbcdtfgiydbcu9hmbaiabBdbabcefhbkaeclfheadcufgdmbkkabk9teiucbcbyd;W1jjbgeabcifc98GfgbBd;W1jjbdndnabZbcztgd9nmbcuhiabad9RcFFifcz4nbcuSmekaehikaik;LeeeudndnaeabVciGTmbabhixekdndnadcz9pmbabhixekabhiinaiaeydbBdbaiclfaeclfydbBdbaicwfaecwfydbBdbaicxfaecxfydbBdbaeczfheaiczfhiadc9Wfgdcs0mbkkadcl6mbinaiaeydbBdbaeclfheaiclfhiadc98fgdci0mbkkdnadTmbinaiaeRbb86bbaicefhiaecefheadcufgdmbkkabk;aeedudndnabciGTmbabhixekaecFeGc:b:c:ew2hldndnadcz9pmbabhixekabhiinaialBdbaicxfalBdbaicwfalBdbaiclfalBdbaiczfhiadc9Wfgdcs0mbkkadcl6mbinaialBdbaiclfhiadc98fgdci0mbkkdnadTmbinaiae86bbaicefhiadcufgdmbkkabk9teiucbcbyd;W1jjbgeabcrfc94GfgbBd;W1jjbdndnabZbcztgd9nmbcuhiabad9RcFFifcz4nbcuSmekaehikaik9:eiuZbhedndncbyd;W1jjbgdaecztgi9nmbcuheadai9RcFFifcz4nbcuSmekadhekcbabae9Rcifc98Gcbyd;W1jjbfgdBd;W1jjbdnadZbcztge9nmbadae9RcFFifcz4nb8Akk6eiucbhidnadTmbdninabRbbglaeRbbgv9hmeaecefheabcefhbadcufgdmbxdkkalav9Rhikaikk:bedbcjwk9Oebbbdbbbbbbbebbbeeebeebebbeeebebbbbbebebbbbbebbbdbbbbbbbbbbbbbbbeeeeebebbbbbebbbbbeebbbbbbbbbbbbbbbbbbbbbc;Owkxebbbdbbbj9Kbb\";\n\n\tvar wasmpack = new Uint8Array([32,0,65,2,1,106,34,33,3,128,11,4,13,64,6,253,10,7,15,116,127,5,8,12,40,16,19,54,20,9,27,255,113,17,42,67,24,23,146,148,18,14,22,45,70,69,56,114,101,21,25,63,75,136,108,28,118,29,73,115]);\n\n\tif (typeof WebAssembly !== 'object') {\n\t\treturn {\n\t\t\tsupported: false,\n\t\t};\n\t}\n\n\tvar instance;\n\n\tvar ready =\n\t\tWebAssembly.instantiate(unpack(wasm), {})\n\t\t.then(function(result) {\n\t\t\tinstance = result.instance;\n\t\t\tinstance.exports.__wasm_call_ctors();\n\t\t});\n\n\tfunction unpack(data) {\n\t\tvar result = new Uint8Array(data.length);\n\t\tfor (var i = 0; i < data.length; ++i) {\n\t\t\tvar ch = data.charCodeAt(i);\n\t\t\tresult[i] = ch > 96 ? ch - 97 : ch > 64 ? ch - 39 : ch + 4;\n\t\t}\n\t\tvar write = 0;\n\t\tfor (var i = 0; i < data.length; ++i) {\n\t\t\tresult[write++] = (result[i] < 60) ? wasmpack[result[i]] : (result[i] - 60) * 64 + result[++i];\n\t\t}\n\t\treturn result.buffer.slice(0, write);\n\t}\n\n\tfunction assert(cond) {\n\t\tif (!cond) {\n\t\t\tthrow new Error(\"Assertion failed\");\n\t\t}\n\t}\n\n\tfunction bytes(view) {\n\t\treturn new Uint8Array(view.buffer, view.byteOffset, view.byteLength);\n\t}\n\n\tfunction reorder(fun, indices, vertices) {\n\t\tvar sbrk = instance.exports.sbrk;\n\t\tvar ip = sbrk(indices.length * 4);\n\t\tvar rp = sbrk(vertices * 4);\n\t\tvar heap = new Uint8Array(instance.exports.memory.buffer);\n\t\tvar indices8 = bytes(indices);\n\t\theap.set(indices8, ip);\n\t\tvar unique = fun(rp, ip, indices.length, vertices);\n\t\t// heap may have grown\n\t\theap = new Uint8Array(instance.exports.memory.buffer);\n\t\tvar remap = new Uint32Array(vertices);\n\t\tnew Uint8Array(remap.buffer).set(heap.subarray(rp, rp + vertices * 4));\n\t\tindices8.set(heap.subarray(ip, ip + indices.length * 4));\n\t\tsbrk(ip - sbrk(0));\n\n\t\tfor (var i = 0; i < indices.length; ++i)\n\t\t\tindices[i] = remap[indices[i]];\n\n\t\treturn [remap, unique];\n\t}\n\n\tfunction maxindex(source) {\n\t\tvar result = 0;\n\t\tfor (var i = 0; i < source.length; ++i) {\n\t\t\tvar index = source[i];\n\t\t\tresult = result < index ? index : result;\n\t\t}\n\t\treturn result;\n\t}\n\n\tfunction simplify(fun, indices, index_count, vertex_positions, vertex_count, vertex_positions_stride, target_index_count, target_error, options) {\n\t\tvar sbrk = instance.exports.sbrk;\n\t\tvar te = sbrk(4);\n\t\tvar ti = sbrk(index_count * 4);\n\t\tvar sp = sbrk(vertex_count * vertex_positions_stride);\n\t\tvar si = sbrk(index_count * 4);\n\t\tvar heap = new Uint8Array(instance.exports.memory.buffer);\n\t\theap.set(bytes(vertex_positions), sp);\n\t\theap.set(bytes(indices), si);\n\t\tvar result = fun(ti, si, index_count, sp, vertex_count, vertex_positions_stride, target_index_count, target_error, options, te);\n\t\t// heap may have grown\n\t\theap = new Uint8Array(instance.exports.memory.buffer);\n\t\tvar target = new Uint32Array(result);\n\t\tbytes(target).set(heap.subarray(ti, ti + result * 4));\n\t\tvar error = new Float32Array(1);\n\t\tbytes(error).set(heap.subarray(te, te + 4));\n\t\tsbrk(te - sbrk(0));\n\t\treturn [target, error[0]];\n\t}\n\n\tfunction simplifyAttr(fun, indices, index_count, vertex_positions, vertex_count, vertex_positions_stride, vertex_attributes, vertex_attributes_stride, attribute_weights, vertex_lock, target_index_count, target_error, options) {\n\t\tvar sbrk = instance.exports.sbrk;\n\t\tvar te = sbrk(4);\n\t\tvar ti = sbrk(index_count * 4);\n\t\tvar sp = sbrk(vertex_count * vertex_positions_stride);\n\t\tvar sa = sbrk(vertex_count * vertex_attributes_stride);\n\t\tvar sw = sbrk(attribute_weights.length * 4);\n\t\tvar si = sbrk(index_count * 4);\n\t\tvar vl = vertex_lock ? sbrk(vertex_count) : 0;\n\t\tvar heap = new Uint8Array(instance.exports.memory.buffer);\n\t\theap.set(bytes(vertex_positions), sp);\n\t\theap.set(bytes(vertex_attributes), sa);\n\t\theap.set(bytes(attribute_weights), sw);\n\t\theap.set(bytes(indices), si);\n\t\tif (vertex_lock) {\n\t\t\theap.set(bytes(vertex_lock), vl);\n\t\t}\n\t\tvar result = fun(ti, si, index_count, sp, vertex_count, vertex_positions_stride, sa, vertex_attributes_stride, sw, attribute_weights.length, vl, target_index_count, target_error, options, te);\n\t\t// heap may have grown\n\t\theap = new Uint8Array(instance.exports.memory.buffer);\n\t\tvar target = new Uint32Array(result);\n\t\tbytes(target).set(heap.subarray(ti, ti + result * 4));\n\t\tvar error = new Float32Array(1);\n\t\tbytes(error).set(heap.subarray(te, te + 4));\n\t\tsbrk(te - sbrk(0));\n\t\treturn [target, error[0]];\n\t}\n\n\tfunction simplifyScale(fun, vertex_positions, vertex_count, vertex_positions_stride) {\n\t\tvar sbrk = instance.exports.sbrk;\n\t\tvar sp = sbrk(vertex_count * vertex_positions_stride);\n\t\tvar heap = new Uint8Array(instance.exports.memory.buffer);\n\t\theap.set(bytes(vertex_positions), sp);\n\t\tvar result = fun(sp, vertex_count, vertex_positions_stride);\n\t\tsbrk(sp - sbrk(0));\n\t\treturn result;\n\t}\n\n\tfunction simplifyPoints(fun, vertex_positions, vertex_count, vertex_positions_stride, vertex_colors, vertex_colors_stride, color_weight, target_vertex_count) {\n\t\tvar sbrk = instance.exports.sbrk;\n\t\tvar ti = sbrk(target_vertex_count * 4);\n\t\tvar sp = sbrk(vertex_count * vertex_positions_stride);\n\t\tvar sc = sbrk(vertex_count * vertex_colors_stride);\n\t\tvar heap = new Uint8Array(instance.exports.memory.buffer);\n\t\theap.set(bytes(vertex_positions), sp);\n\t\tif (vertex_colors) {\n\t\t\theap.set(bytes(vertex_colors), sc);\n\t\t}\n\t\tvar result = fun(ti, sp, vertex_count, vertex_positions_stride, sc, vertex_colors_stride, color_weight, target_vertex_count);\n\t\t// heap may have grown\n\t\theap = new Uint8Array(instance.exports.memory.buffer);\n\t\tvar target = new Uint32Array(result);\n\t\tbytes(target).set(heap.subarray(ti, ti + result * 4));\n\t\tsbrk(ti - sbrk(0));\n\t\treturn target;\n\t}\n\n\tvar simplifyOptions = {\n\t\tLockBorder: 1,\n\t\tSparse: 2,\n\t\tErrorAbsolute: 4,\n\t};\n\n\treturn {\n\t\tready: ready,\n\t\tsupported: true,\n\n\t\t// set this to true to be able to use simplifyPoints and simplifyWithAttributes\n\t\t// note that these functions are experimental and may change interface/behavior in a way that will require revising calling code\n\t\tuseExperimentalFeatures: false,\n\n\t\tcompactMesh: function(indices) {\n\t\t\tassert(indices instanceof Uint32Array || indices instanceof Int32Array || indices instanceof Uint16Array || indices instanceof Int16Array);\n\t\t\tassert(indices.length % 3 == 0);\n\n\t\t\tvar indices32 = indices.BYTES_PER_ELEMENT == 4 ? indices : new Uint32Array(indices);\n\t\t\treturn reorder(instance.exports.meshopt_optimizeVertexFetchRemap, indices32, maxindex(indices) + 1);\n\t\t},\n\n\t\tsimplify: function(indices, vertex_positions, vertex_positions_stride, target_index_count, target_error, flags) {\n\t\t\tassert(indices instanceof Uint32Array || indices instanceof Int32Array || indices instanceof Uint16Array || indices instanceof Int16Array);\n\t\t\tassert(indices.length % 3 == 0);\n\t\t\tassert(vertex_positions instanceof Float32Array);\n\t\t\tassert(vertex_positions.length % vertex_positions_stride == 0);\n\t\t\tassert(vertex_positions_stride >= 3);\n\t\t\tassert(target_index_count >= 0 && target_index_count <= indices.length);\n\t\t\tassert(target_index_count % 3 == 0);\n\t\t\tassert(target_error >= 0);\n\n\t\t\tvar options = 0;\n\t\t\tfor (var i = 0; i < (flags ? flags.length : 0); ++i) {\n\t\t\t\tassert(flags[i] in simplifyOptions);\n\t\t\t\toptions |= simplifyOptions[flags[i]];\n\t\t\t}\n\n\t\t\tvar indices32 = indices.BYTES_PER_ELEMENT == 4 ? indices : new Uint32Array(indices);\n\t\t\tvar result = simplify(instance.exports.meshopt_simplify, indices32, indices.length, vertex_positions, vertex_positions.length / vertex_positions_stride, vertex_positions_stride * 4, target_index_count, target_error, options);\n\t\t\tresult[0] = (indices instanceof Uint32Array) ? result[0] : new indices.constructor(result[0]);\n\n\t\t\treturn result;\n\t\t},\n\n\t\tsimplifyWithAttributes: function(indices, vertex_positions, vertex_positions_stride, vertex_attributes, vertex_attributes_stride, attribute_weights, vertex_lock, target_index_count, target_error, flags) {\n\t\t\tassert(this.useExperimentalFeatures); // set useExperimentalFeatures to use this; note that this function is experimental and may change interface in a way that will require revising calling code\n\t\t\tassert(indices instanceof Uint32Array || indices instanceof Int32Array || indices instanceof Uint16Array || indices instanceof Int16Array);\n\t\t\tassert(indices.length % 3 == 0);\n\t\t\tassert(vertex_positions instanceof Float32Array);\n\t\t\tassert(vertex_positions.length % vertex_positions_stride == 0);\n\t\t\tassert(vertex_positions_stride >= 3);\n\t\t\tassert(vertex_attributes instanceof Float32Array);\n\t\t\tassert(vertex_attributes.length % vertex_attributes_stride == 0);\n\t\t\tassert(vertex_attributes_stride >= 0);\n\t\t\tassert(vertex_lock == null || vertex_lock.length == vertex_positions.length);\n\t\t\tassert(target_index_count >= 0 && target_index_count <= indices.length);\n\t\t\tassert(target_index_count % 3 == 0);\n\t\t\tassert(target_error >= 0);\n\t\t\tassert(Array.isArray(attribute_weights));\n\t\t\tassert(vertex_attributes_stride >= attribute_weights.length);\n\t\t\tassert(attribute_weights.length <= 16);\n\n\t\t\tvar options = 0;\n\t\t\tfor (var i = 0; i < (flags ? flags.length : 0); ++i) {\n\t\t\t\tassert(flags[i] in simplifyOptions);\n\t\t\t\toptions |= simplifyOptions[flags[i]];\n\t\t\t}\n\n\t\t\tvar indices32 = indices.BYTES_PER_ELEMENT == 4 ? indices : new Uint32Array(indices);\n\t\t\tvar result = simplifyAttr(instance.exports.meshopt_simplifyWithAttributes, indices32, indices.length, vertex_positions, vertex_positions.length / vertex_positions_stride, vertex_positions_stride * 4, vertex_attributes, vertex_attributes_stride * 4, new Float32Array(attribute_weights), vertex_lock ? new Uint8Array(vertex_lock) : null, target_index_count, target_error, options);\n\t\t\tresult[0] = (indices instanceof Uint32Array) ? result[0] : new indices.constructor(result[0]);\n\n\t\t\treturn result;\n\t\t},\n\n\t\tgetScale: function(vertex_positions, vertex_positions_stride) {\n\t\t\tassert(vertex_positions instanceof Float32Array);\n\t\t\tassert(vertex_positions.length % vertex_positions_stride == 0);\n\t\t\tassert(vertex_positions_stride >= 3);\n\t\t\treturn simplifyScale(instance.exports.meshopt_simplifyScale, vertex_positions, vertex_positions.length / vertex_positions_stride, vertex_positions_stride * 4);\n\t\t},\n\n\t\tsimplifyPoints: function(vertex_positions, vertex_positions_stride, target_vertex_count, vertex_colors, vertex_colors_stride, color_weight) {\n\t\t\tassert(this.useExperimentalFeatures); // set useExperimentalFeatures to use this; note that this function is experimental and may change interface in a way that will require revising calling code\n\t\t\tassert(vertex_positions instanceof Float32Array);\n\t\t\tassert(vertex_positions.length % vertex_positions_stride == 0);\n\t\t\tassert(vertex_positions_stride >= 3);\n\t\t\tassert(target_vertex_count >= 0 && target_vertex_count <= vertex_positions.length / vertex_positions_stride);\n\t\t\tif (vertex_colors) {\n\t\t\t\tassert(vertex_colors instanceof Float32Array);\n\t\t\t\tassert(vertex_colors.length % vertex_colors_stride == 0);\n\t\t\t\tassert(vertex_colors_stride >= 3);\n\t\t\t\tassert(vertex_positions.length / vertex_positions_stride == vertex_colors.length / vertex_colors_stride);\n\t\t\t\treturn simplifyPoints(instance.exports.meshopt_simplifyPoints, vertex_positions, vertex_positions.length / vertex_positions_stride, vertex_positions_stride * 4, vertex_colors, vertex_colors_stride * 4, color_weight, target_vertex_count);\n\t\t\t} else {\n\t\t\t\treturn simplifyPoints(instance.exports.meshopt_simplifyPoints, vertex_positions, vertex_positions.length / vertex_positions_stride, vertex_positions_stride * 4, undefined, 0, 0, target_vertex_count);\n\t\t\t}\n\t\t},\n\t};\n})();\n\n// UMD-style export for MeshoptSimplifier\nif (typeof exports === 'object' && typeof module === 'object')\n\tmodule.exports = MeshoptSimplifier;\nelse if (typeof define === 'function' && define['amd'])\n\tdefine([], function() {\n\t\treturn MeshoptSimplifier;\n\t});\nelse if (typeof exports === 'object')\n\texports[\"MeshoptSimplifier\"] = MeshoptSimplifier;\nelse\n\t(typeof self !== 'undefined' ? self : this).MeshoptSimplifier = MeshoptSimplifier;\n";
+let wk=null,wkSeq=0;const wkWait=new Map();
+function prep(msg,transfer,prog){return new Promise((res,rej)=>{
+  if(!wk){wk=new Worker(URL.createObjectURL(new Blob([MESHOPT_SRC,'\n('+workerMain.toString()+')()'],{type:'text/javascript'})));
+    wk.onmessage=e=>{const d=e.data,p=wkWait.get(d.id);if(!p)return;if(d.op==='progress'){if(p.prog)p.prog(d.msg);return}wkWait.delete(d.id);if(d.op==='error')p.rej(new Error(d.msg));else p.res(d)};
+    wk.onerror=e=>{wkWait.forEach(p=>p.rej(new Error(e.message||'worker error')));wkWait.clear();wk=null}}
+  const id=++wkSeq;wkWait.set(id,{res,rej,prog});wk.postMessage({...msg,id},transfer||[])})}
+
+// 방향·크기 맞추기: 높이 0.5, 가운데, 바닥 0. STL·PLY는 Z가 위(블렌더 내보내기)라 눕혀 세운다
+function normT(srcBox,al,ext){const cand=[new THREE.Matrix4(),new THREE.Matrix4().makeRotationX(-Math.PI/2),new THREE.Matrix4().makeRotationX(Math.PI/2),new THREE.Matrix4().makeRotationZ(Math.PI/2),new THREE.Matrix4().makeRotationZ(-Math.PI/2)];
+  const base=al&&al.base>=0?al.base:(ext==='stl'||ext==='ply'?1:0);
+  const R=new THREE.Matrix4().makeScale(al&&al.mirror?-1:1,1,1).multiply(new THREE.Matrix4().makeRotationY((al&&al.yaw||0)*Math.PI/180)).multiply(new THREE.Matrix4().makeRotationX((al&&al.pitch||0)*Math.PI/180)).multiply(cand[base]);
+  const b=boxFromSrc(srcBox,R),s=b.getSize(new THREE.Vector3()),sc=(REF_BOX.max.y-REF_BOX.min.y)/(s.y||1),rc=REF_BOX.getCenter(new THREE.Vector3()),bc=b.getCenter(new THREE.Vector3());
+  return new THREE.Matrix4().makeTranslation(rc.x-bc.x*sc,REF_BOX.min.y-b.min.y*sc,rc.z-bc.z*sc).multiply(new THREE.Matrix4().makeScale(sc,sc,sc)).multiply(R)}
+function boxFromSrc(sb,M){const b=new THREE.Box3();for(let i=0;i<8;i++)b.expandByPoint(new THREE.Vector3(i&1?sb[3]:sb[0],i&2?sb[4]:sb[1],i&4?sb[5]:sb[2]).applyMatrix4(M));return b}
+function applyMat(a,M){const e=M.elements;for(let i=0;i<a.length;i+=3){const x=a[i],y=a[i+1],z=a[i+2];a[i]=e[0]*x+e[4]*y+e[8]*z+e[12];a[i+1]=e[1]*x+e[5]*y+e[9]*z+e[13];a[i+2]=e[2]*x+e[6]*y+e[10]*z+e[14]}return a}
+const fmtN=n=>n>=10000?(n/10000).toFixed(n>=100000?0:1)+'만':String(n);
+let origGeoBusy=null;
+async function buildOrigGeo(){if(ST.orig.geo)return ST.orig.geo;if(origGeoBusy)return origGeoBusy;const key=ST.key;
+  origGeoBusy=(async()=>{status('원본 화면 준비 중… (큰 파일은 조금 걸려요)');const cp=ST.orig.raw.slice();const r=await prep({op:'normals',raw:cp},[cp.buffer]);
+    if(ST.key!==key||!ST.orig.raw)return null;const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(ST.orig.raw,3));g.setAttribute('normal',new THREE.BufferAttribute(r.normals,3));g.computeBoundingBox();g.computeBoundingSphere();ST.orig.geo=g;return g})();
+  try{return await origGeoBusy}finally{origGeoBusy=null}}
+function setLight(raw){if(ST.ref.geo){ST.ref.geo.dispose();if(ST.ref.hullGeo)ST.ref.hullGeo.dispose()}
+  // 펜선(바깥 테두리)은 꺾임 없이 고르게 부풀린 법선으로 → 줄인 면 사이가 갈라져 검은 줄이 비치지 않게
+  ST.ref={raw,box:bboxRaw(raw),geo:renderGeoFrom(raw),hullGeo:renderGeoFrom(raw,180),name:G.file}}
+function setOrig(raw,name){applyMat(raw,ST.T);ST.orig={raw,name,tris:raw.length/9,box:boxFromSrc(ST.srcBox,ST.T),geo:null};ST.origState='ready'}
+async function activate(key,light,srcBox){const f=G.files[key];
+  if(ST.orig.geo)ST.orig.geo.dispose();ST.key=key;ST.srcBox=srcBox;ST.orig={};ST.origState='none';ST.origPromise=null;G.showOrig=false;
+  ST.T=normT(srcBox,f.align,f.ext);applyMat(light,ST.T);const b=boxFromSrc(srcBox,ST.T);f.box=[b.min.toArray().map(v=>+v.toFixed(5)),b.max.toArray().map(v=>+v.toFixed(5))];
+  G.file=key;ensureLayouts(key);G.sel=0;save();status(`${f.name} — 가벼운 버전 준비 중…`);await tick();
+  setLight(light);fitted=false;setActiveGeo();buildTabs();buildUI()}
+// 새로 올린 파일: 원본은 이 컴퓨터에 기억, 가벼운 버전을 먼저 띄우고, 원본은 바로 이어서 준비
+async function ingest(name,buf,opt){opt=opt||{};const ext=name.split('.').pop().toLowerCase();if(!['stl','obj','ply','glb','gltf'].includes(ext))throw new Error('STL · OBJ · PLY · GLB 파일만 됩니다');
+  const prog=m=>status(`${name} — ${m}…`);prog('읽는 중');await tick();
+  let stored=null;if(G.rememberOrig&&!opt.stored){try{const d=await DB.open();stored=DB.putNow(d,'orig',name,{name,buf}).catch(()=>status('원본을 이 컴퓨터에 기억하지 못했어요 (저장 공간이 모자랄 수 있어요). 작업은 그대로 할 수 있어요.',true))}catch(e){}}
+  let r;if(ext==='stl')r=await prep({buf,target:G.lightFaces,wantRaw:true},[buf],prog);
+  else{const raw=await parseFile(name,buf);r=await prep({raw,target:G.lightFaces,wantRaw:true},[raw.buffer],prog)}
+  if(!G.files[name])G.files[name]=newFileEntry(name,ext);const f=G.files[name];f.ext=ext;
+  try{await DB.put('light',name,{name,ext,srcBox:r.box,tris:r.tris,faces:G.lightFaces,light:r.light,date:Date.now()})}catch(e){}
+  await activate(name,r.light,r.box);
+  status(`${name} — 원본 준비 중…`);await tick();setOrig(r.raw,name);
+  if(stored)await stored;buildUI();updCutInfo();
+  status(`${name} — 가벼운 버전 ${fmtN(ST.ref.raw.length/9)}면으로 작업 중 · 원본 ${fmtN(r.tris)}면 준비됨 (STL은 원본으로 잘라요)${G.legacy&&f.kind==='torso'&&opt.fresh?' · 예전 토르소 구성을 이어 왔어요':''}`)}
+async function openStored(key){const L=await DB.get('light',key);if(!L||!L.light)return false;
+  if(!G.files[key])G.files[key]=newFileEntry(L.name,L.ext);G.files[key].ext=L.ext;
+  await activate(key,L.light,L.srcBox);
+  ST.origState='loading';buildUI();updCutInfo();status(`${L.name} — 가벼운 버전으로 바로 작업할 수 있어요. 원본은 뒤에서 불러오는 중…`);
+  ST.origPromise=(async()=>{try{const o=await DB.get('orig',key);
+      if(!o){if(ST.key===key){ST.origState='missing';buildUI();updCutInfo();status(`${L.name} — 이 컴퓨터에 원본이 기억돼 있지 않아요. STL로 저장하려면 원본을 다시 올려 주세요.`,true)}return}
+      let raw;if(L.ext==='stl')raw=(await prep({buf:o.buf,target:0,wantRaw:true},[o.buf])).raw;else raw=await parseFile(o.name,o.buf);
+      if(ST.key!==key)return;setOrig(raw,o.name);buildUI();updCutInfo();status(`${L.name} — 원본 ${fmtN(ST.orig.tris)}면 준비됨. "원본 확인"으로 볼 수 있고, STL은 원본으로 잘라요.`);
+      if(L.faces!==G.lightFaces)await rebuildLight()}
+    catch(e){console.error(e);if(ST.key===key){ST.origState='error';buildUI();status('원본을 불러오지 못했어요: '+(e.message||e),true)}}})();
+  return true}
+async function rebuildLight(){if(!ST.orig.raw)return;const key=ST.key,f=MS();status(`가벼운 버전을 ${fmtN(G.lightFaces)}면으로 다시 만드는 중…`);
+  const cp=ST.orig.raw.slice();const r=await prep({raw:cp,target:G.lightFaces},[cp.buffer],m=>status(m+'…'));if(ST.key!==key)return;
+  const src=applyMat(r.light.slice(),ST.T.clone().invert());try{await DB.put('light',key,{name:f.name,ext:f.ext,srcBox:ST.srcBox,tris:ST.orig.tris,faces:G.lightFaces,light:src,date:Date.now()})}catch(e){}
+  setLight(r.light);fitted=false;setActiveGeo();buildUI();status(`가벼운 버전을 ${fmtN(r.light.length/9)}면으로 바꿨어요.`)}
+function realign(){if(!ST.ref.raw)return;const f=MS(),Tn=normT(ST.srcBox,f.align,f.ext),M=Tn.clone().multiply(ST.T.clone().invert());ST.T=Tn;
+  applyMat(ST.ref.raw,M);setLight(ST.ref.raw);
+  if(ST.orig.raw){if(ST.orig.geo)ST.orig.geo.dispose();applyMat(ST.orig.raw,M);ST.orig.geo=null;ST.orig.box=boxFromSrc(ST.srcBox,ST.T)}
+  const b=boxFromSrc(ST.srcBox,ST.T);f.box=[b.min.toArray(),b.max.toArray()];defModel(G.file);save();fitted=false;setActiveGeo();drawFront()}
+// 정면에서 본 작은 그림 (방향 확인용)
+function drawFront(){const c=$('frontCv');if(!c||!ST.active)return;const tmp=new THREE.Mesh(ST.ref.geo,shadeM);const sc=new THREE.Scene();sc.add(new THREE.HemisphereLight(0xffffff,0x555555,1.4));const d=new THREE.DirectionalLight(0xffffff,2);d.position.set(-1,1,2);sc.add(d);sc.add(tmp);
+  const b=ST.ref.box,ctr=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()),cmr=new THREE.PerspectiveCamera(20,1,0.01,100),D=Math.max(s.y,s.x)*1.6/Math.tan(10*Math.PI/180)/2;cmr.position.set(ctr.x,ctr.y,ctr.z+D);cmr.lookAt(ctr);
+  r2.setSize(240,240,false);r2.render(sc,cmr);const x=c.getContext('2d');c.width=240;c.height=240;x.fillStyle='#fff';x.fillRect(0,0,240,240);x.drawImage(r2.domElement,0,0)}
+async function fillStored(list){let lk=[],ok=[];try{lk=await DB.keys('light');ok=await DB.keys('orig')}catch(e){list.innerHTML='<p class="hint">이 브라우저에서는 파일을 기억할 수 없어요.</p>';return}
+  const esc=t=>String(t).replace(/</g,'&lt;');const legacyKeys={torso:1,torsoJ:1,medusa:1};list.innerHTML='';
+  const rows=[];for(const k of lk)rows.push({k,light:1,orig:ok.includes(k)});for(const k of ok)if(!lk.includes(k))rows.push({k,light:0,orig:1,old:!!legacyKeys[k]});
+  if(!rows.length){list.innerHTML='<p class="hint">아직 이 컴퓨터에 기억된 파일이 없어요.</p>';return}
+  for(const it of rows){let nm=it.k;if(it.old){try{const v=await DB.get('orig',it.k);nm=v&&v.name||it.k}catch(e){}}
+    const d=document.createElement('div');d.className='saveitem';d.innerHTML=`<div><b>${esc(nm)}</b><small>${it.light?'가벼운 버전 있음':'가벼운 버전 아직 없음'} · ${it.orig?'원본 기억됨':'원본 없음 (STL 저장하려면 다시 올리기)'}${it.old?' · 예전 버전에서 기억한 원본':''}${ST.key===it.k?' · <b>지금 여는 중</b>':''}</small></div>`;
+    const b=document.createElement('div');d.appendChild(b);
+    if(it.light){if(ST.key!==it.k)btn(b,'열기',async()=>{try{await openStored(it.k)}catch(e){status('열지 못했어요: '+(e.message||e),true)}})}
+    else btn(b,'가벼운 버전 만들어 열기',async()=>{try{const v=await DB.get('orig',it.k);if(!v)throw new Error('원본이 없어요');
+      if(it.old){await DB.put('orig',v.name,{name:v.name,buf:v.buf});await DB.del('orig',it.k)}await ingest(v.name,v.buf,{stored:true,fresh:true})}catch(e){status('만들지 못했어요: '+(e.message||e),true)}});
+    btn(b,'지우기',async()=>{if(!confirmTwice())return;await DB.del('light',it.k);await DB.del('orig',it.k);status(`이 컴퓨터에서 「${nm}」 파일을 지웠어요 (칸 구성은 남아 있어요).`);buildUI()},'ghost');
+    list.appendChild(d)}}
 
 // ---------- UI ----------
 const ctl=$('ctl');let stTimer=0;
@@ -4194,21 +4345,35 @@ function selectRow(parent,label,opts,val,onCh){const r=document.createElement('l
 let aimMode=false;
 const TABS=[['model','모델'],['layout','칸'],['scene','장면'],['style','스타일'],['cut','3D 자르기'],['save','저장']];
 function buildTabs(){const t=$('tabs');t.innerHTML='';TABS.forEach(([k,l])=>{const b=document.createElement('button');b.textContent=l;if(G.tab===k)b.classList.add('on');b.onclick=()=>{G.tab=k;save();buildTabs();buildUI()};t.appendChild(b)})}
-function buildUI(){ctl.innerHTML='';const S=cur(),P=preset();
-  if(G.tab==='model'){const s=sec(ctl,'조각 고르기','홈페이지용 가벼운 3D가 기본으로 들어 있어요. 구성은 그대로 두고, 나중에 원본을 올리면 같은 구성으로 출력용 파일을 뽑습니다.');
-    chips(s,Object.entries(MODELS).map(([k,m])=>[k,m.ko]),v=>G.model===v,v=>{G.model=v;G.sel=0;save();loadModel(v)});
-    const s2=sec(ctl,'원본 3D');const info=document.createElement('p');info.className='hint';info.innerHTML=ST.orig.raw?`지금: <b>원본</b> — ${ST.orig.name} · 삼각형 ${ST.orig.tris.toLocaleString()}`:'지금: <b>홈페이지용</b> (가벼운 버전)';s2.appendChild(info);
-    const fb=document.createElement('label');fb.className='filebtn';fb.innerHTML='원본 3D 올리기<input type="file" accept=".stl,.obj,.ply,.glb,.gltf" hidden>';fb.querySelector('input').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{await loadOriginal(f.name,await f.arrayBuffer(),false)}catch(err){status('원본을 못 읽었어요: '+(err.message||err),true)}};s2.appendChild(fb);
-    const row=document.createElement('div');row.className='chips';s2.appendChild(row);
-    btn(row,'기억된 원본 불러오기',async()=>{try{const v=await DB.get(G.model);if(!v){status('이 기기에 기억된 원본이 없어요.',true);return}await loadOriginal(v.name,v.buf,true)}catch(e){status('불러오지 못했어요: '+e.message,true)}});
-    if(ST.orig.raw)btn(row,'홈페이지용으로 돌아가기',useHomepage);
-    btn(row,'기억된 원본 지우기',async()=>{await DB.del(G.model);status('이 기기에 기억된 원본을 지웠어요.')},'ghost');
-    const ck=document.createElement('label');ck.className='check';ck.innerHTML=`<input type="checkbox" ${G.rememberOrig?'checked':''}> 올린 원본을 이 기기에 기억하기 (파일은 인터넷에 올라가지 않아요)`;ck.querySelector('input').onchange=e=>{G.rememberOrig=e.target.checked;save()};s2.appendChild(ck);
-    if(ST.orig.raw){const s3=sec(ctl,'원본 방향 맞추기','크기와 위치는 기준(홈페이지용)에 자동으로 맞춰요. 두 그림의 방향이 다르면 아래 버튼으로 돌려 주세요.');
-      const cmp=document.createElement('div');cmp.id='cmp';cmp.className='cmp';cmp.innerHTML='<figure><canvas></canvas><figcaption>기준 (홈페이지용)</figcaption></figure><figure><canvas></canvas><figcaption>원본 (맞춘 뒤)</figcaption></figure>';s3.appendChild(cmp);
-      const al=G.align[G.model];const r2b=document.createElement('div');r2b.className='chips';s3.appendChild(r2b);
-      btn(r2b,'옆으로 90° 돌리기',()=>{al.yaw=((al.yaw||0)+90)%360;realign()});btn(r2b,'앞뒤로 90° 돌리기',()=>{al.pitch=((al.pitch||0)+90)%360;realign()});btn(r2b,'좌우 뒤집기',()=>{al.mirror=!al.mirror;realign()});btn(r2b,'처음 맞춤으로',()=>{G.align[G.model]={base:-1,yaw:0,pitch:0,mirror:false};realign()},'ghost');
-      setTimeout(drawCompare,0)}}
+function buildUI(){ctl.innerHTML='';
+  if(G.tab!=='model'&&!MS()){sec(ctl,'먼저 3D 파일을 올려 주세요','"모델" 탭에서 원본 3D를 올리면 칸 구성과 장면을 만들 수 있어요.');return}
+  const S=MS()?cur():null,P=MS()?preset():null;
+  if(G.tab==='model'){const f=MS(),esc=t=>String(t).replace(/</g,'&lt;');
+    const s=sec(ctl,'3D 파일','원본 3D를 올리면 가벼운 버전을 먼저 만들어 바로 작업할 수 있게 띄우고, 원본은 뒤에서 준비해요. STL 저장은 언제나 원본으로 자릅니다. 칸 구성·장면은 파일 이름별로 저장돼 어느 컴퓨터에서나 같고, 3D 파일은 컴퓨터마다 따로 올려요.');
+    const info=document.createElement('p');info.className='hint';
+    const ot={ready:ST.orig.raw?`원본 ${fmtN(ST.orig.tris)}면 준비됨`:'',loading:'원본 불러오는 중…',missing:'원본 없음 — STL 저장하려면 다시 올려 주세요',error:'원본을 못 불러왔어요',none:''}[ST.origState]||'';
+    info.innerHTML=f&&ST.ref.raw?`지금: <b>${esc(f.name)}</b> · 가벼운 버전 ${fmtN(ST.ref.raw.length/9)}면 · ${ot}`:(f?`칸 구성 저장된 파일: <b>${esc(f.name)}</b> — 이 컴퓨터에는 아직 3D 파일이 없어요.`:'아직 올린 3D 파일이 없어요.');s.appendChild(info);
+    const fb=document.createElement('label');fb.className='filebtn';fb.innerHTML='원본 3D 올리기 (STL · OBJ · PLY · GLB)<input type="file" accept=".stl,.obj,.ply,.glb,.gltf" hidden>';
+    fb.querySelector('input').onchange=async e=>{const fl=e.target.files[0];e.target.value='';if(!fl)return;try{await ingest(fl.name,await fl.arrayBuffer(),{fresh:!G.files[fl.name]})}catch(err){console.error(err);status('파일을 못 읽었어요: '+(err.message||err),true)}};s.appendChild(fb);
+    if(f&&ST.ref.raw){const vr=chips(s,[['light','가벼운 버전으로 작업'],['orig','원본 확인']],v=>(v==='orig')===!!G.showOrig,v=>{if(v==='orig'&&!ST.orig.raw)return;(async()=>{if(v==='orig'){try{await buildOrigGeo()}catch(e){status('원본 화면을 만들지 못했어요: '+(e.message||e),true);return}if(!ST.orig.geo)return}
+        G.showOrig=v==='orig';status(G.showOrig?'원본을 보여 주는 중 — 아주 큰 파일이면 화면이 느릴 수 있어요. 작업은 가벼운 버전이 빨라요.':'가벼운 버전으로 작업 중.');fitted=false;setActiveGeo();buildUI()})()});
+      const ob=vr.querySelectorAll('button')[1];if(!ST.orig.raw){ob.disabled=true;ob.title=ST.origState==='loading'?'원본을 불러오는 중이에요':'이 컴퓨터에 원본이 없어요'}}
+    selectRow(s,'가벼운 버전 크기',[['200000','20만 면'],['300000','30만 면 (기본)'],['500000','50만 면'],['800000','80만 면']],String(G.lightFaces),v=>{G.lightFaces=+v;save();if(ST.orig.raw)rebuildLight().catch(e=>status('다시 만들지 못했어요: '+e.message,true));else status('원본이 준비되면 이 크기로 다시 만들어요.')});
+    const ck=document.createElement('label');ck.className='check';ck.innerHTML=`<input type="checkbox" ${G.rememberOrig?'checked':''}> 올린 원본을 이 컴퓨터에 기억하기 (인터넷에 올라가지 않아요)`;ck.querySelector('input').onchange=e=>{G.rememberOrig=e.target.checked;save()};s.appendChild(ck);
+    const s2=sec(ctl,'이 컴퓨터에 기억된 파일','다시 열면 가벼운 버전이 바로 뜨고 원본은 뒤에서 불러와요.');const list=document.createElement('div');list.className='savelist';s2.appendChild(list);fillStored(list);
+    if(f){const s4=sec(ctl,'칸 구성 가져오기','다른 파일에서 만든 칸 구성과 장면(앵글)을 지금 파일로 복사해요. 지금 파일의 구성은 덮어써요.');
+      const opts=[];if(G.legacy)opts.push(['__legacy','토르소 조각 01 · 예전 구성 (최종 눈·입 포함)']);for(const k in G.files)if(k!==G.file&&G.files[k].st)opts.push([k,G.files[k].name]);
+      if(!opts.length){const h=document.createElement('p');h.className='hint';h.textContent='가져올 다른 구성이 없어요.';s4.appendChild(h)}
+      else{let pick=opts[0][0];selectRow(s4,'가져올 구성',opts,pick,v=>pick=v);const r=document.createElement('div');r.className='chips';s4.appendChild(r);
+        btn(r,'가져오기',()=>{if(!confirmTwice())return;const src=pick==='__legacy'?G.legacy:G.files[pick];if(!src)return;f.preset=src.preset;f.st=JSON.parse(JSON.stringify(src.st));
+          if(pick==='__legacy'||G.files[pick]&&G.files[pick].kind==='torso')f.kind='torso';ensureLayouts(G.file);G.sel=0;fitted=false;save();buildUI();refresh();status('칸 구성을 가져왔어요.')})}
+      const s5=sec(ctl,'부위 목록','"장면" 탭에서 고르는 부위 이름이에요. 토르소 파일이면 토르소 부위를 쓰세요.');
+      chips(s5,[['torso','토르소 부위 (눈·입·쇄골…)'],['generic','일반 (정면·옆·위쪽…)']],v=>f.kind===v,v=>{f.kind=v;defModel(G.file);save();buildUI()})}
+    if(f&&ST.ref.raw){const s3=sec(ctl,'방향 맞추기','크기와 위치는 자동으로 맞춰요. 아래 그림이 정면에서 바로 선 모습이 아니면 버튼으로 돌려 주세요.');
+      const cmp=document.createElement('div');cmp.className='cmp';cmp.innerHTML='<figure><canvas id="frontCv"></canvas><figcaption>정면에서 본 모습</figcaption></figure>';s3.appendChild(cmp);
+      const al=f.align;const r2b=document.createElement('div');r2b.className='chips';s3.appendChild(r2b);
+      btn(r2b,'옆으로 90° 돌리기',()=>{al.yaw=((al.yaw||0)+90)%360;realign()});btn(r2b,'앞뒤로 90° 돌리기',()=>{al.pitch=((al.pitch||0)+90)%360;realign()});btn(r2b,'좌우 뒤집기',()=>{al.mirror=!al.mirror;realign()});btn(r2b,'처음 맞춤으로',()=>{f.align={base:-1,yaw:0,pitch:0,mirror:false};realign();buildUI()},'ghost');
+      setTimeout(drawFront,0)}}
   if(G.tab==='layout'){const s=sec(ctl,'칸 구성');selectRow(s,'구성',PRESETS.map((p,i)=>[String(i),(i+1)+'. '+p.name]),String(MS().preset),v=>{MS().preset=+v;G.sel=0;fitted=false;save();buildUI();refresh()});
     chips(s,[['h','가로 직사각'],['v','세로 직사각'],['s','정사각']],()=>false,v=>{const d={h:[230,95],v:[95,230],s:[170,170]}[v];S.W=d[0];S.H=d[1];S.skR=0;fitted=false;buildUI();refresh()});
     slider(s,'폭',()=>S.W,v=>S.W=v,60,320,1);slider(s,'높이',()=>S.H,v=>S.H=v,50,320,1);slider(s,'오른쪽 기울기',()=>S.skR,v=>S.skR=v,-40,40,1);slider(s,'칸 사이 간격',()=>S.gap,v=>S.gap=v,0,10,0.2);
@@ -4217,16 +4382,16 @@ function buildUI(){ctl.innerHTML='';const S=cur(),P=preset();
     const s=sec(ctl,'칸 고르기','만화 컷 화면에서 칸을 눌러도 골라져요. 번호는 오른쪽 위부터 읽는 순서예요.');chips(s,S.panels.map((_,i)=>[i,(i+1)+'번 칸']),v=>v===sel,v=>{G.sel=v;save();buildUI();refresh()});
     const s2=sec(ctl,(sel+1)+'번 칸 장면');const opts=Object.entries(partsOf()).map(([k,v])=>[k,v[0]]);if(Pn.part==='custom')opts.unshift(['custom','직접 겨냥한 곳']);
     if(Pn.cam){const h=document.createElement('p');h.className='hint';h.innerHTML='이 칸은 <b>저장된 최종 앵글</b>로 고정돼 있어요. 앵글을 바꾸려면 아래에서 고정을 풀어 주세요.';s2.appendChild(h);
-      btn(s2,'고정 풀고 일반 앵글로 바꾸기',()=>{const k=Pn.part;delete Pn.cam;Object.assign(Pn,panelFor(G.model,partsOf()[k]?k:'front',Pn.roll));buildUI();refresh()},'wide');
-      const r0=document.createElement('div');r0.className='chips';s2.appendChild(r0);btn(r0,'최종 앵글로 되돌리기',()=>{const c=presetCam(G.model,MS().preset,sel);if(c){Pn.cam=c;buildUI();refresh()}},'ghost');return}
-    selectRow(s2,'부위',opts,Pn.part,v=>{if(v==='custom')return;Object.assign(Pn,panelFor(G.model,v,Pn.roll));buildUI();refresh()});
+      btn(s2,'고정 풀고 일반 앵글로 바꾸기',()=>{const k=Pn.part;delete Pn.cam;Object.assign(Pn,panelFor(G.file,partsOf()[k]?k:'front',Pn.roll));buildUI();refresh()},'wide');
+      const r0=document.createElement('div');r0.className='chips';s2.appendChild(r0);btn(r0,'최종 앵글로 되돌리기',()=>{const c=presetCam(G.file,MS().preset,sel);if(c){Pn.cam=c;buildUI();refresh()}},'ghost');return}
+    selectRow(s2,'부위',opts,Pn.part,v=>{if(v==='custom')return;Object.assign(Pn,panelFor(G.file,v,Pn.roll));buildUI();refresh()});
     const ab=btn(s2,aimMode?'겨냥 중 — 만화 컷에서 원하는 곳을 누르세요':'화면을 눌러 겨냥점 정하기',()=>{aimMode=!aimMode;buildUI();status(aimMode?'만화 컷 화면에서 이 칸 안의 원하는 곳을 누르면 그 지점을 중심으로 잡아요.':'겨냥을 취소했어요.')},aimMode?'on wide':'wide');
     slider(s2,'도는 각도',()=>Pn.az,v=>Pn.az=v,-180,360,1,'°');slider(s2,'위아래 각도',()=>Pn.el,v=>Pn.el=v,-85,85,1,'°');slider(s2,'거리(크기)',()=>Pn.d,v=>Pn.d=v,0.01,1,0.005);slider(s2,'기울기',()=>Pn.roll,v=>Pn.roll=v,-90,90,1,'°');slider(s2,'좌우 이동',()=>Pn.sx,v=>Pn.sx=v,-0.7,0.7,0.01);slider(s2,'위아래 이동',()=>Pn.sy,v=>Pn.sy=v,-0.7,0.7,0.01);
-    const r=document.createElement('div');r.className='chips';s2.appendChild(r);btn(r,'이 칸 장면 처음으로',()=>{const pk=PRESETS[MS().preset].parts[sel];const cyc=MODELS[G.model].cycle;const c=presetCam(G.model,MS().preset,sel);Object.assign(Pn,panelFor(G.model,c?pk[0]:(cyc?cyc[sel%cyc.length]:(pk?pk[0]:'front')),pk?pk[1]:0));if(c)Pn.cam=c;buildUI();refresh()},'ghost')}
+    const r=document.createElement('div');r.className='chips';s2.appendChild(r);btn(r,'이 칸 장면 처음으로',()=>{const pk=PRESETS[MS().preset].parts[sel];const cyc=MODELS[G.file].cycle;const c=presetCam(G.file,MS().preset,sel);Object.assign(Pn,panelFor(G.file,c?pk[0]:(cyc?cyc[sel%cyc.length]:(pk?pk[0]:'front')),pk?pk[1]:0));if(c)Pn.cam=c;buildUI();refresh()},'ghost')}
   if(G.tab==='style'){const s=sec(ctl,'스타일');chips(s,[['toon','만화 펜선'],['shade','조각 음영']],v=>G.style===v,v=>{G.style=v;setStyle();save();buildUI();refresh()});
     slider(s,'펜선 굵기',()=>G.line,v=>{G.line=v;setStyle()},0,3,0.05);slider(s,'화각 (작을수록 정사법)',()=>G.lens,v=>G.lens=v,2,30,0.5,'°');
     const s2=sec(ctl,'페이지 그림 저장','지금 페이지를 큰 PNG로 저장해요.');const r=document.createElement('div');r.className='chips';s2.appendChild(r);[[3000,'3000px'],[5000,'5000px'],[8000,'8000px']].forEach(([w,l])=>btn(r,l,()=>exportPNG(w)))}
-  if(G.tab==='cut'){const s=sec(ctl,'3D 자르기','칸 모양 기둥으로 조각을 앞에서 뒤까지 잘라 칸마다 STL로 저장해요. 원본을 올려 두었으면 원본으로 자릅니다.');
+  if(G.tab==='cut'){const s=sec(ctl,'3D 자르기','칸 모양 기둥으로 조각을 앞에서 뒤까지 잘라 칸마다 STL로 저장해요. 화면은 가벼운 버전이어도 STL은 언제나 원본으로 자릅니다.');
     slider(s,'페이지 실제 폭',()=>G.pageCm,v=>G.pageCm=v,10,200,1,' cm',()=>{save();updCutInfo()});
     slider(s,'깊이 제한',()=>G.depthCm,v=>G.depthCm=v,0,60,0.5,' cm',()=>{save();if(G.view==='3d')refresh();updCutInfo()});
     slider(s,'조각 띄우기 (보기만)',()=>G.spread,v=>G.spread=v,0,80,1,'',()=>{save();if(G.view==='3d')refresh()});
@@ -4238,26 +4403,26 @@ function buildUI(){ctl.innerHTML='';const S=cur(),P=preset();
     const repS=document.createElement('div');repS.id='cutReport';sS.appendChild(repS);
     const s=sec(ctl,'구성 저장','지금 칸 구성과 장면을 이름 붙여 저장해요. 모델 파일은 저장하지 않고 방법만 저장합니다.');
     const row=document.createElement('div');row.className='saverow';row.innerHTML='<input type="text" placeholder="이름 (예: 입술 + 골반 띠)"><button class="primary">저장</button>';s.appendChild(row);
-    row.querySelector('button').onclick=()=>{const nm=row.querySelector('input').value.trim()||(preset().name+' · '+new Date().toLocaleString('ko-KR'));G.saved.unshift({name:nm,model:G.model,preset:MS().preset,state:JSON.parse(JSON.stringify(cur())),style:G.style,lens:G.lens,line:G.line,date:Date.now()});save();buildUI();status('저장했어요: '+nm)};
+    row.querySelector('button').onclick=()=>{const nm=row.querySelector('input').value.trim()||(preset().name+' · '+new Date().toLocaleString('ko-KR'));G.saved.unshift({name:nm,file:G.file,preset:MS().preset,state:JSON.parse(JSON.stringify(cur())),style:G.style,lens:G.lens,line:G.line,date:Date.now()});save();buildUI();status('저장했어요: '+nm)};
     const list=document.createElement('div');list.className='savelist';s.appendChild(list);
     if(!G.saved.length)list.innerHTML='<p class="hint">아직 저장한 구성이 없어요.</p>';
-    G.saved.forEach((it,i)=>{const d=document.createElement('div');d.className='saveitem';d.innerHTML=`<div><b>${it.name.replace(/</g,'&lt;')}</b><small>${MODELS[it.model].ko} · ${PRESETS[it.preset].name}</small></div>`;const b=document.createElement('div');d.appendChild(b);
-      btn(b,'불러오기',()=>{const go=()=>{MS().preset=it.preset;MS().st[it.preset]=JSON.parse(JSON.stringify(it.state));G.style=it.style;G.lens=it.lens;G.line=it.line||1;G.sel=0;fitted=false;setStyle();save();buildUI();refresh();status('불러왔어요: '+it.name)};if(it.model!==G.model){G.model=it.model;loadModel(it.model).then(go)}else go()});
+    G.saved.forEach((it,i)=>{const d=document.createElement('div');d.className='saveitem';d.innerHTML=`<div><b>${it.name.replace(/</g,'&lt;')}</b><small>${(it.file?(G.files[it.file]?G.files[it.file].name:it.file):'토르소 (예전)').replace(/</g,'&lt;')} · ${PRESETS[it.preset].name}</small></div>`;const b=document.createElement('div');d.appendChild(b);
+      btn(b,'불러오기',()=>{const go=()=>{MS().preset=it.preset;MS().st[it.preset]=JSON.parse(JSON.stringify(it.state));G.style=it.style;G.lens=it.lens;G.line=it.line||1;G.sel=0;fitted=false;setStyle();save();buildUI();refresh();status('불러왔어요: '+it.name)};go()});
       btn(b,'지우기',()=>{G.saved.splice(i,1);save();buildUI()},'ghost');list.appendChild(d)});
     const s2=sec(ctl,'다른 기기로 옮기기','저장한 구성 전부를 파일로 내보내고, 다른 기기에서 불러올 수 있어요.');const r=document.createElement('div');r.className='chips';s2.appendChild(r);
     btn(r,'내보내기',()=>download(new Blob([JSON.stringify({tool:'MANGA CUT',version:VERSION,G},null,1)],{type:'application/json'}),'manga-cut-settings.json'));
-    const fl=document.createElement('label');fl.className='filebtn';fl.innerHTML='불러오기<input type="file" accept=".json" hidden>';fl.querySelector('input').onchange=async e=>{try{const j=JSON.parse(await e.target.files[0].text());if(!j.G||!j.G.models)throw new Error('형식이 달라요');G={...DEF(),...j.G,view:'3d'};save();await loadModel(G.model);buildTabs();buildUI();status('설정을 불러왔어요.')}catch(err){status('불러오지 못했어요: '+err.message,true)}};r.appendChild(fl);
+    const fl=document.createElement('label');fl.className='filebtn';fl.innerHTML='불러오기<input type="file" accept=".json" hidden>';fl.querySelector('input').onchange=async e=>{try{const j=JSON.parse(await e.target.files[0].text());if(!j.G||!(j.G.files||j.G.files))throw new Error('형식이 달라요');G={...migrate(j.G),view:'3d'};if(G.file)ensureLayouts(G.file);save();buildTabs();buildUI();if(!G.file||!(await openStored(G.file)))status('설정을 불러왔어요. 3D 파일은 "모델" 탭에서 열어 주세요.');else status('설정을 불러왔어요.')}catch(err){status('불러오지 못했어요: '+err.message,true)}};r.appendChild(fl);
     const s3=sec(ctl,'초기화');const r3b=document.createElement('div');r3b.className='chips';s3.appendChild(r3b);
-    btn(r3b,'지금 구성만 처음으로',()=>{MS().st[MS().preset]=mkState(G.model,MS().preset);G.sel=0;fitted=false;save();buildUI();refresh()},'ghost');
-    btn(r3b,'이 조각의 모든 구성 처음으로',()=>{if(!confirmTwice())return;G.models[G.model]=mkModelState(G.model);G.sel=0;fitted=false;save();buildUI();refresh()},'ghost')}}
+    btn(r3b,'지금 구성만 처음으로',()=>{MS().st[MS().preset]=mkState(G.file,MS().preset);G.sel=0;fitted=false;save();buildUI();refresh()},'ghost');
+    btn(r3b,'이 파일의 모든 구성 처음으로',()=>{if(!confirmTwice())return;const m=mkModelState(G.file);MS().preset=m.preset;MS().st=m.st;G.sel=0;fitted=false;save();buildUI();refresh()},'ghost')}}
 let confirmArm=0;function confirmTwice(){const now=Date.now();if(now-confirmArm<3000){confirmArm=0;return true}confirmArm=now;status('한 번 더 누르면 처음으로 돌아가요.',true);return false}
-function updCutInfo(){const e=$('cutInfo');if(!e)return;const S=cur();const mpu=mmPerUnit();e.textContent=`페이지 ${(S.W*mpu/10).toFixed(1)} × ${(S.H*mpu/10).toFixed(1)} cm · 칸 사이 틈 ${(S.gap*2*mpu).toFixed(1)} mm (투명 아크릴 두께 기준) · ${G.depthCm>0?'앞에서 '+G.depthCm+' cm까지만':'깊이 끝까지'} · ${ST.orig.raw?'원본으로 자름':'홈페이지용으로 자름'}`}
+function updCutInfo(){const e=$('cutInfo');if(!e||!MS())return;const S=cur();const mpu=mmPerUnit();e.textContent=`페이지 ${(S.W*mpu/10).toFixed(1)} × ${(S.H*mpu/10).toFixed(1)} cm · 칸 사이 틈 ${(S.gap*2*mpu).toFixed(1)} mm (투명 아크릴 두께 기준) · ${G.depthCm>0?'앞에서 '+G.depthCm+' cm까지만':'깊이 끝까지'} · ${ST.orig.raw?'STL은 원본으로 자름':(ST.origState==='loading'?'원본 불러오는 중 (STL은 원본으로 자름)':'원본 없음 — STL을 저장하려면 원본을 올려 주세요')}`}
 function setView(v){G.view=v;document.querySelectorAll('#viewTg button').forEach(x=>x.classList.toggle('on',x.dataset.v===v));cv2.style.display=v==='2d'?'block':'none';cv3.style.display=v==='3d'?'block':'none';$('viewHint').textContent=v==='2d'?'칸을 누르면 그 칸을 골라요':'끌어서 돌리기 · 휠로 확대';refresh()}
 document.querySelectorAll('#viewTg button').forEach(b=>b.onclick=()=>setView(b.dataset.v));
 $('fitBtn').onclick=()=>{if(G.view==='3d'){ctrl.autoRotate=false;$('rotBtn').classList.remove('on');fit()}};
 $('rotBtn').onclick=()=>{ctrl.autoRotate=!ctrl.autoRotate;$('rotBtn').classList.toggle('on',ctrl.autoRotate)};
-function exportPNG(w){const c=document.createElement('canvas');renderPage(c,w,false);c.toBlob(b=>download(b,`manga-cut_${G.model}_${w}px.png`),'image/png');refresh()}
-cv2.addEventListener('click',e=>{const r=cv2.getBoundingClientRect();const px=(e.clientX-r.left)*cv2.width/r.width,py=(e.clientY-r.top)*cv2.height/r.height;const i=lastQs.findIndex(q=>inPoly([px,py],q));if(i<0)return;
+function exportPNG(w){const c=document.createElement('canvas');renderPage(c,w,false);c.toBlob(b=>download(b,`manga-cut_${fileBase()}_${w}px.png`),'image/png');refresh()}
+cv2.addEventListener('click',e=>{if(!MS())return;const r=cv2.getBoundingClientRect();const px=(e.clientX-r.left)*cv2.width/r.width,py=(e.clientY-r.top)*cv2.height/r.height;const i=lastQs.findIndex(q=>inPoly([px,py],q));if(i<0)return;
   const S=cur();if(aimMode&&S.panels[i]&&mesh2){curL=lastL;const q=lastQs[i];const [x0,y0,w,h]=bbox(q);setCam(S.panels[i],q,x0,y0,w,h);const rc=new THREE.Raycaster();rc.setFromCamera(new THREE.Vector2((px-x0)/w*2-1,1-(py-y0)/h*2),cam);const hit=rc.intersectObject(mesh2,false)[0];
     if(hit){const Pn=S.panels[i];delete Pn.cam;Pn.part='custom';Pn.t=hit.point.toArray().map(x=>+x.toFixed(5));Pn.sx=0;Pn.sy=0;aimMode=false;G.sel=i;save();buildUI();refresh();status('겨냥점을 정했어요. 이제 거리·각도로 다듬어 주세요.')}else status('조각 위를 눌러 주세요.',true);return}
   G.sel=i;if(G.tab!=='scene'){G.tab='scene';buildTabs()}save();buildUI();refresh()});
@@ -4265,17 +4430,12 @@ let pend=false;function refresh(){save();if(pend)return;pend=true;requestAnimati
 function refreshAll(){refresh()}
 window.addEventListener('resize',()=>{if(G.view==='2d')refresh()});
 
-// ---------- loading ----------
-async function loadModel(m){status(`${MODELS[m].ko} 불러오는 중…`);ST.orig={};
-  const g=await new Promise((res,rej)=>new GLTFLoader().load(MODELS[m].file,res,ev=>{if(ev.total)status(`${MODELS[m].ko} 불러오는 중… ${Math.round(ev.loaded/ev.total*100)}%`)},rej));
-  const raw=rawFromObject(g.scene);
-  status(`${MODELS[m].ko} 준비 중…`);await tick();
-  ST.ref={raw,box:bboxRaw(raw),geo:renderGeoFrom(raw),name:MODELS[m].en};fitted=false;setActiveGeo();buildTabs();buildUI();
-  status(`${MODELS[m].ko} — 홈페이지용 3D를 썼어요. 원본은 "모델" 탭에서 올릴 수 있어요.`);
-  try{const v=await DB.get(m);if(v)status(`${MODELS[m].ko} — 이 기기에 기억된 원본(${v.name})이 있어요. "모델" 탭에서 불러올 수 있어요.`)}catch(e){}}
+// ---------- start: 이 컴퓨터에 기억된 파일이면 가벼운 버전을 바로 띄우고 원본은 뒤에서 ----------
 buildTabs();buildUI();setView('3d');loop();
-try{await loadModel(G.model)}catch(e){status('3D 파일을 불러오지 못했어요: '+(e.message||e)+' — models 폴더가 같은 곳에 있어야 해요.',true)}
-window.__MC={G,ST,cutSTL,refresh,renderPage,setView,loadOriginal,cells,pieceDefs,clipPlane,build3d,fit,r3,sc3,vcam,ctrl,exportPNG};
+if(G.file)ensureLayouts(G.file);
+{let ok=false;if(G.file){try{ok=await openStored(G.file)}catch(e){console.error(e)}}
+  if(!ok){if(G.file)status(`이 컴퓨터에는 「${MS().name}」 3D 파일이 아직 없어요. "모델" 탭에서 원본을 올려 주세요. 칸 구성은 그대로 저장돼 있어요.`);else status('"모델" 탭에서 원본 3D 파일을 올려 주세요.');G.tab='model';buildTabs();buildUI()}}
+window.__MC={get G(){return G},ST,cutSTL,refresh,renderPage,setView,ingest,openStored,rebuildLight,realign,cells,pieceDefs,clipPlane,build3d,fit,r3,sc3,vcam,ctrl,exportPNG};
 }catch(err){console.error(err);const s=document.getElementById('st');if(s){s.textContent='시작 중 오류: '+(err&&err.message||err)+' — 이 문구를 캡처해서 알려 주세요.';s.classList.add('warn')}}
 })();
 </script>
