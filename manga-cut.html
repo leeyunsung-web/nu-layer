@@ -38,8 +38,8 @@ button:disabled{opacity:.5;cursor:wait}
 <header><b>MANGA CUT</b><span>만화 칸 구성으로 조각을 잘라 보는 도구 — 만화 컷 · 3D 조각 · STL</span></header>
 <div class="wrap">
 <section class="view">
-<div class="vbar" id="viewTg"><button data-v="2d" class="on">만화 컷</button><button data-v="3d">3D 조각</button><span class="sp"></span><small id="viewHint"></small><button id="rotBtn" class="on ghost">자동 회전</button><button id="fitBtn" class="ghost">정면</button></div>
-<canvas id="cv2"></canvas><canvas id="cv3" style="display:none"></canvas>
+<div class="vbar" id="viewTg"><button data-v="2d">만화 컷</button><button data-v="3d" class="on">3D 조각</button><span class="sp"></span><small id="viewHint"></small><button id="rotBtn" class="on ghost">자동 회전</button><button id="fitBtn" class="ghost">정면</button></div>
+<canvas id="cv2" style="display:none"></canvas><canvas id="cv3"></canvas>
 <div id="st">준비 중…</div>
 </section>
 <aside><nav id="tabs"></nav><div id="ctl"></div></aside>
@@ -3880,7 +3880,7 @@ void main() {
 'use strict';try{
 const {polygonClipping,THREE,GLTFLoader,STLLoader,OBJLoader,PLYLoader,OrbitControls,mergeVertices}=window.MC;
 const $=id=>document.getElementById(id);
-const VERSION='mc1';
+const VERSION='mc2';
 
 // ---------- models & parts ----------
 const MODELS={
@@ -3920,7 +3920,7 @@ function mkState(model,pi){const p=PRESETS[pi];const cyc=MODELS[model].cycle;
   return{W:p.W,H:p.H,skR:p.skR,gap:3.4,lines:p.lines.map(l=>({off:l.off,ang:l.ang})),
     panels:p.parts.map(([k,roll],i)=>{const c=presetCam(model,pi,i);const P=panelFor(model,c?k:(cyc?cyc[i%cyc.length]:k),roll);if(c)P.cam=c;return P})}}
 const mkModelState=m=>({preset:(m==='torso'||m==='torsoJ')?FINAL_PRESET:0,st:PRESETS.map((_,i)=>mkState(m,i))});
-const DEF=()=>({model:'torso',tab:'model',view:'2d',style:'toon',lens:3,line:1,sel:0,pageCm:40,depthCm:0,spread:0,
+const DEF=()=>({model:'torso',tab:'model',view:'3d',style:'toon',lens:3,line:1,sel:0,pageCm:40,depthCm:0,spread:0,
   models:{torso:mkModelState('torso'),torsoJ:mkModelState('torsoJ'),medusa:mkModelState('medusa')},saved:[],align:{torso:null,torsoJ:null,medusa:null},rememberOrig:true,finalSeen:true});
 let G=DEF();
 try{const v=JSON.parse(localStorage.getItem('mangaCut1')||'null');
@@ -3928,7 +3928,7 @@ try{const v=JSON.parse(localStorage.getItem('mangaCut1')||'null');
     if(!v.models.torsoJ||!v.models.torsoJ.st||v.models.torsoJ.st.length>PRESETS.length)v.models.torsoJ=mkModelState('torsoJ');v.align={torso:null,torsoJ:null,medusa:null,...(v.align||{})};
     ['torso','torsoJ','medusa'].forEach(m=>{while(v.models[m].st.length<PRESETS.length)v.models[m].st.push(mkState(m,v.models[m].st.length))});
     if(!v.finalSeen){v.models.torso.preset=FINAL_PRESET;v.finalSeen=true}G={...G,...v}}}catch(e){}
-G.view='2d';
+G.view='3d';
 const save=()=>{try{localStorage.setItem('mangaCut1',JSON.stringify(G))}catch(e){}};
 const MS=()=>G.models[G.model];
 const cur=()=>MS().st[MS().preset];
@@ -4103,7 +4103,7 @@ function zip(files){const now=new Date();const DT=[(now.getHours()<<11)|(now.get
 function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000)}
 const tick=()=>new Promise(r=>setTimeout(r,0));
 let cutting=false;
-async function cutSTL(){if(cutting||!ST.active)return;cutting=true;const btn=$('cutBtn');btn.disabled=true;
+async function cutSTL(mode){if(cutting||!ST.active)return;cutting=true;const one=mode==='one';const btns=[...document.querySelectorAll('.stlbtn')];btns.forEach(b=>b.disabled=true);
   try{const a=ST.active;const defs=pieceDefs(900);const mpu=mmPerUnit();const files=[];const report=[];const all=[];
     const bb=a.box;const tol=(bb.max.distanceTo(bb.min))*2e-6;
     for(const D of defs){status(`${D.idx+1}번 칸 자르는 중… (${defs.length}칸 중)`);await tick();
@@ -4122,11 +4122,12 @@ async function cutSTL(){if(cutting||!ST.active)return;cutting=true;const btn=$('
     const tot=all.reduce((s,a)=>s+a.length,0);const merged=new Float32Array(tot);let k=0;all.forEach(a=>{merged.set(a,k);k+=a.length});files.push({name:'page-all-panels.stl',data:stlBinary(merged,'page')});
     const info={tool:'MANGA CUT',version:VERSION,date:new Date().toISOString(),model:MODELS[G.model].en,source:ST.orig.raw?('original: '+ST.orig.name):'homepage model (light)',preset:preset().name,page_width_cm:G.pageCm,depth_limit_cm:G.depthCm,lens_deg:G.lens,units:'mm, Z up, front faces -Y',layout:cur(),pieces:report};
     files.push({name:'cut-info.json',data:new TextEncoder().encode(JSON.stringify(info,null,2))});
-    const stamp=new Date().toISOString().slice(0,16).replace(/[-:T]/g,'');download(zip(files),`manga-cut_${G.model}_${stamp}.zip`);
+    const stamp=new Date().toISOString().slice(0,16).replace(/[-:T]/g,'');
+    if(one)download(new Blob([files.find(f=>f.name==='page-all-panels.stl').data],{type:'model/stl'}),`manga-cut_${G.model}_${stamp}.stl`);else download(zip(files),`manga-cut_${G.model}_${stamp}.zip`);
     const openTot=report.reduce((s,r)=>s+r.open_edges,0);
     $('cutReport').innerHTML=report.map(r=>`<div class="rep"><b>${r.panel}번 칸</b> ${r.size_mm.map(v=>(v/10).toFixed(1)).join(' × ')} cm · 삼각형 ${r.triangles.toLocaleString()}${r.open_edges?` · <span class="warn">단면이 덜 닫힌 곳 ${r.open_edges}</span>`:''}</div>`).join('');
-    status(openTot?'STL 저장 완료 — 일부 단면이 덜 닫혔어요(원본 3D가 완전히 닫힌 메쉬가 아닐 때 생겨요). 출력 전에 슬라이서에서 확인해 주세요.':'STL 저장 완료 — 칸별 파일과 페이지 전체 파일을 ZIP으로 받았어요.',!!openTot)}
-  catch(e){console.error(e);status('자르는 중 오류: '+(e.message||e),true)}finally{cutting=false;btn.disabled=false}}
+    status(openTot?'STL 저장 완료 — 일부 단면이 덜 닫혔어요(원본 3D가 완전히 닫힌 메쉬가 아닐 때 생겨요). 출력 전에 슬라이서에서 확인해 주세요.':(one?'STL 저장 완료 — 페이지 전체를 STL 한 파일로 받았어요 (칸 조각이 제자리에 놓인 상태, mm 단위).':'STL 저장 완료 — 칸별 파일과 페이지 전체 파일을 ZIP으로 받았어요.'),!!openTot)}
+  catch(e){console.error(e);status('자르는 중 오류: '+(e.message||e),true)}finally{cutting=false;btns.forEach(b=>b.disabled=false)}}
 
 // ---------- original model: IndexedDB + alignment ----------
 const DB={open(){return new Promise((res,rej)=>{const r=indexedDB.open('mangaCutDB',1);r.onupgradeneeded=()=>r.result.createObjectStore('orig');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})},
@@ -4213,9 +4214,12 @@ function buildUI(){ctl.innerHTML='';const S=cur(),P=preset();
     slider(s,'깊이 제한',()=>G.depthCm,v=>G.depthCm=v,0,60,0.5,' cm',()=>{save();if(G.view==='3d')refresh();updCutInfo()});
     slider(s,'조각 띄우기 (보기만)',()=>G.spread,v=>G.spread=v,0,80,1,'',()=>{save();if(G.view==='3d')refresh()});
     const inf=document.createElement('p');inf.className='hint';inf.id='cutInfo';s.appendChild(inf);
-    const r=document.createElement('div');r.className='chips';s.appendChild(r);btn(r,'3D로 미리 보기',()=>setView('3d'));const cb=btn(r,'STL로 자르기 (ZIP)',cutSTL,'primary');cb.id='cutBtn';
+    const r=document.createElement('div');r.className='chips';s.appendChild(r);btn(r,'3D로 미리 보기',()=>setView('3d'));btn(r,'STL 저장 (한 파일)',()=>cutSTL('one'),'primary').classList.add('stlbtn');btn(r,'칸별 STL (ZIP)',()=>cutSTL('zip')).classList.add('stlbtn');
     const rep=document.createElement('div');rep.id='cutReport';s.appendChild(rep);updCutInfo()}
-  if(G.tab==='save'){const s=sec(ctl,'구성 저장','지금 칸 구성과 장면을 이름 붙여 저장해요. 모델 파일은 저장하지 않고 방법만 저장합니다.');
+  if(G.tab==='save'){const sS=sec(ctl,'STL로 저장','지금 칸 구성대로 조각을 잘라 STL로 받아요. 한 파일은 칸 조각들이 페이지 위 제자리에 놓인 상태 그대로, ZIP은 칸마다 따로 + 페이지 전체 + 자른 정보가 들어 있어요. 크기·깊이는 "3D 자르기" 탭 값을 따릅니다.');
+    const rS=document.createElement('div');rS.className='chips';sS.appendChild(rS);btn(rS,'STL 저장 (한 파일)',()=>cutSTL('one'),'primary').classList.add('stlbtn');btn(rS,'칸별 STL (ZIP)',()=>cutSTL('zip')).classList.add('stlbtn');
+    const repS=document.createElement('div');repS.id='cutReport';sS.appendChild(repS);
+    const s=sec(ctl,'구성 저장','지금 칸 구성과 장면을 이름 붙여 저장해요. 모델 파일은 저장하지 않고 방법만 저장합니다.');
     const row=document.createElement('div');row.className='saverow';row.innerHTML='<input type="text" placeholder="이름 (예: 입술 + 골반 띠)"><button class="primary">저장</button>';s.appendChild(row);
     row.querySelector('button').onclick=()=>{const nm=row.querySelector('input').value.trim()||(preset().name+' · '+new Date().toLocaleString('ko-KR'));G.saved.unshift({name:nm,model:G.model,preset:MS().preset,state:JSON.parse(JSON.stringify(cur())),style:G.style,lens:G.lens,line:G.line,date:Date.now()});save();buildUI();status('저장했어요: '+nm)};
     const list=document.createElement('div');list.className='savelist';s.appendChild(list);
@@ -4225,7 +4229,7 @@ function buildUI(){ctl.innerHTML='';const S=cur(),P=preset();
       btn(b,'지우기',()=>{G.saved.splice(i,1);save();buildUI()},'ghost');list.appendChild(d)});
     const s2=sec(ctl,'다른 기기로 옮기기','저장한 구성 전부를 파일로 내보내고, 다른 기기에서 불러올 수 있어요.');const r=document.createElement('div');r.className='chips';s2.appendChild(r);
     btn(r,'내보내기',()=>download(new Blob([JSON.stringify({tool:'MANGA CUT',version:VERSION,G},null,1)],{type:'application/json'}),'manga-cut-settings.json'));
-    const fl=document.createElement('label');fl.className='filebtn';fl.innerHTML='불러오기<input type="file" accept=".json" hidden>';fl.querySelector('input').onchange=async e=>{try{const j=JSON.parse(await e.target.files[0].text());if(!j.G||!j.G.models)throw new Error('형식이 달라요');G={...DEF(),...j.G,view:'2d'};save();await loadModel(G.model);buildTabs();buildUI();status('설정을 불러왔어요.')}catch(err){status('불러오지 못했어요: '+err.message,true)}};r.appendChild(fl);
+    const fl=document.createElement('label');fl.className='filebtn';fl.innerHTML='불러오기<input type="file" accept=".json" hidden>';fl.querySelector('input').onchange=async e=>{try{const j=JSON.parse(await e.target.files[0].text());if(!j.G||!j.G.models)throw new Error('형식이 달라요');G={...DEF(),...j.G,view:'3d'};save();await loadModel(G.model);buildTabs();buildUI();status('설정을 불러왔어요.')}catch(err){status('불러오지 못했어요: '+err.message,true)}};r.appendChild(fl);
     const s3=sec(ctl,'초기화');const r3b=document.createElement('div');r3b.className='chips';s3.appendChild(r3b);
     btn(r3b,'지금 구성만 처음으로',()=>{MS().st[MS().preset]=mkState(G.model,MS().preset);G.sel=0;fitted=false;save();buildUI();refresh()},'ghost');
     btn(r3b,'이 조각의 모든 구성 처음으로',()=>{if(!confirmTwice())return;G.models[G.model]=mkModelState(G.model);G.sel=0;fitted=false;save();buildUI();refresh()},'ghost')}}
@@ -4253,7 +4257,7 @@ async function loadModel(m){status(`${MODELS[m].ko} 불러오는 중…`);ST.ori
   ST.ref={raw,box:bboxRaw(raw),geo:dgeo||renderGeoFrom(raw),name:MODELS[m].en};fitted=false;setActiveGeo();buildTabs();buildUI();
   status(`${MODELS[m].ko} — 홈페이지용 3D를 썼어요. 원본은 "모델" 탭에서 올릴 수 있어요.`);
   try{const v=await DB.get(m);if(v)status(`${MODELS[m].ko} — 이 기기에 기억된 원본(${v.name})이 있어요. "모델" 탭에서 불러올 수 있어요.`)}catch(e){}}
-buildTabs();buildUI();setView('2d');loop();
+buildTabs();buildUI();setView('3d');loop();
 try{await loadModel(G.model)}catch(e){status('3D 파일을 불러오지 못했어요: '+(e.message||e)+' — models 폴더가 같은 곳에 있어야 해요.',true)}
 window.__MC={G,ST,cutSTL,refresh,renderPage,setView,loadOriginal,cells,pieceDefs,clipPlane,build3d,fit,r3,sc3,vcam,ctrl,exportPNG};
 }catch(err){console.error(err);const s=document.getElementById('st');if(s){s.textContent='시작 중 오류: '+(err&&err.message||err)+' — 이 문구를 캡처해서 알려 주세요.';s.classList.add('warn')}}
