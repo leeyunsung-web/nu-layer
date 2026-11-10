@@ -92,14 +92,13 @@
 
   /** 십자별: 둥근 몸통 + 뿌리에서 끝으로 오목하게 가늘어지는 네 바늘 팔. body 몸통비, armW 팔 뿌리 굵기, len 팔 길이배, hv 가로팔/세로팔 비 */
   K.crossStar = (ctx, o) => { const c = setup(ctx, o); const r = o.r, b = r * (o.body == null ? 0.22 : o.body), aw = Math.max(0.6, r * (o.armW == null ? 0.35 : o.armW) * 0.35), v = b + r * (o.len == null ? 1 : o.len), hh_ = b + r * (o.len == null ? 1 : o.len) * (o.hv == null ? 0.8 : o.hv), th = o.rot || 0, cr = Math.cos(th), sr = Math.sin(th);
-    const AP = new Path2D ? new Path2D() : null; const arms = AP || ctx; if (!AP) ctx.beginPath();
+    const AP = (!ctx.isRecorder && typeof Path2D !== 'undefined') ? new Path2D() : null; const arms = AP || ctx; if (!AP) ctx.beginPath();
     for (let q = 0; q < 4; q++) { const L = q % 2 ? hh_ : v, c0 = [0, 1, 0, -1][q], s0 = [-1, 0, 1, 0][q], ca = c0 * cr - s0 * sr, sa = c0 * sr + s0 * cr, px = -sa, py = ca, b0 = b * 0.55;
       const bx = o.x + ca * b0, by = o.y + sa * b0, tx = o.x + ca * L, ty = o.y + sa * L, m = b0 + (L - b0) * 0.3;
       arms.moveTo(bx + px * aw, by + py * aw); arms.quadraticCurveTo(o.x + ca * m + px * aw * 0.22, o.y + sa * m + py * aw * 0.22, tx, ty); arms.quadraticCurveTo(o.x + ca * m - px * aw * 0.22, o.y + sa * m - py * aw * 0.22, bx - px * aw, by - py * aw); arms.closePath(); }
     const strokeOn = o.line > 0 && r > 5;
-    if (ctx.isRecorder) { // SVG 기록기: Path2D 대신 직접
-      if (strokeOn) { ctx.strokeStyle = c.l; ctx.lineWidth = Math.min(3.2, r * 0.16); ctx.beginPath(); ctx.arc(o.x, o.y, b, 0, TAU); ctx.stroke(); ctx.replay(arms); ctx.stroke(); }
-      ctx.beginPath(); ctx.arc(o.x, o.y, b, 0, TAU); ctx.fillStyle = c.f; ctx.fill(); ctx.replay(arms); ctx.fill(); return; }
+    if (ctx.isRecorder) { // SVG 기록기: 팔 경로가 d 에 쌓여 있음
+      ctx.fillStyle = c.f; if (strokeOn) { ctx.strokeStyle = c.l; ctx.lineWidth = Math.min(3.2, r * 0.16); ctx.stroke(); } ctx.fill(); ctx.beginPath(); ctx.arc(o.x, o.y, b, 0, TAU); if (strokeOn) ctx.stroke(); ctx.fill(); return; }
     const BP = new Path2D(); BP.arc(o.x, o.y, b, 0, TAU); if (strokeOn) { ctx.strokeStyle = c.l; ctx.lineWidth = Math.min(3.2, r * 0.16); ctx.stroke(BP); ctx.stroke(AP); } ctx.fillStyle = c.f; ctx.fill(BP); ctx.fill(AP, 'nonzero'); };
 
   /** 핏방울·구슬: 둥근 방울, 테두리, 그늘 초승달과 하이라이트. asp 가로세로비, gloss false 면 단순 하이라이트만 */
@@ -186,15 +185,17 @@
 
   // ── SVG 기록기: 캔버스 명령을 받아 <path> 로 쌓는다 ──
   function svgRecorder(W, H) { const out = []; let d = '', sub = []; const f = v => (+v).toFixed(1);
+    let TX = [1, 0, 0, 1, 0, 0]; const TS = []; const ap = (x, y) => [TX[0] * x + TX[2] * y + TX[4], TX[1] * x + TX[3] * y + TX[5]];
     const R = { isRecorder: true, lineWidth: 1, fillStyle: '#000', strokeStyle: '#000', lineJoin: 'round', lineCap: 'round', miterLimit: 8, globalAlpha: 1,
-      beginPath() { d = ''; }, closePath() { d += 'Z'; }, moveTo(x, y) { d += `M${f(x)} ${f(y)}`; }, lineTo(x, y) { d += `L${f(x)} ${f(y)}`; },
-      quadraticCurveTo(a, b, x, y) { d += `Q${f(a)} ${f(b)} ${f(x)} ${f(y)}`; }, bezierCurveTo(a, b, c2, e, x, y) { d += `C${f(a)} ${f(b)} ${f(c2)} ${f(e)} ${f(x)} ${f(y)}`; },
-      arc(x, y, r, s, e) { const full = Math.abs(e - s) >= TAU - 1e-6; const x0 = x + Math.cos(s) * r, y0 = y + Math.sin(s) * r; d += `M${f(x0)} ${f(y0)}`; if (full) { d += `A${f(r)} ${f(r)} 0 1 1 ${f(x - r)} ${f(y)}A${f(r)} ${f(r)} 0 1 1 ${f(x0)} ${f(y0)}`; } else { const x1 = x + Math.cos(e) * r, y1 = y + Math.sin(e) * r; d += `A${f(r)} ${f(r)} 0 ${Math.abs(e - s) > Math.PI ? 1 : 0} ${e > s ? 1 : 0} ${f(x1)} ${f(y1)}`; } },
-      ellipse(x, y, rx, ry, rot, s, e) { const n = 24, cs = Math.cos(rot), sn = Math.sin(rot); for (let i = 0; i <= n; i++) { const a = s + (e - s) * i / n, X = Math.cos(a) * rx, Y = Math.sin(a) * ry; const px = x + X * cs - Y * sn, py = y + X * sn + Y * cs; d += (i ? 'L' : 'M') + f(px) + ' ' + f(py); } },
-      rect(x, y, w, hh_) { d += `M${f(x)} ${f(y)}h${f(w)}v${f(hh_)}h${f(-w)}Z`; },
+      translate(x, y) { TX = [TX[0], TX[1], TX[2], TX[3], TX[4] + TX[0] * x + TX[2] * y, TX[5] + TX[1] * x + TX[3] * y]; }, scale(sx, sy) { TX = [TX[0] * sx, TX[1] * sx, TX[2] * sy, TX[3] * sy, TX[4], TX[5]]; },
+      beginPath() { d = ''; }, closePath() { d += 'Z'; }, moveTo(x, y) { const p = ap(x, y); d += `M${f(p[0])} ${f(p[1])}`; }, lineTo(x, y) { const p = ap(x, y); d += `L${f(p[0])} ${f(p[1])}`; },
+      quadraticCurveTo(a, b, x, y) { const c = ap(a, b), p = ap(x, y); d += `Q${f(c[0])} ${f(c[1])} ${f(p[0])} ${f(p[1])}`; }, bezierCurveTo(a, b, c2, e, x, y) { const A = ap(a, b), B = ap(c2, e), p = ap(x, y); d += `C${f(A[0])} ${f(A[1])} ${f(B[0])} ${f(B[1])} ${f(p[0])} ${f(p[1])}`; },
+      arc(x, y, r, s, e) { R.ellipse(x, y, r, r, 0, s, e); },
+      ellipse(x, y, rx, ry, rot, s, e) { const n = 32, cs = Math.cos(rot), sn = Math.sin(rot); for (let i = 0; i <= n; i++) { const a = s + (e - s) * i / n, X = Math.cos(a) * rx, Y = Math.sin(a) * ry; const p = ap(x + X * cs - Y * sn, y + X * sn + Y * cs); d += (i ? 'L' : 'M') + f(p[0]) + ' ' + f(p[1]); } if (Math.abs(e - s) >= TAU - 1e-6) d += 'Z'; },
+      rect(x, y, w, hh_) { const a = ap(x, y), b = ap(x + w, y), c = ap(x + w, y + hh_), e = ap(x, y + hh_); d += `M${f(a[0])} ${f(a[1])}L${f(b[0])} ${f(b[1])}L${f(c[0])} ${f(c[1])}L${f(e[0])} ${f(e[1])}Z`; },
       fill(rule) { if (d) out.push(`<path d="${d}" fill="${R.fillStyle}"${rule === 'evenodd' ? ' fill-rule="evenodd"' : ''}${R.globalAlpha < 1 ? ` opacity="${R.globalAlpha}"` : ''}${R._clip ? ` clip-path="url(#${R._clip})"` : ''}/>`); },
       stroke() { if (d) out.push(`<path d="${d}" fill="none" stroke="${R.strokeStyle}" stroke-width="${f(R.lineWidth)}" stroke-linejoin="${R.lineJoin}" stroke-linecap="${R.lineCap}"${R._clip ? ` clip-path="url(#${R._clip})"` : ''}/>`); },
-      save() { sub.push({ clip: R._clip }); }, restore() { const s = sub.pop(); R._clip = s ? s.clip : null; },
+      save() { sub.push({ clip: R._clip, tx: TX.slice() }); }, restore() { const s = sub.pop(); if (s) { R._clip = s.clip; TX = s.tx; } },
       clip() { const id = 'c' + out.length + '_' + Math.floor(Math.random() * 1e6); out.push(`<clipPath id="${id}"><path d="${d}"/></clipPath>`); R._clip = id; },
       replay(p) { if (p && p._d) d = p._d; }, _clip: null,
       toSVG(bg) { return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">\n` + (bg ? `<rect width="100%" height="100%" fill="${bg}"/>\n` : '') + out.join('\n') + '\n</svg>'; } };
