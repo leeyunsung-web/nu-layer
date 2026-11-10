@@ -125,7 +125,7 @@ details.corners{display:flex;flex-direction:column;gap:10px}details.corners summ
 <body>
 <div class="wrap">
   <header>
-    <h1>SCULPT LINE</h1>
+    <h1>SCULPT LINE <span id="buildTag" style="font-size:11px;font-weight:500;opacity:.55;margin-left:6px">b6 · 3D 조각</span></h1>
     <p class="sub">조각 3D 파일을 올리고 각도와 빛을 정하면, 같은 굵기의 펜으로 찍는 망점의 밀도만으로 명암을 만들어 펜 플로터용 SVG로 저장합니다.</p>
   </header>
 
@@ -8286,7 +8286,7 @@ $('mgFromMain').onclick=()=>{const pn=MG.panels[mgSel];if(!pn)return;const d=cam
   pn.shot={az:THREE.MathUtils.radToDeg(Math.atan2(d.x,d.z)),el:THREE.MathUtils.radToDeg(Math.asin(d.y/r)),dist:r,t:controls.target.toArray(),fov:P.fov};mgSave();mgDraw()};
 $('mgAllSame').onclick=()=>{const s=MG.panels[mgSel].shot;MG.panels.forEach(p=>p.shot=JSON.parse(JSON.stringify(s)));mgSave();mgDraw()};
 $('mgClose').onclick=()=>{mgEl.hidden=true;document.body.style.overflow=''};
-function openManga(page){if(page){MG=JSON.parse(JSON.stringify(page));mgSave()}mgEl.hidden=false;document.body.style.overflow='hidden';mgInit();
+function openManga(page){if(page){MG=JSON.parse(JSON.stringify(page));mgSave()}mgMode='3d';mgEl.hidden=false;document.body.style.overflow='hidden';mgInit();
   $('mgPaper').value=MG.paper;$('mgGut').value=MG.gutter;$('mgThick').value=MG.thick;$('mgBack').checked=!!MG.backAlign;mgSel=Math.min(mgSel,MG.panels.length-1);pgNeedFit=true;requestAnimationFrame(mgDraw)}
 // cut every panel: each panel's shot is a camera, its quad (relative to the panel's box, in box-height units) is the frame
 async function mgCutAll(){if(!mesh||!base){flash('먼저 모델을 불러와 주세요.',true);return}
