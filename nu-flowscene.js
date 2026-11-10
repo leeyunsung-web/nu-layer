@@ -63,7 +63,7 @@
   function newDrop(S, G, dr, initial) { const { R, rr, rg } = S; const st = G.streams[Math.floor(R() * G.streams.length)], u = R(), p = bez(st.P, Math.min(1, Math.max(0, u))), t = bezT(st.P, u), side = R() < 0.5 ? -1 : 1, dist = st.w * (0.7 + Math.abs(rg()) * 2.2);
     const q = R(), r = q < 0.5 ? dr[0] + (dr[1] - dr[0]) * q * 2 : dr[1] + (dr[2] - dr[1]) * (q - 0.5) * 2;
     const big = R() < 0.1 ? rr(2, 3.5) : 1; return { x: p[0] - t[1] * dist * side, y: p[1] + t[0] * dist * side, r: r * 1.5 * big * Math.max(1, S.H) * rr(0.75, 1.25), vx: t[0] * st.speed * rr(0.3, 0.8), vy: t[1] * st.speed * rr(0.3, 0.8), born: initial ? S.t - rr(0, 6) : S.t, life: rr(6, 16), ph: R() * 100 }; }
-  const DECO_DEF = [['star5', 3], ['glint', 4], ['crossStar', 2], ['burstStar', 1.2]];
+  const DECO_DEF = [['ysStar5', 3], ['glint', 4], ['crossStar', 2], ['burstStar', 1.2]];
   function spawnDeco(S, initial) { const { R, rr, rg } = S; if (!S.groups.length) return; const G = S.groups[Math.floor(R() * S.groups.length)], st = G.streams[Math.floor(R() * G.streams.length)];
     const ks = (S.o.deco_kinds || DECO_DEF).filter(k => k[1] > 0); let tot = ks.reduce((a, k) => a + k[1], 0) * R(), kind = ks[0][0]; for (const [k, w] of ks) { tot -= w; if (tot <= 0) { kind = k; break; } }
     const u = R(), p = bez(st.P, u), t = bezT(st.P, u), side = R() < 0.5 ? -1 : 1, dist = st.w * (0.6 + Math.abs(rg()) * 1.8);   // 띠 가장자리를 따라

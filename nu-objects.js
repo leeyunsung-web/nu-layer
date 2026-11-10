@@ -205,6 +205,8 @@
   const P2 = root.Path2D && root.Path2D.prototype; if (P2 && !P2._nuoPatched) { P2._nuoPatched = true; const f = v => (+v).toFixed(1); for (const [k, fn] of [['moveTo', (x, y) => `M${f(x)} ${f(y)}`], ['lineTo', (x, y) => `L${f(x)} ${f(y)}`], ['quadraticCurveTo', (a, b, x, y) => `Q${f(a)} ${f(b)} ${f(x)} ${f(y)}`], ['closePath', () => 'Z']]) { const orig = P2[k]; P2[k] = function (...a) { this._d = (this._d || '') + fn(...a); return orig ? orig.apply(this, a) : undefined; }; } }
 
   root.NUO = { kinds: Object.keys(K), LIFE_MODE, life, skPop, balloon,
+    /** 학습으로 만든 새 모양을 붙인다 (원래 모양은 그대로 둔다) */
+    register(kind, fn, mode, ko) { K[kind] = fn; LIFE_MODE[kind] = mode || 'balloon'; if (!root.NUO.kinds.includes(kind)) root.NUO.kinds.push(kind); if (ko) root.NUO.KO[kind] = ko; },
     /** o.t(지난 시간)·o.life(수명)가 있으면 생애를 적용해 그린다. 반환: 그렸으면 true */
     draw(ctx, kind, o) { const fn = K[kind]; if (!fn) throw new Error('모르는 모양: ' + kind); let q = o;
       if (o.t != null && o.life != null) { const L = life(kind, o.t, o.life, o.pop, o.phase); if (!L.alive || L.s <= 0.01) return false; q = Object.assign({}, o, { r: o.r * L.s, flash: L.flash, cut: L.cut, grow: L.grow });
