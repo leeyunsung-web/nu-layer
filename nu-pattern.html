@@ -6,14 +6,8 @@
 <meta name="robots" content="noindex,nofollow">
 <title>NU PATTERN — 배경 패턴 생성</title>
 <style>
-  :root{
-    --bg:#f5f5f7; --panel:#fff; --panel-alt:#f5f5f7;
-    --border:#d2d2d7; --border-soft:#e5e5ea;
-    --ink:#1d1d1f; --ink-dim:#6e6e73;
-    --accent:#1d1d1f; --accent-dim:#424245;
-    --font-sans:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Helvetica,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;
-    --font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-  }
+  :root{--bg:#f5f5f7;--panel:#fff;--panel-alt:#f5f5f7;--border:#d2d2d7;--border-soft:#e5e5ea;--ink:#1d1d1f;--ink-dim:#6e6e73;--accent:#1d1d1f;
+    --font-sans:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Helvetica,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;--font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
   *{box-sizing:border-box}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--font-sans);-webkit-font-smoothing:antialiased}
   body{padding:18px 18px 60px}
@@ -21,97 +15,60 @@
   header{border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:18px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
   h1{font-size:19px;margin:0;letter-spacing:2px;font-weight:600}
   .sub{font-size:12px;color:var(--ink-dim)}
-  .cols{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:18px;align-items:start}
-  @media (max-width:960px){ .cols{grid-template-columns:1fr} }
+  .cols{display:grid;grid-template-columns:minmax(0,1fr) 390px;gap:18px;align-items:start}
+  @media (max-width:960px){.cols{grid-template-columns:1fr}}
   .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px}
   .panel h3{font-size:11px;letter-spacing:1.4px;margin:0 0 10px;color:var(--ink-dim);font-weight:600}
-  .stage{position:relative;background:#fff;border:1px solid var(--border-soft);border-radius:10px;overflow:hidden}
+  .stage{background:#fff;border:1px solid var(--border-soft);border-radius:10px;overflow:hidden}
   #cv{display:block;max-width:100%;max-height:80vh;width:auto;height:auto;margin:0 auto;touch-action:none;cursor:crosshair}
   .row{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px;align-items:center}
   button{font-family:inherit;font-size:11.5px;letter-spacing:.4px;padding:7px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:var(--ink);cursor:pointer}
-  button:hover{background:var(--panel-alt)}
-  button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
-  button.go{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
-  button.sm{padding:4px 8px;font-size:11px}
+  button:hover{background:var(--panel-alt)}button.on{background:var(--accent);color:#fff;border-color:var(--accent)}button.go{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}button.sm{padding:4px 8px;font-size:11px}
   .tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:12px;flex-wrap:wrap}
-  .tabs button{border:0;border-radius:8px 8px 0 0;background:transparent;padding:8px 10px}
-  .tabs button.on{background:var(--panel-alt);color:var(--ink);font-weight:600}
+  .tabs button{border:0;border-radius:8px 8px 0 0;background:transparent;padding:8px 10px}.tabs button.on{background:var(--panel-alt);color:var(--ink);font-weight:600}
   .tab{display:none}.tab.on{display:block}
-  .sl{display:grid;grid-template-columns:96px 1fr 48px;align-items:center;gap:9px;margin:7px 0}
-  .sl label{font-size:11.5px;color:var(--ink-dim)}
-  .sl output{font-size:11px;text-align:right;font-variant-numeric:tabular-nums}
+  .sl{display:grid;grid-template-columns:100px 1fr 46px;align-items:center;gap:9px;margin:7px 0}
+  .sl label{font-size:11.5px;color:var(--ink-dim)}.sl output{font-size:11px;text-align:right;font-variant-numeric:tabular-nums}
   input[type=range]{width:100%;accent-color:var(--accent)}
   .chk{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-dim);margin:8px 0}
   select{font-family:inherit;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--ink)}
-  .fam{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-  .fam button{padding:9px 4px;font-size:11.5px;line-height:1.25}
-  .fam small{display:block;color:var(--ink-dim);font-size:10px;font-weight:400;margin-top:2px}
-  .fam button.on small{color:#ddd}
-  .pal{display:flex;flex-wrap:wrap;gap:6px}
-  .sw{width:26px;height:26px;border-radius:7px;border:1px solid var(--border-soft);cursor:pointer;position:relative}
-  .sw.sel{outline:2px solid var(--ink);outline-offset:1px}
-  .palrow{display:flex;gap:3px;border:1px solid var(--border-soft);border-radius:8px;padding:3px;cursor:pointer}
-  .palrow.sel{outline:2px solid var(--ink)}
-  .palrow i{display:block;width:18px;height:18px;border-radius:4px}
+  .fam{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.fam button{padding:9px 4px;font-size:11.5px;line-height:1.25}.fam small{display:block;color:var(--ink-dim);font-size:10px;font-weight:400;margin-top:2px}.fam button.on small{color:#ddd}
+  .pal{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.sw{width:26px;height:26px;border-radius:7px;border:1px solid var(--border-soft);cursor:pointer}.sw.sel{outline:2px solid var(--ink);outline-offset:1px}
+  .palrow{display:flex;gap:3px;border:1px solid var(--border-soft);border-radius:8px;padding:3px;cursor:pointer}.palrow.sel{outline:2px solid var(--ink)}.palrow i{display:block;width:18px;height:18px;border-radius:4px}
   .pals{display:flex;flex-wrap:wrap;gap:6px;max-height:190px;overflow:auto}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:6px;max-height:320px;overflow:auto}
-  .grid canvas{width:100%;aspect-ratio:1;border:1px solid var(--border-soft);border-radius:7px;background:#fff;cursor:pointer}
-  .grid canvas.off{opacity:.25}
-  .imgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:6px;max-height:380px;overflow:auto}
-  .imgs figure{margin:0;font-size:9.5px;color:var(--ink-dim);line-height:1.2;min-width:0}
-  .imgs figure div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .imgs img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;border:1px solid var(--border-soft);display:block}
-  table{border-collapse:collapse;width:100%;font-size:11.5px}
-  td,th{border-bottom:1px solid var(--border-soft);padding:5px 4px;text-align:left}
-  th{color:var(--ink-dim);font-weight:600;font-size:10.5px;letter-spacing:.5px}
+  .kinds{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:6px}
+  .kind{border:1px solid var(--border-soft);border-radius:9px;padding:4px;cursor:pointer;text-align:center;font-size:10.5px;color:var(--ink-dim);background:#fff}.kind canvas{width:100%;aspect-ratio:1;display:block;border-radius:6px}.kind.off{opacity:.3}.kind.sel{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+  .imgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:6px;max-height:380px;overflow:auto}.imgs figure{margin:0;font-size:9.5px;color:var(--ink-dim);line-height:1.2;min-width:0}.imgs figure div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.imgs img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;border:1px solid var(--border-soft);display:block}
+  table{border-collapse:collapse;width:100%;font-size:11.5px}td,th{border-bottom:1px solid var(--border-soft);padding:5px 4px;text-align:left}th{color:var(--ink-dim);font-weight:600;font-size:10.5px}
   .note{font-size:11.5px;color:var(--ink-dim);line-height:1.55;margin:6px 0}
-  .bar{height:7px;border-radius:4px;background:var(--border-soft);overflow:hidden;display:flex}
-  .bar i{display:block;height:100%}
+  .mini{display:flex;gap:5px;flex-wrap:wrap}.mini canvas{width:84px;height:84px;border:1px solid var(--border-soft);border-radius:8px;cursor:pointer;background:#fff}.mini canvas:hover{border-color:var(--ink)}
   .kv{font-family:var(--font-mono);font-size:11px;color:var(--ink-dim)}
-  .mini{display:flex;gap:5px;flex-wrap:wrap}
-  .mini canvas{width:84px;height:84px;border:1px solid var(--border-soft);border-radius:8px;cursor:pointer;background:#fff}
-  .mini canvas:hover{border-color:var(--ink)}
   #toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 14px;border-radius:9px;font-size:12px;opacity:0;transition:opacity .2s;pointer-events:none}
 </style>
 </head>
 <body>
 <div class="wrap">
-<header><h1>NU PATTERN</h1><span class="sub">내 그림의 배경 패턴을 학습해 새 패턴을 그려 내는 도구 · 자료 <b id="hdN">…</b>장 · 모티프 <b id="hdM">…</b>개</span></header>
+<header><h1>NU PATTERN</h1><span class="sub">내 그림의 배경 패턴을 학습해 새 패턴을 그려 내는 도구 · 자료 <b id="hdN">…</b>장 · 모양 <b id="hdM">…</b>종 (뉴 플로우 공용)</span></header>
 <div class="cols">
   <div>
     <div class="panel">
       <div class="stage"><canvas id="cv" width="1200" height="1200"></canvas></div>
       <div class="row">
-        <button class="go" id="bGen">새로 생성</button>
-        <button id="bVar">같은 구도로 변주</button>
-        <button id="bBack" title="직전 결과로">되돌리기</button>
-        <span style="flex:1"></span>
-        <button id="bPng">PNG 저장</button>
-        <button id="bSvg">SVG 저장</button>
+        <button class="go" id="bGen">새로 생성</button><button id="bVar">같은 구도로 변주</button><button id="bBack">되돌리기</button>
+        <span style="flex:1"></span><button id="bPng">PNG 저장</button><button id="bSvg">SVG 저장</button>
       </div>
       <div class="row" style="margin-top:6px">
         <span class="note" style="margin:0">그리기:</span>
-        <button class="sm" data-tool="none">끄기</button>
-        <button class="sm" data-tool="stamp">찍기</button>
-        <button class="sm" data-tool="spray">뿌리기</button>
-        <button class="sm" data-tool="erase">지우기</button>
-        <select id="toolCls"></select>
-        <span class="note" style="margin:0">찍기 크기</span><input type="range" id="toolSize" min="0.02" max="0.4" step="0.005" value="0.08" style="width:90px">
-        <button class="sm" id="bClearDraw">그린 것 지우기</button>
+        <button class="sm" data-tool="none">끄기</button><button class="sm" data-tool="stamp">찍기</button><button class="sm" data-tool="spray">뿌리기</button><button class="sm" data-tool="erase">지우기</button>
+        <select id="toolKind"></select><span class="note" style="margin:0">크기</span><input type="range" id="toolSize" min="0.01" max="0.3" step="0.005" value="0.05" style="width:90px"><button class="sm" id="bClearDraw">그린 것 지우기</button>
       </div>
-      <div class="note">클릭·드래그로 모티프를 더 찍거나 뿌릴 수 있어요. 지우기는 가장 가까운 모양을 없애요. 생성 결과와 그린 것은 함께 저장돼요.</div>
+      <div class="note">클릭·드래그로 모양을 더 찍거나 뿌릴 수 있어요. 지우기는 가장 가까운 모양을 없애요. 생성 결과와 그린 것은 함께 저장돼요.</div>
     </div>
-    <div class="panel">
-      <h3>다른 씨앗 미리보기</h3>
-      <div class="mini" id="mini"></div>
-      <div class="note">같은 설정으로 씨앗만 바꾼 결과예요. 마음에 드는 걸 누르면 큰 화면에 그대로 그려요.</div>
-    </div>
+    <div class="panel"><h3>다른 씨앗 미리보기</h3><div class="mini" id="mini"></div><div class="note">같은 설정으로 씨앗만 바꾼 결과예요. 누르면 큰 화면에 그대로 그려요.</div></div>
   </div>
   <div>
     <div class="panel">
-      <div class="tabs">
-        <button class="on" data-tab="gen">생성</button><button data-tab="col">색</button><button data-tab="mot">모티프</button><button data-tab="learn">학습 자료</button><button data-tab="set">저장·설정</button>
-      </div>
+      <div class="tabs"><button class="on" data-tab="gen">생성</button><button data-tab="col">색</button><button data-tab="kind">모양</button><button data-tab="learn">학습 자료</button><button data-tab="set">저장·설정</button></div>
 
       <div class="tab on" id="tab-gen">
         <h3>패턴 종류 (학습한 분류)</h3>
@@ -126,14 +83,14 @@
         <div class="sl"><label>방향 흐트림</label><input type="range" id="p-angleJit" min="0" max="1" step="0.05"><output></output></div>
         <div class="sl"><label>중심 X</label><input type="range" id="p-cx" min="-0.3" max="1.3" step="0.01"><output></output></div>
         <div class="sl"><label>중심 Y</label><input type="range" id="p-cy" min="-0.3" max="1.3" step="0.01"><output></output></div>
-        <div class="sl"><label>학습 모양 비율</label><input type="range" id="p-libMix" min="0" max="1" step="0.05"><output></output></div>
-        <div class="sl"><label>둥글림</label><input type="range" id="p-smooth" min="0" max="1" step="0.05"><output></output></div>
+        <div class="sl"><label>모양 다양함</label><input type="range" id="p-vary" min="0" max="1.5" step="0.05"><output></output></div>
         <div class="sl"><label>겹침 허용</label><input type="range" id="p-overlap" min="0" max="1" step="0.05"><output></output></div>
         <h3 style="margin-top:14px">마감</h3>
-        <label class="chk"><input type="checkbox" id="p-outline"> 윤곽선</label>
-        <div class="sl"><label>윤곽선 굵기</label><input type="range" id="p-outlineW" min="0.5" max="8" step="0.25"><output></output></div>
-        <label class="chk"><input type="checkbox" id="p-highlight"> 방울 하이라이트</label>
+        <div class="sl"><label>테두리 굵기</label><input type="range" id="p-lineW" min="0" max="3" step="0.1"><output></output></div>
+        <label class="chk"><input type="checkbox" id="p-darkLine"> 테두리를 한 가지 어두운 색으로 (유화 윤곽선처럼)</label>
+        <label class="chk"><input type="checkbox" id="p-gloss"> 방울 명암·하이라이트</label>
         <label class="chk"><input type="checkbox" id="p-satellite"> 큰 모양 주변 잔방울</label>
+        <div class="sl"><label>빛 방향 (도)</label><input type="range" id="p-light" min="-180" max="180" step="5"><output></output></div>
         <div class="sl"><label>화면 비율</label><select id="p-ratio" style="grid-column:2/4"><option value="1">1 : 1</option><option value="0.8">4 : 5 (세로)</option><option value="0.75">3 : 4 (세로)</option><option value="1.25">5 : 4 (가로)</option><option value="1.333">4 : 3 (가로)</option><option value="1.778">16 : 9</option><option value="0.5625">9 : 16</option></select></div>
       </div>
 
@@ -142,32 +99,25 @@
         <div class="pals" id="pals"></div>
         <div class="row"><button class="sm" id="bPalRand">아무 팔레트</button><button class="sm" id="bPalAll">전체 그림 팔레트 보기</button></div>
         <h3 style="margin-top:14px">현재 색</h3>
-        <div class="note">첫 칸이 바탕색이에요. 칸을 누르면 바꿀 수 있고, 모티프 종류마다 어떤 색을 쓰는지는 아래에서 정해요.</div>
-        <div class="pal" id="curPal"></div>
-        <input type="color" id="colPick" style="margin-top:8px">
-        <h3 style="margin-top:14px">모티프별 색</h3>
-        <div id="clsCol"></div>
+        <div class="note">첫 칸이 바탕색이에요. 칸을 누르고 아래 색 상자에서 바꿔요.</div>
+        <div class="pal" id="curPal"></div><input type="color" id="colPick" style="margin-top:8px">
+        <h3 style="margin-top:14px">모양별 색</h3><div id="kindCol"></div>
         <label class="chk"><input type="checkbox" id="p-colorShuffle"> 생성할 때마다 색 배정 섞기</label>
       </div>
 
-      <div class="tab" id="tab-mot">
-        <h3>모티프 섞임 (종류별 비중)</h3>
-        <div id="mixSl"></div>
+      <div class="tab" id="tab-kind">
+        <h3>모양 (뉴 플로우에서 가져온 벡터 모양)</h3>
+        <div class="note">누르면 끄고 켤 수 있어요. 꺼진 모양은 생성에 안 나와요. 아래 비중은 이 패턴 종류에서 각 모양이 얼마나 자주 나올지예요.</div>
+        <div class="kinds" id="kinds"></div>
+        <h3 style="margin-top:14px">모양 비중</h3><div id="mixSl"></div>
         <div class="row"><button class="sm" id="bMixLearn">학습값으로</button></div>
-        <h3 style="margin-top:14px">학습한 모양 도서관</h3>
-        <div class="row" style="margin-top:0"><select id="libCls"></select><button class="sm" id="bLibAll">모두 켜기</button><button class="sm" id="bLibNone">모두 끄기</button><span class="note" id="libN" style="margin:0"></span></div>
-        <div class="grid" id="libGrid"></div>
-        <div class="note">그림에서 잘라 낸 실제 모양들이에요. 누르면 끄고 켤 수 있고, 끈 모양은 생성에 안 쓰여요. 위 '학습 모양 비율'이 0이면 절차적으로만 그려요.</div>
       </div>
 
       <div class="tab" id="tab-learn">
         <h3>어떻게 학습했나</h3>
-        <div class="note">그림마다 색을 평면으로 묶고, 색 덩어리 하나하나를 모양(침·띠·방울·튀김·별·반짝이·폭발별·선)으로 재서 분류했어요. 인물이 있는 작품은 인물을 먼저 가리고 배경만 봤어요. 그림 전체는 모양 비중·방향 집중·방사 중심으로 8가지 패턴 종류로 나눴어요.</div>
-        <h3 style="margin-top:12px">종류별 통계</h3>
-        <table id="famTable"></table>
-        <h3 style="margin-top:12px">학습 자료 (종류별)</h3>
-        <select id="learnFam"></select>
-        <div class="imgs" id="learnImgs"></div>
+        <div class="note">그림마다 색을 평면으로 묶고 색 덩어리 하나하나를 재서 모양 종류(침·띠·방울·튀김·별·반짝이·폭발별·선)로 분류했어요. 인물이 있는 작품은 인물을 가리고 배경만 봤어요. 그림 전체는 모양 비중·방향 집중·방사 중심으로 패턴 종류를 나눴고, 종류마다 밀도·크기 분포·팔레트를 뽑았어요. 모양 자체는 뉴 플로우에서 손으로 다듬은 벡터 모양을 써요.</div>
+        <h3 style="margin-top:12px">종류별 통계</h3><table id="famTable"></table>
+        <h3 style="margin-top:12px">학습 자료 (종류별)</h3><select id="learnFam"></select><div class="imgs" id="learnImgs"></div>
       </div>
 
       <div class="tab" id="tab-set">
@@ -179,303 +129,161 @@
         <h3 style="margin-top:14px">초기화</h3>
         <div class="row" style="margin-top:0"><button class="sm" id="bResetP">슬라이더 기본값으로</button><button class="sm" id="bResetAll">모든 저장값 지우기</button></div>
         <div class="note">설정은 이 브라우저에 계속 저장돼요. 저절로 초기화되지 않고, 위 버튼으로만 초기화돼요.</div>
-        <h3 style="margin-top:14px">정보</h3>
-        <div class="kv" id="info"></div>
+        <h3 style="margin-top:14px">정보</h3><div class="kv" id="info"></div>
       </div>
     </div>
   </div>
 </div>
 </div>
 <div id="toast"></div>
+<script src="nu-objects.js"></script>
 <script src="nupattern-data.js"></script>
 <script>
 'use strict';
-const D = window.NP_DATA;
-const CL = D.classes;                        // ray streak line splash blob drop wisp star sparkle burst
-const CLKO = {ray:'침·집중선', streak:'쓸린 띠', line:'선·고리', splash:'튀김', blob:'덩어리', drop:'방울', wisp:'조각', star:'별', sparkle:'반짝이', burst:'폭발별'};
-const FAMS = Object.keys(D.families);
+const D = window.NP_DATA, FAMS = Object.keys(D.families), KINDS = NUO.kinds, KO = NUO.KO;
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
-const LS = 'nuPattern.v1';
-document.getElementById('hdN').textContent = D.images.length;
-document.getElementById('hdM').textContent = Object.values(D.motifs).reduce((a, v) => a + v.length, 0);
-
-// ---------- 난수 ----------
+const LS = 'nuPattern.v2';
+$('#hdN').textContent = D.images.length; $('#hdM').textContent = KINDS.length;
+// 분석 분류(침·띠·…) → 모양 종류 비중 기본값
+const BASE_MIX = {
+  burst:  {needle: 3, rayFan: 0.6, bolt: 0.5, burstStar: 0.4, drop: 1.2, glint: 0.6, crossStar: 0.3, jelly: 0.3, star5: 0.2},
+  stars:  {star5: 2.2, burstStar: 0.8, crossStar: 1.2, glint: 1.4, drop: 0.5, band: 0.4, spiky: 0.3},
+  splash: {jelly: 1.5, drop: 2, inkSplat: 0.5, paintStreak: 0.7, heart: 0.3, glint: 0.4, star5: 0.3, band: 0.4},
+  bubbles:{drop: 3, heart: 0.5, ring: 0.5, glint: 0.3, jelly: 0.5},
+  flow:   {band: 2.5, needle: 1, paintStreak: 0.8, zig: 0.4, drop: 0.5, glint: 0.3},
+  swirl:  {band: 2.5, zig: 0.8, needle: 0.5, drop: 0.6, ring: 0.3},
+  cells:  {ring: 2, puff: 0.8, cloud: 0.5, drop: 0.8, glint: 0.3, jelly: 0.3},
+  mixed:  {jelly: 1, drop: 1.4, star5: 0.9, crossStar: 0.5, band: 0.8, needle: 0.6, glint: 0.6, inkSplat: 0.3, paintStreak: 0.4},
+  clouds: {puff: 2, needle: 2, cloud: 0.4, drop: 0.4, glint: 0.3}
+};
 function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-let R = Math.random;
-const rr = (a, b) => a + (b - a) * R();
-const rg = () => { let u = 1 - R(), v = R(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
-const pick = arr => arr[Math.floor(R() * arr.length)];
-const logn = (m, s) => Math.pow(10, m + s * rg());
+let R = Math.random; const rr = (a, b) => a + (b - a) * R(), rg = () => { const u = 1 - R(), v = R(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }, pick = a => a[Math.floor(R() * a.length)], logn = (m, s) => Math.pow(10, m + s * rg());
 
-// ---------- 설정 ----------
-const DEF = {family:'splash', seed:7, density:1, size:1, sizeVar:0.6, angle:35, angleJit:0.35, cx:0.5, cy:0.5, libMix:0.65, smooth:0.5, overlap:0.35,
-  outline:false, outlineW:2, highlight:true, satellite:true, ratio:'0.8', colorShuffle:true, palIdx:0, pal:null, clsCol:{}, mix:null, libOff:{}, tool:'none', toolCls:'drop', toolSize:0.08};
-let P = Object.assign({}, DEF);
-try { const s = JSON.parse(localStorage.getItem(LS) || 'null'); if (s && s.P) Object.assign(P, s.P); } catch (e) {}
+const DEF = {family: 'splash', seed: 7, density: 1, size: 1, sizeVar: 0.6, angle: 35, angleJit: 0.35, cx: 0.5, cy: 0.5, vary: 0.8, overlap: 0.35, lineW: 1, darkLine: false, gloss: true, satellite: true, light: -135, ratio: '0.8', colorShuffle: true,
+  palIdx: 0, pal: null, kindCol: {}, mix: null, kindOff: {}, tool: 'none', toolKind: 'drop', toolSize: 0.05};
+let P = Object.assign({}, DEF), PRESETS = {};
+try { const s = JSON.parse(localStorage.getItem(LS) || 'null'); if (s && s.P) Object.assign(P, s.P); if (s && s.presets) PRESETS = s.presets; } catch (e) {}
 function save(){ try { localStorage.setItem(LS, JSON.stringify({P, presets: PRESETS})); } catch (e) {} }
-let PRESETS = {}; try { PRESETS = JSON.parse(localStorage.getItem(LS) || '{}').presets || {}; } catch (e) {}
 
-// ---------- 색 ----------
+// ── 색 ──
 function hex2rgb(h){ return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]; }
-function rgb2hex(c){ return '#' + c.map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join(''); }
 function lum(h){ const [r, g, b] = hex2rgb(h); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }
-function mix(a, b, t){ const A = hex2rgb(a), B = hex2rgb(b); return rgb2hex(A.map((v, i) => v + (B[i] - v) * t)); }
-function famPalettes(f){ return (D.families[f].palettes || []).filter(p => p.length >= 3); }
-function ensurePalette(){
-  const ps = famPalettes(P.family);
-  if (!P.pal || P.pal.length < 2) P.pal = (ps[P.palIdx % ps.length] || ['#ffffff', '#fbd21a', '#f14b68', '#3b5bdb']).slice(0, 7);
-}
-function outlineColor(){ // 가장 어두운 색을 더 어둡게, 없으면 바탕을 어둡게
-  const cands = P.pal.slice(1); let d = cands.length ? cands.reduce((a, b) => lum(a) < lum(b) ? a : b) : P.pal[0];
-  return mix(d, '#1a1030', 0.55);
-}
 function sat(h){ const [r, g, b] = hex2rgb(h).map(v => v / 255); const mx = Math.max(r, g, b), mn = Math.min(r, g, b); return mx ? (mx - mn) / mx : 0; }
+function famPalettes(f){ return (D.families[f].palettes || []).filter(p => p.length >= 3); }
+function palSat(p){ return p.slice(1).reduce((a, c) => a + sat(c), 0) / Math.max(1, p.length - 1); }
+function ensurePalette(){ let ps = famPalettes(P.family); if (!P.pal || P.pal.length < 2){ if (P.palIdx === 0){ const i = ps.findIndex(p => palSat(p) > 0.35); if (i > 0) P.palIdx = i; } P.pal = (ps[P.palIdx % ps.length] || ['#ffffff', '#fbd21a', '#f14b68', '#3b5bdb']).slice(0, 7); } }
+function darkLine(){ const c = P.pal.slice(1); const d = c.length ? c.reduce((a, b) => lum(a) < lum(b) ? a : b) : P.pal[0]; return NUO.mixc(d, '#1a1030', 0.55); }
 function pickVivid(cols){ const w = cols.map(c => 0.25 + sat(c)); let t = R() * w.reduce((a, b) => a + b, 0); for (let i = 0; i < cols.length; i++){ t -= w[i]; if (t <= 0) return cols[i]; } return cols[cols.length - 1]; }
-function assignColors(){ // 모티프 종류마다 색 하나씩 (사용자가 고정한 건 그대로)
-  const motifCols = P.pal.slice(1); if (!motifCols.length) return;
-  const sorted = motifCols.slice().sort((a, b) => lum(a) - lum(b));
-  const map = {};
-  for (const c of CL){
-    if (P.clsCol[c] && P.pal.includes(P.clsCol[c])) { map[c] = P.clsCol[c]; continue; }
-    if (c === 'star' || c === 'burst') map[c] = sorted[sorted.length - 1 - (sorted.length > 2 ? 1 : 0)] ;   // 별은 밝은 쪽
-    else if (c === 'sparkle') map[c] = sorted[sorted.length - 1];
-    else if (c === 'line') map[c] = sorted[0];
-    else map[c] = pickVivid(motifCols);
-  }
-  return map;
-}
+function assignColors(){ const mc = P.pal.slice(1); if (!mc.length) return {}; const sorted = mc.slice().sort((a, b) => lum(a) - lum(b)), map = {};
+  for (const k of KINDS){ if (P.kindCol[k] && P.pal.includes(P.kindCol[k])) { map[k] = P.kindCol[k]; continue; }
+    if (['star5', 'burstStar', 'bolt', 'rayFan', 'spiky', 'needle'].includes(k)) map[k] = sorted[Math.max(0, sorted.length - 1 - (sorted.length > 2 ? 1 : 0))];
+    else if (['glint', 'crossStar'].includes(k)) map[k] = sorted[sorted.length - 1];
+    else if (['inkSplat', 'ring'].includes(k)) map[k] = sorted[0];
+    else map[k] = pickVivid(mc); } return map; }
+function trioOf(f){ const ground = P.pal[0]; const l = P.darkLine ? darkLine() : NUO.shadeH(f, -0.38); let h = NUO.shadeH(f, 0.55); if (lum(f) > 225) h = '#ffffff'; return {f, l, h}; }
 
-// ---------- 모양 ----------
-function libShapes(cls){ return (D.motifs[cls] || []).filter((m, i) => !P.libOff[cls + ':' + i]); }
-// 절차적 모양: 모두 [-1,1] 정규화 폴리곤
-function procShape(cls, rnd, wv){
-  const pts = [];
-  if (cls === 'ray'){ const L = 1, w = (wv || rr(0.03, 0.12)), bend = rr(-0.08, 0.08), k = rr(0.3, 0.7);
-    pts.push([-L, 0]); pts.push([-L * k, -w + bend * 0.3]); pts.push([L * 0.2, -w * 0.5]); pts.push([L, bend]); pts.push([L * 0.2, w * 0.5]); pts.push([-L * k, w + bend * 0.3]); return pts; }
-  if (cls === 'streak'){ const n = 14, w = (wv || rr(0.12, 0.35)), curv = rr(-0.5, 0.5), tail = rr(0.2, 0.6);
-    for (let i = 0; i <= n; i++){ const t = i / n, x = -1 + 2 * t, y = curv * (x * x - 1); const ww = w * Math.sin(Math.PI * Math.pow(t, tail)) * (1 + 0.3 * Math.sin(t * 9 + rnd * 6)); pts.push([x, y - ww]); }
-    for (let i = n; i >= 0; i--){ const t = i / n, x = -1 + 2 * t, y = curv * (x * x - 1); const ww = w * Math.sin(Math.PI * Math.pow(t, tail)) * (1 + 0.3 * Math.cos(t * 7 + rnd * 5)); pts.push([x, y + ww]); } return pts; }
-  if (cls === 'star' || cls === 'burst'){ const n = cls === 'star' ? (R() < 0.8 ? 5 : 6) : Math.floor(rr(7, 13)), inner = cls === 'star' ? rr(0.42, 0.55) : rr(0.3, 0.5);
-    for (let i = 0; i < n * 2; i++){ const a = Math.PI * i / n - Math.PI / 2, r = (i % 2 ? inner : 1) * (1 + (i % 2 ? 0 : rr(-0.12, 0.12))); pts.push([Math.cos(a) * r, Math.sin(a) * r]); } return pts; }
-  if (cls === 'sparkle'){ const n = 4, inner = rr(0.08, 0.2), long = rr(0.7, 1); // 네 끝, 오목한 변
-    for (let i = 0; i < n; i++){ const a = Math.PI / 2 * i - Math.PI / 2, L = (i % 2 ? long : 1); pts.push([Math.cos(a) * L, Math.sin(a) * L]);
-      const am = a + Math.PI / 4; for (const t of [0.35, 0.5, 0.65]){ const q = Math.PI / 2 * (i + t) - Math.PI / 2; const rI = inner + (Math.abs(t - 0.5) * 2) ** 2 * (0.5 - inner); pts.push([Math.cos(q) * rI, Math.sin(q) * rI]); } } return pts; }
-  if (cls === 'drop' || cls === 'blob' || cls === 'splash' || cls === 'wisp'){ const n = 28, lob = cls === 'drop' ? rr(0.02, 0.08) : cls === 'blob' ? rr(0.08, 0.2) : rr(0.18, 0.4), k1 = Math.floor(rr(2, 5)), k2 = Math.floor(rr(5, 9)), ph = rnd * 7, el = cls === 'drop' ? rr(0.85, 1) : rr(0.6, 1);
-    for (let i = 0; i < n; i++){ const a = 2 * Math.PI * i / n; let r = 1 + lob * Math.sin(k1 * a + ph) + lob * 0.6 * Math.cos(k2 * a + ph * 1.7);
-      if (cls === 'splash' && i % 7 === 0) r += rr(0.1, 0.45); pts.push([Math.cos(a) * r, Math.sin(a) * r * el]); } return pts; }
-  if (cls === 'line'){ const n = 20, r0 = 1, w = rr(0.06, 0.14), span = rr(1.2, 2 * Math.PI), a0 = rnd * 6;
-    for (let i = 0; i <= n; i++){ const a = a0 + span * i / n; pts.push([Math.cos(a) * (r0 - w), Math.sin(a) * (r0 - w)]); }
-    for (let i = n; i >= 0; i--){ const a = a0 + span * i / n; pts.push([Math.cos(a) * (r0 + w), Math.sin(a) * (r0 + w)]); } return pts; }
-  return [[-1, -1], [1, -1], [1, 1], [-1, 1]];
-}
-function getShape(cls, wv){
-  const lib = libShapes(cls);
-  if (lib.length && R() < P.libMix){ const m = pick(lib); return {pts: m.p, lib: true, flip: R() < 0.5}; }
-  return {pts: procShape(cls, R(), wv), lib: false};
-}
-const ROUND = {drop: 1, blob: 1, splash: 0.8, wisp: 0.7, streak: 0.6, line: 0.5, ray: 0.15, star: 0, burst: 0, sparkle: 0};
-
-// ---------- 장면 생성 ----------
+// ── 장면 ──
 let SCENE = null, HIST = [], DRAWN = [];
-function sceneBase(){ ensurePalette(); return {w: 1, h: 1 / parseFloat(P.ratio), ground: P.pal[0], shapes: [], cols: assignColors()}; }
-function add(S, cls, x, y, s, rot, extra){ const sh = getShape(cls, extra && extra.ar); S.shapes.push(Object.assign({cls, x, y, s, rot, pts: sh.pts, lib: sh.lib, col: S.cols[cls]}, extra || {})); return S.shapes[S.shapes.length - 1]; }
-function famMix(){ const fm = D.families[P.family].mix; const m = {}; for (const c of CL) m[c] = (P.mix && P.mix[c] != null) ? P.mix[c] : fm[c]; return m; }
-function pickCls(m, allow){ const ks = allow.filter(k => m[k] > 0); let t = ks.reduce((a, k) => a + m[k], 0) * R(); for (const k of ks){ t -= m[k]; if (t <= 0) return k; } return ks[ks.length - 1] || 'drop'; }
-function sizeOf(base){ return base * P.size * Math.exp(rg() * 0.45 * P.sizeVar); }
-function tooClose(S, x, y, s){ if (P.overlap >= 1) return false; for (const o of S.shapes){ const d = Math.hypot(o.x - x, o.y - y); if (d < (o.s + s) * (1 - P.overlap) * 0.9) return true; } return false; }
-function place(S, cls, s, x, y, rot, extra){ for (let t = 0; t < 6; t++){ if (!tooClose(S, x, y, s)) return add(S, cls, x, y, s, rot, extra); x = rr(-0.05, S.w + 0.05); y = rr(-0.05, S.h + 0.05); } return null; }
-function satellites(S, sh){ if (!P.satellite || sh.s < 0.05) return; const n = Math.floor(rr(2, 7) * Math.min(1.5, sh.s * 8)); for (let i = 0; i < n; i++){ const a = rr(0, 6.28), d = sh.s * rr(1.1, 2.4); add(S, 'drop', sh.x + Math.cos(a) * d, sh.y + Math.sin(a) * d, sh.s * rr(0.08, 0.3), rr(0, 6.28), {col: sh.col}); } }
-
+function famMix(){ const base = BASE_MIX[P.family] || BASE_MIX.mixed, m = {}; for (const k of KINDS){ const v = (P.mix && P.mix[k] != null) ? P.mix[k] : (base[k] || 0); m[k] = P.kindOff[k] ? 0 : v; } return m; }
+function pickKind(m, allow){ const ks = (allow || KINDS).filter(k => m[k] > 0); if (!ks.length) return null; let t = ks.reduce((a, k) => a + m[k], 0) * R(); for (const k of ks){ t -= m[k]; if (t <= 0) return k; } return ks[ks.length - 1]; }
+function sizeOf(b){ return b * P.size * Math.exp(rg() * 0.45 * P.sizeVar); }
+function newScene(){ ensurePalette(); return {w: 1, h: 1 / parseFloat(P.ratio), ground: P.pal[0], cols: assignColors(), shapes: []}; }
+function add(S, kind, x, y, r, rot, ex){ if (!kind || P.kindOff[kind]) return null; const sh = Object.assign({kind, x, y, r, rot: rot || 0, seed: Math.floor(R() * 1e6), z: 0}, ex || {}); S.shapes.push(sh); return sh; }
+function tooClose(S, x, y, r){ if (P.overlap >= 1) return false; for (const o of S.shapes){ if (o.big === false) continue; const d = Math.hypot(o.x - x, o.y - y); if (d < (o.r + r) * (1 - P.overlap) * 1.1) return true; } return false; }
+function place(S, kind, r, x, y, rot, ex){ for (let t = 0; t < 7; t++){ if (!tooClose(S, x, y, r)) return add(S, kind, x, y, r, rot, ex); x = rr(-0.03, S.w + 0.03); y = rr(-0.03, S.h + 0.03); } return null; }
+function satellites(S, sh, n){ if (!P.satellite) return; n = n || Math.round(rr(3, 8)); for (let i = 0; i < n; i++){ const a = rr(0, 6.28), d = sh.r * rr(1.2, 2.6); add(S, 'drop', sh.x + Math.cos(a) * d, sh.y + Math.sin(a) * d, sh.r * rr(0.08, 0.28), 0, {col: sh.col, big: false, asp: rr(0.8, 1.2)}); } }
+function scatter(S, n, kinds, m, base, sd, ex){ for (let i = 0; i < n; i++){ const k = pickKind(m, kinds); if (!k) return; place(S, k, sizeOf(logn(base, sd)), rr(-0.03, S.w + 0.03), rr(-0.03, S.h + 0.03), rr(0, 6.28), Object.assign({big: false}, ex || {})); } }
+const A0 = () => P.angle * Math.PI / 180;
 const GEN = {
-  burst(S){ // 중심에서 뻗는 침·띠 + 중심 둘레 방울
-    const cx = P.cx * S.w, cy = P.cy * S.h, m = famMix();
-    const nRay = Math.round(60 * P.density), big = Math.round(rr(4, 8));
-    for (let i = 0; i < nRay; i++){
-      const a = rr(0, 6.28), isBig = i < big;
-      const len = isBig ? sizeOf(rr(0.45, 0.9)) : sizeOf(logn(-0.7, 0.3)), r0 = isBig ? rr(0.0, 0.05) : rr(0.03, 0.5);
-      const cls = (!isBig && R() < m.streak / (m.streak + m.ray + 1e-6) * 0.5) ? 'streak' : 'ray';
-      const x = cx + Math.cos(a) * (r0 + len / 2), y = cy + Math.sin(a) * (r0 + len / 2);
-      add(S, cls, x, y, len / 2, a, {ar: isBig ? rr(0.06, 0.14) : rr(0.02, 0.07)});
-    }
-    const nDrop = Math.round(25 * P.density);
-    for (let i = 0; i < nDrop; i++){ const a = rr(0, 6.28), d = Math.abs(rg()) * 0.3 + 0.04; const cls = pickCls(m, ['drop', 'splash', 'blob', 'star', 'sparkle']); place(S, cls, sizeOf(logn(-1.5, 0.3)), cx + Math.cos(a) * d, cy + Math.sin(a) * d * 1.1, rr(0, 6.28)); }
-  },
-  stars(S){
-    const m = famMix(), n = Math.round(70 * P.density);
-    for (let i = 0; i < n; i++){ const cls = i < 3 ? 'star' : pickCls(m, ['star', 'sparkle', 'burst', 'drop', 'streak']); const s = i < 3 ? sizeOf(rr(0.1, 0.2)) : sizeOf(logn(-1.5, 0.35));
-      const sh = place(S, cls, s, rr(-0.03, S.w + 0.03), rr(-0.03, S.h + 0.03), cls === 'streak' ? P.angle * Math.PI / 180 + rg() * P.angleJit : rr(-0.3, 0.3)); }
-    const k = Math.round(14 * P.density); for (let i = 0; i < k; i++) add(S, 'drop', rr(0, S.w), rr(0, S.h), sizeOf(logn(-2.1, 0.25)), 0);
-  },
-  splash(S){
-    const m = famMix(), nC = Math.round(rr(2, 4) * Math.sqrt(P.density));
-    for (let c = 0; c < nC; c++){
-      const cx = rr(0.1, S.w - 0.1), cy = rr(0.1, S.h - 0.1), dir = P.angle * Math.PI / 180 + rg() * P.angleJit * 1.2, col = null;
-      const main = add(S, pickCls(m, ['splash', 'blob', 'wisp']), cx, cy, sizeOf(rr(0.09, 0.2)), dir);
-      satellites(S, main);
-      const tail = Math.round(rr(6, 16) * P.density); // 방향으로 줄어드는 꼬리
-      for (let i = 1; i <= tail; i++){ const t = i / tail, d = main.s * (1 + t * rr(3, 6)), jx = rg() * 0.03 * (1 + t), jy = rg() * 0.03 * (1 + t);
-        add(S, R() < 0.3 ? 'streak' : 'drop', cx + Math.cos(dir) * d + jx, cy + Math.sin(dir) * d + jy, main.s * (1 - t) * rr(0.15, 0.45), dir + rg() * 0.3, {col: main.col}); }
-    }
-    const n = Math.round(45 * P.density);
-    for (let i = 0; i < n; i++){ const cls = pickCls(m, ['drop', 'splash', 'blob', 'wisp', 'streak', 'star']); place(S, cls, sizeOf(logn(-1.45, 0.35)), rr(-0.02, S.w + 0.02), rr(-0.02, S.h + 0.02), rr(0, 6.28)); }
-  },
-  bubbles(S){
-    const n = Math.round(55 * P.density);
-    for (let i = 0; i < n; i++){ const s = sizeOf(i < 4 ? rr(0.08, 0.16) : logn(-1.45, 0.3)); const sh = place(S, R() < 0.85 ? 'drop' : 'blob', s, rr(0, S.w), rr(0, S.h), rr(0, 6.28), {hl: true}); if (sh && R() < 0.4) satellites(S, sh); }
-  },
-  flow(S){
-    const m = famMix(), a0 = P.angle * Math.PI / 180, n = Math.round(40 * P.density);
-    for (let i = 0; i < n; i++){ const a = a0 + rg() * P.angleJit * 0.5, L = sizeOf(logn(-0.75, 0.3)); const cls = pickCls(m, ['streak', 'ray', 'line']);
-      add(S, cls, rr(-0.1, S.w + 0.1), rr(-0.1, S.h + 0.1), L / 2, a, {ar: cls === 'ray' ? rr(0.03, 0.08) : rr(0.12, 0.3)}); }
-    const k = Math.round(20 * P.density); for (let i = 0; i < k; i++) add(S, pickCls(m, ['drop', 'splash', 'star']), rr(0, S.w), rr(0, S.h), sizeOf(logn(-1.6, 0.3)), rr(0, 6.28));
-  },
-  swirl(S){ // 소용돌이 두세 개로 만든 흐름장
-    const m = famMix(), vort = []; for (let i = 0; i < Math.floor(rr(2, 4)); i++) vort.push([rr(0, S.w), rr(0, S.h), R() < 0.5 ? 1 : -1, rr(0.2, 0.5)]);
-    const field = (x, y) => { let vx = Math.cos(P.angle * Math.PI / 180) * 0.3, vy = Math.sin(P.angle * Math.PI / 180) * 0.3; for (const [vx0, vy0, sgn, rad] of vort){ const dx = x - vx0, dy = y - vy0, d2 = dx * dx + dy * dy + 0.01; const f = Math.exp(-d2 / (rad * rad)); vx += -dy / d2 * f * sgn * 0.6; vy += dx / d2 * f * sgn * 0.6; } return Math.atan2(vy, vx); };
-    const n = Math.round(60 * P.density);
-    for (let i = 0; i < n; i++){ const x = rr(-0.05, S.w + 0.05), y = rr(-0.05, S.h + 0.05), a = field(x, y) + rg() * P.angleJit * 0.3; add(S, pickCls(m, ['streak', 'ray', 'line', 'wisp']), x, y, sizeOf(logn(-1.05, 0.3)), a, {ar: rr(0.1, 0.3)}); }
-    const k = Math.round(15 * P.density); for (let i = 0; i < k; i++) add(S, 'drop', rr(0, S.w), rr(0, S.h), sizeOf(logn(-1.7, 0.3)), 0);
-  },
-  cells(S){ // 선·고리·거품막
-    const m = famMix(), n = Math.round(45 * P.density);
-    for (let i = 0; i < n; i++){ const s = sizeOf(logn(-1.2, 0.35)); place(S, pickCls(m, ['line', 'drop', 'blob', 'wisp', 'streak']), s, rr(0, S.w), rr(0, S.h), rr(0, 6.28), {ring: R() < 0.5}); }
-    const k = Math.round(25 * P.density); for (let i = 0; i < k; i++) add(S, 'drop', rr(0, S.w), rr(0, S.h), sizeOf(logn(-2.0, 0.3)), 0);
-  },
+  burst(S){ const m = famMix(), cx = P.cx * S.w, cy = P.cy * S.h, nN = Math.round(70 * P.density), big = Math.round(rr(5, 9));
+    for (let i = 0; i < nN; i++){ const a = rr(0, 6.28), isBig = i < big, len = isBig ? sizeOf(rr(0.5, 1.0)) : sizeOf(logn(-0.65, 0.3)), r0 = isBig ? rr(0, 0.04) : rr(0.03, 0.5);
+      add(S, 'needle', cx + Math.cos(a) * r0, cy + Math.sin(a) * r0, len * 0.1, a, {len, w: len * (isBig ? rr(0.02, 0.045) : rr(0.006, 0.02)), bend: rg() * 0.03, k: rr(0.25, 0.5), z: isBig ? 1 : 0}); }
+    for (let i = 0; i < Math.round(3 * P.density); i++){ const a = rr(0, 6.28), d = rr(0.05, 0.3); add(S, pickKind(m, ['rayFan', 'bolt', 'burstStar']) || 'bolt', cx + Math.cos(a) * d, cy + Math.sin(a) * d, sizeOf(rr(0.02, 0.05)), a, {z: 2}); }
+    for (let i = 0; i < Math.round(28 * P.density); i++){ const a = rr(0, 6.28), d = Math.abs(rg()) * 0.3 + 0.04; place(S, pickKind(m, ['drop', 'glint', 'crossStar', 'jelly', 'star5']), sizeOf(logn(-1.6, 0.3)), cx + Math.cos(a) * d, cy + Math.sin(a) * d * 1.1, rr(0, 6.28), {z: 3, big: false}); } },
+  clouds(S){ const m = famMix(), cx = P.cx * S.w, cy = P.cy * S.h;   // 뭉게 윤곽 구름을 깔고 그 위로 집중선
+    for (let i = 0; i < Math.round(9 * P.density); i++){ const a = rr(0, 6.28), d = rr(0.15, 0.6); add(S, R() < 0.8 ? 'puff' : 'cloud', cx + Math.cos(a) * d, cy + Math.sin(a) * d, sizeOf(rr(0.08, 0.18)), rr(-0.3, 0.3), {asp: rr(0.55, 0.85), n: Math.round(rr(7, 12)), z: 0}); }
+    GEN.burst(S); S.shapes.forEach(s => { if (s.kind === 'needle') s.z = 2; }); },
+  stars(S){ const m = famMix(); for (let i = 0; i < 3; i++) place(S, 'star5', sizeOf(rr(0.08, 0.14)), rr(0.05, S.w - 0.05), rr(0.05, S.h - 0.05), rr(-0.4, 0.4), {z: 3});
+    const n = Math.round(60 * P.density); for (let i = 0; i < n; i++){ const k = pickKind(m, ['star5', 'burstStar', 'crossStar', 'glint', 'drop', 'spiky']); place(S, k, sizeOf(logn(k === 'glint' || k === 'crossStar' ? -1.75 : -1.45, 0.35)), rr(-0.03, S.w + 0.03), rr(-0.03, S.h + 0.03), rr(-0.4, 0.4), {z: 2, big: false, flat: R() < 0.3}); }
+    if (m.band > 0) for (let i = 0; i < Math.round(3 * P.density); i++) add(S, 'band', rr(0, S.w), rr(0, S.h), 0.02, A0() + rg() * P.angleJit * 0.4, {len: sizeOf(rr(0.5, 1.1)), w: rr(0.02, 0.05), curve: rg() * 0.15, z: 0}); },
+  splash(S){ const m = famMix(), nC = Math.round(rr(2, 4) * Math.sqrt(P.density));
+    for (let c = 0; c < nC; c++){ const cx = rr(0.12, S.w - 0.12), cy = rr(0.12, S.h - 0.12), dir = A0() + rg() * P.angleJit * 1.2; const main = add(S, 'jelly', cx, cy, sizeOf(rr(0.07, 0.14)), dir, {lobes: rr(0.12, 0.35), asp: rr(0.75, 1), z: 1}); if (!main) continue; satellites(S, main);
+      const tail = Math.round(rr(5, 12) * P.density); for (let i = 1; i <= tail; i++){ const t = i / tail, d = main.r * (1.1 + t * rr(3, 6)); add(S, R() < 0.25 ? 'paintStreak' : 'drop', cx + Math.cos(dir) * d + rg() * 0.03 * (1 + t), cy + Math.sin(dir) * d + rg() * 0.03 * (1 + t), main.r * (1 - t * 0.8) * rr(0.15, 0.4), dir + rg() * 0.3, {col: main.col, big: false, len: main.r * rr(1, 2.5), w: main.r * 0.12, asp: rr(0.8, 1.3)}); } }
+    scatter(S, Math.round(40 * P.density), ['drop', 'jelly', 'inkSplat', 'paintStreak', 'heart', 'glint', 'star5', 'band'], m, -1.5, 0.35, {z: 2}); },
+  bubbles(S){ const m = famMix(); for (let i = 0; i < Math.round(55 * P.density); i++){ const k = pickKind(m, ['drop', 'heart', 'ring', 'glint', 'jelly']); const sh = place(S, k, sizeOf(i < 4 ? rr(0.07, 0.14) : logn(-1.45, 0.3)), rr(0, S.w), rr(0, S.h), rr(-0.5, 0.5), {asp: rr(0.85, 1.15), big: i >= 4 ? false : true}); if (sh && R() < 0.35) satellites(S, sh, 3); } },
+  flow(S){ const m = famMix(), a0 = A0(); for (let i = 0; i < Math.round(36 * P.density); i++){ const k = pickKind(m, ['band', 'needle', 'paintStreak', 'zig']), L = sizeOf(logn(-0.7, 0.3)); add(S, k, rr(-0.1, S.w + 0.1), rr(-0.1, S.h + 0.1), L * 0.15, a0 + rg() * P.angleJit * 0.5, {len: L, w: L * (k === 'needle' ? rr(0.012, 0.03) : rr(0.04, 0.12)), curve: rg() * 0.12, bend: rg() * 0.02, z: 0}); }
+    scatter(S, Math.round(18 * P.density), ['drop', 'glint', 'star5'], m, -1.6, 0.3, {z: 2}); },
+  swirl(S){ const m = famMix(), vort = []; for (let i = 0; i < Math.floor(rr(2, 4)); i++) vort.push([rr(0, S.w), rr(0, S.h), R() < 0.5 ? 1 : -1, rr(0.2, 0.5)]);
+    const field = (x, y) => { let vx = Math.cos(A0()) * 0.3, vy = Math.sin(A0()) * 0.3; for (const [x0, y0, sg, rad] of vort){ const dx = x - x0, dy = y - y0, d2 = dx * dx + dy * dy + 0.01, f = Math.exp(-d2 / (rad * rad)); vx += -dy / d2 * f * sg * 0.6; vy += dx / d2 * f * sg * 0.6; } return Math.atan2(vy, vx); };
+    for (let i = 0; i < Math.round(55 * P.density); i++){ const x = rr(-0.05, S.w + 0.05), y = rr(-0.05, S.h + 0.05), a = field(x, y) + rg() * P.angleJit * 0.3, L = sizeOf(logn(-0.95, 0.3)), k = pickKind(m, ['band', 'zig', 'needle']); add(S, k, x, y, L * 0.15, a, {len: L, w: L * rr(0.05, 0.14), curve: (field(x + Math.cos(a) * 0.05, y + Math.sin(a) * 0.05) - a) * 1.5, z: 0}); }
+    scatter(S, Math.round(14 * P.density), ['drop', 'ring'], m, -1.7, 0.3, {z: 2}); },
+  cells(S){ const m = famMix(); for (let i = 0; i < Math.round(40 * P.density); i++){ const k = pickKind(m, ['ring', 'puff', 'cloud', 'drop', 'jelly', 'glint']); place(S, k, sizeOf(logn(-1.25, 0.35)), rr(0, S.w), rr(0, S.h), rr(0, 6.28), {gap: R() < 0.5 ? rr(0.1, 0.5) : 0, n: Math.round(rr(6, 10)), asp: rr(0.6, 1), big: false}); }
+    scatter(S, Math.round(22 * P.density), ['drop'], m, -2.0, 0.3, {z: 2}); },
   mixed(S){ GEN.splash(S); const keep = S.shapes.length; GEN.stars(S); S.shapes = S.shapes.slice(0, keep).concat(S.shapes.slice(keep).filter((_, i) => i % 2 === 0)); if (R() < 0.5) GEN.flow(S); }
 };
-function generate(seed){
-  R = mulberry32(seed * 7919 + 13);
-  const S = sceneBase(); if (!P.colorShuffle) R = mulberry32(seed * 7919 + 13);
-  (GEN[P.family] || GEN.mixed)(S);
-  // 큰 것 먼저 그리도록 정렬 (별·반짝이는 맨 위)
-  S.shapes.sort((a, b) => (a.cls === 'star' || a.cls === 'sparkle' || a.cls === 'burst') - (b.cls === 'star' || b.cls === 'sparkle' || b.cls === 'burst') || b.s - a.s);
-  S.seed = seed; return S;
-}
+function generate(seed){ R = mulberry32(seed * 7919 + 13); const S = newScene(); if (!P.colorShuffle){ R = mulberry32(999); S.cols = assignColors(); R = mulberry32(seed * 7919 + 13); }
+  (GEN[P.family] || GEN.mixed)(S); for (const s of S.shapes) if (!s.col) s.col = S.cols[s.kind];
+  S.shapes.sort((a, b) => (a.z || 0) - (b.z || 0) || b.r - a.r); S.seed = seed; return S; }
 
-// ---------- 그리기 ----------
-function pathOf(ctx, sh, W, sm){
-  const pts = sh.pts, n = pts.length, s = sh.s * W, ar = sh.ar; // 침·띠는 ar로 납작하게
-  const sx = s, sy = s;
-  const T = ([x, y]) => { if (sh.flip) y = -y; const c = Math.cos(sh.rot), si = Math.sin(sh.rot); const X = x * sx, Y = y * sy; return [sh.x * W + X * c - Y * si, sh.y * W + X * si + Y * c]; };
-  const round = sm * (ROUND[sh.cls] ?? 0.5);
-  ctx.beginPath();
-  if (round < 0.05 || n < 6){ pts.forEach((p, i) => { const [X, Y] = T(p); i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }); }
-  else { // 꼭짓점을 둥글림: 이웃 중점 사이를 2차 곡선으로
-    const q = pts.map(T); const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
-    const k = round * 0.5;
-    for (let i = 0; i < n; i++){ const p = q[i], m0 = mid(q[(i + n - 1) % n], p), m1 = mid(p, q[(i + 1) % n]); const a = lerp(p, m0, k * 2 * 0.5 + 0.0), b = lerp(p, m1, k * 2 * 0.5);
-      if (i === 0) ctx.moveTo(a[0], a[1]); else ctx.lineTo(a[0], a[1]); ctx.quadraticCurveTo(p[0], p[1], b[0], b[1]); }
-  }
-  ctx.closePath();
-}
-function render(S, canvas, W, drawn){
-  const H = Math.round(W * S.h); canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d'); ctx.fillStyle = S.ground; ctx.fillRect(0, 0, W, H);
-  const oc = outlineColor(), ow = P.outlineW * W / 1200;
-  const all = S.shapes.concat(drawn || []);
-  for (const sh of all){
-    const col = sh.col || S.cols[sh.cls] || '#000';
-    pathOf(ctx, sh, W, P.smooth);
-    if (P.outline && sh.s * W > 2.5){ ctx.lineJoin = 'round'; ctx.lineWidth = ow * 2; ctx.strokeStyle = oc; ctx.stroke(); }
-    if (sh.ring){ ctx.lineWidth = Math.max(1, sh.s * W * 0.12); ctx.strokeStyle = col; ctx.stroke(); continue; }
-    ctx.fillStyle = col; ctx.fill();
-    if (P.highlight && (sh.hl || (sh.cls === 'drop' || sh.cls === 'blob') ) && sh.s * W > 9){ // 왼쪽 위 하이라이트
-      const r = sh.s * W; ctx.fillStyle = mix(col, '#ffffff', 0.62); ctx.beginPath(); ctx.ellipse(sh.x * W - r * 0.32, sh.y * W - r * 0.38, r * 0.3, r * 0.2, -0.6, 0, 6.28); ctx.fill();
-      if (r > 30){ ctx.beginPath(); ctx.arc(sh.x * W + r * 0.25, sh.y * W + r * 0.3, r * 0.08, 0, 6.28); ctx.fill(); }
-    }
-  }
-}
-function svgOf(S, W){
-  const H = Math.round(W * S.h); const oc = outlineColor(), ow = P.outlineW * W / 1200; let out = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">\n<rect width="100%" height="100%" fill="${S.ground}"/>\n`;
-  const tmp = document.createElement('canvas').getContext('2d');
-  for (const sh of S.shapes.concat(DRAWN)){ const col = sh.col || S.cols[sh.cls]; const s = sh.s * W, sx = s, sy = s;
-    const c = Math.cos(sh.rot), si = Math.sin(sh.rot); const q = sh.pts.map(([x, y]) => { if (sh.flip) y = -y; const X = x * sx, Y = y * sy; return [(sh.x * W + X * c - Y * si).toFixed(1), (sh.y * W + X * si + Y * c).toFixed(1)]; });
-    const d = 'M' + q.map(p => p.join(',')).join('L') + 'Z';
-    const st = (P.outline && s > 2.5) ? ` stroke="${oc}" stroke-width="${(ow * 2).toFixed(1)}" stroke-linejoin="round" paint-order="stroke"` : '';
-    out += sh.ring ? `<path d="${d}" fill="none" stroke="${col}" stroke-width="${(s * 0.12).toFixed(1)}"/>\n` : `<path d="${d}" fill="${col}"${st}/>\n`; }
-  return out + '</svg>';
-}
+// ── 그리기 ──
+function drawShape(ctx, sh, W){ const o = {x: sh.x * W, y: sh.y * W, r: sh.r * W, rot: sh.rot, seed: sh.seed, col: trioOf(sh.col), light: P.light, line: P.lineW * W / 1200 * (sh.r * W > 6 ? 1 : 0.5), vary: P.vary, jag: 0.4 + P.vary * 0.3, gloss: P.gloss, flat: sh.flat && !P.gloss ? true : sh.flat};
+  for (const k of ['len', 'w', 'curve', 'bend', 'k', 'asp', 'lobes', 'gap', 'n', 'taper']) if (sh[k] != null) o[k] = typeof sh[k] === 'number' && ['len', 'w'].includes(k) ? sh[k] * W : sh[k];
+  if (sh.kind === 'ring') o.w = Math.max(1, sh.r * W * 0.12); if (sh.kind === 'drop' && !P.gloss) o.gloss = false; if (sh.kind === 'cloud') o.line = P.lineW * W / 400;
+  NUO.draw(ctx, sh.kind, o); }
+function render(S, canvas, W, drawn){ const H = Math.round(W * S.h); canvas.width = W; canvas.height = H; const ctx = canvas.getContext('2d'); ctx.fillStyle = S.ground; ctx.fillRect(0, 0, W, H); for (const sh of S.shapes.concat(drawn || [])) drawShape(ctx, sh, W); }
+function svgOf(S, W){ const H = Math.round(W * S.h), rec = NUO.svgRecorder(W, H); for (const sh of S.shapes.concat(DRAWN)) drawShape(rec, sh, W); return rec.toSVG(S.ground); }
 
-// ---------- UI ----------
+// ── UI ──
 const cv = $('#cv');
-function draw(){ if (!SCENE) return; render(SCENE, cv, 1200, DRAWN); }
-function regen(push = true){ if (push && SCENE) HIST.push({S: SCENE, D: DRAWN}); SCENE = generate(P.seed); DRAWN = []; draw(); minis(); save(); }
-function minis(){ const box = $('#mini'); box.innerHTML = ''; const keep = P.seed; for (let i = 1; i <= 6; i++){ const c = document.createElement('canvas'); const sd = (keep * 31 + i * 977) % 9999 + 1; const S = generate(sd); render(S, c, 240, []); c.title = '씨앗 ' + sd; c.onclick = () => { P.seed = sd; syncUI(); regen(); }; box.appendChild(c); } R = mulberry32(keep); }
+function draw(){ if (SCENE) render(SCENE, cv, 1200, DRAWN); }
+function regen(push = true){ if (push && SCENE) HIST.push({S: SCENE, D: DRAWN}); SCENE = generate(P.seed); DRAWN = []; draw(); minis(); save(); info(); }
+function minis(){ const box = $('#mini'); box.innerHTML = ''; for (let i = 1; i <= 6; i++){ const c = document.createElement('canvas'), sd = (P.seed * 31 + i * 977) % 9999 + 1, S = generate(sd); render(S, c, 220, []); c.title = '씨앗 ' + sd; c.onclick = () => { P.seed = sd; syncUI(); regen(); }; box.appendChild(c); } }
+function info(){ $('#info').textContent = `family=${P.family} seed=${P.seed} shapes=${SCENE ? SCENE.shapes.length : 0} drawn=${DRAWN.length}`; }
 $('#bGen').onclick = () => { P.seed = Math.floor(Math.random() * 9999) + 1; syncUI(); regen(); };
-$('#bVar').onclick = () => { // 같은 구도: 모양만 다시 뽑기
-  if (!SCENE) return; HIST.push({S: SCENE, D: DRAWN}); R = mulberry32(Math.floor(Math.random() * 1e9)); const S2 = Object.assign({}, SCENE, {shapes: SCENE.shapes.map(sh => Object.assign({}, sh, getShape(sh.cls), {rot: sh.rot + rg() * 0.15, s: sh.s * Math.exp(rg() * 0.1)}))}); SCENE = S2; draw(); };
+$('#bVar').onclick = () => { if (!SCENE) return; HIST.push({S: SCENE, D: DRAWN}); R = mulberry32(Math.floor(Math.random() * 1e9)); SCENE = Object.assign({}, SCENE, {shapes: SCENE.shapes.map(sh => Object.assign({}, sh, {seed: Math.floor(R() * 1e6), rot: sh.rot + rg() * 0.12, r: sh.r * Math.exp(rg() * 0.08)}))}); draw(); };
 $('#bBack').onclick = () => { const h = HIST.pop(); if (h){ SCENE = h.S; DRAWN = h.D; draw(); } };
 function dl(blob, name){ const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
-$('#bPng').onclick = () => { const W = parseInt($('#exportSize').value); const c = document.createElement('canvas'); render(SCENE, c, W, DRAWN); c.toBlob(b => dl(b, `nu-pattern_${P.family}_${P.seed}.png`), 'image/png'); toast('PNG 저장'); };
+$('#bPng').onclick = () => { const W = parseInt($('#exportSize').value), c = document.createElement('canvas'); render(SCENE, c, W, DRAWN); c.toBlob(b => dl(b, `nu-pattern_${P.family}_${P.seed}.png`), 'image/png'); toast('PNG 저장'); };
 $('#bSvg').onclick = () => { dl(new Blob([svgOf(SCENE, 2000)], {type: 'image/svg+xml'}), `nu-pattern_${P.family}_${P.seed}.svg`); toast('SVG 저장'); };
 function toast(t){ const e = $('#toast'); e.textContent = t; e.style.opacity = 1; clearTimeout(toast.t); toast.t = setTimeout(() => e.style.opacity = 0, 1400); }
-
-// 탭
 $$('.tabs button').forEach(b => b.onclick = () => { $$('.tabs button').forEach(x => x.classList.toggle('on', x === b)); $$('.tab').forEach(t => t.classList.toggle('on', t.id === 'tab-' + b.dataset.tab)); });
-// 종류 버튼
-const famBox = $('#famBtns');
-for (const f of FAMS){ const b = document.createElement('button'); b.innerHTML = D.families[f].ko + `<small>${D.families[f].n}장</small>`; b.dataset.f = f; b.onclick = () => { P.family = f; P.palIdx = 0; P.pal = null; P.mix = null; ensurePalette(); syncUI(); regen(); }; famBox.appendChild(b); }
-// 슬라이더
-const SL = ['seed', 'density', 'size', 'sizeVar', 'angle', 'angleJit', 'cx', 'cy', 'libMix', 'smooth', 'overlap', 'outlineW'];
-for (const k of SL){ const el = $('#p-' + k); el.oninput = () => { P[k] = parseFloat(el.value); el.nextElementSibling.value = el.value; if (['smooth', 'outlineW'].includes(k)) { draw(); save(); } else regen(false); }; }
-for (const k of ['outline', 'highlight', 'satellite', 'colorShuffle']){ $('#p-' + k).onchange = e => { P[k] = e.target.checked; save(); if (k === 'colorShuffle') regen(false); else draw(); }; }
+const famBox = $('#famBtns'); for (const f of FAMS){ const b = document.createElement('button'); b.innerHTML = D.families[f].ko + `<small>${D.families[f].n}장</small>`; b.dataset.f = f; b.onclick = () => { P.family = f; P.palIdx = 0; P.pal = null; P.mix = null; ensurePalette(); syncUI(); regen(); }; famBox.appendChild(b); }
+const SL = ['seed', 'density', 'size', 'sizeVar', 'angle', 'angleJit', 'cx', 'cy', 'vary', 'overlap', 'lineW', 'light'];
+for (const k of SL){ const el = $('#p-' + k); el.oninput = () => { P[k] = parseFloat(el.value); el.nextElementSibling.value = el.value; if (['vary', 'lineW', 'light'].includes(k)){ draw(); save(); } else regen(false); }; }
+for (const k of ['darkLine', 'gloss', 'satellite', 'colorShuffle']) $('#p-' + k).onchange = e => { P[k] = e.target.checked; save(); if (k === 'satellite' || k === 'colorShuffle') regen(false); else draw(); };
 $('#p-ratio').onchange = e => { P.ratio = e.target.value; regen(false); };
-function syncUI(){
-  $$('#famBtns button').forEach(b => b.classList.toggle('on', b.dataset.f === P.family));
-  const fm = D.families[P.family]; const top = Object.entries(fm.mix).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([c, v]) => `${CLKO[c]} ${Math.round(v * 100)}%`).join(' · ');
-  $('#famNote').textContent = `${fm.n}장에서 배움 — 주로 ${top}. 밀도 ${fm.density}, 방향 집중 ${fm.conc}.`;
-  for (const k of SL){ const el = $('#p-' + k); el.value = P[k]; el.nextElementSibling.value = P[k]; }
-  for (const k of ['outline', 'highlight', 'satellite', 'colorShuffle']) $('#p-' + k).checked = !!P[k];
-  $('#p-ratio').value = P.ratio;
-  $$('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === P.tool)); $('#toolCls').value = P.toolCls; $('#toolSize').value = P.toolSize;
-  palUI(); mixUI(); presetUI(); $('#info').textContent = `family=${P.family} seed=${P.seed} shapes=${SCENE ? SCENE.shapes.length : 0} drawn=${DRAWN.length}`;
-}
-// 색 UI
-let palAll = false;
-function palUI(){
-  ensurePalette();
-  const ps = palAll ? D.images.map(i => i.palette) : famPalettes(P.family); const box = $('#pals'); box.innerHTML = '';
-  ps.slice(0, 80).forEach((p, i) => { const d = document.createElement('div'); d.className = 'palrow' + (JSON.stringify(p.slice(0, 7)) === JSON.stringify(P.pal) ? ' sel' : ''); p.slice(0, 7).forEach(c => { const s = document.createElement('i'); s.style.background = c; d.appendChild(s); }); d.onclick = () => { P.pal = p.slice(0, 7); P.palIdx = i; P.clsCol = {}; palUI(); regen(false); }; box.appendChild(d); });
-  const cur = $('#curPal'); cur.innerHTML = '';
-  P.pal.forEach((c, i) => { const s = document.createElement('div'); s.className = 'sw' + (palSel === i ? ' sel' : ''); s.style.background = c; s.title = i ? '모티프 색' : '바탕색'; s.onclick = () => { palSel = i; $('#colPick').value = c; palUI(); }; cur.appendChild(s); });
+function syncUI(){ $$('#famBtns button').forEach(b => b.classList.toggle('on', b.dataset.f === P.family)); const fm = D.families[P.family];
+  const top = Object.entries(famMix()).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k]) => KO[k]).join(' · '); $('#famNote').textContent = `${fm.n}장에서 배움 — 주로 ${top}. 밀도 ${fm.density}, 방향 집중 ${fm.conc}.`;
+  for (const k of SL){ const el = $('#p-' + k); el.value = P[k]; el.nextElementSibling.value = P[k]; } for (const k of ['darkLine', 'gloss', 'satellite', 'colorShuffle']) $('#p-' + k).checked = !!P[k]; $('#p-ratio').value = P.ratio;
+  $$('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === P.tool)); $('#toolKind').value = P.toolKind; $('#toolSize').value = P.toolSize; palUI(); kindUI(); presetUI(); info(); }
+// 색
+let palAll = false, palSel = 0;
+function palUI(){ ensurePalette(); const ps = palAll ? D.images.map(i => i.palette).filter(p => p.length >= 3) : famPalettes(P.family), box = $('#pals'); box.innerHTML = '';
+  ps.slice(0, 90).forEach((p, i) => { const d = document.createElement('div'); d.className = 'palrow' + (JSON.stringify(p.slice(0, 7)) === JSON.stringify(P.pal) ? ' sel' : ''); p.slice(0, 7).forEach(c => { const s = document.createElement('i'); s.style.background = c; d.appendChild(s); }); d.onclick = () => { P.pal = p.slice(0, 7); P.palIdx = i; P.kindCol = {}; palUI(); regen(false); }; box.appendChild(d); });
+  const cur = $('#curPal'); cur.innerHTML = ''; P.pal.forEach((c, i) => { const s = document.createElement('div'); s.className = 'sw' + (palSel === i ? ' sel' : ''); s.style.background = c; s.title = i ? '모티프 색' : '바탕색'; s.onclick = () => { palSel = i; $('#colPick').value = c; palUI(); }; cur.appendChild(s); });
   const add = document.createElement('button'); add.className = 'sm'; add.textContent = '+ 색 추가'; add.onclick = () => { if (P.pal.length < 9){ P.pal.push('#ff66aa'); palSel = P.pal.length - 1; palUI(); } }; cur.appendChild(add);
-  const rm = document.createElement('button'); rm.className = 'sm'; rm.textContent = '− 선택 색 빼기'; rm.onclick = () => { if (palSel > 0 && P.pal.length > 2){ P.pal.splice(palSel, 1); palSel = 0; P.clsCol = {}; palUI(); regen(false); } }; cur.appendChild(rm);
-  const cc = $('#clsCol'); cc.innerHTML = '';
-  for (const c of CL){ if (c === 'line' && false) continue; const row = document.createElement('div'); row.className = 'sl'; row.innerHTML = `<label>${CLKO[c]}</label>`; const sel = document.createElement('select'); sel.style.gridColumn = '2/4'; sel.innerHTML = '<option value="">자동</option>' + P.pal.slice(1).map(h => `<option value="${h}" style="background:${h}">${h}</option>`).join(''); sel.value = P.clsCol[c] || ''; sel.onchange = () => { if (sel.value) P.clsCol[c] = sel.value; else delete P.clsCol[c]; regen(false); }; row.appendChild(sel); cc.appendChild(row); }
-}
-let palSel = 0;
-$('#colPick').oninput = e => { P.pal[palSel] = e.target.value; P.clsCol = {}; palUI(); if (SCENE){ SCENE.ground = P.pal[0]; SCENE.cols = assignColors(); SCENE.shapes.forEach(s => { if (s.col && !P.pal.includes(s.col)) s.col = SCENE.cols[s.cls]; }); draw(); save(); } };
-$('#bPalRand').onclick = () => { const ps = famPalettes(P.family); P.palIdx = Math.floor(Math.random() * ps.length); P.pal = null; P.clsCol = {}; ensurePalette(); palUI(); regen(false); };
+  const rm = document.createElement('button'); rm.className = 'sm'; rm.textContent = '− 선택 색 빼기'; rm.onclick = () => { if (palSel > 0 && P.pal.length > 2){ P.pal.splice(palSel, 1); palSel = 0; P.kindCol = {}; palUI(); regen(false); } }; cur.appendChild(rm);
+  const cc = $('#kindCol'); cc.innerHTML = ''; for (const k of KINDS){ if (P.kindOff[k]) continue; const row = document.createElement('div'); row.className = 'sl'; row.innerHTML = `<label>${KO[k]}</label>`; const sel = document.createElement('select'); sel.style.gridColumn = '2/4'; sel.innerHTML = '<option value="">자동</option>' + P.pal.slice(1).map(h => `<option value="${h}" style="background:${h}">${h}</option>`).join(''); sel.value = P.kindCol[k] || ''; sel.onchange = () => { if (sel.value) P.kindCol[k] = sel.value; else delete P.kindCol[k]; regen(false); }; row.appendChild(sel); cc.appendChild(row); } }
+$('#colPick').oninput = e => { P.pal[palSel] = e.target.value; P.kindCol = {}; palUI(); if (SCENE){ SCENE.ground = P.pal[0]; const cols = assignColors(); SCENE.shapes.forEach(s => { if (!P.pal.includes(s.col)) s.col = cols[s.kind]; }); SCENE.cols = cols; draw(); save(); } };
+$('#bPalRand').onclick = () => { const ps = famPalettes(P.family); P.palIdx = Math.floor(Math.random() * ps.length); P.pal = null; P.kindCol = {}; ensurePalette(); palUI(); regen(false); };
 $('#bPalAll').onclick = () => { palAll = !palAll; $('#bPalAll').classList.toggle('on', palAll); palUI(); };
-// 모티프 비중 UI
-function mixUI(){
-  const box = $('#mixSl'); box.innerHTML = ''; const m = famMix();
-  for (const c of CL){ const row = document.createElement('div'); row.className = 'sl'; row.innerHTML = `<label>${CLKO[c]}</label><input type="range" min="0" max="1" step="0.01" value="${m[c].toFixed(2)}"><output>${Math.round(m[c] * 100)}%</output>`; const inp = row.querySelector('input'); inp.oninput = () => { P.mix = P.mix || Object.assign({}, D.families[P.family].mix); P.mix[c] = parseFloat(inp.value); row.querySelector('output').value = Math.round(inp.value * 100) + '%'; regen(false); }; box.appendChild(row); }
-  const lc = $('#libCls'); if (!lc.options.length){ for (const c of CL){ lc.add(new Option(CLKO[c] + ` (${(D.motifs[c] || []).length})`, c)); } lc.onchange = libUI; } libUI();
-  const tc = $('#toolCls'); if (!tc.options.length){ for (const c of CL) tc.add(new Option(CLKO[c], c)); tc.value = P.toolCls; tc.onchange = () => { P.toolCls = tc.value; save(); }; }
-}
-$('#bMixLearn').onclick = () => { P.mix = null; mixUI(); regen(false); };
-function libUI(){
-  const c = $('#libCls').value || 'drop', g = $('#libGrid'); g.innerHTML = ''; const lib = D.motifs[c] || [];
-  lib.forEach((m, i) => { const k = c + ':' + i; const cn = document.createElement('canvas'); cn.width = cn.height = 54; const x = cn.getContext('2d'); x.fillStyle = m.c; x.beginPath(); m.p.forEach((p, j) => { const X = 27 + p[0] * 22, Y = 27 + p[1] * 22; j ? x.lineTo(X, Y) : x.moveTo(X, Y); }); x.closePath(); x.fill(); cn.className = P.libOff[k] ? 'off' : ''; cn.title = m.s; cn.onclick = () => { if (P.libOff[k]) delete P.libOff[k]; else P.libOff[k] = 1; cn.className = P.libOff[k] ? 'off' : ''; save(); libN(); }; g.appendChild(cn); });
-  libN();
-}
-function libN(){ const c = $('#libCls').value || 'drop'; $('#libN').textContent = `켜짐 ${libShapes(c).length} / ${(D.motifs[c] || []).length}`; }
-$('#bLibAll').onclick = () => { const c = $('#libCls').value; (D.motifs[c] || []).forEach((_, i) => delete P.libOff[c + ':' + i]); save(); libUI(); };
-$('#bLibNone').onclick = () => { const c = $('#libCls').value; (D.motifs[c] || []).forEach((_, i) => P.libOff[c + ':' + i] = 1); save(); libUI(); };
-// 학습 자료 탭
-(function learnUI(){
-  const t = $('#famTable'); let h = '<tr><th>종류</th><th>자료</th><th>모양 비중</th><th>밀도</th></tr>';
-  const COLS = {ray: '#e0463c', streak: '#5aa84a', line: '#333', splash: '#b24fe0', blob: '#3a6fd8', drop: '#38a6e6', wisp: '#999', star: '#e6b800', sparkle: '#2bb5a0', burst: '#d6338f'};
-  for (const f of FAMS){ const fm = D.families[f]; const bar = CL.map(c => `<i style="width:${fm.mix[c] * 100}%;background:${COLS[c]}" title="${CLKO[c]} ${Math.round(fm.mix[c] * 100)}%"></i>`).join(''); h += `<tr><td>${fm.ko}</td><td>${fm.n}장</td><td style="min-width:110px"><div class="bar">${bar}</div></td><td>${fm.density}</td></tr>`; }
-  t.innerHTML = h + `<tr><td colspan="4" class="note" style="padding-top:8px">막대 색: ${CL.map(c => `<span style="color:${COLS[c]}">■</span>${CLKO[c]}`).join(' ')}</td></tr>`;
+// 모양
+function kindUI(){ const box = $('#kinds'); box.innerHTML = ''; const m = famMix();
+  for (const k of KINDS){ const d = document.createElement('div'); d.className = 'kind' + (P.kindOff[k] ? ' off' : ''); const c = document.createElement('canvas'); c.width = c.height = 72; const g = c.getContext('2d'); const o = {x: 36, y: 36, r: 16, seed: 3, col: NUO.trio(SCENE ? (SCENE.cols[k] || '#FAD805') : '#FAD805'), light: P.light, line: 1.2};
+    if (['needle', 'band', 'paintStreak', 'zig', 'wave', 'rayFan', 'bolt'].includes(k)){ o.r = 8; o.len = 54; o.w = 9; o.rot = -0.5; } if (k === 'wedge'){ o.r = 0; o.len = 30; o.span = 0.5; o.x = 22; o.y = 22; } if (k === 'puff') o.r = 20;
+    try { NUO.draw(g, k, o); } catch (e) {} d.appendChild(c); d.appendChild(document.createTextNode(KO[k])); d.onclick = () => { if (P.kindOff[k]) delete P.kindOff[k]; else P.kindOff[k] = 1; save(); kindUI(); palUI(); regen(false); }; box.appendChild(d); }
+  const ms = $('#mixSl'); ms.innerHTML = ''; const base = BASE_MIX[P.family] || BASE_MIX.mixed;
+  for (const k of KINDS){ if (!(base[k] > 0) && !(P.mix && P.mix[k] > 0)) continue; const row = document.createElement('div'); row.className = 'sl'; row.innerHTML = `<label>${KO[k]}</label><input type="range" min="0" max="3" step="0.1" value="${(P.mix && P.mix[k] != null ? P.mix[k] : base[k] || 0)}"><output>${(P.mix && P.mix[k] != null ? P.mix[k] : base[k] || 0)}</output>`; const inp = row.querySelector('input'); inp.oninput = () => { P.mix = P.mix || Object.assign({}, base); P.mix[k] = parseFloat(inp.value); row.querySelector('output').value = inp.value; regen(false); }; ms.appendChild(row); }
+  const tk = $('#toolKind'); if (!tk.options.length){ for (const k of KINDS) tk.add(new Option(KO[k], k)); tk.value = P.toolKind; tk.onchange = () => { P.toolKind = tk.value; save(); }; } }
+$('#bMixLearn').onclick = () => { P.mix = null; kindUI(); regen(false); };
+// 학습 자료
+(function learnUI(){ const t = $('#famTable'); let h = '<tr><th>종류</th><th>자료</th><th>밀도</th><th>크기(log10)</th><th>방향 집중</th></tr>'; for (const f of FAMS){ const fm = D.families[f]; h += `<tr><td>${fm.ko}</td><td>${fm.n}장</td><td>${fm.density}</td><td>${fm.szm} ± ${fm.szs}</td><td>${fm.conc}</td></tr>`; } t.innerHTML = h;
   const sel = $('#learnFam'); sel.add(new Option('전체', 'all')); for (const f of FAMS) sel.add(new Option(D.families[f].ko, f)); sel.onchange = show; show();
-  function show(){ const f = sel.value, box = $('#learnImgs'); box.innerHTML = ''; D.images.filter(i => f === 'all' || i.family === f).forEach(i => { if (!i.thumb) return; const fg = document.createElement('figure'); fg.innerHTML = `<img src="data:image/jpeg;base64,${i.thumb}" alt=""><div>${i.name || i.id}</div>`; fg.title = `${i.name}\n모양 ${i.n}개 · ${D.families[i.family].ko}`; fg.onclick = () => { P.pal = i.palette.slice(0, 7); P.clsCol = {}; P.family = i.family; palUI(); syncUI(); regen(false); toast('이 그림의 색·종류로'); }; box.appendChild(fg); }); }
-})();
+  function show(){ const f = sel.value, box = $('#learnImgs'); box.innerHTML = ''; D.images.filter(i => f === 'all' || i.family === f).forEach(i => { if (!i.thumb) return; const fg = document.createElement('figure'); fg.innerHTML = `<img src="data:image/jpeg;base64,${i.thumb}" alt=""><div>${i.name || i.id}</div>`; fg.title = `${i.name}\n모양 ${i.n}개 · ${D.families[i.family].ko}`; fg.onclick = () => { if (i.palette.length >= 2) P.pal = i.palette.slice(0, 7); P.kindCol = {}; P.family = i.family; P.mix = null; palUI(); syncUI(); regen(false); toast('이 그림의 색·종류로'); }; box.appendChild(fg); }); } })();
 // 프리셋·초기화
 function presetUI(){ const box = $('#presets'); box.innerHTML = ''; for (const n of Object.keys(PRESETS)){ const b = document.createElement('button'); b.className = 'sm'; b.textContent = n; b.onclick = () => { Object.assign(P, PRESETS[n]); syncUI(); regen(); }; b.oncontextmenu = e => { e.preventDefault(); delete PRESETS[n]; save(); presetUI(); }; box.appendChild(b); } if (!Object.keys(PRESETS).length) box.innerHTML = '<span class="note">아직 없어요. 오른쪽 클릭으로 지울 수 있어요.</span>'; }
 $('#bPresetSave').onclick = () => { const n = $('#presetName').value.trim() || ('설정 ' + (Object.keys(PRESETS).length + 1)); PRESETS[n] = JSON.parse(JSON.stringify(P)); save(); presetUI(); toast('저장: ' + n); };
-$('#bResetP').onclick = () => { const keep = {family: P.family, libOff: P.libOff}; P = Object.assign({}, DEF, keep); ensurePalette(); syncUI(); regen(); toast('기본값으로'); };
+$('#bResetP').onclick = () => { const keep = {family: P.family, kindOff: P.kindOff}; P = Object.assign({}, DEF, keep); ensurePalette(); syncUI(); regen(); toast('기본값으로'); };
 $('#bResetAll').onclick = () => { if (!confirm('저장한 설정과 프리셋을 모두 지울까요?')) return; localStorage.removeItem(LS); PRESETS = {}; P = Object.assign({}, DEF); ensurePalette(); syncUI(); regen(); };
 // 그리기 도구
 $$('[data-tool]').forEach(b => b.onclick = () => { P.tool = b.dataset.tool; save(); syncUI(); });
@@ -483,14 +291,12 @@ $('#toolSize').oninput = e => { P.toolSize = parseFloat(e.target.value); save();
 $('#bClearDraw').onclick = () => { DRAWN = []; draw(); };
 let dragging = false, lastPt = null;
 function evPos(e){ const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.width]; }
-function stamp(x, y, spray){ R = Math.random; const s = P.toolSize * (spray ? Math.exp(rg() * 0.5) * 0.35 : 1); const sh = Object.assign({cls: P.toolCls, x, y, s, rot: rr(0, 6.28), col: SCENE.cols[P.toolCls]}, getShape(P.toolCls)); if (P.toolCls === 'ray' || P.toolCls === 'streak') sh.ar = rr(0.08, 0.25); DRAWN.push(sh); draw(); }
+function stamp(x, y, spray){ R = Math.random; const k = P.toolKind, r = P.toolSize * (spray ? Math.exp(rg() * 0.5) * 0.35 : 1); const sh = {kind: k, x, y, r, rot: rr(0, 6.28), seed: Math.floor(Math.random() * 1e6), col: SCENE.cols[k]}; if (['needle', 'band', 'paintStreak', 'zig', 'wave'].includes(k)){ sh.len = r * 6; sh.w = r * (k === 'needle' ? 0.25 : 0.9); sh.rot = P.angle * Math.PI / 180 + rg() * 0.3; } DRAWN.push(sh); draw(); info(); }
 cv.addEventListener('pointerdown', e => { if (P.tool === 'none' || !SCENE) return; dragging = true; cv.setPointerCapture(e.pointerId); const [x, y] = evPos(e); lastPt = [x, y];
-  if (P.tool === 'erase'){ let bi = -1, bd = 1e9; const all = SCENE.shapes.concat(DRAWN); all.forEach((s, i) => { const d = Math.hypot(s.x - x, s.y - y) - s.s * 0.5; if (d < bd){ bd = d; bi = i; } }); if (bi >= 0 && bd < 0.08){ HIST.push({S: Object.assign({}, SCENE, {shapes: SCENE.shapes.slice()}), D: DRAWN.slice()}); if (bi < SCENE.shapes.length) SCENE.shapes.splice(bi, 1); else DRAWN.splice(bi - SCENE.shapes.length, 1); draw(); } return; }
+  if (P.tool === 'erase'){ let bi = -1, bd = 1e9; const all = SCENE.shapes.concat(DRAWN); all.forEach((s, i) => { const d = Math.hypot(s.x - x, s.y - y) - s.r * 0.5; if (d < bd){ bd = d; bi = i; } }); if (bi >= 0 && bd < 0.08){ HIST.push({S: Object.assign({}, SCENE, {shapes: SCENE.shapes.slice()}), D: DRAWN.slice()}); if (bi < SCENE.shapes.length) SCENE.shapes.splice(bi, 1); else DRAWN.splice(bi - SCENE.shapes.length, 1); draw(); } return; }
   stamp(x, y, P.tool === 'spray'); });
 cv.addEventListener('pointermove', e => { if (!dragging || P.tool === 'none' || P.tool === 'erase') return; const [x, y] = evPos(e); if (Math.hypot(x - lastPt[0], y - lastPt[1]) < (P.tool === 'spray' ? 0.02 : P.toolSize * 0.9)) return; lastPt = [x, y]; stamp(x + (P.tool === 'spray' ? rg() * 0.03 : 0), y + (P.tool === 'spray' ? rg() * 0.03 : 0), P.tool === 'spray'); });
 cv.addEventListener('pointerup', () => dragging = false);
-
-// 시작
 ensurePalette(); syncUI(); regen(false);
 </script>
 </body>
