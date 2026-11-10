@@ -104,7 +104,7 @@ details.corners{display:flex;flex-direction:column;gap:10px}details.corners summ
 .pieceview{position:relative;aspect-ratio:4/3;background:var(--stage);border-radius:4px;overflow:hidden}.pieceview canvas{display:block;width:100%;height:100%;touch-action:none}
 .saverow.sel{outline:2px solid var(--accent);outline-offset:-2px}.saverow.other{opacity:.7}
 .cutov .pnum{fill:#fff;font:600 15px/1 'JetBrains Mono',monospace;text-anchor:middle;dominant-baseline:middle;paint-order:stroke;stroke:var(--accent);stroke-width:3px}
-.mg{position:fixed;inset:0;z-index:50;background:var(--bg,#F4F5F7);display:flex;flex-direction:column}
+.mg{position:fixed;inset:0;z-index:50;user-select:none;background:var(--bg,#F4F5F7);display:flex;flex-direction:column}
 .mg[hidden]{display:none}
 .mgbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
 .mgbar label{display:flex;gap:6px;align-items:center;font-size:13px}.mgbar .mgt{font-size:15px;margin-right:6px}
@@ -8122,6 +8122,7 @@ renderMerge();renderRecs();cutReady=true;drawFrame();
 // ---------- comic page editor: lay out panels like a manga page, compose a shot of the model in each, cut every panel ----------
 const MG_KEY='sculptMangaPage';
 const MG_PAPER={'만화 원고 B5':257/182,'A4':297/210,'정사각':1,'가로 펼침':257/364};
+const MG_PAPER_MM={'만화 원고 B5':182,'A4':210,'정사각':200,'가로 펼침':364};   // 종이 가로 길이 -- STL의 실제 크기
 const shotDef=()=>({az:0,el:0,dist:1/Math.sin(THREE.MathUtils.degToRad(P.fov)/2)*1.12,t:[0,0,0],fov:P.fov});
 let MG;try{MG=JSON.parse(localStorage.getItem(MG_KEY)||'null')}catch(e){MG=null}
 const mgSave=()=>{try{localStorage.setItem(MG_KEY,JSON.stringify(MG))}catch(e){}};
@@ -8140,17 +8141,20 @@ function mgTemplate(name,seed){const ar=mgAR(),m=.06,g=MG.gutter,X0=m,X1=1-m,Y0=
     for(let j=0;j<ws.length;j++)out.push(quadFromLines(sh(top,g/2,k>0),sh(bot,-g/2,k<rows.length-1),sh(V[j],g/2,j>0),sh(V[j+1],-g/2,j<ws.length-1),cx,cy))});
   return out.filter(cutConvex).map(q=>({q,shot:shotDef()}))}
 if(!MG||!MG.panels){MG={paper:'만화 원고 B5',gutter:.025,panels:[]};MG.panels=mgTemplate('기본 3단')}
-let mgSel=0,mgMode='shot',mgR=null,mgScene,mgCam,mgLight,mgMesh=null,mgK=1,mgOX=0,mgOY=0;
+if(MG.thick===undefined)MG.thick=15;if(MG.backAlign===undefined)MG.backAlign=true;
+let mgSel=0,mgMode='3d',mgR=null,mgScene,mgCam,mgLight,mgMesh=null,mgK=1,mgOX=0,mgOY=0;
 const mgEl=document.createElement('div');mgEl.className='mg';mgEl.hidden=true;
 mgEl.innerHTML=`<div class="mgbar">
   <b class="mgt">만화 페이지 꾸미기</b>
   <label>틀 <select id="mgTpl">${['기본 3단','4칸 세로','큰 칸 + 작은 칸','사선 액션','세로 둘','여섯 칸','한 칸','랜덤'].map(t=>`<option>${t}</option>`).join('')}</select></label><button id="mgApply">틀 적용</button>
   <label>원고 <select id="mgPaper">${Object.keys(MG_PAPER).map(t=>`<option>${t}</option>`).join('')}</select></label>
   <label>칸 사이 <input type="range" id="mgGut" min="0" max=".06" step=".005"></label>
-  <span class="seg"><button id="mgModeShot">구도 잡기</button><button id="mgModeEdit">칸 모양</button></span>
+  <span class="seg"><button id="mgMode3d" title="칸마다 잘라낸 3D 조각을 종이 위에 놓인 모습으로 봅니다. 끌어서 돌려 볼 수 있습니다">3D 조각</button><button id="mgModeShot">구도 잡기</button><button id="mgModeEdit">칸 모양</button></span>
+  <label title="3D 조각의 두께. 칸의 구도 중심에서 뒤로 이만큼(mm) 남기고 잘라 뒷면을 평평하게 합니다. 0이면 뒤를 자르지 않습니다">조각 두께 <input type="range" id="mgThick" min="0" max="80" step="1"><span id="mgThickV"></span></label>
+  <label title="켜면 조각마다 뒷면을 종이 면에 맞춥니다. 끄면 원래 깊이 관계를 그대로 두어 앞뒤로 들쭉날쭉합니다"><input type="checkbox" id="mgBack"> 뒷면을 종이에 맞춤</label>
   <button id="mgSplitH" title="고른 칸을 위아래로 나눕니다">위아래 나누기</button><button id="mgSplitV" title="고른 칸을 좌우로 나눕니다">좌우 나누기</button><button id="mgDel" class="ghost">칸 지우기</button>
   <button id="mgFromMain" title="왼쪽 3D 화면의 각도를 고른 칸에 가져옵니다">메인 각도 가져오기</button><button id="mgAllSame" class="ghost">모든 칸에 같은 각도</button>
-  <button id="mgPng">페이지 그림 저장</button><button class="primary" id="mgCut">이 페이지로 자르기</button><button id="mgClose">닫기</button></div>
+  <button id="mgPng">페이지 그림 저장</button><button id="mgStl" title="칸마다 잘라낸 3D 조각을 종이 위 자리 그대로 놓은 STL 한 파일로 저장합니다 (원본 해상도, mm 단위)">STL 저장 (페이지 전체)</button><button class="primary" id="mgCut">이 페이지로 자르기</button><button id="mgClose">닫기</button></div>
   <p class="mghint" id="mgHint"></p>
   <div class="mgstage" id="mgStage"><canvas id="mgCv"></canvas><svg id="mgSvg"></svg></div>`;
 document.body.appendChild(mgEl);
@@ -8163,6 +8167,10 @@ function shotCam(s,asp,cam){cam=cam||new THREE.PerspectiveCamera();const a=THREE
   cam.up.set(0,1,0);cam.lookAt(s.t[0],s.t[1],s.t[2]);cam.near=Math.max(.01,s.dist-2.2);cam.far=s.dist+2.2;cam.updateProjectionMatrix();cam.updateMatrixWorld();return cam}
 const bboxOf=q=>{const xs=q.map(p=>p[0]),ys=q.map(p=>p[1]);const x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);return{x0,x1,y0,y1,w:x1-x0,h:y1-y0,cx:(x0+x1)/2,cy:(y0+y1)/2}};
 function mgDraw(){if(mgEl.hidden||!mgR)return;
+  $('mgModeShot').classList.toggle('on',mgMode==='shot');$('mgModeEdit').classList.toggle('on',mgMode==='edit');$('mgMode3d').classList.toggle('on',mgMode==='3d');
+  $('mgThickV').textContent=MG.thick>0?MG.thick+' mm':'안 자름';
+  if(pgO)pgO.enabled=mgMode==='3d';
+  if(mgMode==='3d'){mgDraw3d();return}
   const W=mgStage.clientWidth,H=mgStage.clientHeight,ar=mgAR(),dpr=Math.min(2,devicePixelRatio||1);mgK=Math.min((W-24)/1,(H-24)/ar);mgOX=(W-mgK)/2;mgOY=(H-ar*mgK)/2;
   mgCv.width=Math.round(W*dpr);mgCv.height=Math.round(H*dpr);const g=mgCv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
   g.fillStyle=cssVar('--stage')||'#dcdfe4';g.fillRect(0,0,W,H);g.fillStyle='#fff';g.fillRect(mgOX,mgOY,mgK,ar*mgK);
@@ -8183,11 +8191,70 @@ function mgDraw(){if(mgEl.hidden||!mgR)return;
     if(i===mgSel&&mgMode==='edit'){pn.q.forEach((p,k)=>{const q=P2(p);s+=`<circle class="mghd" data-k="${k}" cx="${q[0]}" cy="${q[1]}" r="8"/>`});s+=`<rect class="mghd mv" data-k="m" x="${c[0]-8}" y="${c[1]-8}" width="16" height="16" rx="3"/>`}});
   mgSvg.innerHTML=s;
   $('mgHint').textContent=!mesh?'먼저 3D 파일을 불러와 주세요.':mgMode==='shot'?`구도 잡기: 칸 안을 끌면 돌리고, Shift를 누르고 끌면 옮기고, 휠로 확대합니다. 칸 ${MG.panels.length}개 · 고른 칸 ${mgSel+1}번.`:`칸 모양: 칸을 눌러 고르고, 모서리를 끌어 모양을, 가운데 네모를 끌어 위치를 바꿉니다. 오목해지면 빨간 점선이 됩니다.`;
-  $('mgModeShot').classList.toggle('on',mgMode==='shot');$('mgModeEdit').classList.toggle('on',mgMode==='edit')}
+}
+// ---------- 3D 조각 보기: 칸마다 구도대로 잘라낸 조각을 종이 위 제자리에 놓는다 ----------
+// 종이 단위(가로 1)로 계산한다. 칸의 구도 중심 깊이에서 화면 크기와 실제 크기가 같아지도록 k를 잡는다.
+const mgKeyOf=(pn,srcId)=>JSON.stringify([pn.q,pn.shot,MG.thick,MG.paper,srcId]);
+const mgPieceCache=new Map();
+function mgPieceOf(pn,src,srcId){const key=mgKeyOf(pn,srcId);if(mgPieceCache.has(key))return mgPieceCache.get(key);
+  const b=bboxOf(pn.q),cam=shotCam(pn.shot,b.w/b.h),corners=pn.q.map(([x,y])=>[(x-b.cx)/b.h,(y-b.cy)/b.h]);
+  const k=b.h/(2*pn.shot.dist*Math.tan(THREE.MathUtils.degToRad(pn.shot.fov)/2)),mm=MG_PAPER_MM[MG.paper]||182;
+  const planes=cutConvex(corners)?planesFor(corners,0,0,cam,b.w/b.h):null;let out=null;
+  if(planes){const fw=new THREE.Vector3();cam.getWorldDirection(fw);const C=cam.position;
+    if(MG.thick>0){const Tw=MG.thick/(mm*k);planes.push([-fw.x,-fw.y,-fw.z,fw.dot(C)+pn.shot.dist+Tw])}
+    const r=clipMesh(src.pos,src.idx,planes);
+    if(r.idx.length){const n=r.pos.length/3,pos=new Float32Array(n*3),v=new THREE.Vector3(),inv=cam.matrixWorldInverse;let zmin=1e9;
+      for(let i=0;i<n;i++){v.set(r.pos[i*3],r.pos[i*3+1],r.pos[i*3+2]).applyMatrix4(inv);
+        pos[i*3]=b.cx+v.x*k;pos[i*3+1]=b.cy-v.y*k;pos[i*3+2]=(v.z+pn.shot.dist)*k;if(pos[i*3+2]<zmin)zmin=pos[i*3+2]}
+      out={pos,idx:r.idx,zmin}}}
+  if(mgPieceCache.size>40)mgPieceCache.delete(mgPieceCache.keys().next().value);mgPieceCache.set(key,out);return out}
+// 모든 칸의 조각을 종이 좌표로 모은다. 뒷면 맞춤이면 조각마다 뒷면을 z=0에, 아니면 전체에서 가장 뒤를 z=0에 둔다.
+function mgPagePieces(src,srcId){const ps=MG.panels.map(pn=>mgPieceOf(pn,src,srcId));let zAll=1e9;ps.forEach(p=>{if(p&&p.zmin<zAll)zAll=p.zmin});
+  return ps.map(p=>{if(!p)return null;const dz=MG.backAlign?p.zmin:zAll,pos=new Float32Array(p.pos);for(let i=2;i<pos.length;i+=3)pos[i]-=dz;return{pos,idx:p.idx}})}
+let pgScene=null,pgCam,pgO,pgGroup=null,pgSheet=null,pgNeedFit=true;
+function mgInit3d(){if(pgScene)return;pgScene=new THREE.Scene();pgScene.add(new THREE.HemisphereLight(0xf4f4f6,0x5e6168,.8));
+  const L=new THREE.DirectionalLight(0xffffff,.9);L.position.set(-.5,.9,1.2);pgScene.add(L);const L2=new THREE.DirectionalLight(0xffffff,.25);L2.position.set(.8,-.3,.6);pgScene.add(L2);
+  pgCam=new THREE.PerspectiveCamera(28,1,.005,50);pgO=new THREE.OrbitControls(pgCam,mgSvg);pgO.enableDamping=false;pgO.addEventListener('change',()=>{if(mgMode==='3d')mgDraw3d()})}
+function mgFit3d(){const ar=mgAR();pgO.target.set(.5,-ar/2,0);const d=Math.max(1,ar)/Math.tan(THREE.MathUtils.degToRad(14))*.62;pgCam.position.set(.5+.25*d,-ar/2+.22*d,d);pgCam.lookAt(pgO.target);pgNeedFit=false;pgO.update()}
+function mgBuild3d(){const ar=mgAR();if(pgGroup){pgScene.remove(pgGroup);pgGroup.traverse(o=>{if(o.geometry&&o!==pgSheet)o.geometry.dispose()})}
+  pgGroup=new THREE.Group();pgScene.add(pgGroup);
+  pgSheet=new THREE.Mesh(new THREE.PlaneGeometry(1,ar),new THREE.MeshStandardMaterial({color:0xffffff,roughness:1}));pgSheet.position.set(.5,-ar/2,-.0005);pgGroup.add(pgSheet);
+  const lm=new THREE.LineBasicMaterial({color:0x9a9ca2});MG.panels.forEach(pn=>{const pts=pn.q.concat([pn.q[0]]).map(([x,y])=>new THREE.Vector3(x,-y,.0004));pgGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),lm))});
+  if(!mesh)return;const g0=mesh.geometry,src={pos:g0.attributes.position.array,idx:g0.index.array},srcId=(base?base.name+'|'+base.len:'')+'|'+g0.uuid;
+  const pm=new THREE.MeshStandardMaterial({color:0x9a9a9c,roughness:.9,flatShading:true,side:THREE.DoubleSide});
+  mgPagePieces(src,srcId).forEach(p=>{if(!p)return;const g=new THREE.BufferGeometry();
+    const pos=new Float32Array(p.pos);for(let i=1;i<pos.length;i+=3)pos[i]=-pos[i];   // 종이 y(아래로) -> 3D y(위로)
+    g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setIndex(new THREE.BufferAttribute(p.idx,1));g.computeVertexNormals();pgGroup.add(new THREE.Mesh(g,pm))})}
+let mgBuiltKey='';
+function mgDraw3d(){mgInit3d();const W=mgStage.clientWidth,H=mgStage.clientHeight,dpr=Math.min(2,devicePixelRatio||1);if(!W||!H)return;
+  const key=JSON.stringify([MG.panels,MG.thick,MG.backAlign,MG.paper,mesh&&mesh.geometry.uuid]);if(key!==mgBuiltKey){mgBuild3d();mgBuiltKey=key}
+  if(pgNeedFit)mgFit3d();
+  mgR.setSize(W,H,false);mgR.setScissorTest(false);mgR.setViewport(0,0,W,H);pgCam.aspect=W/H;pgCam.updateProjectionMatrix();
+  mgR.setClearColor(new THREE.Color(cssVar('--stage')||'#dcdfe4'),1);mgR.clear();mgR.render(pgScene,pgCam);
+  mgCv.width=Math.round(W*dpr);mgCv.height=Math.round(H*dpr);const g=mgCv.getContext('2d');g.drawImage(mgR.domElement,0,0,mgCv.width,mgCv.height);
+  mgSvg.setAttribute('viewBox',`0 0 ${W} ${H}`);mgSvg.innerHTML='';
+  const n=MG.panels.length,made=pgGroup?pgGroup.children.filter(o=>o.isMesh&&o!==pgSheet).length:0;
+  $('mgHint').textContent=!mesh?'먼저 3D 파일을 불러와 주세요.':`3D 조각: 칸 ${n}개 중 ${made}개가 조각으로 나왔습니다 (나머지는 칸 안에 모델이 없음). 끌어서 돌리고 휠로 확대합니다. 구도를 바꾸려면 "구도 잡기"로.`+(MG.thick>0?` 두께 ${MG.thick} mm, 종이 가로 ${MG_PAPER_MM[MG.paper]||182} mm 기준.`:' 뒤를 자르지 않아 조각이 모델 끝까지 이어집니다.')}
+$('mgMode3d').onclick=()=>{mgMode='3d';mgDraw()};
+$('mgThick').oninput=()=>{MG.thick=+$('mgThick').value;$('mgThickV').textContent=MG.thick>0?MG.thick+' mm':'안 자름';mgSave();clearTimeout(mgSvg._t3);mgSvg._t3=setTimeout(mgDraw,250)};
+$('mgBack').onchange=()=>{MG.backAlign=$('mgBack').checked;mgSave();mgDraw()};
+// 페이지 전체 STL: 원본 해상도로 다시 잘라 종이 위 자리 그대로, mm 단위
+$('mgStl').onclick=async()=>{if(!mesh||!base){flash('먼저 모델을 불러와 주세요.',true);return}
+  const src=await rootSource(),mm=MG_PAPER_MM[MG.paper]||182,parts=[];$('loadOv').hidden=false;
+  try{for(let i=0;i<MG.panels.length;i++){$('loadMsg').textContent=`${i+1}/${MG.panels.length}번 칸 조각 만드는 중…`;await tick();
+      const p=mgPieceOf(MG.panels[i],src,'orig|'+base.name+'|'+base.len+'|'+(merged?merged.res:0));parts.push(p)}}
+  finally{$('loadOv').hidden=true}
+  let zAll=1e9;parts.forEach(p=>{if(p&&p.zmin<zAll)zAll=p.zmin});const ar=mgAR();let total=0;parts.forEach(p=>{if(p)total+=p.idx.length*3});
+  if(!total){flash('칸 안에 모델이 없어 조각이 나오지 않았습니다.',true);return}
+  const soup=new Float32Array(total);let o=0;
+  for(const p of parts){if(!p)continue;const dz=MG.backAlign?p.zmin:zAll;
+    for(let i=0;i<p.idx.length;i++){const v=p.idx[i]*3;soup[o++]=p.pos[v]*mm;soup[o++]=(ar-p.pos[v+1])*mm;soup[o++]=(p.pos[v+2]-dz)*mm}}
+  const nm=`${modelName}-manga-page`;saveFile(nm+'.stl',stlBlob(soup,nm),'model/stl',flash);
+  flash(`페이지 STL 저장: 조각 ${parts.filter(Boolean).length}개 · 면 ${(total/9).toLocaleString()}개 · 종이 ${mm}×${Math.round(mm*ar)} mm`)};
 const mgPage=e=>{const b=mgStage.getBoundingClientRect();return[(e.clientX-b.left-mgOX)/mgK,(e.clientY-b.top-mgOY)/mgK]};
 const inQuad=(pt,q)=>{let c=false;for(let i=0,j=3;i<4;j=i++){const a=q[i],b=q[j];if((a[1]>pt[1])!==(b[1]>pt[1])&&pt[0]<(b[0]-a[0])*(pt[1]-a[1])/(b[1]-a[1])+a[0])c=!c}return c};
 let mgDrag=null;
-mgSvg.addEventListener('pointerdown',e=>{const pt=mgPage(e),t=e.target;mgSvg.setPointerCapture(e.pointerId);
+mgSvg.addEventListener('pointerdown',e=>{if(mgMode==='3d')return;const pt=mgPage(e),t=e.target;mgSvg.setPointerCapture(e.pointerId);
   if(t.dataset&&t.dataset.k!==undefined){mgDrag={kind:'corner',k:t.dataset.k,start:pt,q:MG.panels[mgSel].q.map(p=>p.slice())};return}
   const hit=MG.panels.findIndex(p=>inQuad(pt,p.q));if(hit>=0&&hit!==mgSel){mgSel=hit;mgDraw()}
   if(hit<0)return;
@@ -8220,21 +8287,23 @@ $('mgFromMain').onclick=()=>{const pn=MG.panels[mgSel];if(!pn)return;const d=cam
 $('mgAllSame').onclick=()=>{const s=MG.panels[mgSel].shot;MG.panels.forEach(p=>p.shot=JSON.parse(JSON.stringify(s)));mgSave();mgDraw()};
 $('mgClose').onclick=()=>{mgEl.hidden=true;document.body.style.overflow=''};
 function openManga(page){if(page){MG=JSON.parse(JSON.stringify(page));mgSave()}mgEl.hidden=false;document.body.style.overflow='hidden';mgInit();
-  $('mgPaper').value=MG.paper;$('mgGut').value=MG.gutter;mgSel=Math.min(mgSel,MG.panels.length-1);requestAnimationFrame(mgDraw)}
+  $('mgPaper').value=MG.paper;$('mgGut').value=MG.gutter;$('mgThick').value=MG.thick;$('mgBack').checked=!!MG.backAlign;mgSel=Math.min(mgSel,MG.panels.length-1);pgNeedFit=true;requestAnimationFrame(mgDraw)}
 // cut every panel: each panel's shot is a camera, its quad (relative to the panel's box, in box-height units) is the frame
 async function mgCutAll(){if(!mesh||!base){flash('먼저 모델을 불러와 주세요.',true);return}
   const bad=MG.panels.findIndex(p=>!cutConvex(p.q));if(bad>=0){mgSel=bad;mgDraw();flash(`${bad+1}번 칸이 오목해서 자를 수 없습니다.`,true);return}
   const pid=Date.now().toString(36),snap=JSON.parse(JSON.stringify(MG));let k=0,last=null;
   for(let i=0;i<MG.panels.length;i++){const pn=MG.panels[i],b=bboxOf(pn.q),cam=shotCam(pn.shot,b.w/b.h);
     const corners=pn.q.map(([x,y])=>[(x-b.cx)/b.h,(y-b.cy)/b.h]);$('loadMsg').textContent=`${i+1}/${MG.panels.length}번 칸 자르는 중…`;
-    const rec=await makeCut(corners,{mode:'만화 페이지',page:{id:pid,idx:i+1,n:MG.panels.length},manga:i===0?snap:undefined,mangaId:pid},cam,b.w/b.h,0,0,
+    // 조각 두께를 뒤 자르기 값으로 옮긴다 (planesFor의 far: 깊이 dist+1-2*far) -- 3D 조각 보기와 같은 조각이 되게
+    const kk=b.h/(2*pn.shot.dist*Math.tan(THREE.MathUtils.degToRad(pn.shot.fov)/2)),Tw=MG.thick>0?MG.thick/((MG_PAPER_MM[MG.paper]||182)*kk):0,far=Tw>0&&Tw<1?(1-Tw)/2:0;
+    const rec=await makeCut(corners,{mode:'만화 페이지',page:{id:pid,idx:i+1,n:MG.panels.length},manga:i===0?snap:undefined,mangaId:pid},cam,b.w/b.h,0,far,
       {pos:cam.position.toArray(),target:pn.shot.t.slice(),fov:pn.shot.fov},cornersToFrame(corners));
     if(rec){k++;last=rec}}
   if(last){selRec=last.id;renderRecs();await showRec(last)}
   flash(`만화 페이지 칸 ${k}개를 잘랐습니다. 컷 탭의 자른 기록에 있습니다.`);mgEl.hidden=true;document.body.style.overflow='';showTab(CUT_TAB)}
 $('mgCut').onclick=mgCutAll;
 // page picture for exhibition plans
-$('mgPng').onclick=()=>{mgDraw();const ar=mgAR(),dpr=mgCv.width/mgStage.clientWidth,c=document.createElement('canvas');
+$('mgPng').onclick=()=>{mgDraw();if(mgMode==='3d'){mgCv.toBlob(bl=>saveFile(`${modelName}-manga-page-3d.png`,bl,'image/png',flash),'image/png');return}const ar=mgAR(),dpr=mgCv.width/mgStage.clientWidth,c=document.createElement('canvas');
   c.width=Math.round(mgK*dpr);c.height=Math.round(ar*mgK*dpr);const g=c.getContext('2d');g.drawImage(mgCv,mgOX*dpr,mgOY*dpr,mgK*dpr,ar*mgK*dpr,0,0,c.width,c.height);
   g.scale(dpr,dpr);g.strokeStyle='#111';g.lineWidth=2.2;g.lineJoin='miter';MG.panels.forEach((p,i)=>{g.beginPath();p.q.forEach((q,k)=>k?g.lineTo(q[0]*mgK,q[1]*mgK):g.moveTo(q[0]*mgK,q[1]*mgK));g.closePath();g.stroke();
     g.fillStyle='#111';g.font='600 13px sans-serif';g.fillText(String(i+1),p.q[0][0]*mgK+7,p.q[0][1]*mgK+17)});
