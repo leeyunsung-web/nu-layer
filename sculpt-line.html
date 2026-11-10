@@ -103,6 +103,8 @@ details.corners{display:flex;flex-direction:column;gap:10px}details.corners summ
 .cutpanel{display:flex;flex-direction:column;gap:12px}
 .ptitle{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;font-weight:500;margin:0 0 6px;color:var(--mute);flex-wrap:wrap}
 .pieceview{position:relative;aspect-ratio:4/3;background:var(--stage);border-radius:4px;overflow:hidden}.pieceview canvas{display:block;width:100%;height:100%;touch-action:none}
+.savethumb{width:72px;height:72px;flex:0 0 72px;object-fit:contain;background:var(--paper,#fff);border:1px solid var(--line);border-radius:3px}.savethumb.none{display:grid;place-items:center;font-size:11px;color:var(--mute)}
+.saverename{font:inherit;width:100%;padding:2px 4px}
 .saverow.sel{outline:2px solid var(--accent);outline-offset:-2px}.saverow.other{opacity:.7}
 .cutov .pnum{fill:#fff;font:600 15px/1 'JetBrains Mono',monospace;text-anchor:middle;dominant-baseline:middle;paint-order:stroke;stroke:var(--accent);stroke-width:3px}
 .mg{position:fixed;inset:0;z-index:50;user-select:none;background:var(--bg,#F4F5F7);display:flex;flex-direction:column}
@@ -126,7 +128,7 @@ details.corners{display:flex;flex-direction:column;gap:10px}details.corners summ
 <body>
 <div class="wrap">
   <header>
-    <h1>SCULPT LINE <span id="buildTag" style="font-size:11px;font-weight:500;opacity:.55;margin-left:6px">b6 · 3D 조각</span></h1>
+    <h1>SCULPT LINE <span id="buildTag" style="font-size:11px;font-weight:500;opacity:.55;margin-left:6px">b7 · 정밀 윤곽</span></h1>
     <p class="sub">조각 3D 파일을 올리고 각도와 빛을 정하면, 같은 굵기의 펜으로 찍는 망점의 밀도만으로 명암을 만들어 펜 플로터용 SVG로 저장합니다.</p>
   </header>
 
@@ -7058,7 +7060,7 @@ TABS.forEach((t,i)=>{
     else if(c.paperChips){node=document.createElement('div');node.className='bar';
       ['A4','A3'].forEach(n=>{const bb=document.createElement('button');bb.className='chip';bb.textContent=n;bb.onclick=()=>{P.paper=n;syncInputs();changed('layout')};node.appendChild(bb)})}
     else if(c.saves){node=document.createElement('div');node.className='saves';
-      node.innerHTML='<div class="bar"><input type="text" id="saveName" placeholder="저장 이름 (비워 두면 자동)" maxlength="60"><button class="primary" id="saveNow">지금 설정 저장</button></div><div id="saveList" class="savelist"></div><div class="bar"><button id="savesExport">저장 목록을 파일로 내보내기</button><label class="filebtn">파일에서 가져오기<input type="file" id="savesImport" accept=".json,application/json"></label></div><p class="hint">저장 목록은 이 브라우저에만 남습니다. 다른 컴퓨터에서 쓰려면 파일로 내보내 가져오세요.</p>'}
+      node.innerHTML='<div class="bar"><input type="text" id="saveName" placeholder="저장 이름 (비워 두면 자동)" maxlength="60"><button class="primary" id="saveNow">지금 설정 저장</button></div><div id="saveList" class="savelist"></div><div class="bar"><button id="savesExport">저장 목록을 파일로 내보내기</button><label class="filebtn">파일에서 가져오기<input type="file" id="savesImport" accept=".json,application/json"></label></div><p class="hint">저장 목록과 썸네일은 관리자 모드에서 다른 컴퓨터에도 자동으로 맞춰집니다. 3D 원본 파일은 컴퓨터마다 따로 올려야 합니다.</p>'}
     else if(c.samples){node=document.createElement('div');node.className='bar';const lab=document.createElement('span');lab.className='hint';lab.textContent='샘플로 시험해 보기';node.appendChild(lab);
       [['두상','head'],['매듭','knot']].forEach(([n,k])=>{const bb=document.createElement('button');bb.className='chip';bb.textContent=n;bb.onclick=()=>loadSample(k);node.appendChild(bb)})}
     else if(c.dirChips){node=document.createElement('div');node.className='bar';
@@ -7234,7 +7236,7 @@ function compute(preview){
     const key=[mesh.uuid,W,H,...cam.matrixWorld.elements.map(v=>v.toFixed(5)),cam.fov,P.lineOuter,P.lineInner,P.lineCrease,P.creaseAngle,P.lineSlice,P.sliceCount,P.sliceAxis,P.innerJump].join('|');
     if(lineCache&&lineCache.key===key)lines=lineCache.lines;
     else{lines={outer:[],inner:[],crease:[],slice:[]};
-      if(P.lineOuter)marching(M,W,H,lines.outer);
+      if(P.lineOuter)marchingIso(coverage(cam,W,H,4),W,H,lines.outer);
       if(P.lineInner||P.lineCrease||P.lineSlice)geomLines(cam,lin,M,W,H,lines);
       lineCache={key,lines}}}
   // engraving field: how far each pixel stands toward the viewer, in screen pixels (so a bend of 1 shifts a line by the form's own depth)
@@ -7247,6 +7249,25 @@ function compute(preview){
 }
 
 // ---------- lines: outer outline from the mask, inner contours / creases / slices from the mesh ----------
+// 바깥 윤곽선: 화면을 4×4배로 쪼개 그려서 픽셀마다 '얼마나 덮였는지(0~1)'를 구한다 → 계단 없이 실제 외곽을 따라가는 선
+function coverage(cam,W,H,ss){
+  const C=new Float32Array(W*H),rt=new THREE.WebGLRenderTarget(W,H),sc=new THREE.Scene(),mat=new THREE.MeshBasicMaterial({color:0xffffff,side:THREE.DoubleSide}),c2=cam.clone();
+  sc.add(new THREE.Mesh(mesh.geometry,mat));const px=new Uint8Array(W*H*4),w=1/(ss*ss);
+  for(let ty=0;ty<ss;ty++)for(let tx=0;tx<ss;tx++){c2.setViewOffset(W*ss,H*ss,tx*W,ty*H,W,H);c2.updateProjectionMatrix();
+    renderer.setRenderTarget(rt);renderer.setClearColor(0x000000,1);renderer.clear();renderer.render(sc,c2);renderer.readRenderTargetPixels(rt,0,0,W,H,px);
+    for(let y=0;y<H;y++){const Y=ty*H+y,cy=(Y/ss)|0,row=(H-1-y)*W*4;for(let x=0;x<W;x++){if(px[row+x*4]>127){const X=tx*W+x;C[cy*W+((X/ss)|0)]+=w}}}}
+  renderer.setRenderTarget(null);rt.dispose();mat.dispose();return C}
+function marchingIso(C,W,H,out){
+  // 칸 모서리 = 픽셀 중심. 경계가 지나는 변에서 0.5가 되는 지점을 직선 보간으로 찾는다 (같은 변은 늘 같은 점 → 선이 끊기지 않게 이어짐)
+  const v=(x,y)=>C[y*W+x],I=(a,b)=>{const d=b-a;return Math.abs(d)<1e-6?.5:Math.min(1,Math.max(0,(.5-a)/d))};
+  const P2=(e,x,y,o)=>{if(e===0){o[0]=x+.5+I(v(x,y),v(x+1,y));o[1]=y+.5}else if(e===2){o[0]=x+.5+I(v(x,y+1),v(x+1,y+1));o[1]=y+1.5}
+    else if(e===3){o[0]=x+.5;o[1]=y+.5+I(v(x,y),v(x,y+1))}else{o[0]=x+1.5;o[1]=y+.5+I(v(x+1,y),v(x+1,y+1))}};
+  const T={1:[[3,2]],2:[[2,1]],3:[[3,1]],4:[[0,1]],5:[[3,0],[2,1]],6:[[0,2]],7:[[3,0]],8:[[3,0]],9:[[0,2]],10:[[3,2],[0,1]],11:[[0,1]],12:[[3,1]],13:[[2,1]],14:[[3,2]]},A=[0,0],B=[0,0];
+  for(let y=0;y<H-1;y++)for(let x=0;x<W-1;x++){const a=v(x,y),b=v(x+1,y),c=v(x+1,y+1),d=v(x,y+1);
+    let k=(a>=.5)*8+(b>=.5)*4+(c>=.5)*2+(d>=.5);if(!k||k===15)continue;
+    if(k===5||k===10){const m=(a+b+c+d)/4>=.5;if(k===5&&m)k=-5;if(k===10&&m)k=-10}
+    const segs=k===-5?[[3,2],[0,1]]:k===-10?[[3,0],[2,1]]:T[k];
+    for(const[e1,e2]of segs){P2(e1,x,y,A);P2(e2,x,y,B);out.push(A[0],A[1],B[0],B[1])}}}
 function marching(M,W,H,out){
   const at=(x,y)=>x>=0&&y>=0&&x<W&&y<H?M[y*W+x]:0;
   const E=[[.5,0],[1,.5],[.5,1],[0,.5]],T={1:[[3,2]],2:[[2,1]],3:[[3,1]],4:[[0,1]],5:[[3,0],[2,1]],6:[[0,2]],7:[[3,0]],8:[[3,0]],9:[[0,2]],10:[[3,2],[0,1]],11:[[0,1]],12:[[3,1]],13:[[2,1]],14:[[3,2]]};
@@ -7689,7 +7710,14 @@ $('saveJpg').onclick=async()=>{if(!pens){setStatus('먼저 모델을 불러와 �
   saveFile(`${modelName}-screentone-${P.paper.replace(/[^A-Za-z0-9]/g,'')}-${dpi}dpi.jpg`,blob,'image/jpeg',setStatus)};
 
 // ---------- settings saves (kept in this site's storage; 3D files are never stored) ----------
-const SAVE_KEY='sculptDotSaves',LAST_KEY='sculptDotLast';
+const SAVE_KEY='sculptDotSaves',LAST_KEY='sculptDotLast',THUMB_KEY='sculptDotThumbs';
+// 썸네일: 저장할 때의 결과 그림(없으면 3D 화면)을 작은 JPG로. 설정과 따로 두어 목록이 무거워지지 않게
+const loadThumbs=()=>{try{return JSON.parse(localStorage.getItem(THUMB_KEY)||'{}')||{}}catch(e){return{}}};
+const storeThumbs=t=>{const ids=new Set(loadSaves().map(e=>e.id));for(const k in t)if(!ids.has(k))delete t[k];try{localStorage.setItem(THUMB_KEY,JSON.stringify(t))}catch(e){}};
+function makeThumb(){try{const L=140,c=document.createElement('canvas'),g=c.getContext('2d');
+  if(pens){const[pw,ph]=paperSize(),k=L/Math.max(pw,ph),B=document.createElement('canvas'),bg=B.getContext('2d');B.width=Math.round(pw*k*5);B.height=Math.round(ph*k*5);bg.fillStyle='#fff';bg.fillRect(0,0,B.width,B.height);paintArt(bg,k*5,0,0,B.width,B.height,false);c.width=Math.round(pw*k);c.height=Math.round(ph*k);g.imageSmoothingQuality='high';g.drawImage(B,0,0,c.width,c.height)}
+  else{draw();const src=renderer.domElement,k=L/Math.max(src.width,src.height);c.width=Math.round(src.width*k);c.height=Math.round(src.height*k);g.drawImage(src,0,0,c.width,c.height)}
+  return c.toDataURL('image/jpeg',.7)}catch(e){return null}}
 // the working state (settings, angle, which model) is kept on every change so closing and reopening picks up where you left off
 function saveLast(){if(currentSample&&pendingRestore)return;try{localStorage.setItem(LAST_KEY,JSON.stringify(snapshot('지난 작업')))}catch(e){}}
 const loadSaves=()=>{try{const a=JSON.parse(localStorage.getItem(SAVE_KEY)||'[]');return Array.isArray(a)?a:[]}catch(e){return[]}};
@@ -7704,8 +7732,9 @@ function snapshot(name){return{id:Date.now().toString(36)+Math.random().toString
   view:{pos:camera.position.toArray(),target:controls.target.toArray()},model:{name:modelName,file:modelFile,sample:currentSample,yaw:yawTurns}}}
 function saveSettings(name){
   const nm=(name||'').trim()||`${currentSample?'샘플 '+(currentSample==='head'?'두상':'매듭'):modelFile||modelName} · ${fmtDate(new Date().toISOString())}`;
-  const a=loadSaves();a.unshift(snapshot(nm));
+  const a=loadSaves(),e=snapshot(nm);a.unshift(e);
   if(!storeSaves(a.slice(0,60))){flash('저장하지 못했습니다. 브라우저 저장 공간이 막혀 있습니다.',true);return}
+  const th=makeThumb();if(th){const t=loadThumbs();t[e.id]=th;storeThumbs(t)}
   renderSaves();flash(`설정을 저장했습니다: ${nm}`)}
 async function restore(e){
   const needModel=P.target!==e.P.target||P.upAxis!==e.P.upAxis||yawTurns!==e.model.yaw;
@@ -7717,23 +7746,30 @@ async function restore(e){
 function renderSaves(){
   const box=$('saveList');if(!box)return;const a=loadSaves();
   if(!a.length){box.innerHTML='<p class="hint">아직 저장한 설정이 없습니다. 위에서 이름을 적고 저장하거나, 맨 위의 설정 저장 버튼을 누르세요.</p>';return}
-  box.innerHTML='';
+  box.innerHTML='';const TH=loadThumbs();
   a.forEach(e=>{const row=document.createElement('div');row.className='saverow';
+    let im;if(TH[e.id]){im=document.createElement('img');im.className='savethumb';im.src=TH[e.id];im.alt=''}else{im=document.createElement('div');im.className='savethumb none';im.textContent='그림 없음'}
     const info=document.createElement('div');info.className='saveinfo';
     const t=document.createElement('b');t.textContent=e.name;const sub=document.createElement('span');
     sub.textContent=`${fmtDate(e.date)} · ${e.model.sample?'샘플':(e.model.file||e.model.name)} · 펜 ${(+e.P.pen1).toFixed(2)}mm${+e.P.penCount>1?' 외 '+(e.P.penCount-1)+'자루':''} · ${e.P.paper==='직접 입력'?e.P.paperW+'×'+e.P.paperH+'mm':e.P.paper}`;
     info.append(t,sub);
     const load=document.createElement('button');load.textContent='불러오기';load.onclick=()=>restore(e);
+    const ren=document.createElement('button');ren.textContent='이름 바꾸기';ren.className='ghost';
+    ren.onclick=()=>{const inp=document.createElement('input');inp.type='text';inp.maxLength=60;inp.value=e.name;inp.className='saverename';t.replaceWith(inp);inp.focus();inp.select();
+      let done=false;const fin=ok=>{if(done)return;done=true;const v=inp.value.trim();
+        if(ok&&v&&v!==e.name){const all=loadSaves(),x=all.find(z=>z.id===e.id);if(x){x.name=v;storeSaves(all);flash(`이름을 바꿨습니다: ${v}`)}}renderSaves()};
+      inp.onkeydown=ev=>{if(ev.key==='Enter')fin(true);else if(ev.key==='Escape')fin(false)};inp.onblur=()=>fin(true)};
+    t.title='두 번 눌러 이름 바꾸기';t.ondblclick=()=>ren.onclick();
     const del=document.createElement('button');del.textContent='삭제';del.className='ghost';
-    del.onclick=()=>{if(del.dataset.armed){storeSaves(loadSaves().filter(x=>x.id!==e.id));renderSaves();flash('삭제했습니다.')}else{del.dataset.armed='1';del.textContent='한 번 더 누르면 삭제';setTimeout(()=>{delete del.dataset.armed;del.textContent='삭제'},3000)}};
-    row.append(info,load,del);box.appendChild(row)})}
+    del.onclick=()=>{if(del.dataset.armed){storeSaves(loadSaves().filter(x=>x.id!==e.id));storeThumbs(loadThumbs());renderSaves();flash('삭제했습니다.')}else{del.dataset.armed='1';del.textContent='한 번 더 누르면 삭제';setTimeout(()=>{delete del.dataset.armed;del.textContent='삭제'},3000)}};
+    row.append(im,info,load,ren,del);box.appendChild(row)})}
 $('saveNow').onclick=()=>{saveSettings($('saveName').value);$('saveName').value=''};
 $('quickSave').onclick=()=>saveSettings('');
-$('savesExport').onclick=()=>{const a=loadSaves();if(!a.length){flash('내보낼 저장이 없습니다.',true);return}saveFile(`sculpt-line-settings-${new Date().toISOString().slice(0,10)}.json`,JSON.stringify(a,null,1),'application/json',flash)};
+$('savesExport').onclick=()=>{const a=loadSaves();if(!a.length){flash('내보낼 저장이 없습니다.',true);return}const TH=loadThumbs();saveFile(`sculpt-line-settings-${new Date().toISOString().slice(0,10)}.json`,JSON.stringify(a.map(e=>TH[e.id]?{...e,thumb:TH[e.id]}:e),null,1),'application/json',flash)};
 $('savesImport').onchange=async ev=>{const f=ev.target.files[0];if(!f)return;
   try{const inc=JSON.parse(await f.text());if(!Array.isArray(inc))throw new Error('형식이 맞지 않습니다');
-    const a=loadSaves(),ids=new Set(a.map(x=>x.id));let n=0;for(const e of inc){if(e&&e.P&&e.model&&!ids.has(e.id)){a.push(e);n++}}
-    a.sort((x,y)=>y.date<x.date?-1:1);storeSaves(a.slice(0,200));renderSaves();flash(`설정 ${n}개를 가져왔습니다.`)}
+    const a=loadSaves(),ids=new Set(a.map(x=>x.id));let n=0;const TH=loadThumbs();for(const e0 of inc){if(e0&&e0.P&&e0.model&&!ids.has(e0.id)){const{thumb,...e}=e0;if(thumb)TH[e.id]=thumb;a.push(e);n++}}
+    a.sort((x,y)=>y.date<x.date?-1:1);storeSaves(a.slice(0,200));storeThumbs(TH);renderSaves();flash(`설정 ${n}개를 가져왔습니다.`)}
   catch(err){flash('가져오지 못했습니다: '+err.message,true)}ev.target.value=''};
 renderSaves();
 
