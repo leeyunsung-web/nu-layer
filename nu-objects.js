@@ -25,16 +25,34 @@
     ctx.beginPath(); ctx.ellipse(o.x + lx * R * 0.32, o.y + ly * R * 0.32, R * 0.3, R * 0.17, la + Math.PI / 2, 0, TAU); ctx.fillStyle = c.h; ctx.fill();
     ctx.beginPath(); ctx.arc(o.x + lx * R * 0.62 - ly * R * 0.18, o.y + ly * R * 0.62 + lx * R * 0.18, R * 0.065, 0, TAU); ctx.fill(); ctx.restore(); }
   /** 계단 꺾임 쐐기 (번개·광선의 공통 모양) — 뉴 플로우 notchSpike */
-  function notchSpike(ctx, x0, y0, a, L, W, steps, sg, point, c, lineW, fc) { const ca = Math.cos(a), sa = Math.sin(a);
-    const tb = point ? 0.3 : 0.24, wd = v => { const b = Math.min(1, v / tb), e = b * b * (3 - 2 * b); return W * 0.5 * e * Math.pow(Math.max(0, 1 - v), 0.8); }, P = (v, o) => [x0 + ca * v * L - sa * o, y0 + sa * v * L + ca * o];
+  function notchSpike(ctx, x0, y0, a, L, W, steps, sg, point, c, lineW, fc, cut, grow) { const ca = Math.cos(a), sa = Math.sin(a), s0 = Math.min(cut || 0, 0.98), uE = Math.min(1, grow == null ? 1 : grow), sp = uE - s0; if (sp * L < 3) return;
+    const tb = point ? 0.3 : 0.24, wd = v => { const b = Math.min(1, v / tb), e = b * b * (3 - 2 * b); return W * 0.5 * e * Math.pow(Math.max(0, 1 - v), 0.8); }, P = (v, o) => { const u = s0 + sp * v; return [x0 + ca * u * L - sa * o, y0 + sa * u * L + ca * o]; };
     const top = [P(0, 0)], bot = [P(0, 0)]; let Y = 0; const vs = [0.06, 0.13, 0.21, 0.3, ...steps.map(x => -x), 0.82, 0.92].sort((p, q) => Math.abs(p) - Math.abs(q));
     for (const v0 of vs) { if (v0 >= 0) { const w = wd(v0); top.push(P(v0, Y - w)); bot.push(P(v0, Y + w)); continue; }
-      const st = -v0, w = wd(st), jj = w * 1.15 * sg, f = w * 1.5 / L, b = w * 0.25 / L;
+      const st = -v0, w = wd(st), jj = w * 1.15 * sg, f = w * 1.5 / (L * sp), b = w * 0.25 / (L * sp);
       if (sg > 0) { top.push(P(st + f, Y - w)); top.push(P(st - b, Y + jj - w)); bot.push(P(st + b, Y + w)); bot.push(P(st - f, Y + jj + w)); }
       else { top.push(P(st + b, Y - w)); top.push(P(st - f, Y + jj - w)); bot.push(P(st + f, Y + w)); bot.push(P(st - b, Y + jj + w)); }
       Y += jj; }
     const tip = P(1, Y); ctx.beginPath(); ctx.moveTo(top[0][0], top[0][1]); for (let q = 1; q < top.length; q++) ctx.lineTo(top[q][0], top[q][1]); ctx.lineTo(tip[0], tip[1]);
     for (let q = bot.length - 1; q >= 1; q--) ctx.lineTo(bot[q][0], bot[q][1]); ctx.closePath(); ctx.fillStyle = fc || c.f; ctx.fill(); if (lineW > 0) { ctx.strokeStyle = c.l; ctx.lineWidth = lineW; ctx.stroke(); } }
+
+
+  // ── 생애 (뉴 플로우의 팡·풍선·빨려 들어가기) ──
+  /** t: 태어난 뒤 지난 시간(초), life: 수명(초), pop: 팡 세기(0~3). 반환 {s 전체 배율, bx,by 풍선 가로세로, grow 뻗은 비율, cut 뿌리부터 사라진 비율, flash 첫 섬광, alive} */
+  function skPop(t, life, pop, d) { t -= d || 0; if (t <= 0) return 0; const a = 0.16; let s = 1; if (t < a) { const u = t / a - 1, c1 = 1.70158 * pop, c3 = c1 + 1; s = 1 + c3 * u * u * u + c1 * u * u; } const out = Math.min(0.38, life * 0.4); if (t > life - out) { const u = Math.max(0, (life - t) / out); s *= u * u * (3 - 2 * u); } return Math.max(0, s); }
+  function balloon(t, life, pop) { const k = Math.max(0, t); let s = 1 - Math.exp(-k * 9) * Math.cos(k * 20) * (1 + 0.35 * pop); s = Math.max(0, Math.min(1.25, s)); const out = Math.min(0.38, life * 0.4); if (t > life - out) { const u = Math.max(0, (life - t) / out); s *= u * u * (3 - 2 * u); } const wob = 0.12 * pop * Math.exp(-k * 5) * Math.sin(k * 24); return [s * (1 + wob), s * (1 - wob)]; }
+  const ease3 = (t, d) => { const u = Math.min(1, Math.max(0, t / d)); return 1 - Math.pow(1 - u, 3); };
+  const LIFE_MODE = { burstStar: 'pop', spiky: 'pop', glint: 'twinkle', crossStar: 'twinkle', star5: 'balloon', drop: 'balloon', jelly: 'balloon', heart: 'balloon', cloud: 'balloon', puff: 'balloon', ring: 'balloon', inkSplat: 'pop',
+    bolt: 'strike', rayFan: 'shoot', needle: 'shoot', paintStreak: 'shoot', band: 'sweep', zig: 'shoot', wave: 'sweep', wedge: 'sweep' };
+  function life(kind, t, lf, pop, seedPhase) { pop = pop == null ? 1 : pop; const m = LIFE_MODE[kind] || 'pop', L = { s: 1, bx: 1, by: 1, grow: 1, cut: 0, flash: false, alive: t >= 0 && t <= lf };
+    if (!L.alive) return L; const out = Math.min(0.5, lf * 0.35), fin = t > lf - out ? Math.min(1, (t - (lf - out)) / out) : 0;
+    if (m === 'pop') { L.s = skPop(t, lf, pop); L.flash = t < 0.08; }
+    else if (m === 'balloon') { const [bx, by] = balloon(t, lf, pop); L.bx = bx; L.by = by; L.s = 1; }
+    else if (m === 'twinkle') { const ph = (seedPhase || 0) * TAU; L.s = skPop(t, lf, pop * 0.5) * (0.6 + 0.4 * (0.5 + 0.5 * Math.sin(t * 5.5 + ph))); }
+    else if (m === 'strike') { L.grow = ease3(t, 0.15); L.flash = t < 0.095; if (fin > 0) { if (Math.floor((1 - fin) * out / 0.045) % 2 === 1) L.alive = false; L.s = 0.7 + 0.3 * (1 - fin); } }
+    else if (m === 'shoot') { L.grow = ease3(t, 0.2); const rt = Math.max(0, (t - lf * 0.5) / (lf * 0.5)); L.cut = rt * rt; }
+    else if (m === 'sweep') { L.grow = ease3(t, 0.35); L.cut = fin * fin; L.s = 1; }
+    return L; }
 
   const K = {};   // 종류별 그리기
 
@@ -45,18 +63,18 @@
     for (let k = 0; k < n * 2; k++) { const tip = !(k & 1), q = k >> 1, a = sp + k * Math.PI / n + (tip ? (hh(10 + q) - 0.5) * J * 0.6 : (hh(70 + q) - 0.5) * 0.5 * V), base = R * bf * (1 + (hh(80 + q) - 0.5) * 0.5 * V);
       const lng = (q === lg ? 0.65 : 0) + (hh(60 + q) < 0.18 * V ? 0.4 + 0.4 * hh(61 + q) : 0), rr = tip ? R * (0.55 + 0.55 * J * hh(30 + q) + V * 0.45 * (hh(50 + q) - 0.35) + lng) : base;
       let dx = Math.cos(a) * rr, dy = Math.sin(a) * rr; const pa = dx * cs + dy * ss, pp = -dx * ss + dy * cs; dx = pa * st * cs - pp * ss / st; dy = pa * st * ss + pp * cs / st; k ? ctx.lineTo(o.x + dx, o.y + dy) : ctx.moveTo(o.x + dx, o.y + dy); }
-    ctx.closePath(); fillStroke(ctx, c, o); if (o.flash) { ctx.beginPath(); ctx.arc(o.x, o.y, R * 0.3, 0, TAU); ctx.fillStyle = '#fff'; ctx.fill(); } };
+    ctx.closePath(); fillStroke(ctx, c, o); if (o.flash) { ctx.beginPath(); ctx.arc(o.x, o.y, R * 0.55, 0, TAU); ctx.fillStyle = '#fff'; ctx.fill(); } };
 
   /** 번개 갈래: dir 방향, len 길이배(1.5~2.1), n 갈래 수 */
   K.bolt = (ctx, o) => { const c = setup(ctx, o); ctx.lineJoin = 'miter'; const sd = o.seed | 0, hh = n => h(sd * 31, n, 5), R = o.r, m = o.n || 1, dir = o.rot || 0, lw = ctx.lineWidth;
     for (let j = 0; j < m; j++) { const a = dir + (j - (m - 1) / 2) * 0.6 + (hh(20 + j) - 0.5) * 0.25, L = R * (o.len || 1.5 + 0.6 * hh(25 + j)), W = R * (0.42 + 0.1 * hh(26 + j));
       const ox = (j - (m - 1) / 2) * Math.sin(a) * W * 2.6, oy = -(j - (m - 1) / 2) * Math.cos(a) * W * 2.6;
-      notchSpike(ctx, o.x + Math.cos(a) * R * 0.25 + ox, o.y + Math.sin(a) * R * 0.25 + oy, a, L, W, [0.36 + (hh(3) - 0.5) * 0.1, 0.66 + (hh(4) - 0.5) * 0.1], hh(28 + j) < 0.5 ? 1 : -1, true, c, lw); } };
+      notchSpike(ctx, o.x + Math.cos(a) * R * 0.25 + ox, o.y + Math.sin(a) * R * 0.25 + oy, a, L, W, [0.36 + (hh(3) - 0.5) * 0.1, 0.66 + (hh(4) - 0.5) * 0.1], hh(28 + j) < 0.5 ? 1 : -1, true, c, lw, o.flash ? '#FFFFFF' : null, o.cut, o.grow); } };
 
   /** 뻗는 광선: 같은 계단 꺾임의 긴 쐐기가 부채꼴로 나란히 (3~5개) */
   K.rayFan = (ctx, o) => { const c = setup(ctx, o); ctx.lineJoin = 'miter'; const sd = o.seed | 0, hh = n => h(sd * 31, n, 5), R = o.r, m = o.n || 3 + Math.floor(hh(2) * 3), dir = o.rot || 0, nx = -Math.sin(dir), ny = Math.cos(dir), lw = ctx.lineWidth;
     for (let j = 0; j < m; j++) { const off = (j - (m - 1) / 2) * R * 0.55 * (1 + 0.3 * hh(30 + j)), a = dir + (j - (m - 1) / 2) * 0.07 + (hh(20 + j) - 0.5) * 0.06, L = R * (o.len || 3.5 + 3 * hh(25 + j)), W = R * (0.32 + 0.22 * hh(27 + j));
-      notchSpike(ctx, o.x + nx * off, o.y + ny * off, a, L, W, hh(29 + j) < 0.5 ? [0.42] : [0.32, 0.62], hh(28 + j) < 0.5 ? 1 : -1, false, c, lw); } };
+      notchSpike(ctx, o.x + nx * off, o.y + ny * off, a, L, W, hh(29 + j) < 0.5 ? [0.42] : [0.32, 0.62], hh(28 + j) < 0.5 ? 1 : -1, false, c, lw, null, o.cut, o.grow); } };
 
   /** 오각별: 변이 살짝 볼록하고 꼭짓점은 조금 둥글며, 별 모양을 따라 흐르는 그늘·하이라이트 띠 */
   K.star5 = (ctx, o) => { const c = setup(ctx, o); const Ro = o.r * 0.95, Ri = Ro * (o.inner || 0.47), a0 = (o.rot || 0) - Math.PI / 2, [lx0, ly0] = lightDir(o), lx = lx0 * Ro, ly = ly0 * Ro;
@@ -106,21 +124,21 @@
     const nd = o.dots == null ? 4 : o.dots; for (let q = 0; q < nd; q++) { const d = r * (1.5 + q * 0.6), rr = r * (0.28 - 0.05 * q); ctx.beginPath(); ctx.arc(o.x + Math.cos(a + q * 0.3) * d, o.y + Math.sin(a + q * 0.3) * d, Math.max(0.5, rr), 0, TAU); ctx.fill(); } };
 
   /** 페인트 튀김 줄: 뿌리가 굵고 끝이 가는 획 + 끝에 튄 점들 (len 길이, w 굵기, dots 점 수) */
-  K.paintStreak = (ctx, o) => { const c = setup(ctx, o); const a = o.rot || 0, L = o.len || o.r * 4, w = o.w || o.r * 0.5, ca = Math.cos(a), sa = Math.sin(a), sd = o.seed | 0;
+  K.paintStreak = (ctx, o) => { const c = setup(ctx, o); const a = o.rot || 0, L = (o.len || o.r * 4) * (o.grow == null ? 1 : o.grow), w = (o.w || o.r * 0.5) * (1 - (o.cut || 0)), ca = Math.cos(a), sa = Math.sin(a), sd = o.seed | 0; if (L < 1 || w < 0.3) return;
     ctx.beginPath(); const n = 16; for (let i = 0; i <= n; i++) { const u = i / n, ww = w * Math.pow(1 - u, 0.7) * (1 + 0.15 * nz(sd, u * 4)), bx = o.x + ca * L * u, by = o.y + sa * L * u; i ? ctx.lineTo(bx - sa * ww, by + ca * ww) : ctx.moveTo(bx - sa * ww, by + ca * ww); }
     for (let i = n; i >= 0; i--) { const u = i / n, ww = w * Math.pow(1 - u, 0.7) * (1 + 0.15 * nz(sd + 1, u * 4)), bx = o.x + ca * L * u, by = o.y + sa * L * u; ctx.lineTo(bx + sa * ww, by - ca * ww); } ctx.closePath(); ctx.fillStyle = c.f; ctx.fill();
     const nd = o.dots == null ? 3 : o.dots; for (let q = 0; q < nd; q++) { const d = L * (1.08 + q * 0.1), rr = w * (0.9 - 0.18 * q); ctx.beginPath(); ctx.arc(o.x + ca * d, o.y + sa * d, Math.max(0.5, rr), 0, TAU); ctx.fill(); } };
 
   /** 쓸린 띠 (얼룩말 줄·찢긴 결): 굵기가 출렁이는 긴 띠 조각. len 길이, w 굵기, curve 휨, taper 끝 가늘기(0~1) */
-  K.band = (ctx, o) => { const c = setup(ctx, o); const a = o.rot || 0, L = o.len || o.r * 5, w = o.w || o.r * 0.5, cv = o.curve || 0, tp = o.taper == null ? 0.6 : o.taper, sd = o.seed | 0, ca = Math.cos(a), sa = Math.sin(a), n = 20;
-    const spine = u => { const x = (u - 0.5) * L, y = cv * L * 0.5 * (4 * u * (1 - u) - 1) ; return [o.x + ca * x - sa * y, o.y + sa * x + ca * y]; };
-    const wid = (u, s) => w * (1 - tp * Math.pow(Math.abs(u * 2 - 1), 1.6)) * (1 + 0.35 * nz(sd + s, u * 5)) * (u < 0.04 || u > 0.96 ? 0.35 : 1);
+  K.band = (ctx, o) => { const c = setup(ctx, o); const a = o.rot || 0, L = o.len || o.r * 5, w = o.w || o.r * 0.5, cv = o.curve || 0, tp = o.taper == null ? 0.6 : o.taper, sd = o.seed | 0, ca = Math.cos(a), sa = Math.sin(a), n = 20, u0 = o.cut || 0, u1 = o.grow == null ? 1 : o.grow; if (u1 - u0 < 0.03) return;
+    const spine = v => { const u = u0 + (u1 - u0) * v; const x = (u - 0.5) * L, y = cv * L * 0.5 * (4 * u * (1 - u) - 1) ; return [o.x + ca * x - sa * y, o.y + sa * x + ca * y]; };
+    const wid = (v, s) => { const u = u0 + (u1 - u0) * v; return w * (1 - tp * Math.pow(Math.abs(u * 2 - 1), 1.6)) * (1 + 0.35 * nz(sd + s, u * 5)) * (v < 0.04 || v > 0.96 ? 0.35 : 1); };
     ctx.beginPath(); for (let i = 0; i <= n; i++) { const u = i / n, [x, y] = spine(u), ww = wid(u, 0); i ? ctx.lineTo(x - sa * ww, y + ca * ww) : ctx.moveTo(x - sa * ww, y + ca * ww); }
     for (let i = n; i >= 0; i--) { const u = i / n, [x, y] = spine(u), ww = wid(u, 9); ctx.lineTo(x + sa * ww, y - ca * ww); } ctx.closePath(); fillStroke(ctx, c, o); };
 
   /** 침·집중선: 뿌리에서 끝으로 가늘어지는 긴 바늘 (len 길이, w 뿌리 굵기, bend 휨) */
-  K.needle = (ctx, o) => { const c = setup(ctx, o); const a = o.rot || 0, L = o.len || o.r * 6, w = o.w || o.r * 0.18, ca = Math.cos(a), sa = Math.sin(a), bd = (o.bend || 0) * L;
-    const P = (u, s) => { const x = u * L, y = bd * u * u + s; return [o.x + ca * x - sa * y, o.y + sa * x + ca * y]; };
+  K.needle = (ctx, o) => { const c = setup(ctx, o); const a = o.rot || 0, L = o.len || o.r * 6, w = o.w || o.r * 0.18, ca = Math.cos(a), sa = Math.sin(a), bd = (o.bend || 0) * L, u0 = o.cut || 0, u1 = o.grow == null ? 1 : o.grow; if (u1 - u0 < 0.02) return;
+    const P = (v, s) => { const u = u0 + (u1 - u0) * v, x = u * L, y = bd * u * u + s; return [o.x + ca * x - sa * y, o.y + sa * x + ca * y]; };
     ctx.beginPath(); let p = P(0, -w * 0.5); ctx.moveTo(p[0], p[1]); p = P(o.k || 0.35, -w * 0.5); ctx.lineTo(p[0], p[1]); p = P(1, 0); ctx.lineTo(p[0], p[1]); p = P(o.k || 0.35, w * 0.5); ctx.lineTo(p[0], p[1]); p = P(0, w * 0.5); ctx.lineTo(p[0], p[1]); ctx.closePath(); ctx.fillStyle = c.f; ctx.fill(); if (o.line > 0) { ctx.strokeStyle = c.l; ctx.stroke(); } };
 
   /** 가시 별 (찢긴 결의 가운데 별): 짧은 가시와 긴 가시가 섞인 날카로운 별. spikes 가시 수, nLong 긴 가시 수 */
@@ -185,6 +203,12 @@
   if (typeof Path2D === 'undefined') { root.Path2D = function () { this._d = ''; }; }
   const P2 = root.Path2D && root.Path2D.prototype; if (P2 && !P2._nuoPatched) { P2._nuoPatched = true; const f = v => (+v).toFixed(1); for (const [k, fn] of [['moveTo', (x, y) => `M${f(x)} ${f(y)}`], ['lineTo', (x, y) => `L${f(x)} ${f(y)}`], ['quadraticCurveTo', (a, b, x, y) => `Q${f(a)} ${f(b)} ${f(x)} ${f(y)}`], ['closePath', () => 'Z']]) { const orig = P2[k]; P2[k] = function (...a) { this._d = (this._d || '') + fn(...a); return orig ? orig.apply(this, a) : undefined; }; } }
 
-  root.NUO = { kinds: Object.keys(K), draw(ctx, kind, o) { const fn = K[kind]; if (!fn) throw new Error('모르는 모양: ' + kind); ctx.save(); fn(ctx, o); ctx.restore(); }, K, h, nz, trio, mixc, shadeH, svgRecorder,
+  root.NUO = { kinds: Object.keys(K), LIFE_MODE, life, skPop, balloon,
+    /** o.t(지난 시간)·o.life(수명)가 있으면 생애를 적용해 그린다. 반환: 그렸으면 true */
+    draw(ctx, kind, o) { const fn = K[kind]; if (!fn) throw new Error('모르는 모양: ' + kind); let q = o;
+      if (o.t != null && o.life != null) { const L = life(kind, o.t, o.life, o.pop, o.phase); if (!L.alive || L.s <= 0.01) return false; q = Object.assign({}, o, { r: o.r * L.s, flash: L.flash, cut: L.cut, grow: L.grow });
+        if (o.len != null) q.len = o.len * L.s; if (o.w != null) q.w = o.w * L.s;
+        if (L.bx !== 1 || L.by !== 1) { ctx.save(); ctx.translate(o.x, o.y); ctx.scale(L.bx, L.by); ctx.translate(-o.x, -o.y); fn(ctx, q); ctx.restore(); return true; } }
+      ctx.save(); fn(ctx, q); ctx.restore(); return true; }, K, h, nz, trio, mixc, shadeH, svgRecorder,
     KO: { burstStar: '터지는 별', bolt: '번개 갈래', rayFan: '뻗는 광선', star5: '오각별', glint: '작은 반짝이', crossStar: '십자별', drop: '방울·구슬', jelly: '젤리 덩어리', heart: '하트 방울', inkSplat: '잉크 튀김', paintStreak: '페인트 줄', band: '쓸린 띠', needle: '침·집중선', spiky: '가시 별', zig: '꺾인 가시', cloud: '거품 구름', puff: '뭉게 윤곽', wave: '물결 띠', wedge: '방사 쐐기', ring: '고리·거품막' } };
 })(typeof window !== 'undefined' ? window : globalThis);

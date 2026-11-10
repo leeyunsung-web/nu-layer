@@ -54,17 +54,17 @@
     <div class="panel">
       <div class="stage"><canvas id="cv" width="1200" height="1200"></canvas></div>
       <div class="row">
-        <button class="go" id="bGen">새로 생성</button><button id="bVar">같은 구도로 변주</button><button id="bBack">되돌리기</button>
-        <span style="flex:1"></span><button id="bPng">PNG 저장</button><button id="bSvg">SVG 저장</button>
+        <button class="go" id="bGen">새로 생성</button><button id="bVar">같은 구도로 변주</button><button id="bBack">되돌리기</button><button id="bPlay">일시정지</button>
+        <span style="flex:1"></span><button id="bPng">스틸 PNG</button><button id="bSvg">스틸 SVG</button><select id="recSec"><option value="5">5초</option><option value="10" selected>10초</option><option value="20">20초</option></select><button id="bRec">영상 녹화</button>
       </div>
       <div class="row" style="margin-top:6px">
         <span class="note" style="margin:0">그리기:</span>
         <button class="sm" data-tool="none">끄기</button><button class="sm" data-tool="stamp">찍기</button><button class="sm" data-tool="spray">뿌리기</button><button class="sm" data-tool="erase">지우기</button>
         <select id="toolKind"></select><span class="note" style="margin:0">크기</span><input type="range" id="toolSize" min="0.01" max="0.3" step="0.005" value="0.05" style="width:90px"><button class="sm" id="bClearDraw">그린 것 지우기</button>
       </div>
-      <div class="note">클릭·드래그로 모양을 더 찍거나 뿌릴 수 있어요. 지우기는 가장 가까운 모양을 없애요. 생성 결과와 그린 것은 함께 저장돼요.</div>
+      <div class="note">장면은 계속 살아 움직여요. 오브젝트마다 태어나고(팡), 머물고(떠다님·회전·반짝임), 사라져요. 클릭·드래그로 모양을 더 찍거나 뿌릴 수 있고, 그린 것은 머물러 있어요. 스틸은 지금 프레임을 저장해요.</div>
     </div>
-    <div class="panel"><h3>다른 씨앗 미리보기</h3><div class="mini" id="mini"></div><div class="note">같은 설정으로 씨앗만 바꾼 결과예요. 누르면 큰 화면에 그대로 그려요.</div></div>
+    <div class="panel"><h3>다른 씨앗 미리보기</h3><div class="mini" id="mini"></div><div class="note">같은 설정으로 씨앗만 바꾼 장면의 한 프레임이에요. 누르면 큰 화면이 그 씨앗으로 다시 시작해요.</div></div>
   </div>
   <div>
     <div class="panel">
@@ -85,6 +85,13 @@
         <div class="sl"><label>중심 Y</label><input type="range" id="p-cy" min="-0.3" max="1.3" step="0.01"><output></output></div>
         <div class="sl"><label>모양 다양함</label><input type="range" id="p-vary" min="0" max="1.5" step="0.05"><output></output></div>
         <div class="sl"><label>겹침 허용</label><input type="range" id="p-overlap" min="0" max="1" step="0.05"><output></output></div>
+        <h3 style="margin-top:14px">움직임</h3>
+        <div class="sl"><label>재생 속도</label><input type="range" id="p-speed" min="0.1" max="3" step="0.05"><output></output></div>
+        <div class="sl"><label>생성 빈도</label><input type="range" id="p-rate" min="0.1" max="3" step="0.05"><output></output></div>
+        <div class="sl"><label>수명</label><input type="range" id="p-lifeK" min="0.3" max="3" step="0.05"><output></output></div>
+        <div class="sl"><label>떠다님</label><input type="range" id="p-drift" min="0" max="2" step="0.05"><output></output></div>
+        <div class="sl"><label>회전</label><input type="range" id="p-spin" min="0" max="2" step="0.05"><output></output></div>
+        <div class="sl"><label>팡 세기</label><input type="range" id="p-pop" min="0" max="3" step="0.05"><output></output></div>
         <h3 style="margin-top:14px">마감</h3>
         <div class="sl"><label>테두리 굵기</label><input type="range" id="p-lineW" min="0" max="3" step="0.1"><output></output></div>
         <label class="chk"><input type="checkbox" id="p-darkLine"> 테두리를 한 가지 어두운 색으로 (유화 윤곽선처럼)</label>
@@ -159,7 +166,7 @@ const BASE_MIX = {
 function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 let R = Math.random; const rr = (a, b) => a + (b - a) * R(), rg = () => { const u = 1 - R(), v = R(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }, pick = a => a[Math.floor(R() * a.length)], logn = (m, s) => Math.pow(10, m + s * rg());
 
-const DEF = {family: 'splash', seed: 7, density: 1, size: 1, sizeVar: 0.6, angle: 35, angleJit: 0.35, cx: 0.5, cy: 0.5, vary: 0.8, overlap: 0.35, lineW: 1, darkLine: false, gloss: true, satellite: true, light: -135, ratio: '0.8', colorShuffle: true,
+const DEF = {family: 'splash', seed: 7, speed: 1, rate: 1, lifeK: 1, drift: 1, spin: 1, pop: 1, density: 1, size: 1, sizeVar: 0.6, angle: 35, angleJit: 0.35, cx: 0.5, cy: 0.5, vary: 0.8, overlap: 0.35, lineW: 1, darkLine: false, gloss: true, satellite: true, light: -135, ratio: '0.8', colorShuffle: true,
   palIdx: 0, pal: null, kindCol: {}, mix: null, kindOff: {}, tool: 'none', toolKind: 'drop', toolSize: 0.05};
 let P = Object.assign({}, DEF), PRESETS = {};
 try { const s = JSON.parse(localStorage.getItem(LS) || 'null'); if (s && s.P) Object.assign(P, s.P); if (s && s.presets) PRESETS = s.presets; } catch (e) {}
@@ -182,75 +189,91 @@ function assignColors(){ const mc = P.pal.slice(1); if (!mc.length) return {}; c
     else map[k] = pickVivid(mc); } return map; }
 function trioOf(f){ const ground = P.pal[0]; const l = P.darkLine ? darkLine() : NUO.shadeH(f, -0.38); let h = NUO.shadeH(f, 0.55); if (lum(f) > 225) h = '#ffffff'; return {f, l, h}; }
 
-// ── 장면 ──
-let SCENE = null, HIST = [], DRAWN = [];
+// ── 장면 엔진 (살아 움직이는 패턴) ──
+// 오브젝트 = {kind, x,y (화면 폭 기준 비율), r, rot, seed, col, birth, life, z, dna, m:{vx,vy,spin,bobA,bobF,bobP, anchor?}}
+let SCENE = null, HIST = [], DRAWN = [], PLAYING = true, lastTs = 0;
 function famMix(){ const base = BASE_MIX[P.family] || BASE_MIX.mixed, m = {}; for (const k of KINDS){ const v = (P.mix && P.mix[k] != null) ? P.mix[k] : (base[k] || 0); m[k] = P.kindOff[k] ? 0 : v; } return m; }
 function pickKind(m, allow){ const ks = (allow || KINDS).filter(k => m[k] > 0); if (!ks.length) return null; let t = ks.reduce((a, k) => a + m[k], 0) * R(); for (const k of ks){ t -= m[k]; if (t <= 0) return k; } return ks[ks.length - 1]; }
 function sizeOf(b){ return b * P.size * Math.exp(rg() * 0.45 * P.sizeVar); }
-function newScene(){ ensurePalette(); return {w: 1, h: 1 / parseFloat(P.ratio), ground: P.pal[0], cols: assignColors(), shapes: []}; }
-function add(S, kind, x, y, r, rot, ex){ if (!kind || P.kindOff[kind]) return null; const sh = Object.assign({kind, x, y, r, rot: rot || 0, seed: Math.floor(R() * 1e6), z: 0}, ex || {}); S.shapes.push(sh); return sh; }
-function tooClose(S, x, y, r){ if (P.overlap >= 1) return false; for (const o of S.shapes){ if (o.big === false) continue; const d = Math.hypot(o.x - x, o.y - y); if (d < (o.r + r) * (1 - P.overlap) * 1.1) return true; } return false; }
-function place(S, kind, r, x, y, rot, ex){ for (let t = 0; t < 7; t++){ if (!tooClose(S, x, y, r)) return add(S, kind, x, y, r, rot, ex); x = rr(-0.03, S.w + 0.03); y = rr(-0.03, S.h + 0.03); } return null; }
-function satellites(S, sh, n){ if (!P.satellite) return; n = n || Math.round(rr(3, 8)); for (let i = 0; i < n; i++){ const a = rr(0, 6.28), d = sh.r * rr(1.2, 2.6); add(S, 'drop', sh.x + Math.cos(a) * d, sh.y + Math.sin(a) * d, sh.r * rr(0.08, 0.28), 0, {col: sh.col, big: false, asp: rr(0.8, 1.2)}); } }
-function scatter(S, n, kinds, m, base, sd, ex){ for (let i = 0; i < n; i++){ const k = pickKind(m, kinds); if (!k) return; place(S, k, sizeOf(logn(base, sd)), rr(-0.03, S.w + 0.03), rr(-0.03, S.h + 0.03), rr(0, 6.28), Object.assign({big: false}, ex || {})); } }
+const LIFE = {burstStar: [0.9, 2.2], bolt: [0.5, 1.1], rayFan: [0.9, 1.8], star5: [5, 14], glint: [1.2, 3], crossStar: [3, 9], drop: [6, 16], jelly: [7, 18], heart: [6, 14], inkSplat: [8, 18], paintStreak: [1.5, 3.5], band: [5, 12], needle: [1.6, 4], spiky: [1, 2.4], zig: [1, 2.5], cloud: [12, 24], puff: [14, 28], wave: [8, 16], wedge: [6, 12], ring: [5, 12]};
+function lifeOf(k){ const [a, b] = LIFE[k] || [3, 8]; return rr(a, b) * P.lifeK; }
 const A0 = () => P.angle * Math.PI / 180;
-const GEN = {
-  burst(S){ const m = famMix(), cx = P.cx * S.w, cy = P.cy * S.h, nN = Math.round(70 * P.density), big = Math.round(rr(5, 9));
-    for (let i = 0; i < nN; i++){ const a = rr(0, 6.28), isBig = i < big, len = isBig ? sizeOf(rr(0.5, 1.0)) : sizeOf(logn(-0.65, 0.3)), r0 = isBig ? rr(0, 0.04) : rr(0.03, 0.5);
-      add(S, 'needle', cx + Math.cos(a) * r0, cy + Math.sin(a) * r0, len * 0.1, a, {len, w: len * (isBig ? rr(0.02, 0.045) : rr(0.006, 0.02)), bend: rg() * 0.03, k: rr(0.25, 0.5), z: isBig ? 1 : 0}); }
-    for (let i = 0; i < Math.round(3 * P.density); i++){ const a = rr(0, 6.28), d = rr(0.05, 0.3); add(S, pickKind(m, ['rayFan', 'bolt', 'burstStar']) || 'bolt', cx + Math.cos(a) * d, cy + Math.sin(a) * d, sizeOf(rr(0.02, 0.05)), a, {z: 2}); }
-    for (let i = 0; i < Math.round(28 * P.density); i++){ const a = rr(0, 6.28), d = Math.abs(rg()) * 0.3 + 0.04; place(S, pickKind(m, ['drop', 'glint', 'crossStar', 'jelly', 'star5']), sizeOf(logn(-1.6, 0.3)), cx + Math.cos(a) * d, cy + Math.sin(a) * d * 1.1, rr(0, 6.28), {z: 3, big: false}); } },
-  clouds(S){ const m = famMix(), cx = P.cx * S.w, cy = P.cy * S.h;   // 뭉게 윤곽 구름을 깔고 그 위로 집중선
-    for (let i = 0; i < Math.round(9 * P.density); i++){ const a = rr(0, 6.28), d = rr(0.15, 0.6); add(S, R() < 0.8 ? 'puff' : 'cloud', cx + Math.cos(a) * d, cy + Math.sin(a) * d, sizeOf(rr(0.08, 0.18)), rr(-0.3, 0.3), {asp: rr(0.55, 0.85), n: Math.round(rr(7, 12)), z: 0}); }
-    GEN.burst(S); S.shapes.forEach(s => { if (s.kind === 'needle') s.z = 2; }); },
-  stars(S){ const m = famMix(); for (let i = 0; i < 3; i++) place(S, 'star5', sizeOf(rr(0.08, 0.14)), rr(0.05, S.w - 0.05), rr(0.05, S.h - 0.05), rr(-0.4, 0.4), {z: 3});
-    const n = Math.round(60 * P.density); for (let i = 0; i < n; i++){ const k = pickKind(m, ['star5', 'burstStar', 'crossStar', 'glint', 'drop', 'spiky']); place(S, k, sizeOf(logn(k === 'glint' || k === 'crossStar' ? -1.75 : -1.45, 0.35)), rr(-0.03, S.w + 0.03), rr(-0.03, S.h + 0.03), rr(-0.4, 0.4), {z: 2, big: false, flat: R() < 0.3}); }
-    if (m.band > 0) for (let i = 0; i < Math.round(3 * P.density); i++) add(S, 'band', rr(0, S.w), rr(0, S.h), 0.02, A0() + rg() * P.angleJit * 0.4, {len: sizeOf(rr(0.5, 1.1)), w: rr(0.02, 0.05), curve: rg() * 0.15, z: 0}); },
-  splash(S){ const m = famMix(), nC = Math.round(rr(2, 4) * Math.sqrt(P.density));
-    for (let c = 0; c < nC; c++){ const cx = rr(0.12, S.w - 0.12), cy = rr(0.12, S.h - 0.12), dir = A0() + rg() * P.angleJit * 1.2; const main = add(S, 'jelly', cx, cy, sizeOf(rr(0.07, 0.14)), dir, {lobes: rr(0.12, 0.35), asp: rr(0.75, 1), z: 1}); if (!main) continue; satellites(S, main);
-      const tail = Math.round(rr(5, 12) * P.density); for (let i = 1; i <= tail; i++){ const t = i / tail, d = main.r * (1.1 + t * rr(3, 6)); add(S, R() < 0.25 ? 'paintStreak' : 'drop', cx + Math.cos(dir) * d + rg() * 0.03 * (1 + t), cy + Math.sin(dir) * d + rg() * 0.03 * (1 + t), main.r * (1 - t * 0.8) * rr(0.15, 0.4), dir + rg() * 0.3, {col: main.col, big: false, len: main.r * rr(1, 2.5), w: main.r * 0.12, asp: rr(0.8, 1.3)}); } }
-    scatter(S, Math.round(40 * P.density), ['drop', 'jelly', 'inkSplat', 'paintStreak', 'heart', 'glint', 'star5', 'band'], m, -1.5, 0.35, {z: 2}); },
-  bubbles(S){ const m = famMix(); for (let i = 0; i < Math.round(55 * P.density); i++){ const k = pickKind(m, ['drop', 'heart', 'ring', 'glint', 'jelly']); const sh = place(S, k, sizeOf(i < 4 ? rr(0.07, 0.14) : logn(-1.45, 0.3)), rr(0, S.w), rr(0, S.h), rr(-0.5, 0.5), {asp: rr(0.85, 1.15), big: i >= 4 ? false : true}); if (sh && R() < 0.35) satellites(S, sh, 3); } },
-  flow(S){ const m = famMix(), a0 = A0(); for (let i = 0; i < Math.round(36 * P.density); i++){ const k = pickKind(m, ['band', 'needle', 'paintStreak', 'zig']), L = sizeOf(logn(-0.7, 0.3)); add(S, k, rr(-0.1, S.w + 0.1), rr(-0.1, S.h + 0.1), L * 0.15, a0 + rg() * P.angleJit * 0.5, {len: L, w: L * (k === 'needle' ? rr(0.012, 0.03) : rr(0.04, 0.12)), curve: rg() * 0.12, bend: rg() * 0.02, z: 0}); }
-    scatter(S, Math.round(18 * P.density), ['drop', 'glint', 'star5'], m, -1.6, 0.3, {z: 2}); },
-  swirl(S){ const m = famMix(), vort = []; for (let i = 0; i < Math.floor(rr(2, 4)); i++) vort.push([rr(0, S.w), rr(0, S.h), R() < 0.5 ? 1 : -1, rr(0.2, 0.5)]);
-    const field = (x, y) => { let vx = Math.cos(A0()) * 0.3, vy = Math.sin(A0()) * 0.3; for (const [x0, y0, sg, rad] of vort){ const dx = x - x0, dy = y - y0, d2 = dx * dx + dy * dy + 0.01, f = Math.exp(-d2 / (rad * rad)); vx += -dy / d2 * f * sg * 0.6; vy += dx / d2 * f * sg * 0.6; } return Math.atan2(vy, vx); };
-    for (let i = 0; i < Math.round(55 * P.density); i++){ const x = rr(-0.05, S.w + 0.05), y = rr(-0.05, S.h + 0.05), a = field(x, y) + rg() * P.angleJit * 0.3, L = sizeOf(logn(-0.95, 0.3)), k = pickKind(m, ['band', 'zig', 'needle']); add(S, k, x, y, L * 0.15, a, {len: L, w: L * rr(0.05, 0.14), curve: (field(x + Math.cos(a) * 0.05, y + Math.sin(a) * 0.05) - a) * 1.5, z: 0}); }
-    scatter(S, Math.round(14 * P.density), ['drop', 'ring'], m, -1.7, 0.3, {z: 2}); },
-  cells(S){ const m = famMix(); for (let i = 0; i < Math.round(40 * P.density); i++){ const k = pickKind(m, ['ring', 'puff', 'cloud', 'drop', 'jelly', 'glint']); place(S, k, sizeOf(logn(-1.25, 0.35)), rr(0, S.w), rr(0, S.h), rr(0, 6.28), {gap: R() < 0.5 ? rr(0.1, 0.5) : 0, n: Math.round(rr(6, 10)), asp: rr(0.6, 1), big: false}); }
-    scatter(S, Math.round(22 * P.density), ['drop'], m, -2.0, 0.3, {z: 2}); },
-  mixed(S){ GEN.splash(S); const keep = S.shapes.length; GEN.stars(S); S.shapes = S.shapes.slice(0, keep).concat(S.shapes.slice(keep).filter((_, i) => i % 2 === 0)); if (R() < 0.5) GEN.flow(S); }
+function newScene(seed){ ensurePalette(); R = mulberry32(seed * 7919 + 13); const S = {w: 1, h: 1 / parseFloat(P.ratio), ground: P.pal[0], cols: null, objs: [], t: 0, seed, rng: mulberry32(seed * 104729 + 7), nextSpawn: 0, vort: []};
+  S.cols = P.colorShuffle ? assignColors() : (R = mulberry32(999), assignColors()); R = S.rng;
+  for (let i = 0; i < Math.floor(rr(2, 4)); i++) S.vort.push([rr(0, S.w), rr(0, S.h), R() < 0.5 ? 1 : -1, rr(0.2, 0.5)]);
+  return S; }
+function field(S, x, y){ // 종류별 흐름장: 속도 (화면 비율/초)
+  const f = P.family, d = P.drift * 0.03; if (f === 'burst' || f === 'clouds'){ const dx = x - P.cx * S.w, dy = y - P.cy * S.h, l = Math.hypot(dx, dy) + 1e-3; return [dx / l * d * 1.5, dy / l * d * 1.5]; }
+  if (f === 'flow') return [Math.cos(A0()) * d * 2, Math.sin(A0()) * d * 2];
+  if (f === 'swirl'){ let vx = Math.cos(A0()) * d * 0.5, vy = Math.sin(A0()) * d * 0.5; for (const [x0, y0, sg, rad] of S.vort){ const dx = x - x0, dy = y - y0, d2 = dx * dx + dy * dy + 0.01, g = Math.exp(-d2 / (rad * rad)); vx += -dy / d2 * g * sg * d * 0.5; vy += dx / d2 * g * sg * d * 0.5; } return [vx, vy]; }
+  if (f === 'bubbles') return [0, -d * 1.2];
+  return [Math.cos(A0()) * d * 0.4, Math.sin(A0()) * d * 0.4]; }
+function add(S, kind, x, y, r, rot, ex){ if (!kind || P.kindOff[kind]) return null; const o = Object.assign({kind, x, y, r, rot: rot || 0, seed: Math.floor(R() * 1e6), birth: S.t, life: lifeOf(kind), z: 0, phase: R(), col: null,
+    m: {vx: 0, vy: 0, spin: (R() - 0.5) * 0.4 * P.spin, bobA: rr(0.002, 0.008), bobF: rr(0.4, 1.2), bobP: R() * 6.28}}, ex || {}); if (!o.col) o.col = S.cols[kind]; S.objs.push(o); return o; }
+function satellites(S, sh, n){ if (!P.satellite) return; n = n || Math.round(rr(3, 7)); for (let i = 0; i < n; i++){ const a = rr(0, 6.28), d = sh.r * rr(1.2, 2.6); add(S, 'drop', sh.x + Math.cos(a) * d, sh.y + Math.sin(a) * d, sh.r * rr(0.08, 0.28), 0, {col: sh.col, asp: rr(0.8, 1.2), life: sh.life * rr(0.6, 1), parent: sh}); } }
+// 종류별 '한 번 태어나는 사건' — 빈도(초당)와 함께
+const EVENTS = {
+  burst: [[18, S => { const cx = P.cx * S.w, cy = P.cy * S.h, a = rr(0, 6.28), big = R() < 0.1, len = big ? sizeOf(rr(0.5, 1)) : sizeOf(logn(-0.65, 0.3)), r0 = big ? rr(0, 0.04) : rr(0.03, 0.5); add(S, 'needle', cx + Math.cos(a) * r0, cy + Math.sin(a) * r0, len * 0.1, a, {len, w: len * (big ? rr(0.02, 0.045) : rr(0.006, 0.02)), bend: rg() * 0.03, k: rr(0.25, 0.5), z: big ? 1 : 0, anchor: true}); }],
+          [0.5, S => { const m = famMix(), a = rr(0, 6.28), d = rr(0.05, 0.3); add(S, pickKind(m, ['rayFan', 'bolt', 'burstStar']) || 'bolt', P.cx * S.w + Math.cos(a) * d, P.cy * S.h + Math.sin(a) * d, sizeOf(rr(0.02, 0.05)), a, {z: 2}); }],
+          [3, S => { const m = famMix(), a = rr(0, 6.28), d = Math.abs(rg()) * 0.3 + 0.04; add(S, pickKind(m, ['drop', 'glint', 'crossStar', 'jelly', 'star5']), P.cx * S.w + Math.cos(a) * d, P.cy * S.h + Math.sin(a) * d * 1.1, sizeOf(logn(-1.6, 0.3)), rr(0, 6.28), {z: 3}); }]],
+  stars: [[0.35, S => add(S, 'star5', rr(0.05, S.w - 0.05), rr(0.05, S.h - 0.05), sizeOf(rr(0.08, 0.14)), rr(-0.4, 0.4), {z: 3})],
+          [5, S => { const m = famMix(), k = pickKind(m, ['star5', 'burstStar', 'crossStar', 'glint', 'drop', 'spiky']); add(S, k, rr(-0.03, S.w + 0.03), rr(-0.03, S.h + 0.03), sizeOf(logn(k === 'glint' || k === 'crossStar' ? -1.75 : -1.45, 0.35)), rr(-0.4, 0.4), {z: 2, flat: R() < 0.3}); }],
+          [0.3, S => { if (famMix().band > 0) add(S, 'band', rr(0, S.w), rr(0, S.h), 0.02, A0() + rg() * P.angleJit * 0.4, {len: sizeOf(rr(0.5, 1.1)), w: rr(0.02, 0.05), curve: rg() * 0.15, z: 0}); }]],
+  splash: [[0.35, S => { const cx = rr(0.12, S.w - 0.12), cy = rr(0.12, S.h - 0.12), dir = A0() + rg() * P.angleJit * 1.2; const main = add(S, 'jelly', cx, cy, sizeOf(rr(0.07, 0.14)), dir, {lobes: rr(0.12, 0.35), asp: rr(0.75, 1), z: 1}); if (!main) return; satellites(S, main);
+      const tail = Math.round(rr(5, 12)); for (let i = 1; i <= tail; i++){ const t = i / tail, d = main.r * (1.1 + t * rr(3, 6)), sp = rr(0.02, 0.06); add(S, R() < 0.25 ? 'paintStreak' : 'drop', cx + Math.cos(dir) * d + rg() * 0.03 * (1 + t), cy + Math.sin(dir) * d + rg() * 0.03 * (1 + t), main.r * (1 - t * 0.8) * rr(0.15, 0.4), dir + rg() * 0.3, {col: main.col, len: main.r * rr(1, 2.5), w: main.r * 0.12, asp: rr(0.8, 1.3), birth: S.t + i * 0.04, life: main.life * rr(0.5, 0.9), m: {vx: Math.cos(dir) * sp * t, vy: Math.sin(dir) * sp * t, spin: 0, bobA: 0.003, bobF: 1, bobP: R() * 6}}); } }],
+           [4, S => { const m = famMix(), k = pickKind(m, ['drop', 'jelly', 'inkSplat', 'paintStreak', 'heart', 'glint', 'star5', 'band']); add(S, k, rr(-0.02, S.w + 0.02), rr(-0.02, S.h + 0.02), sizeOf(logn(-1.5, 0.35)), rr(0, 6.28), {z: 2, len: 0.2, w: 0.02}); }]],
+  bubbles: [[4, S => { const m = famMix(), k = pickKind(m, ['drop', 'heart', 'ring', 'glint', 'jelly']), big = R() < 0.08; const o = add(S, k, rr(0, S.w), rr(0.1, S.h + 0.05), sizeOf(big ? rr(0.07, 0.14) : logn(-1.45, 0.3)), rr(-0.5, 0.5), {asp: rr(0.85, 1.15), z: big ? 1 : 0}); if (o && big && R() < 0.5) satellites(S, o, 3); }]],
+  flow: [[4, S => { const m = famMix(), k = pickKind(m, ['band', 'needle', 'paintStreak', 'zig']), L = sizeOf(logn(-0.7, 0.3)); add(S, k, rr(-0.1, S.w + 0.1), rr(-0.1, S.h + 0.1), L * 0.15, A0() + rg() * P.angleJit * 0.5, {len: L, w: L * (k === 'needle' ? rr(0.012, 0.03) : rr(0.04, 0.12)), curve: rg() * 0.12, bend: rg() * 0.02, z: 0}); }],
+         [1.8, S => add(S, pickKind(famMix(), ['drop', 'glint', 'star5']), rr(0, S.w), rr(0, S.h), sizeOf(logn(-1.6, 0.3)), rr(0, 6.28), {z: 2})]],
+  swirl: [[5, S => { const m = famMix(), x = rr(-0.05, S.w + 0.05), y = rr(-0.05, S.h + 0.05), [vx, vy] = field(S, x, y), a = Math.atan2(vy, vx) + rg() * P.angleJit * 0.3, L = sizeOf(logn(-0.95, 0.3)), k = pickKind(m, ['band', 'zig', 'needle']); const [vx2, vy2] = field(S, x + Math.cos(a) * 0.05, y + Math.sin(a) * 0.05); add(S, k, x, y, L * 0.15, a, {len: L, w: L * rr(0.05, 0.14), curve: (Math.atan2(vy2, vx2) - a) * 1.5, z: 0}); }],
+          [1.4, S => add(S, pickKind(famMix(), ['drop', 'ring']), rr(0, S.w), rr(0, S.h), sizeOf(logn(-1.7, 0.3)), 0, {z: 2})]],
+  cells: [[3, S => { const m = famMix(), k = pickKind(m, ['ring', 'puff', 'cloud', 'drop', 'jelly', 'glint']); add(S, k, rr(0, S.w), rr(0, S.h), sizeOf(logn(-1.25, 0.35)), rr(0, 6.28), {gap: R() < 0.5 ? rr(0.1, 0.5) : 0, n: Math.round(rr(6, 10)), asp: rr(0.6, 1)}); }],
+          [2, S => add(S, 'drop', rr(0, S.w), rr(0, S.h), sizeOf(logn(-2.0, 0.3)), 0, {z: 2})]],
+  clouds: [[1.0, S => { const a = rr(0, 6.28), d = rr(0.15, 0.6); add(S, R() < 0.8 ? 'puff' : 'cloud', P.cx * S.w + Math.cos(a) * d, P.cy * S.h + Math.sin(a) * d, sizeOf(rr(0.08, 0.18)), rr(-0.3, 0.3), {asp: rr(0.55, 0.85), n: Math.round(rr(7, 12)), z: 0}); }]],
+  mixed: []
 };
-function generate(seed){ R = mulberry32(seed * 7919 + 13); const S = newScene(); if (!P.colorShuffle){ R = mulberry32(999); S.cols = assignColors(); R = mulberry32(seed * 7919 + 13); }
-  (GEN[P.family] || GEN.mixed)(S); for (const s of S.shapes) if (!s.col) s.col = S.cols[s.kind];
-  S.shapes.sort((a, b) => (a.z || 0) - (b.z || 0) || b.r - a.r); S.seed = seed; return S; }
-
+EVENTS.clouds = EVENTS.clouds.concat(EVENTS.burst.map(([r, f]) => [r, S => { f(S); const o = S.objs[S.objs.length - 1]; if (o && o.kind === 'needle') o.z = 2; }]));
+EVENTS.mixed = [[0.2, EVENTS.splash[0][1]], [3, EVENTS.stars[1][1]], [2, EVENTS.splash[1][1]], [0.8, EVENTS.flow[0][1]]];
+function step(S, dt){ // 시간 전진: 생성 + 운동 + 소멸
+  const ev = EVENTS[P.family] || EVENTS.mixed, dens = P.density * P.rate;
+  for (const [rate, fn] of ev){ let n = rate * dens * dt; while (n > 0){ if (R() < n) fn(S); n -= 1; } }
+  for (const o of S.objs){ if (o.anchor || o.persist) continue; const [fx, fy] = field(S, o.x, o.y); o.x += (fx + o.m.vx) * dt; o.y += (fy + o.m.vy) * dt; o.m.vx *= Math.pow(0.4, dt); o.m.vy *= Math.pow(0.4, dt); if (P.spin) o.rot += o.m.spin * dt; }
+  S.t += dt; S.objs = S.objs.filter(o => o.persist || (S.t - o.birth <= o.life && o.x > -0.3 && o.x < S.w + 0.3 && o.y > -0.3 && o.y < S.h + 0.3));
+  if (S.objs.length > 700) S.objs.splice(0, S.objs.length - 700); }
+function preroll(S){ R = S.rng; for (let i = 0; i < 160; i++) step(S, 0.05); }
+function makeScene(seed){ const S = newScene(seed); preroll(S); return S; }
 // ── 그리기 ──
-function drawShape(ctx, sh, W){ const o = {x: sh.x * W, y: sh.y * W, r: sh.r * W, rot: sh.rot, seed: sh.seed, col: trioOf(sh.col), light: P.light, line: P.lineW * W / 1200 * (sh.r * W > 6 ? 1 : 0.5), vary: P.vary, jag: 0.4 + P.vary * 0.3, gloss: P.gloss, flat: sh.flat && !P.gloss ? true : sh.flat};
-  for (const k of ['len', 'w', 'curve', 'bend', 'k', 'asp', 'lobes', 'gap', 'n', 'taper']) if (sh[k] != null) o[k] = typeof sh[k] === 'number' && ['len', 'w'].includes(k) ? sh[k] * W : sh[k];
-  if (sh.kind === 'ring') o.w = Math.max(1, sh.r * W * 0.12); if (sh.kind === 'drop' && !P.gloss) o.gloss = false; if (sh.kind === 'cloud') o.line = P.lineW * W / 400;
-  NUO.draw(ctx, sh.kind, o); }
-function render(S, canvas, W, drawn){ const H = Math.round(W * S.h); canvas.width = W; canvas.height = H; const ctx = canvas.getContext('2d'); ctx.fillStyle = S.ground; ctx.fillRect(0, 0, W, H); for (const sh of S.shapes.concat(drawn || [])) drawShape(ctx, sh, W); }
-function svgOf(S, W){ const H = Math.round(W * S.h), rec = NUO.svgRecorder(W, H); for (const sh of S.shapes.concat(DRAWN)) drawShape(rec, sh, W); return rec.toSVG(S.ground); }
-
+function drawObj(ctx, o, W, now){ const age = o.persist ? null : now - o.birth; if (age != null && age < 0) return; const bob = o.persist ? 0 : Math.sin(now * o.m.bobF + o.m.bobP) * o.m.bobA * P.drift;
+  const q = {x: o.x * W, y: (o.y + bob) * W, r: o.r * W, rot: o.rot, seed: o.seed, col: trioOf(o.col), light: P.light, line: P.lineW * W / 1200 * (o.r * W > 6 ? 1 : 0.5), vary: P.vary, jag: 0.4 + P.vary * 0.3, gloss: P.gloss, flat: o.flat, pop: P.pop, phase: o.phase};
+  if (age != null){ q.t = age; q.life = o.life; }
+  for (const k of ['len', 'w', 'curve', 'bend', 'k', 'asp', 'lobes', 'gap', 'n', 'taper']) if (o[k] != null) q[k] = (k === 'len' || k === 'w') ? o[k] * W : o[k];
+  if (o.kind === 'ring') q.w = Math.max(1, o.r * W * 0.12); if (o.kind === 'drop' && !P.gloss) q.gloss = false; if (o.kind === 'cloud') q.line = P.lineW * W / 400;
+  NUO.draw(ctx, o.kind, q); }
+function sortObjs(S){ return S.objs.concat(DRAWN).sort((a, b) => (a.z || 0) - (b.z || 0) || b.r - a.r); }
+function render(S, canvas, W){ const H = Math.round(W * S.h); if (canvas.width !== W || canvas.height !== H){ canvas.width = W; canvas.height = H; } const ctx = canvas.getContext('2d'); ctx.fillStyle = S.ground; ctx.fillRect(0, 0, W, H); for (const o of sortObjs(S)) drawObj(ctx, o, W, S.t); }
+function svgOf(S, W){ const H = Math.round(W * S.h), rec = NUO.svgRecorder(W, H); for (const o of sortObjs(S)) drawObj(rec, o, W, S.t); return rec.toSVG(S.ground); }
+function tick(ts){ requestAnimationFrame(tick); if (!SCENE) return; const dt = Math.min(0.1, (ts - lastTs) / 1000 || 0.016); lastTs = ts; if (PLAYING){ R = SCENE.rng; step(SCENE, dt * P.speed); } render(SCENE, cv, 1200); }
 // ── UI ──
 const cv = $('#cv');
-function draw(){ if (SCENE) render(SCENE, cv, 1200, DRAWN); }
-function regen(push = true){ if (push && SCENE) HIST.push({S: SCENE, D: DRAWN}); SCENE = generate(P.seed); DRAWN = []; draw(); minis(); save(); info(); }
-function minis(){ const box = $('#mini'); box.innerHTML = ''; for (let i = 1; i <= 6; i++){ const c = document.createElement('canvas'), sd = (P.seed * 31 + i * 977) % 9999 + 1, S = generate(sd); render(S, c, 220, []); c.title = '씨앗 ' + sd; c.onclick = () => { P.seed = sd; syncUI(); regen(); }; box.appendChild(c); } }
-function info(){ $('#info').textContent = `family=${P.family} seed=${P.seed} shapes=${SCENE ? SCENE.shapes.length : 0} drawn=${DRAWN.length}`; }
+function draw(){ if (SCENE) render(SCENE, cv, 1200); }
+function regen(push = true){ if (push && SCENE) HIST.push(SCENE.seed); SCENE = makeScene(P.seed); DRAWN = []; draw(); minis(); save(); info(); }
+let miniT = 0; function minis(){ clearTimeout(miniT); miniT = setTimeout(() => { const box = $('#mini'); box.innerHTML = ''; for (let i = 1; i <= 6; i++){ const c = document.createElement('canvas'), sd = (P.seed * 31 + i * 977) % 9999 + 1, S = makeScene(sd); render(S, c, 220); c.title = '씨앗 ' + sd; c.onclick = () => { P.seed = sd; syncUI(); regen(); }; box.appendChild(c); } R = SCENE.rng; }, 60); }
+function info(){ $('#info').textContent = `family=${P.family} seed=${P.seed} objects=${SCENE ? SCENE.objs.length : 0} drawn=${DRAWN.length} t=${SCENE ? SCENE.t.toFixed(1) : 0}s`; setTimeout(info, 1000); }
 $('#bGen').onclick = () => { P.seed = Math.floor(Math.random() * 9999) + 1; syncUI(); regen(); };
-$('#bVar').onclick = () => { if (!SCENE) return; HIST.push({S: SCENE, D: DRAWN}); R = mulberry32(Math.floor(Math.random() * 1e9)); SCENE = Object.assign({}, SCENE, {shapes: SCENE.shapes.map(sh => Object.assign({}, sh, {seed: Math.floor(R() * 1e6), rot: sh.rot + rg() * 0.12, r: sh.r * Math.exp(rg() * 0.08)}))}); draw(); };
-$('#bBack').onclick = () => { const h = HIST.pop(); if (h){ SCENE = h.S; DRAWN = h.D; draw(); } };
+$('#bVar').onclick = () => { if (!SCENE) return; for (const o of SCENE.objs){ o.seed = Math.floor(Math.random() * 1e6); o.rot += (Math.random() - 0.5) * 0.12; o.r *= Math.exp((Math.random() - 0.5) * 0.1); } draw(); toast('모양 DNA만 다시 뽑음'); };
+$('#bBack').onclick = () => { const sd = HIST.pop(); if (sd != null){ P.seed = sd; syncUI(); SCENE = makeScene(sd); DRAWN = []; draw(); } };
+$('#bPlay').onclick = () => { PLAYING = !PLAYING; $('#bPlay').textContent = PLAYING ? '일시정지' : '재생'; };
+$('#bRec').onclick = async () => { if (!SCENE) return; const sec = parseInt($('#recSec').value); const c = document.createElement('canvas'); const W = 1200; render(SCENE, c, W); const stream = c.captureStream(30); const mime = ['video/webm;codecs=vp9', 'video/webm'].find(m => MediaRecorder.isTypeSupported(m)); const rec = new MediaRecorder(stream, {mimeType: mime, videoBitsPerSecond: 12e6}); const chunks = []; rec.ondataavailable = e => chunks.push(e.data); rec.onstop = () => { dl(new Blob(chunks, {type: 'video/webm'}), `nu-pattern_${P.family}_${P.seed}.webm`); toast('영상 저장'); };
+  toast(sec + '초 녹화 중…'); rec.start(); const t0 = performance.now(); let last = t0; const loop = () => { const now = performance.now(); const dt = Math.min(0.1, (now - last) / 1000); last = now; R = SCENE.rng; step(SCENE, dt * P.speed); render(SCENE, c, W); if (now - t0 < sec * 1000) requestAnimationFrame(loop); else rec.stop(); }; PLAYING = false; $('#bPlay').textContent = '재생'; loop(); };
 function dl(blob, name){ const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
-$('#bPng').onclick = () => { const W = parseInt($('#exportSize').value), c = document.createElement('canvas'); render(SCENE, c, W, DRAWN); c.toBlob(b => dl(b, `nu-pattern_${P.family}_${P.seed}.png`), 'image/png'); toast('PNG 저장'); };
+$('#bPng').onclick = () => { const W = parseInt($('#exportSize').value), c = document.createElement('canvas'); render(SCENE, c, W); c.toBlob(b => dl(b, `nu-pattern_${P.family}_${P.seed}_${SCENE.t.toFixed(1)}s.png`), 'image/png'); toast('스틸 PNG 저장'); };
 $('#bSvg').onclick = () => { dl(new Blob([svgOf(SCENE, 2000)], {type: 'image/svg+xml'}), `nu-pattern_${P.family}_${P.seed}.svg`); toast('SVG 저장'); };
 function toast(t){ const e = $('#toast'); e.textContent = t; e.style.opacity = 1; clearTimeout(toast.t); toast.t = setTimeout(() => e.style.opacity = 0, 1400); }
 $$('.tabs button').forEach(b => b.onclick = () => { $$('.tabs button').forEach(x => x.classList.toggle('on', x === b)); $$('.tab').forEach(t => t.classList.toggle('on', t.id === 'tab-' + b.dataset.tab)); });
 const famBox = $('#famBtns'); for (const f of FAMS){ const b = document.createElement('button'); b.innerHTML = D.families[f].ko + `<small>${D.families[f].n}장</small>`; b.dataset.f = f; b.onclick = () => { P.family = f; P.palIdx = 0; P.pal = null; P.mix = null; ensurePalette(); syncUI(); regen(); }; famBox.appendChild(b); }
-const SL = ['seed', 'density', 'size', 'sizeVar', 'angle', 'angleJit', 'cx', 'cy', 'vary', 'overlap', 'lineW', 'light'];
-for (const k of SL){ const el = $('#p-' + k); el.oninput = () => { P[k] = parseFloat(el.value); el.nextElementSibling.value = el.value; if (['vary', 'lineW', 'light'].includes(k)){ draw(); save(); } else regen(false); }; }
-for (const k of ['darkLine', 'gloss', 'satellite', 'colorShuffle']) $('#p-' + k).onchange = e => { P[k] = e.target.checked; save(); if (k === 'satellite' || k === 'colorShuffle') regen(false); else draw(); };
+const SL = ['seed', 'density', 'size', 'sizeVar', 'angle', 'angleJit', 'cx', 'cy', 'vary', 'overlap', 'lineW', 'light', 'speed', 'rate', 'lifeK', 'drift', 'spin', 'pop'];
+for (const k of SL){ const el = $('#p-' + k); el.oninput = () => { P[k] = parseFloat(el.value); el.nextElementSibling.value = el.value; if (['vary', 'lineW', 'light', 'speed', 'rate', 'lifeK', 'drift', 'spin', 'pop', 'overlap', 'density', 'size', 'sizeVar', 'angle', 'angleJit', 'cx', 'cy'].includes(k)){ save(); if (!PLAYING) draw(); } else regen(false); }; }
+for (const k of ['darkLine', 'gloss', 'satellite', 'colorShuffle']) $('#p-' + k).onchange = e => { P[k] = e.target.checked; save(); if (k === 'colorShuffle') regen(false); else draw(); };
 $('#p-ratio').onchange = e => { P.ratio = e.target.value; regen(false); };
 function syncUI(){ $$('#famBtns button').forEach(b => b.classList.toggle('on', b.dataset.f === P.family)); const fm = D.families[P.family];
   const top = Object.entries(famMix()).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k]) => KO[k]).join(' · '); $('#famNote').textContent = `${fm.n}장에서 배움 — 주로 ${top}. 밀도 ${fm.density}, 방향 집중 ${fm.conc}.`;
@@ -264,7 +287,7 @@ function palUI(){ ensurePalette(); const ps = palAll ? D.images.map(i => i.palet
   const add = document.createElement('button'); add.className = 'sm'; add.textContent = '+ 색 추가'; add.onclick = () => { if (P.pal.length < 9){ P.pal.push('#ff66aa'); palSel = P.pal.length - 1; palUI(); } }; cur.appendChild(add);
   const rm = document.createElement('button'); rm.className = 'sm'; rm.textContent = '− 선택 색 빼기'; rm.onclick = () => { if (palSel > 0 && P.pal.length > 2){ P.pal.splice(palSel, 1); palSel = 0; P.kindCol = {}; palUI(); regen(false); } }; cur.appendChild(rm);
   const cc = $('#kindCol'); cc.innerHTML = ''; for (const k of KINDS){ if (P.kindOff[k]) continue; const row = document.createElement('div'); row.className = 'sl'; row.innerHTML = `<label>${KO[k]}</label>`; const sel = document.createElement('select'); sel.style.gridColumn = '2/4'; sel.innerHTML = '<option value="">자동</option>' + P.pal.slice(1).map(h => `<option value="${h}" style="background:${h}">${h}</option>`).join(''); sel.value = P.kindCol[k] || ''; sel.onchange = () => { if (sel.value) P.kindCol[k] = sel.value; else delete P.kindCol[k]; regen(false); }; row.appendChild(sel); cc.appendChild(row); } }
-$('#colPick').oninput = e => { P.pal[palSel] = e.target.value; P.kindCol = {}; palUI(); if (SCENE){ SCENE.ground = P.pal[0]; const cols = assignColors(); SCENE.shapes.forEach(s => { if (!P.pal.includes(s.col)) s.col = cols[s.kind]; }); SCENE.cols = cols; draw(); save(); } };
+$('#colPick').oninput = e => { P.pal[palSel] = e.target.value; P.kindCol = {}; palUI(); if (SCENE){ SCENE.ground = P.pal[0]; const cols = assignColors(); SCENE.objs.forEach(s => { if (!P.pal.includes(s.col)) s.col = cols[s.kind]; }); SCENE.cols = cols; draw(); save(); } };
 $('#bPalRand').onclick = () => { const ps = famPalettes(P.family); P.palIdx = Math.floor(Math.random() * ps.length); P.pal = null; P.kindCol = {}; ensurePalette(); palUI(); regen(false); };
 $('#bPalAll').onclick = () => { palAll = !palAll; $('#bPalAll').classList.toggle('on', palAll); palUI(); };
 // 모양
@@ -291,13 +314,13 @@ $('#toolSize').oninput = e => { P.toolSize = parseFloat(e.target.value); save();
 $('#bClearDraw').onclick = () => { DRAWN = []; draw(); };
 let dragging = false, lastPt = null;
 function evPos(e){ const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.width]; }
-function stamp(x, y, spray){ R = Math.random; const k = P.toolKind, r = P.toolSize * (spray ? Math.exp(rg() * 0.5) * 0.35 : 1); const sh = {kind: k, x, y, r, rot: rr(0, 6.28), seed: Math.floor(Math.random() * 1e6), col: SCENE.cols[k]}; if (['needle', 'band', 'paintStreak', 'zig', 'wave'].includes(k)){ sh.len = r * 6; sh.w = r * (k === 'needle' ? 0.25 : 0.9); sh.rot = P.angle * Math.PI / 180 + rg() * 0.3; } DRAWN.push(sh); draw(); info(); }
+function stamp(x, y, spray){ R = Math.random; const k = P.toolKind, r = P.toolSize * (spray ? Math.exp(rg() * 0.5) * 0.35 : 1); const sh = {kind: k, x, y, r, rot: rr(0, 6.28), seed: Math.floor(Math.random() * 1e6), col: SCENE.cols[k], persist: true, z: 5, m: {vx: 0, vy: 0, spin: 0, bobA: 0, bobF: 0, bobP: 0}}; if (['needle', 'band', 'paintStreak', 'zig', 'wave'].includes(k)){ sh.len = r * 6; sh.w = r * (k === 'needle' ? 0.25 : 0.9); sh.rot = P.angle * Math.PI / 180 + rg() * 0.3; } DRAWN.push(sh); draw(); }
 cv.addEventListener('pointerdown', e => { if (P.tool === 'none' || !SCENE) return; dragging = true; cv.setPointerCapture(e.pointerId); const [x, y] = evPos(e); lastPt = [x, y];
-  if (P.tool === 'erase'){ let bi = -1, bd = 1e9; const all = SCENE.shapes.concat(DRAWN); all.forEach((s, i) => { const d = Math.hypot(s.x - x, s.y - y) - s.r * 0.5; if (d < bd){ bd = d; bi = i; } }); if (bi >= 0 && bd < 0.08){ HIST.push({S: Object.assign({}, SCENE, {shapes: SCENE.shapes.slice()}), D: DRAWN.slice()}); if (bi < SCENE.shapes.length) SCENE.shapes.splice(bi, 1); else DRAWN.splice(bi - SCENE.shapes.length, 1); draw(); } return; }
+  if (P.tool === 'erase'){ let bi = -1, bd = 1e9; const all = SCENE.objs.concat(DRAWN); all.forEach((s, i) => { const d = Math.hypot(s.x - x, s.y - y) - s.r * 0.5; if (d < bd){ bd = d; bi = i; } }); if (bi >= 0 && bd < 0.08){ if (bi < SCENE.objs.length) SCENE.objs.splice(bi, 1); else DRAWN.splice(bi - SCENE.objs.length, 1); draw(); } return; }
   stamp(x, y, P.tool === 'spray'); });
 cv.addEventListener('pointermove', e => { if (!dragging || P.tool === 'none' || P.tool === 'erase') return; const [x, y] = evPos(e); if (Math.hypot(x - lastPt[0], y - lastPt[1]) < (P.tool === 'spray' ? 0.02 : P.toolSize * 0.9)) return; lastPt = [x, y]; stamp(x + (P.tool === 'spray' ? rg() * 0.03 : 0), y + (P.tool === 'spray' ? rg() * 0.03 : 0), P.tool === 'spray'); });
 cv.addEventListener('pointerup', () => dragging = false);
-ensurePalette(); syncUI(); regen(false);
+ensurePalette(); syncUI(); regen(false); requestAnimationFrame(tick);
 </script>
 </body>
 </html>
