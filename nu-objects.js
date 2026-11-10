@@ -196,7 +196,7 @@
       fill(rule) { if (d) out.push(`<path d="${d}" fill="${R.fillStyle}"${rule === 'evenodd' ? ' fill-rule="evenodd"' : ''}${R.globalAlpha < 1 ? ` opacity="${R.globalAlpha}"` : ''}${R._clip ? ` clip-path="url(#${R._clip})"` : ''}/>`); },
       stroke() { if (d) out.push(`<path d="${d}" fill="none" stroke="${R.strokeStyle}" stroke-width="${f(R.lineWidth)}" stroke-linejoin="${R.lineJoin}" stroke-linecap="${R.lineCap}"${R._clip ? ` clip-path="url(#${R._clip})"` : ''}/>`); },
       save() { sub.push({ clip: R._clip, tx: TX.slice() }); }, restore() { const s = sub.pop(); if (s) { R._clip = s.clip; TX = s.tx; } },
-      clip() { const id = 'c' + out.length + '_' + Math.floor(Math.random() * 1e6); out.push(`<clipPath id="${id}"><path d="${d}"/></clipPath>`); R._clip = id; },
+      clip(rule) { const id = 'c' + out.length + '_' + Math.floor(Math.random() * 1e6); out.push(`<clipPath id="${id}"><path d="${d}"${rule === 'evenodd' ? ' clip-rule="evenodd"' : ''}/></clipPath>`); R._clip = id; },
       replay(p) { if (p && p._d) d = p._d; }, _clip: null,
       toSVG(bg) { return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">\n` + (bg ? `<rect width="100%" height="100%" fill="${bg}"/>\n` : '') + out.join('\n') + '\n</svg>'; } };
     return R; }
