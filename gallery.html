@@ -48,6 +48,9 @@
               border-top:1px solid var(--soft)}
   .card .name{font-family:var(--mono);font-size:10px;color:var(--sub);flex:1;
               white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card .cap{padding:8px 10px 10px;border-top:1px solid var(--soft);font-size:11px;line-height:1.45;color:var(--sub)}
+  .card .cap b{display:block;color:var(--ink);font-size:12px;font-weight:600;font-style:italic;margin-bottom:2px}
+  .card .cap span{display:block}
   .acts{position:absolute;top:8px;right:8px;display:none;flex-direction:column;gap:6px}
   .card.show-actions .acts{display:flex}
   .acts button{font-family:var(--mono);font-size:10px;letter-spacing:.5px;
@@ -66,7 +69,7 @@
 <body>
 
 <div class="topbar">
-  <h1>NU-LAYER / GALLERY <span class="build" id="build">g3</span></h1>
+  <h1>NU-LAYER / GALLERY <span class="build" id="build">g4</span></h1>
   <button class="chip" id="srcChip" title="Change the repository this gallery reads">—</button>
   <span class="spacer"></span>
   <span class="chip" id="count">—</span>
@@ -282,10 +285,19 @@
     const nm = document.createElement('span');
     nm.className = 'name';
     const dir = f.path.split('/').slice(1, -1).join('/');
-    nm.textContent = dir ? dir + ' · ' + f.name : f.name;
+    const cp = caps[f.path];
+    nm.textContent = cp ? (cp.date || '') : (dir ? dir + ' · ' + f.name : f.name);
     nm.title = f.path;
     meta.appendChild(nm);
     el.appendChild(meta);
+    if(cp){
+      img.alt = cp.title || f.name;
+      const c = document.createElement('div');
+      c.className = 'cap';
+      const t = document.createElement('b'); t.textContent = cp.title || ''; c.appendChild(t);
+      for(const line of (cp.lines || [])){ const sp = document.createElement('span'); sp.textContent = line; c.appendChild(sp); }
+      el.appendChild(c);
+    }
 
     const acts = document.createElement('div');
     acts.className = 'acts';
@@ -357,6 +369,20 @@
   });
   $('reload').addEventListener('click', ()=> load());
 
+  // ---- 캡션: compositions/captions.json  { "경로": {title, date, lines:[…]} } ----
+  let caps = {};
+  async function loadCaps(){
+    caps = {};
+    try {
+      const res = await fetch(raw(FOLDER + '/captions.json') + '?t=' + Date.now(), { cache:'no-store' });
+      if(res.ok){ const j = await res.json(); if(j && typeof j === 'object') caps = j; }
+    } catch(e){}
+  }
+  // 캡션의 작품 날짜가 있으면 그 날짜로, 없으면 파일 이름 속 날짜로 최신순
+  const when = f => (caps[f.path] && caps[f.path].date) || ((f.name.match(/\d{4}-\d{2}-\d{2}(T[\d-]+)?/) || [''])[0]);
+  const ttl = f => (caps[f.path] && caps[f.path].title) || f.name;
+  const byDate = (a,b) => when(b).localeCompare(when(a)) || ttl(b).localeCompare(ttl(a));
+
   async function load(){
     picked.clear();
     syncSrcChip();
@@ -369,8 +395,8 @@
     $('grid').innerHTML = '<div class="empty">LOADING…</div>';
     say('');
     try {
-      const r = await listAll();
-      files = r.files; how = r.how;
+      const [r] = await Promise.all([listAll(), loadCaps()]);
+      files = r.files.sort(byDate); how = r.how;
       syncCount();
       if(r.warn) say(r.warn, true);
       if(!files.length){
