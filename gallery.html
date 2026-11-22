@@ -123,7 +123,7 @@
 <script>
 (function(){
   'use strict';
-  const BUILD = 'g7';
+  const BUILD = 'g8';
   const FOLDER = 'compositions';
   const GH_KEY = 'objet_studio_gh_config';   // 스튜디오와 같은 칸을 쓴다
   const ROLE_KEY = 'nulayer_role';
@@ -472,14 +472,14 @@
   // ---- 제목 만들기: 시리즈 이름 + 고른 단어들 + 날짜 (마스터만, 한국어 뜻은 이 창에서만 보임) ----
   const SERIES = 'NU-LAYER Study';
   const WORDS = [
-    ['대상', [['Medusa','메두사'],['Torso','토르소'],['Venus','비너스'],['Laocoön','라오콘'],['Angel','천사'],['Figure','인물'],['Face','얼굴'],['Bust','흉상'],['Eye','눈'],['Eyes','두 눈'],['Mouth','입'],['Lips','입술'],['Hair','머리카락'],['Hand','손'],['Heart','하트'],['Serpents','뱀들'],['Body','몸']]],
-    ['폭발·형태', [['Burst','폭발'],['Explosion','대폭발'],['Starburst','별 모양 폭발'],['Shards','파편'],['Fragments','조각들'],['Debris','잔해'],['Stars','별'],['Spikes','가시'],['Sparks','불꽃'],['Flash','섬광'],['Rays','빛줄기'],['Shockwave','충격파'],['Storm','폭풍'],['Smoke','연기'],['Cloud','구름'],['Bubbles','거품'],['Drops','방울'],['Splash','물보라'],['Wave','물결'],['Ribbon','띠'],['Lines','선들'],['Swirl','소용돌이']]],
-    ['느낌·선', [['Dense','빽빽한'],['Sparse','성긴'],['Dark','어두운'],['Light','밝은'],['Bold Line','굵은 선'],['Fine Line','가는 선'],['Screentone','망점'],['Hatching','빗금'],['Engraved','판화식 선'],['Scribble','낙서 같은 선'],['Sharp','날카로운'],['Soft','부드러운'],['Quiet','고요한'],['Violent','격렬한'],['Shattered','부서진'],['Broken','깨진']]],
-    ['구도', [['Wide','가로로 넓은'],['Tall','세로로 긴'],['Close-up','가까이 본'],['Floating','떠 있는'],['Falling','떨어지는'],['Rising','솟아오르는'],['Turning','돌아보는'],['Cut','칸 (잘린 장면)'],['Manga Panel','만화 칸'],['Manga Cut','만화 칸 (영어권에선 낯선 말)'],['Panel','칸'],['Fragment','단편'],['Ruins','폐허'],['Center','가운데'],['Edge','가장자리']]],
+    ['대상', [['Medusa','메두사'],['Torso','토르소'],['Venus','비너스'],['Laocoön','라오콘'],['Angel','천사'],['Figure','인물'],['Face','얼굴'],['Head','머리'],['Bust','흉상'],['Eye','눈'],['Eyes','두 눈'],['Mouth','입'],['Lips','입술'],['Hair','머리카락'],['Hand','손'],['Heart','하트'],['Serpents','뱀들'],['Body','몸']]],
+    ['폭발·형태', [['Burst','폭발'],['Explosion','대폭발'],['Starburst','별 모양 폭발'],['Shards','파편'],['Shard','파편 (하나)'],['Burst of Stars','별 폭발'],['Crackle','파지직 (전기 튀는 소리·느낌)'],['Fragments','조각들'],['Debris','잔해'],['Stars','별'],['Spikes','가시'],['Sparks','불꽃'],['Flash','섬광'],['Rays','빛줄기'],['Shockwave','충격파'],['Storm','폭풍'],['Smoke','연기'],['Cloud','구름'],['Bubbles','거품'],['Drops','방울'],['Splash','물보라'],['Wave','물결'],['Ribbon','띠'],['Lines','선들'],['Swirl','소용돌이']]],
+    ['느낌·선', [['Dense','빽빽한'],['Electric','전기의, 찌릿한'],['Sparse','성긴'],['Dark','어두운'],['Light','밝은'],['Bold Line','굵은 선'],['Fine Line','가는 선'],['Screentone','망점'],['Hatching','빗금'],['Engraved','판화식 선'],['Scribble','낙서 같은 선'],['Sharp','날카로운'],['Soft','부드러운'],['Quiet','고요한'],['Violent','격렬한'],['Shattered','부서진'],['Broken','깨진']]],
+    ['구도', [['Wide','가로로 넓은'],['Tall','세로로 긴'],['Close-up','가까이 본'],['Floating','떠 있는'],['Falling','떨어지는'],['Rising','솟아오르는'],['Turning','돌아보는'],['Cut','칸 (잘린 장면)'],['Manga Panel','만화 칸'],['Manga Panels','만화 칸들'],['Manga Cut','만화 칸 (영어권에선 낯선 말)'],['Panel','칸'],['Fragment','단편'],['Ruins','폐허'],['Center','가운데'],['Edge','가장자리']]],
     ['번호', [['I','1'],['II','2'],['III','3'],['IV','4'],['V','5'],['VI','6'],['VII','7']]],
   ];
   // 단어 사이 잇는 방법: 한 덩어리 이름 / 여러 개 나열 / 이어 주는 말
-  const JOINS = [[' ','붙여서 한 이름 (Medusa Burst)'],[', ','쉼표로 나열 (Medusa, Burst)'],[' and ','and — 그리고'],[' in the ','in the — ~ 속의'],[' in a ','in a — (어떤) ~ 속의'],[' with ','with — ~와 함께'],[' of ','of — ~의'],[' / ','/ — 나란히']];
+  const JOINS = [[' ','붙여서 한 이름 (Medusa Burst)'],[', ','쉼표로 나열 (Medusa, Burst)'],[' and ','and — 그리고'],[' in the ','in the — ~ 속의'],[' in a ','in a — (어떤) ~ 속의'],[' in ','in — ~ 속의'],[' among ','among — ~ 사이의'],[' with ','with — ~와 함께'],[' of ','of — ~의'],[' / ','/ — 나란히']];
   const ko = w => { for(const [,L] of WORDS) for(const [e,k] of L) if(e === w) return k; return ''; };
   const ymd = d => String(d || '').replace(/-/g,'');
   function buildTitle(words, date){
@@ -491,7 +491,7 @@
 
   // ---- 제목 검증: 말이 되는지(문법) · 작품 제목으로 괜찮은지 (규칙으로 점검) ----
   // 품사: N 명사, A 꾸미는 말(형용사), R 번호
-  const POS = {Dense:'A',Sparse:'A',Dark:'A',Light:'A',Engraved:'A',Sharp:'A',Soft:'A',Quiet:'A',Violent:'A',Shattered:'A',Broken:'A',
+  const POS = {Electric:'A',Dense:'A',Sparse:'A',Dark:'A',Light:'A',Engraved:'A',Sharp:'A',Soft:'A',Quiet:'A',Violent:'A',Shattered:'A',Broken:'A',
     Wide:'A',Tall:'A',Floating:'A',Falling:'A',Rising:'A',Turning:'A',I:'R',II:'R',III:'R',IV:'R',V:'R',VI:'R',VII:'R'};
   const pos = w => POS[w] || (ko(w) ? 'N' : '?');
   const PLURAL = {Eyes:1,Serpents:1,Shards:1,Fragments:1,Stars:1,Spikes:1,Sparks:1,Rays:1,Bubbles:1,Drops:1,Lines:1,Ruins:1,Debris:1};
@@ -517,7 +517,7 @@
         if(i === 0) add('bad', '번호만으로 시작하면 제목이 안 돼요. 앞에 단어를 넣으세요.');
         if(j && j !== ' ') add('warn', '번호 앞은 "붙여서"로 잇는 게 자연스러워요: "Medusa Burst II"');
       }
-      if((j === ' in the ' || j === ' in a ') && p === 'A') add('bad', '"in the" 뒤에는 명사가 와야 해요.');
+      if((j === ' in the ' || j === ' in a ' || j === ' in ' || j === ' among ') && p === 'A') add('bad', '"in the" 뒤에는 명사가 와야 해요.');
       if((j === ' and ' || j === ' with ') && p === 'R') add('bad', '"' + j.trim() + '" 뒤에 번호가 오면 말이 안 돼요.');
     });
     // 꾸미는 말만 있고 명사가 없음
@@ -552,7 +552,7 @@
       if(i === 0 || j === ' '){ seg += (seg ? ' ' : '') + k; return; }
       const left = (acc ? acc : '') + (pend ? '' : ''), cur = flush();
       acc = pend ? pend(acc, cur) : (acc ? acc + ' ' : '') + cur;
-      pend = (j === ' in the ' || j === ' in a ') ? (a, b) => b + ' 속의 ' + a : j === ' of ' ? (a, b) => b + '의 ' + a : j === ' with ' ? (a, b) => b + '와 함께 있는 ' + a
+      pend = (j === ' in the ' || j === ' in a ' || j === ' in ') ? (a, b) => b + ' 속의 ' + a : j === ' among ' ? (a, b) => b + ' 사이의 ' + a : j === ' of ' ? (a, b) => b + '의 ' + a : j === ' with ' ? (a, b) => b + '와 함께 있는 ' + a
            : j === ' and ' ? (a, b) => a + ' 그리고 ' + b : j === ', ' ? (a, b) => a + ', ' + b : (a, b) => a + ' / ' + b;
       seg = k;
     });
