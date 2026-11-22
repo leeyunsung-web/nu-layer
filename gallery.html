@@ -61,6 +61,41 @@
   .acts button.del{border-color:var(--red);color:var(--red)}
   .acts button.del:hover{background:var(--red);color:#fff}
 
+  /* ---- 제목 만들기 (마스터 전용) ---- */
+  .card .meta .ttlbtn{font-family:var(--mono);font-size:10px;border:1px solid var(--border);background:#fff;border-radius:8px;padding:2px 7px;cursor:pointer;color:var(--ink)}
+  .card .meta .ttlbtn:hover{background:var(--ink);color:#fff}
+  .tm-back{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+  .tm{background:#fff;border-radius:16px;width:min(760px,100%);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden}
+  .tm header{padding:14px 18px;border-bottom:1px solid var(--soft);display:flex;align-items:center;gap:10px}
+  .tm header b{font-size:13px;letter-spacing:.5px}
+  .tm .x{margin-left:auto;border:0;background:none;font-size:20px;cursor:pointer;color:var(--sub)}
+  .tm .prev{padding:14px 18px;font-size:16px;font-style:italic;font-weight:600;border-bottom:1px solid var(--soft);line-height:1.4}
+  .tm .prev small{display:block;font-style:normal;font-weight:400;font-size:11px;color:var(--sub);margin-top:3px}
+  .tm .tbuild{padding:12px 18px;display:flex;flex-wrap:wrap;align-items:center;gap:6px;border-bottom:1px solid var(--soft)}
+  .tm .fixed{font-family:var(--mono);font-size:12px;color:var(--sub)}
+  .tm .wchip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--ink);border-radius:999px;padding:3px 4px 3px 10px;font-size:13px}
+  .tm .wchip i{font-style:normal;font-size:10px;color:var(--sub)}
+  .tm .wchip button{border:0;background:none;cursor:pointer;color:var(--sub);font-size:13px;padding:0 4px}
+  .tm select.join{font-size:11px;border:1px dashed var(--border);border-radius:6px;padding:2px;background:#fff;color:var(--sub)}
+  .tm .plus{border:1px dashed var(--ink);background:#fff;border-radius:999px;width:30px;height:28px;font-size:17px;cursor:pointer}
+  .tm .plus.on{background:var(--ink);color:#fff}
+  .tm .datebox{margin-left:auto;font-size:11px;color:var(--sub);display:flex;align-items:center;gap:5px}
+  .tm .datebox input{font-family:var(--mono);font-size:12px;width:90px;padding:3px 5px;border:1px solid var(--border);border-radius:6px}
+  .tm .picker{display:flex;min-height:0;flex:1}
+  .tm .cats{border-right:1px solid var(--soft);padding:8px;display:flex;flex-direction:column;gap:3px;min-width:120px}
+  .tm .cats button{text-align:left;border:0;background:none;padding:6px 8px;border-radius:8px;cursor:pointer;font-size:12px;color:var(--sub)}
+  .tm .cats button.on{background:var(--ink);color:#fff}
+  .tm .words{overflow:auto;padding:8px 10px;flex:1;max-height:42vh;scroll-snap-type:y proximity}
+  .tm .words button{display:flex;justify-content:space-between;width:100%;border:0;border-bottom:1px solid #f2f2f2;background:none;padding:8px 6px;cursor:pointer;font-size:14px;scroll-snap-align:start;text-align:left}
+  .tm .words button:hover{background:#f6f6f6}
+  .tm .words button span{color:var(--sub);font-size:12px}
+  .tm .words .own{display:flex;gap:6px;padding:8px 6px}
+  .tm .words .own input{flex:1;font-size:13px;padding:5px 7px;border:1px solid var(--border);border-radius:6px}
+  .tm footer{padding:12px 18px;border-top:1px solid var(--soft);display:flex;gap:8px;align-items:center}
+  .tm footer .msg{font-size:11px;color:var(--sub);flex:1}
+  .tm footer button{font-family:var(--mono);font-size:11px;border:1px solid var(--ink);border-radius:8px;padding:6px 12px;cursor:pointer;background:#fff}
+  .tm footer button.go{background:var(--ink);color:#fff}
+
   .empty{grid-column:1/-1;text-align:center;color:var(--sub);font-family:var(--mono);
          font-size:12px;line-height:2;padding:70px 20px}
   .empty b{color:var(--ink)}
@@ -83,7 +118,7 @@
 <script>
 (function(){
   'use strict';
-  const BUILD = 'g3';
+  const BUILD = 'g5';
   const FOLDER = 'compositions';
   const GH_KEY = 'objet_studio_gh_config';   // 스튜디오와 같은 칸을 쓴다
   const ROLE_KEY = 'nulayer_role';
@@ -289,6 +324,11 @@
     nm.textContent = cp ? (cp.date || '') : (dir ? dir + ' · ' + f.name : f.name);
     nm.title = f.path;
     meta.appendChild(nm);
+    if(isMaster()){
+      const tb = document.createElement('button'); tb.className = 'ttlbtn'; tb.textContent = '✎ TITLE'; tb.title = '제목 만들기';
+      tb.addEventListener('click', e => { e.stopPropagation(); titleMaker(f); });
+      meta.appendChild(tb);
+    }
     el.appendChild(meta);
     if(cp){
       img.alt = cp.title || f.name;
@@ -421,6 +461,119 @@
         + 'If it is public, check the owner, repository and branch names — '
         + '<b>click the chip at the top</b> to change them.');
     }
+  }
+
+
+  // ---- 제목 만들기: 시리즈 이름 + 고른 단어들 + 날짜 (마스터만, 한국어 뜻은 이 창에서만 보임) ----
+  const SERIES = 'NU-LAYER Study';
+  const WORDS = [
+    ['대상', [['Medusa','메두사'],['Torso','토르소'],['Venus','비너스'],['Laocoön','라오콘'],['Angel','천사'],['Figure','인물'],['Face','얼굴'],['Bust','흉상'],['Eye','눈'],['Eyes','두 눈'],['Mouth','입'],['Lips','입술'],['Hair','머리카락'],['Hand','손'],['Heart','하트'],['Serpents','뱀들'],['Body','몸']]],
+    ['폭발·형태', [['Burst','폭발'],['Explosion','대폭발'],['Starburst','별 모양 폭발'],['Shards','파편'],['Fragments','조각들'],['Debris','잔해'],['Stars','별'],['Spikes','가시'],['Sparks','불꽃'],['Flash','섬광'],['Rays','빛줄기'],['Shockwave','충격파'],['Storm','폭풍'],['Smoke','연기'],['Cloud','구름'],['Bubbles','거품'],['Drops','방울'],['Splash','물보라'],['Wave','물결'],['Ribbon','띠'],['Lines','선들'],['Swirl','소용돌이']]],
+    ['느낌·선', [['Dense','빽빽한'],['Sparse','성긴'],['Dark','어두운'],['Light','밝은'],['Bold Line','굵은 선'],['Fine Line','가는 선'],['Screentone','망점'],['Hatching','빗금'],['Engraved','판화식 선'],['Scribble','낙서 같은 선'],['Sharp','날카로운'],['Soft','부드러운'],['Quiet','고요한'],['Violent','격렬한'],['Shattered','부서진'],['Broken','깨진']]],
+    ['구도', [['Wide','가로로 넓은'],['Tall','세로로 긴'],['Close-up','가까이 본'],['Floating','떠 있는'],['Falling','떨어지는'],['Rising','솟아오르는'],['Turning','돌아보는'],['Cut','칸 (잘린 장면)'],['Manga Cut','만화 칸'],['Panel','칸'],['Fragment','단편'],['Ruins','폐허'],['Center','가운데'],['Edge','가장자리']]],
+    ['번호', [['I','1'],['II','2'],['III','3'],['IV','4'],['V','5'],['VI','6'],['VII','7']]],
+  ];
+  // 단어 사이 잇는 방법: 한 덩어리 이름 / 여러 개 나열 / 이어 주는 말
+  const JOINS = [[' ','붙여서 한 이름 (Medusa Burst)'],[', ','쉼표로 나열 (Medusa, Burst)'],[' and ','and — 그리고'],[' in the ','in the — ~ 속의'],[' with ','with — ~와 함께'],[' of ','of — ~의'],[' / ','/ — 나란히']];
+  const ko = w => { for(const [,L] of WORDS) for(const [e,k] of L) if(e === w) return k; return ''; };
+  const ymd = d => String(d || '').replace(/-/g,'');
+  function buildTitle(words, date){
+    const phrase = (words || []).map((x,i) => (i ? (x.join == null ? ' ' : x.join) : '') + x.w).join('');
+    const d = ymd(date);
+    return phrase ? SERIES + ': ' + phrase + (d ? ', ' + d : '') : SERIES + (d ? ' ' + d : '');
+  }
+
+  async function saveCaps(){
+    const path = FOLDER + '/captions.json';
+    const url = 'https://api.github.com/repos/' + cfg.owner + '/' + cfg.repo + '/contents/' + encodeURI(path);
+    let sha;
+    try { sha = (await api(url + '?ref=' + encodeURIComponent(cfg.branch) + '&t=' + Date.now())).sha; } catch(e){ if(e.status !== 404) throw e; }
+    const text = JSON.stringify(caps, null, 1);
+    let bin = ''; for(const b of new TextEncoder().encode(text)) bin += String.fromCharCode(b);
+    const b64 = btoa(bin);
+    const res = await fetch(url, { method:'PUT', headers: Object.assign(headers(), { 'Content-Type':'application/json' }),
+      body: JSON.stringify({ message:'Gallery titles', content: b64, sha, branch: cfg.branch }) });
+    if(!res.ok){ let m = res.statusText; try { const j = await res.json(); if(j && j.message) m = j.message; } catch(e){} throw new Error(res.status + ' ' + m); }
+  }
+
+  function titleMaker(f){
+    const cp = caps[f.path] || (caps[f.path] = { title: '', date: '', lines: [] });
+    let words = JSON.parse(JSON.stringify(cp.words || []));
+    let date = cp.date || '';
+    let cat = 0, picking = words.length === 0;
+    const back = document.createElement('div'); back.className = 'tm-back';
+    const box = document.createElement('div'); box.className = 'tm'; back.appendChild(box);
+    const close = () => back.remove();
+    back.addEventListener('pointerdown', e => { if(e.target === back) close(); });
+    function draw(){
+      box.innerHTML = '';
+      const hd = document.createElement('header');
+      hd.innerHTML = '<b>TITLE · 제목 만들기</b>';
+      const x = document.createElement('button'); x.className = 'x'; x.textContent = '×'; x.onclick = close; hd.appendChild(x);
+      box.appendChild(hd);
+      const pv = document.createElement('div'); pv.className = 'prev';
+      pv.textContent = buildTitle(words, date);
+      const sm = document.createElement('small'); sm.textContent = words.length ? words.map(w => w.w + (ko(w.w) ? ' (' + ko(w.w) + ')' : '')).join(' · ') : '아래 + 를 눌러 단어를 고르세요';
+      pv.appendChild(sm); box.appendChild(pv);
+      const bd = document.createElement('div'); bd.className = 'tbuild';
+      const fx = document.createElement('span'); fx.className = 'fixed'; fx.textContent = SERIES + ':'; bd.appendChild(fx);
+      words.forEach((w, i) => {
+        if(i){
+          const sel = document.createElement('select'); sel.className = 'join'; sel.title = '앞 단어와 잇는 방법';
+          for(const [v, t] of JOINS){ const o = document.createElement('option'); o.value = v; o.textContent = t; if((w.join == null ? ' ' : w.join) === v) o.selected = true; sel.appendChild(o); }
+          sel.onchange = () => { w.join = sel.value; draw(); };
+          bd.appendChild(sel);
+        }
+        const ch = document.createElement('span'); ch.className = 'wchip';
+        ch.innerHTML = esc(w.w) + (ko(w.w) ? ' <i>' + esc(ko(w.w)) + '</i>' : '');
+        const rm = document.createElement('button'); rm.textContent = '×'; rm.title = '빼기';
+        rm.onclick = () => { words.splice(i, 1); draw(); };
+        ch.appendChild(rm); bd.appendChild(ch);
+      });
+      const pl = document.createElement('button'); pl.className = 'plus' + (picking ? ' on' : ''); pl.textContent = '+'; pl.title = '단어 더하기';
+      pl.onclick = () => { picking = !picking; draw(); };
+      bd.appendChild(pl);
+      const db = document.createElement('label'); db.className = 'datebox'; db.textContent = '날짜';
+      const di = document.createElement('input'); di.value = ymd(date); di.placeholder = 'YYYYMMDD';
+      di.oninput = () => { const v = di.value.replace(/\D/g,''); if(v.length === 8){ date = v.slice(0,4) + '-' + v.slice(4,6) + '-' + v.slice(6); pv.firstChild.textContent = buildTitle(words, date); } };
+      db.appendChild(di); bd.appendChild(db);
+      box.appendChild(bd);
+      if(picking){
+        const pk = document.createElement('div'); pk.className = 'picker';
+        const cs = document.createElement('div'); cs.className = 'cats';
+        WORDS.forEach(([name], i) => { const b = document.createElement('button'); b.textContent = name; if(i === cat) b.className = 'on'; b.onclick = () => { cat = i; draw(); }; cs.appendChild(b); });
+        pk.appendChild(cs);
+        const ws = document.createElement('div'); ws.className = 'words';
+        for(const [e, k] of WORDS[cat][1]){
+          const b = document.createElement('button'); b.innerHTML = esc(e) + ' <span>' + esc(k) + '</span>';
+          b.onclick = () => { words.push({ w: e, join: words.length ? ' ' : null }); draw(); };
+          ws.appendChild(b);
+        }
+        const own = document.createElement('div'); own.className = 'own';
+        const oi = document.createElement('input'); oi.placeholder = '목록에 없는 단어 직접 쓰기 (영어)';
+        const ob = document.createElement('button'); ob.textContent = '더하기';
+        const addOwn = () => { const v = oi.value.trim(); if(v){ words.push({ w: v, join: words.length ? ' ' : null }); draw(); } };
+        ob.onclick = addOwn; oi.onkeydown = e => { if(e.key === 'Enter') addOwn(); };
+        own.appendChild(oi); own.appendChild(ob); ws.appendChild(own);
+        pk.appendChild(ws); box.appendChild(pk);
+      }
+      const ft = document.createElement('footer');
+      const msg = document.createElement('span'); msg.className = 'msg'; msg.textContent = '한국어 뜻은 이 창에서만 보이고, 갤러리에는 영어 제목만 나와요.';
+      const cancel = document.createElement('button'); cancel.textContent = '취소'; cancel.onclick = close;
+      const ok = document.createElement('button'); ok.className = 'go'; ok.textContent = '저장';
+      ok.onclick = async () => {
+        const prev = JSON.stringify(cp);
+        cp.words = words; cp.date = date; cp.title = buildTitle(words, date);
+        if(cp.lines && cp.lines[0] && date) cp.lines[0] = cp.lines[0].replace(/^\d{4}/, date.slice(0,4));
+        ok.disabled = true; msg.textContent = '저장하는 중…';
+        try { await saveCaps(); close(); files.sort(byDate); const grid = $('grid'); grid.innerHTML = ''; files.forEach((g, i) => grid.appendChild(card(g, i))); say('Saved title: ' + cp.title); }
+        catch(e){ Object.assign(cp, JSON.parse(prev)); ok.disabled = false; msg.textContent = '저장 실패: ' + (e.message || e); }
+      };
+      ft.appendChild(msg); ft.appendChild(cancel); ft.appendChild(ok);
+      box.appendChild(ft);
+    }
+    draw();
+    document.body.appendChild(back);
   }
 
   // 다른 탭에서 마스터를 풀거나 설정을 바꾸면 여기도 따라간다.
