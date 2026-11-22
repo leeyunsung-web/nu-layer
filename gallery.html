@@ -91,6 +91,11 @@
   .tm .words button span{color:var(--sub);font-size:12px}
   .tm .words .own{display:flex;gap:6px;padding:8px 6px}
   .tm .words .own input{flex:1;font-size:13px;padding:5px 7px;border:1px solid var(--border);border-radius:6px}
+  .tm .chk{padding:10px 18px;border-bottom:1px solid var(--soft);font-size:12px;line-height:1.55;background:#fbfbfb}
+  .tm .chk h4{margin:0 0 4px;font-size:11px;letter-spacing:.5px;color:var(--sub);font-weight:600}
+  .tm .chk div{display:flex;gap:6px}
+  .tm .chk .ok{color:#1f7a3a}.tm .chk .warn{color:#b26a00}.tm .chk .bad{color:var(--red)}
+  .tm .chk .read{color:var(--sub);margin-top:4px}
   .tm footer{padding:12px 18px;border-top:1px solid var(--soft);display:flex;gap:8px;align-items:center}
   .tm footer .msg{font-size:11px;color:var(--sub);flex:1}
   .tm footer button{font-family:var(--mono);font-size:11px;border:1px solid var(--ink);border-radius:8px;padding:6px 12px;cursor:pointer;background:#fff}
@@ -118,7 +123,7 @@
 <script>
 (function(){
   'use strict';
-  const BUILD = 'g5';
+  const BUILD = 'g6';
   const FOLDER = 'compositions';
   const GH_KEY = 'objet_studio_gh_config';   // 스튜디오와 같은 칸을 쓴다
   const ROLE_KEY = 'nulayer_role';
@@ -483,6 +488,79 @@
     return phrase ? SERIES + ': ' + phrase + (d ? ', ' + d : '') : SERIES + (d ? ' ' + d : '');
   }
 
+
+  // ---- 제목 검증: 말이 되는지(문법) · 작품 제목으로 괜찮은지 (규칙으로 점검) ----
+  // 품사: N 명사, A 꾸미는 말(형용사), R 번호
+  const POS = {Dense:'A',Sparse:'A',Dark:'A',Light:'A',Engraved:'A',Sharp:'A',Soft:'A',Quiet:'A',Violent:'A',Shattered:'A',Broken:'A',
+    Wide:'A',Tall:'A',Floating:'A',Falling:'A',Rising:'A',Turning:'A',I:'R',II:'R',III:'R',IV:'R',V:'R',VI:'R',VII:'R'};
+  const pos = w => POS[w] || (ko(w) ? 'N' : '?');
+  const PLURAL = {Eyes:1,Serpents:1,Shards:1,Fragments:1,Stars:1,Spikes:1,Sparks:1,Rays:1,Bubbles:1,Drops:1,Lines:1,Ruins:1,Debris:1};
+  function checkTitle(words){
+    const out = []; const add = (lv, t) => out.push([lv, t]);
+    if(!words.length){ add('warn','단어가 없으면 "NU-LAYER Study 날짜"만 남아요. 제목으로는 되지만 작품끼리 구별이 어려워요.'); return out; }
+    const J = i => i ? (words[i].join == null ? ' ' : words[i].join) : '';
+    const seen = {};
+    words.forEach((x, i) => {
+      const p = pos(x.w), j = J(i), next = words[i+1], np = next ? pos(next.w) : null, nj = next ? J(i+1) : null;
+      if(seen[x.w.toLowerCase()]) add('bad', '"' + x.w + '"가 두 번 들어갔어요. 하나는 빼세요.');
+      seen[x.w.toLowerCase()] = 1;
+      if(x.w.toLowerCase() === 'study') add('warn', '시리즈 이름에 이미 Study가 있어서 겹쳐요.');
+      // 꾸미는 말은 명사 앞에 붙거나, 쉼표 뒤에서 따로 설명하는 자리에 있어야 한다
+      if(p === 'A'){
+        const before = i > 0 && j === ' ' && pos(words[i-1].w) === 'N';
+        if(before) add('bad', '"' + words[i-1].w + ' ' + x.w + '"는 영어 순서가 어색해요. 꾸미는 말은 앞에: "' + x.w + ' ' + words[i-1].w + '", 또는 쉼표로 따로: "' + words[i-1].w + ', ' + x.w + '"');
+        if(j && j !== ' ' && j !== ', ' && !(next && nj === ' ' && np === 'N')) add('bad', '"' + j.trim() + '" 뒤에는 명사(대상·형태)가 와야 해요. "' + x.w + '" 뒤에 명사를 붙이거나 잇는 방법을 쉼표로 바꾸세요.');
+        if(!next && i > 0 && j === ' ') {}
+      }
+      if(p === 'R'){
+        if(next) add('warn', '번호(' + x.w + ')는 보통 맨 끝에 둬요.');
+        if(i === 0) add('bad', '번호만으로 시작하면 제목이 안 돼요. 앞에 단어를 넣으세요.');
+        if(j && j !== ' ') add('warn', '번호 앞은 "붙여서"로 잇는 게 자연스러워요: "Medusa Burst II"');
+      }
+      if(j === ' in the ' && p === 'A') add('bad', '"in the" 뒤에는 명사가 와야 해요.');
+      if((j === ' and ' || j === ' with ') && p === 'R') add('bad', '"' + j.trim() + '" 뒤에 번호가 오면 말이 안 돼요.');
+    });
+    // 꾸미는 말만 있고 명사가 없음
+    if(!words.some(x => pos(x.w) === 'N' || pos(x.w) === '?')) add('bad', '꾸미는 말만 있고 무엇인지(명사)가 없어요. 대상이나 형태 단어를 하나 넣으세요.');
+    // 명사 + 명사 붙임: 앞 명사가 뒤 명사를 꾸미는 영어식 (Medusa Burst = 메두사의 폭발) — 복수형이 앞에 오면 어색
+    words.forEach((x, i) => { if(i && J(i) === ' ' && pos(words[i-1].w) === 'N' && pos(x.w) === 'N' && PLURAL[words[i-1].w] && !/s$/.test(x.w))
+      add('warn', '"' + words[i-1].w + ' ' + x.w + '"는 앞 단어를 단수로 쓰는 게 자연스러워요 (예: Star ' + x.w + ').'); });
+    // 명사가 세 개 이상 쉼표 없이 줄줄이 붙으면 무엇이 중심인지 흐려진다
+    { let run = 0, start = 0;
+      words.forEach((x, i) => { const p = pos(x.w); if(p === 'N' && (i === 0 || J(i) === ' ')){ if(!run) start = i; run++; } else run = (p === 'N') ? (start = i, 1) : 0;
+        if(run === 3) add('warn', '"' + words.slice(start, i + 1).map(y => y.w).join(' ') + '"처럼 명사가 셋 이상 붙어 있으면 무엇이 중심인지 흐려요. 쉼표나 of · in the 로 나누어 보세요 (예: "' + words[i].w + ' of the ' + words[start].w + '" / "' + words[start].w + ', ' + words.slice(start+1, i+1).map(y => y.w).join(' ') + '").'); }); }
+    // 작품 제목으로서
+    const n = words.length;
+    if(n > 5) add('warn', '단어가 ' + n + '개예요. 작품 제목은 보통 1~4단어가 기억하기 좋아요.');
+    const commas = words.filter((x, i) => J(i) === ', ').length;
+    if(commas >= 3) add('warn', '쉼표로 너무 많이 나열하면 제목보다 설명문처럼 보여요. 핵심 두세 단어만 남겨 보세요.');
+    const tech = words.filter(x => /^(Screentone|Hatching|Engraved|Bold Line|Fine Line|Scribble)$/.test(x.w));
+    if(tech.length && tech.length === n) add('warn', '기법 단어만 있으면 재료 설명처럼 보여요. 대상이나 형태 단어를 함께 넣으면 작품 제목다워져요.');
+    if(!out.some(x => x[0] !== 'ok')) add('ok', '영어 순서와 잇는 말이 자연스러워요. 작품 제목으로 써도 괜찮아요.');
+    else if(!out.some(x => x[0] === 'bad')) out.unshift(['ok', '말은 돼요. 아래는 더 다듬을 수 있는 점이에요.']);
+    if(words.some(x => pos(x.w) === '?')) add('warn', '직접 쓴 단어(' + words.filter(x => pos(x.w) === '?').map(x => x.w).join(', ') + ')는 철자와 뜻을 따로 확인해 주세요.');
+    return out;
+  }
+  // 한국어로 어떻게 읽히는지 (확인용)
+  function readKo(words){
+    // 영어 연결어는 한국어 어순으로 뒤집어 읽는다: A in the B → B 속의 A, A of B → B의 A
+    let acc = '', seg = '';
+    const flush = () => { const t = seg; seg = ''; return t; };
+    let pend = null;
+    words.forEach((x, i) => {
+      const k = ko(x.w) || x.w, j = i ? (x.join == null ? ' ' : x.join) : '';
+      if(i === 0 || j === ' '){ seg += (seg ? ' ' : '') + k; return; }
+      const left = (acc ? acc : '') + (pend ? '' : ''), cur = flush();
+      acc = pend ? pend(acc, cur) : (acc ? acc + ' ' : '') + cur;
+      pend = j === ' in the ' ? (a, b) => b + ' 속의 ' + a : j === ' of ' ? (a, b) => b + '의 ' + a : j === ' with ' ? (a, b) => b + '와 함께 있는 ' + a
+           : j === ' and ' ? (a, b) => a + ' 그리고 ' + b : j === ', ' ? (a, b) => a + ', ' + b : (a, b) => a + ' / ' + b;
+      seg = k;
+    });
+    const last = flush();
+    return pend ? pend(acc, last) : (acc ? acc + ' ' : '') + last;
+  }
+
+
   async function saveCaps(){
     const path = FOLDER + '/captions.json';
     const url = 'https://api.github.com/repos/' + cfg.owner + '/' + cfg.repo + '/contents/' + encodeURI(path);
@@ -515,6 +593,14 @@
       pv.textContent = buildTitle(words, date);
       const sm = document.createElement('small'); sm.textContent = words.length ? words.map(w => w.w + (ko(w.w) ? ' (' + ko(w.w) + ')' : '')).join(' · ') : '아래 + 를 눌러 단어를 고르세요';
       pv.appendChild(sm); box.appendChild(pv);
+      const ck = document.createElement('div'); ck.className = 'chk';
+      ck.innerHTML = '<h4>검증 · 말이 되는지 / 작품 제목으로 괜찮은지</h4>';
+      for(const [lv, t] of checkTitle(words)){
+        const d = document.createElement('div'); d.className = lv;
+        d.textContent = (lv === 'ok' ? '✓ ' : lv === 'warn' ? '△ ' : '✕ ') + t; ck.appendChild(d);
+      }
+      if(words.length){ const r = document.createElement('div'); r.className = 'read'; r.textContent = '읽히는 뜻: ' + readKo(words); ck.appendChild(r); }
+      box.appendChild(ck);
       const bd = document.createElement('div'); bd.className = 'tbuild';
       const fx = document.createElement('span'); fx.className = 'fixed'; fx.textContent = SERIES + ':'; bd.appendChild(fx);
       words.forEach((w, i) => {
