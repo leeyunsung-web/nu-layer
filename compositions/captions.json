@@ -280,13 +280,27 @@
   ]
  },
  "compositions/NU-LAYER Study/nu-layer-study_20261110.webp": {
-  "title": "NU-LAYER Study 20261110",
+  "title": "NU-LAYER Study: Manga Cut Mouth Face, 20261110",
   "date": "2026-11-10",
   "lines": [
    "2026 · Ink on paper (pen plotter drawing)",
    "42 × 29.7 cm (A3 sheet) · Unique",
    "Front: signed and dated “Lee Yunsung 2026”, lower right",
    "Back: title, medium, dimensions and signature"
+  ],
+  "words": [
+   {
+    "w": "Manga Cut",
+    "join": " "
+   },
+   {
+    "w": "Mouth",
+    "join": " "
+   },
+   {
+    "w": "Face",
+    "join": " "
+   }
   ]
  }
 }
